@@ -1,5 +1,5 @@
 # Thesis: e-Tire Management System
-Technological 
+*(Technological University of the Philippines - Manila)*
 
 ## 📖 About the project
 This is a web application developed as part of our Capstone 1 & 2. 
