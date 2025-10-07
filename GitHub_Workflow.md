@@ -44,6 +44,7 @@ Typical Flow Summary
 How to: 
 
 1. Commmitting and Pushing to a Branch
+
 A. Switch to a branch 
     
     If working on a feature: 
@@ -63,6 +64,7 @@ D. Push to the branch
     git push origin feature/new-feature
 
 2. Merging Branches
+
 A. Merge feature branch into dev 
 Once feature is done and pushed: 
 
