@@ -1,3 +1,4 @@
+```
                          ┌───────────────────────────────┐
                          │         MAIN BRANCH           │
                          │  - Stable production code     │
@@ -35,7 +36,7 @@
           │          MAIN              │
           │   (Stable release ready)   │
           └────────────────────────────┘
-
+```
 Typical Flow Summary
 (feature) → dev → main
 (hotfix) → main + dev
