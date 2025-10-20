@@ -3,15 +3,19 @@
 
 ## 📖 About the project
 This is a web application developed as part of our Capstone 1 & 2. 
-The system digitalizes and automates QUEEN.R Tire Supplies & Vulcanizing Shop operations such as inventory tracking, sales & services recording, and financial monitoring. 
+The system digitalizes and automates Queen.R Tire Supply & Vulcanizing Shop operations such as inventory tracking, sales & services recording, and financial monitoring. 
 
 **Key Features:** 
-- Role-Based Access Contro (Admin/Owner, Employee)
+- Role-Based Access Contro (Admin, Branch Manager, Employee, Guest)
 - Dashboard
-- Financial Management
 - Inventory Management
-- Sales & Services
-- Supplier Contact List
+- Point-of-Sales
+- Service Management
+- Supplier Management & Purchase Order
+- Branch Management
+- Customer Management
+- Data Backup & Import
+- Admin Panel (Admins Only)
 
 ## Tech Stack
 - **Frontend:** HTML & CSS, TypeScript, Next.js, Tailwind CSS
