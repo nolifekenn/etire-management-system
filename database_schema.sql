@@ -5,38 +5,7 @@
 -- Enable UUID extension if not already enabled
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Users table with branch support (create if not exists)
-CREATE TABLE IF NOT EXISTS public.users (
-  user_id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  name character varying NOT NULL,
-  role integer NOT NULL DEFAULT 0 CHECK (role = ANY (ARRAY[0, 1, 2, 3])),
-  username character varying NOT NULL UNIQUE,
-  password character varying NOT NULL,
-  branch_id uuid,
-  is_active boolean DEFAULT true,
-  created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-  updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT users_pkey PRIMARY KEY (user_id),
-  CONSTRAINT users_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(branch_id)
-);
-
--- Add missing columns to existing users table
-ALTER TABLE public.users 
-ADD COLUMN IF NOT EXISTS branch_id uuid,
-ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true;
-
--- Add foreign key constraint for branch_id
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints 
-                 WHERE constraint_name = 'users_branch_id_fkey' 
-                 AND table_name = 'users') THEN
-    ALTER TABLE public.users 
-    ADD CONSTRAINT users_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(branch_id);
-  END IF;
-END $$;
-
--- Branch Management
+-- STEP 1: Create branches table FIRST (without manager_id foreign key)
 CREATE TABLE IF NOT EXISTS public.branches (
   branch_id uuid NOT NULL DEFAULT uuid_generate_v4(),
   name character varying NOT NULL,
@@ -47,9 +16,53 @@ CREATE TABLE IF NOT EXISTS public.branches (
   is_active boolean DEFAULT true,
   created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT branches_pkey PRIMARY KEY (branch_id),
-  CONSTRAINT branches_manager_id_fkey FOREIGN KEY (manager_id) REFERENCES public.users(user_id)
+  CONSTRAINT branches_pkey PRIMARY KEY (branch_id)
 );
+
+-- STEP 2: Create users table (now branches exists)
+CREATE TABLE IF NOT EXISTS public.users (
+  user_id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  auth_id uuid, -- Add this column for Supabase Auth integration
+  name character varying NOT NULL,
+  role integer NOT NULL DEFAULT 0 CHECK (role = ANY (ARRAY[0, 1, 2, 3])),
+  username character varying NOT NULL UNIQUE,
+  password character varying NOT NULL,
+  branch_id uuid,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT users_pkey PRIMARY KEY (user_id),
+  CONSTRAINT users_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(branch_id),
+  CONSTRAINT users_auth_id_unique UNIQUE (auth_id)
+);
+
+-- Add missing columns to existing users table
+ALTER TABLE public.users 
+ADD COLUMN IF NOT EXISTS auth_id uuid,
+ADD COLUMN IF NOT EXISTS branch_id uuid,
+ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true;
+
+-- Add unique constraint on auth_id if it doesn't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints 
+                 WHERE constraint_name = 'users_auth_id_unique' 
+                 AND table_name = 'users') THEN
+    ALTER TABLE public.users 
+    ADD CONSTRAINT users_auth_id_unique UNIQUE (auth_id);
+  END IF;
+END $$;
+-- STEP 3: NOW add the foreign key constraint to branches for manager_id
+ALTER TABLE public.branches
+DROP CONSTRAINT IF EXISTS branches_manager_id_fkey;
+
+ALTER TABLE public.branches
+ADD CONSTRAINT branches_manager_id_fkey FOREIGN KEY (manager_id) REFERENCES public.users(user_id);
+
+-- Add missing columns to existing users table
+ALTER TABLE public.users 
+ADD COLUMN IF NOT EXISTS branch_id uuid,
+ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true;
 
 -- Suppliers
 CREATE TABLE IF NOT EXISTS public.suppliers (
@@ -137,12 +150,10 @@ BEGIN
   END IF;
 END $$;
 
--- Sales will be created as a view instead of a table
-
 -- Sale Items (enhanced to include sale metadata)
 CREATE TABLE IF NOT EXISTS public.sale_items (
   sale_item_id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  sale_id uuid NOT NULL, -- This will be a generated UUID for grouping items
+  sale_id uuid NOT NULL,
   user_id uuid NOT NULL,
   customer_id uuid,
   branch_id uuid,
@@ -225,7 +236,7 @@ CREATE TABLE IF NOT EXISTS public.service_jobs (
 -- Enhanced Receipts
 CREATE TABLE IF NOT EXISTS public.receipts (
   receipt_id uuid NOT NULL DEFAULT uuid_generate_v4(),
-  sale_id uuid, -- This will reference the sale_id from sale_items (for grouping)
+  sale_id uuid,
   job_id uuid,
   user_id uuid NOT NULL,
   receipt_date timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
@@ -356,9 +367,9 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
 );
 
 -- Sales View (aggregated from sale_items)
--- First drop the existing sales table, then create as view
-DROP TABLE IF EXISTS sales CASCADE;
-CREATE VIEW sales AS
+-- First drop the existing sales view, then create as view
+DROP VIEW IF EXISTS sales CASCADE;  -- Change this line to drop the view
+CREATE OR REPLACE VIEW sales AS
 SELECT 
   sale_id,
   user_id,
@@ -376,7 +387,7 @@ GROUP BY sale_id, user_id, customer_id, branch_id, sale_date, payment_method;
 
 -- Views for reporting (drop and recreate to handle column changes)
 DROP VIEW IF EXISTS daily_sales_report;
-CREATE VIEW daily_sales_report AS
+CREATE OR REPLACE VIEW daily_sales_report AS
 SELECT 
   DATE(sale_date) as sale_date,
   COUNT(DISTINCT sale_id) as total_transactions,
@@ -387,7 +398,7 @@ GROUP BY DATE(sale_date)
 ORDER BY sale_date DESC;
 
 DROP VIEW IF EXISTS low_stock_products;
-CREATE VIEW low_stock_products AS
+CREATE OR REPLACE VIEW low_stock_products AS
 SELECT 
   item_id,
   name,
@@ -439,3 +450,30 @@ WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE key = 'company_address');
 INSERT INTO system_settings (key, value, description) 
 SELECT 'company_phone', '+1-555-0101', 'Company phone for receipts'
 WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE key = 'company_phone');
+
+-- 1. Enable RLS on users table
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+
+-- 2. Drop existing policies if any
+DROP POLICY IF EXISTS "Allow public user registration" ON public.users;
+DROP POLICY IF EXISTS "Users can read own data" ON public.users;
+DROP POLICY IF EXISTS "Service role has full access" ON public.users;
+
+-- 3. Allow anyone to insert new users (for registration)
+CREATE POLICY "Allow public user registration"
+ON public.users
+FOR INSERT
+WITH CHECK (true);
+
+-- 4. Allow users to read their own data
+CREATE POLICY "Users can read own data"
+ON public.users
+FOR SELECT
+USING (auth.uid() = auth_id OR auth.role() = 'authenticated');
+
+-- 5. Allow service role full access (for admin operations)
+CREATE POLICY "Service role has full access"
+ON public.users
+FOR ALL
+USING (auth.role() = 'service_role')
+WITH CHECK (auth.role() = 'service_role');

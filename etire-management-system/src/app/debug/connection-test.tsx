@@ -32,24 +32,24 @@ export default function ConnectionTest() {
 
         if (supabase) {
             try {
-                // Test 3: Basic connection with a simple query
+                // Test 3: Basic connection with system_settings
                 console.log('Testing basic connection...');
-                const { data: connectionData, error: connectionError } = await supabase
-                    .from('user')
-                    .select('count')
+                const { data: settingsData, error: settingsError } = await supabase
+                    .from('system_settings')
+                    .select('*')
                     .limit(1);
                 
                 testResults.basicConnection = {
-                    success: !connectionError,
-                    error: connectionError?.message || null,
-                    data: connectionData
+                    success: !settingsError,
+                    error: settingsError?.message || null,
+                    data: settingsData
                 };
 
-                // Test 4: Try to fetch actual users
-                console.log('Testing user fetch...');
+                // Test 4: Try to fetch users from correct table
+                console.log('Testing users table...');
                 const { data: usersData, error: usersError } = await supabase
-                    .from('user')
-                    .select('user_id, name, username, role')
+                    .from('users')
+                    .select('user_id, username, full_name, role')
                     .limit(3);
                 
                 testResults.userFetch = {
@@ -59,17 +59,32 @@ export default function ConnectionTest() {
                     data: usersData
                 };
 
-                // Test 5: Check if the old 'user' table exists (should fail)
-                console.log('Testing old table name...');
-                const { data: oldTableData, error: oldTableError } = await supabase
-                    .from('user')
-                    .select('count')
-                    .limit(1);
+                // Test 5: Try to fetch branches
+                console.log('Testing branches table...');
+                const { data: branchesData, error: branchesError } = await supabase
+                    .from('branches')
+                    .select('branch_id, branch_name, is_active')
+                    .limit(3);
                 
-                testResults.oldTableTest = {
-                    success: !oldTableError,
-                    error: oldTableError?.message || null,
-                    data: oldTableData
+                testResults.branchesFetch = {
+                    success: !branchesError,
+                    error: branchesError?.message || null,
+                    count: branchesData?.length || 0,
+                    data: branchesData
+                };
+
+                // Test 6: Try to fetch inventory
+                console.log('Testing inventory table...');
+                const { data: inventoryData, error: inventoryError } = await supabase
+                    .from('inventory')
+                    .select('item_id, item_name, quantity')
+                    .limit(3);
+                
+                testResults.inventoryFetch = {
+                    success: !inventoryError,
+                    error: inventoryError?.message || null,
+                    count: inventoryData?.length || 0,
+                    data: inventoryData
                 };
 
             } catch (error) {
@@ -103,7 +118,7 @@ export default function ConnectionTest() {
             <Card>
                 <CardHeader>
                     <CardTitle>Database Connection Diagnostic</CardTitle>
-                    <CardDescription>Test database connection and identify issues</CardDescription>
+                    <CardDescription>Test database connection and core tables</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Button onClick={runConnectionTest} disabled={isLoading}>
@@ -132,9 +147,9 @@ export default function ConnectionTest() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-2">
-                            <p>Supabase URL: {results.envVars.supabaseUrl ? 'Set' : 'Missing'}</p>
-                            <p>Supabase Key: {results.envVars.supabaseKey ? 'Set' : 'Missing'}</p>
-                            <p>URL: {results.envVars.urlValue}</p>
+                            <p>Supabase URL: {results.envVars.supabaseUrl ? '✅ Set' : '❌ Missing'}</p>
+                            <p>Supabase Key: {results.envVars.supabaseKey ? '✅ Set' : '❌ Missing'}</p>
+                            <p className="text-xs text-muted-foreground">URL: {results.envVars.urlValue}</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -149,10 +164,7 @@ export default function ConnectionTest() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-2">
-                            <p>Available: {results.supabaseClient.available ? 'Yes' : 'No'}</p>
-                            <p>Type: {results.supabaseClient.type}</p>
-                        </div>
+                        <p>Available: {results.supabaseClient.available ? '✅ Yes' : '❌ No'}</p>
                     </CardContent>
                 </Card>
             )}
@@ -162,7 +174,7 @@ export default function ConnectionTest() {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             {getStatusIcon(results.basicConnection.success)}
-                            Basic Connection Test
+                            Basic Connection (system_settings)
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -185,50 +197,91 @@ export default function ConnectionTest() {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             {getStatusIcon(results.userFetch.success)}
-                            User Fetch Test
+                            Users Table
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-2">
                             {getStatusBadge(results.userFetch.success)}
-                            <p>Users found: {results.userFetch.count}</p>
+                            <p>Records found: {results.userFetch.count}</p>
                             {results.userFetch.error && (
                                 <Alert variant="destructive">
                                     <AlertTriangle className="h-4 w-4" />
-                                    <AlertTitle>User Fetch Error</AlertTitle>
+                                    <AlertTitle>Users Table Error</AlertTitle>
                                     <AlertDescription>{results.userFetch.error}</AlertDescription>
                                 </Alert>
                             )}
                             {results.userFetch.data && results.userFetch.data.length > 0 && (
-                                <div>
-                                    <p className="font-medium">Sample users:</p>
-                                    <pre className="bg-gray-100 p-2 rounded text-sm overflow-auto">
+                                <details>
+                                    <summary className="cursor-pointer font-medium">View sample data</summary>
+                                    <pre className="bg-muted p-2 rounded text-xs overflow-auto mt-2">
                                         {JSON.stringify(results.userFetch.data, null, 2)}
                                     </pre>
-                                </div>
+                                </details>
                             )}
                         </div>
                     </CardContent>
                 </Card>
             )}
 
-            {results.oldTableTest && (
+            {results.branchesFetch && (
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                            {getStatusIcon(!results.oldTableTest.success)}
-                            Old Table Name Test
+                            {getStatusIcon(results.branchesFetch.success)}
+                            Branches Table
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-2">
-                            <Badge variant={!results.oldTableTest.success ? "default" : "destructive"} 
-                                   className={!results.oldTableTest.success ? "bg-green-600" : ""}>
-                                {!results.oldTableTest.success ? 'Correctly Failed' : 'Unexpectedly Succeeded'}
-                            </Badge>
-                            <p>Testing old 'user' table (should fail):</p>
-                            {results.oldTableTest.error && (
-                                <p className="text-sm text-gray-600">Error: {results.oldTableTest.error}</p>
+                            {getStatusBadge(results.branchesFetch.success)}
+                            <p>Records found: {results.branchesFetch.count}</p>
+                            {results.branchesFetch.error && (
+                                <Alert variant="destructive">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    <AlertTitle>Branches Table Error</AlertTitle>
+                                    <AlertDescription>{results.branchesFetch.error}</AlertDescription>
+                                </Alert>
+                            )}
+                            {results.branchesFetch.data && results.branchesFetch.data.length > 0 && (
+                                <details>
+                                    <summary className="cursor-pointer font-medium">View sample data</summary>
+                                    <pre className="bg-muted p-2 rounded text-xs overflow-auto mt-2">
+                                        {JSON.stringify(results.branchesFetch.data, null, 2)}
+                                    </pre>
+                                </details>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {results.inventoryFetch && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            {getStatusIcon(results.inventoryFetch.success)}
+                            Inventory Table
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-2">
+                            {getStatusBadge(results.inventoryFetch.success)}
+                            <p>Records found: {results.inventoryFetch.count}</p>
+                            {results.inventoryFetch.error && (
+                                <Alert variant="destructive">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    <AlertTitle>Inventory Table Error</AlertTitle>
+                                    <AlertDescription>{results.inventoryFetch.error}</AlertDescription>
+                                </Alert>
+                            )}
+                            {results.inventoryFetch.data && results.inventoryFetch.data.length > 0 && (
+                                <details>
+                                    <summary className="cursor-pointer font-medium">View sample data</summary>
+                                    <pre className="bg-muted p-2 rounded text-xs overflow-auto mt-2">
+                                        {JSON.stringify(results.inventoryFetch.data, null, 2)}
+                                    </pre>
+                                </details>
                             )}
                         </div>
                     </CardContent>

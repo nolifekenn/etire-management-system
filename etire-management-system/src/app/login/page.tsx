@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -40,83 +39,224 @@ export default function LoginPage() {
     const [showRegisterPassword, setShowRegisterPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+    // Replace handleRegister and handleLogin functions
+    
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         setRegistrationError(null);
+        
         if (!loginUsername || !loginPassword) {
             toast({ title: 'Error', description: 'Username and password are required.', variant: 'destructive' });
             setIsLoading(false);
             return;
         }
-
+    
         try {
-            const success = await login(loginUsername, loginPassword);
-            if (success) {
-                toast({ title: 'Success', description: 'Logged in successfully!' });
-                router.push('/dashboard');
-            } else {
-                toast({ title: 'Login Failed', description: 'Invalid username or password.', variant: 'destructive' });
+            console.log('Attempting login for username:', loginUsername);
+            
+            // Step 1: Find user in database by username
+            const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('*')
+                .eq('username', loginUsername)
+                .single();
+    
+            if (userError || !userData) {
+                console.error('User not found:', userError);
+                throw new Error('Invalid username or password');
             }
+    
+            console.log('User found:', userData);
+    
+            // Step 2: Sign in with auth_id if exists, otherwise use email
+            const email = userData.email || `${loginUsername}@etire.com`;
+            
+            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+                email: email,
+                password: loginPassword,
+            });
+    
+            if (authError) {
+                console.error('Login auth error:', authError);
+                throw new Error('Invalid username or password');
+            }
+    
+            console.log('Login successful:', userData);
+    
+            // Store user data in localStorage
+            localStorage.setItem('user', JSON.stringify(userData));
+    
+            toast({ title: 'Success', description: 'Logged in successfully!' });
+            router.push('/dashboard');
+    
         } catch (error: any) {
-            toast({ title: 'Login Error', description: error.message, variant: 'destructive' });
+            console.error('Login error:', error);
+            toast({ 
+                title: 'Login Failed', 
+                description: error.message || 'Invalid username or password.', 
+                variant: 'destructive' 
+            });
         } finally {
             setIsLoading(false);
         }
     };
-
+    
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         setRegistrationError(null);
+        
         if (registerPassword !== confirmPassword) {
             toast({ title: 'Error', description: 'Passwords do not match.', variant: 'destructive' });
             return;
         }
+        
+        if (registerPassword.length < 6) {
+            toast({ title: 'Error', description: 'Password must be at least 6 characters long.', variant: 'destructive' });
+            return;
+        }
+        
         if (!firstName || !lastName || !registerUsername || !registerPassword) {
-             toast({ title: 'Error', description: 'All fields are required.', variant: 'destructive' });
+            toast({ title: 'Error', description: 'All fields are required.', variant: 'destructive' });
             return;
         }
         
         setIsLoading(true);
-
-        if (!supabase) {
-             toast({ title: 'Configuration Error', description: "Database client is not available. Please check your environment configuration.", variant: 'destructive' });
-             setIsLoading(false);
-             return;
-        }
-
-        const { data, error } = await supabase.from('user').insert({
-            name: `${firstName} ${lastName}`,
-            username: registerUsername,
-            password: registerPassword, 
-            role: 0 // Default role is Guest
-        }).select().single();
-
-        if (error) {
-             if (error.message.includes('infinite recursion') || error.message.includes('policy')) {
-                setRegistrationError(`Database Security Policy Error: ${error.message}. This is happening because the policy on your 'user' table is preventing new users from being created. You need a policy that allows anonymous inserts.`);
-             } else if (error.message.includes('unique constraint') || error.code === '23505') {
-                 toast({ title: 'Registration Error', description: 'This username is already taken.', variant: 'destructive' });
-             } else if (error.code === 'PGRST301') {
-                 toast({ title: 'Registration Error', description: 'Database connection failed. Please check your Supabase configuration.', variant: 'destructive' });
-             } else {
-                console.error('Registration error:', error);
-                toast({ title: 'Registration Error', description: error.message || 'An unexpected error occurred during registration.', variant: 'destructive' });
-             }
-        } else if (data) {
-            toast({ title: 'Success', description: 'Registration successful! Please log in.' });
+    
+        try {
+            console.log('Step 1: Checking if username exists...');
+            
+            // Check if username already exists
+            const { data: existingUser } = await supabase
+                .from('users')
+                .select('username')
+                .eq('username', registerUsername)
+                .single();
+    
+            if (existingUser) {
+                throw new Error('Username already taken');
+            }
+    
+            console.log('Step 2: Creating auth user...');
+            
+            // Create Supabase Auth user with auto-generated email
+            const generatedEmail = `${registerUsername}@etire.com`;
+            
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: generatedEmail,
+                password: registerPassword,
+                options: {
+                    data: {
+                        username: registerUsername,
+                        full_name: `${firstName} ${lastName}`
+                    }
+                }
+            });
+    
+            if (authError) {
+                console.error('Auth signup error:', authError);
+                throw authError;
+            }
+    
+            if (!authData.user) {
+                throw new Error('No user data returned from signup');
+            }
+    
+            console.log('Step 3: Auth user created, ID:', authData.user.id);
+            console.log('Step 4: Creating database user record...');
+    
+            // Create user record in users table
+            const newUser = {
+                auth_id: authData.user.id,
+                username: registerUsername,
+                email: generatedEmail,
+                full_name: `${firstName} ${lastName}`,
+                role: 1, // Default role (1 = cashier)
+                is_active: true,
+            };
+    
+            console.log('Inserting user:', newUser);
+    
+            const { data: userData, error: userError } = await supabase
+                .from('users')
+                .insert(newUser)
+                .select()
+                .single();
+    
+            if (userError) {
+                console.error('User table insert error:', userError);
+                
+                // Cleanup: Try to delete the auth user if database insert fails
+                try {
+                    await supabase.auth.admin.deleteUser(authData.user.id);
+                } catch (cleanupError) {
+                    console.error('Failed to cleanup auth user:', cleanupError);
+                }
+                
+                throw userError;
+            }
+    
+            console.log('Step 5: Registration successful!', userData);
+    
+            toast({ 
+                title: 'Success', 
+                description: 'Registration successful! You can now log in.' 
+            });
+            
             setActiveTab("login");
+            
             // Clear registration form
             setFirstName('');
             setLastName('');
             setRegisterUsername('');
             setRegisterPassword('');
             setConfirmPassword('');
+    
+        } catch (error: any) {
+            console.error('Full registration error:', error);
+            console.error('Error details:', {
+                message: error?.message,
+                details: error?.details,
+                hint: error?.hint,
+                code: error?.code,
+            });
+    
+            if (error?.message?.includes('Username already taken')) {
+                toast({
+                    title: 'Registration Error',
+                    description: 'This username is already taken.',
+                    variant: 'destructive',
+                });
+            } else if (error?.message?.includes('duplicate') || error?.code === '23505') {
+                toast({
+                    title: 'Registration Error',
+                    description: 'This username is already taken.',
+                    variant: 'destructive',
+                });
+            } else if (error?.message?.includes('User already registered')) {
+                toast({
+                    title: 'Registration Error',
+                    description: 'An account already exists with this information.',
+                    variant: 'destructive',
+                });
+            } else if (error?.code === '42P01') {
+                setRegistrationError(`Table not found: ${error.message}. Please ensure your database schema is properly set up.`);
+            } else if (error?.message?.includes('policy') || error?.message?.includes('permission')) {
+                setRegistrationError(
+                    `Database Security Policy Error: ${error.message}. ` +
+                    `Row Level Security is blocking user creation. Please check your RLS policies.`
+                );
+            } else {
+                toast({
+                    title: 'Registration Error',
+                    description: error?.message || 'An unexpected error occurred during registration.',
+                    variant: 'destructive',
+                });
+            }
+        } finally {
+            setIsLoading(false);
         }
-        
-        setIsLoading(false);
     };
-
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-background">
       <div className="flex items-center gap-3 mb-8">
@@ -195,23 +335,34 @@ export default function LoginPage() {
                         <AlertDescription>
                             {registrationError}
                             <p className="font-bold mt-4">How to fix:</p>
-                            <p>Run the following SQL in your Supabase SQL Editor. It will allow anyone to create an account, and allow logged-in users to read from the users table (which is needed for other parts of the app). After running, try registering again.</p>
+                            <p>Run the following SQL in your Supabase SQL Editor:</p>
                             <pre className="mt-2 p-2 bg-gray-800 text-white rounded-md text-xs whitespace-pre-wrap">
-{`-- This script allows anonymous inserts and authenticated reads on the 'users' table.
-DROP POLICY IF EXISTS "Allow anonymous insert on users" ON public.users;
-DROP POLICY IF EXISTS "Allow authenticated read access on users" ON public.users;
+{`-- Enable RLS on users table
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
--- 1. Policy to allow anyone to create a user (for registration)
-CREATE POLICY "Allow anonymous insert on users"
+-- Drop existing policies if any
+DROP POLICY IF EXISTS "Allow public user registration" ON public.users;
+DROP POLICY IF EXISTS "Users can read own data" ON public.users;
+DROP POLICY IF EXISTS "Service role has full access" ON public.users;
+
+-- Allow anyone to insert new users (for registration)
+CREATE POLICY "Allow public user registration"
 ON public.users
 FOR INSERT
 WITH CHECK (true);
 
--- 2. Policy to allow logged-in users to read the user list
-CREATE POLICY "Allow authenticated read access on users"
+-- Allow users to read their own data
+CREATE POLICY "Users can read own data"
 ON public.users
 FOR SELECT
-USING (auth.role() = 'authenticated');`}
+USING (auth.uid() = auth_id OR auth.role() = 'authenticated');
+
+-- Allow service role full access (for admin operations)
+CREATE POLICY "Service role has full access"
+ON public.users
+FOR ALL
+USING (auth.role() = 'service_role')
+WITH CHECK (auth.role() = 'service_role');`}
                             </pre>
                         </AlertDescription>
                     </Alert>
@@ -294,4 +445,3 @@ USING (auth.role() = 'authenticated');`}
     </main>
   );
 }
-    
