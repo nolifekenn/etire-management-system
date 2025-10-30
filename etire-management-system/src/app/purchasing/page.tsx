@@ -102,19 +102,21 @@ export default function PurchasingPage() {
     const [poNotes, setPONotes] = useState('');
 
     const fetchSuppliers = useCallback(async () => {
-        if (!supabase) return;
         setIsSupplierLoading(true);
-        const { data, error } = await supabase
-            .from('suppliers')
-            .select('*')
-            .order('name', { ascending: true });
-
-        if (error) {
-            setSupplierError(`Could not fetch suppliers: ${error.message}`);
+        try {
+            const res = await fetch('/purchasing/api');
+            const data = await res.json();
+            
+            if (!res.ok) {
+                setSupplierError(data.error?.message || 'Failed to fetch suppliers');
+                setSuppliers([]);
+            } else {
+                setSuppliers(data);
+                setSupplierError(null);
+            }
+        } catch (error) {
+            setSupplierError('Network error');
             setSuppliers([]);
-        } else {
-            setSuppliers(data as Supplier[]);
-            setSupplierError(null);
         }
         setIsSupplierLoading(false);
     }, []);
@@ -215,14 +217,14 @@ export default function PurchasingPage() {
     };
 
     const handleSubmitSupplier = async () => {
-        if (!supabase || !authUser) return;
+        if (!authUser) return;
         if (!supplierName) {
             toast({ title: "Validation Error", description: "Supplier name is required.", variant: "destructive" });
             return;
         }
-
+    
         setIsSupplierLoading(true);
-
+    
         const supplierData = {
             name: supplierName,
             contact_person: contactPerson || null,
@@ -232,30 +234,34 @@ export default function PurchasingPage() {
             payment_terms: paymentTerms || null,
             is_active: supplierActive,
         };
-
-        let error;
-        if (editingSupplier) {
-            const { error: updateError } = await supabase
-                .from('suppliers')
-                .update(supplierData)
-                .eq('supplier_id', editingSupplier.supplier_id);
-            error = updateError;
-        } else {
-            const { error: insertError } = await supabase
-                .from('suppliers')
-                .insert([supplierData]);
-            error = insertError;
+    
+        try {
+            const method = editingSupplier ? 'PATCH' : 'POST';
+            const body = editingSupplier 
+                ? { supplier_id: editingSupplier.supplier_id, ...supplierData }
+                : supplierData;
+    
+            const res = await fetch('/purchasing/api', {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+    
+            const data = await res.json();
+    
+            if (!res.ok) {
+                toast({ title: "Save Error", description: data.error?.message || 'Failed to save supplier', variant: "destructive" });
+            } else {
+                toast({ title: "Success", description: `Supplier ${editingSupplier ? 'updated' : 'created'} successfully.` });
+                setIsSupplierDialogOpen(false);
+                resetSupplierForm();
+                fetchSuppliers();
+            }
+        } catch (error) {
+            toast({ title: "Error", description: "Network error", variant: "destructive" });
         }
-
+    
         setIsSupplierLoading(false);
-
-        if (error) {
-            toast({ title: "Save Error", description: `Could not save supplier: ${error.message}`, variant: "destructive" });
-        } else {
-            toast({ title: "Success", description: `Supplier ${editingSupplier ? 'updated' : 'created'} successfully.` });
-            setIsSupplierDialogOpen(false);
-            fetchSuppliers();
-        }
     };
 
     const handleSubmitPO = async () => {
