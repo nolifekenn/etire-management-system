@@ -102,37 +102,41 @@ export default function PurchasingPage() {
     const [poNotes, setPONotes] = useState('');
 
     const fetchSuppliers = useCallback(async () => {
-        if (!supabase) return;
         setIsSupplierLoading(true);
-        const { data, error } = await supabase
-            .from('suppliers')
-            .select('*')
-            .order('name', { ascending: true });
-
-        if (error) {
-            setSupplierError(`Could not fetch suppliers: ${error.message}`);
+        try {
+            const res = await fetch('/purchasing/api');
+            const data = await res.json();
+            
+            if (!res.ok) {
+                setSupplierError(data.error?.message || 'Failed to fetch suppliers');
+                setSuppliers([]);
+            } else {
+                setSuppliers(data);
+                setSupplierError(null);
+            }
+        } catch (error) {
+            setSupplierError('Network error');
             setSuppliers([]);
-        } else {
-            setSuppliers(data as Supplier[]);
-            setSupplierError(null);
         }
         setIsSupplierLoading(false);
     }, []);
 
     const fetchPurchaseOrders = useCallback(async () => {
-        if (!supabase) return;
         setIsPOLoading(true);
-        const { data, error } = await supabase
-            .from('purchase_order')
-            .select('*, supplier(name), branch(name), user(name)')
-            .order('order_date', { ascending: false });
-
-        if (error) {
-            setPOError(`Could not fetch purchase orders: ${error.message}`);
+        try {
+            const res = await fetch('/purchasing/api?type=purchase-orders');
+            const data = await res.json();
+            
+            if (!res.ok) {
+                setPOError(data.error?.message || 'Failed to fetch purchase orders');
+                setPurchaseOrders([]);
+            } else {
+                setPurchaseOrders(data);
+                setPOError(null);
+            }
+        } catch (error) {
+            setPOError('Network error');
             setPurchaseOrders([]);
-        } else {
-            setPurchaseOrders(data as any);
-            setPOError(null);
         }
         setIsPOLoading(false);
     }, []);
@@ -214,107 +218,123 @@ export default function PurchasingPage() {
         setIsDeleteDialogOpen(true);
     };
 
-    const handleSubmitSupplier = async () => {
-        if (!supabase || !authUser) return;
-        if (!supplierName) {
-            toast({ title: "Validation Error", description: "Supplier name is required.", variant: "destructive" });
-            return;
-        }
+const handleSubmitSupplier = async () => {
+    if (!authUser) return;
+    if (!supplierName) {
+        toast({ title: "Validation Error", description: "Supplier name is required.", variant: "destructive" });
+        return;
+    }
 
-        setIsSupplierLoading(true);
+    setIsSupplierLoading(true);
 
-        const supplierData = {
-            name: supplierName,
-            contact_person: contactPerson || null,
-            phone: supplierPhone || null,
-            email: supplierEmail || null,
-            address: supplierAddress || null,
-            payment_terms: paymentTerms || null,
-            is_active: supplierActive,
-        };
+    const supplierData = {
+        name: supplierName,
+        contact_person: contactPerson || null,
+        phone: supplierPhone || null,
+        email: supplierEmail || null,
+        address: supplierAddress || null,
+        payment_terms: paymentTerms || null,
+        is_active: supplierActive,
+    };
 
-        let error;
-        if (editingSupplier) {
-            const { error: updateError } = await supabase
-                .from('suppliers')
-                .update(supplierData)
-                .eq('supplier_id', editingSupplier.supplier_id);
-            error = updateError;
-        } else {
-            const { error: insertError } = await supabase
-                .from('suppliers')
-                .insert([supplierData]);
-            error = insertError;
-        }
+    try {
+        const method = editingSupplier ? 'PATCH' : 'POST';
+        const body = editingSupplier 
+            ? { supplier_id: editingSupplier.supplier_id, ...supplierData }
+            : supplierData;
 
-        setIsSupplierLoading(false);
+        const res = await fetch('/purchasing/api', {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
 
-        if (error) {
-            toast({ title: "Save Error", description: `Could not save supplier: ${error.message}`, variant: "destructive" });
+        const data = await res.json();
+
+        if (!res.ok) {
+            toast({ title: "Save Error", description: data.error?.message || 'Failed to save supplier', variant: "destructive" });
         } else {
             toast({ title: "Success", description: `Supplier ${editingSupplier ? 'updated' : 'created'} successfully.` });
             setIsSupplierDialogOpen(false);
+            resetSupplierForm();
             fetchSuppliers();
         }
+    } catch (error) {
+        toast({ title: "Error", description: "Network error", variant: "destructive" });
+    }
+
+    setIsSupplierLoading(false);
+};
+
+const handleSubmitPO = async () => {
+    if (!authUser) return;
+    if (!poNumber || !selectedSupplier || !selectedBranch) {
+        toast({ title: "Validation Error", description: "PO Number, Supplier, and Branch are required.", variant: "destructive" });
+        return;
+    }
+
+    setIsPOLoading(true);
+
+    const poData = {
+        po_number: poNumber,
+        supplier_id: selectedSupplier,
+        branch_id: selectedBranch,
+        user_id: authUser.user_id,
+        expected_delivery_date: expectedDelivery || null,
+        notes: poNotes || null,
+        // REMOVE total_amount: 0 - column doesn't exist
     };
 
-    const handleSubmitPO = async () => {
-        if (!supabase || !authUser) return;
-        if (!poNumber || !selectedSupplier || !selectedBranch) {
-            toast({ title: "Validation Error", description: "PO Number, Supplier, and Branch are required.", variant: "destructive" });
-            return;
-        }
+    try {
+        const method = editingPO ? 'PATCH' : 'POST';
+        const body = editingPO 
+            ? { po_id: editingPO.po_id, ...poData }
+            : poData;
 
-        setIsPOLoading(true);
+        const res = await fetch('/purchasing/api?type=purchase-orders', {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
 
-        const poData = {
-            po_number: poNumber,
-            supplier_id: selectedSupplier,
-            branch_id: selectedBranch,
-            user_id: authUser.user_id,
-            expected_delivery_date: expectedDelivery || null,
-            notes: poNotes || null,
-            total_amount: 0, // Will be calculated when items are added
-        };
+        const data = await res.json();
 
-        let error;
-        if (editingPO) {
-            const { error: updateError } = await supabase
-                .from('purchase_order')
-                .update(poData)
-                .eq('po_id', editingPO.po_id);
-            error = updateError;
-        } else {
-            const { error: insertError } = await supabase
-                .from('purchase_order')
-                .insert([poData]);
-            error = insertError;
-        }
-
-        setIsPOLoading(false);
-
-        if (error) {
-            toast({ title: "Save Error", description: `Could not save purchase order: ${error.message}`, variant: "destructive" });
+        if (!res.ok) {
+            toast({ title: "Save Error", description: data.error?.message || 'Failed to save purchase order', variant: "destructive" });
         } else {
             toast({ title: "Success", description: `Purchase order ${editingPO ? 'updated' : 'created'} successfully.` });
             setIsPODialogOpen(false);
+            resetPOForm();
             fetchPurchaseOrders();
         }
-    };
+    } catch (error) {
+        toast({ title: "Error", description: "Network error", variant: "destructive" });
+    }
 
-    const handleDelete = async () => {
-        if (!deletingItem || !supabase) return;
-        
-        const tableName = deletingItem.type === 'supplier' ? 'supplier' : 'purchase_order';
-        const idField = deletingItem.type === 'supplier' ? 'supplier_id' : 'po_id';
-        
-        const { error } = await supabase
-            .from(tableName)
-            .delete()
-            .eq(idField, deletingItem[`${deletingItem.type}_id`]);
+    setIsPOLoading(false);
+};
 
-        if (error) {
-            toast({ title: "Delete Error", description: `Could not delete ${deletingItem.type}: ${error.message}`, variant: "destructive" });
+// Replace handleDelete (around line 295)
+const handleDelete = async () => {
+    if (!deletingItem) return;
+
+    try {
+        let url = '/purchasing/api?';
+        
+        if (deletingItem.type === 'supplier') {
+            url += `supplier_id=${deletingItem.supplier_id}`;
+        } else {
+            url += `type=purchase-orders&po_id=${deletingItem.po_id}`;
+        }
+        
+        const res = await fetch(url, {
+            method: 'DELETE',
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            toast({ title: "Delete Error", description: data.error?.message || 'Failed to delete', variant: "destructive" });
         } else {
             toast({ title: "Success", description: `${deletingItem.type} deleted successfully.` });
             setIsDeleteDialogOpen(false);
@@ -324,7 +344,10 @@ export default function PurchasingPage() {
                 fetchPurchaseOrders();
             }
         }
-    };
+    } catch (error) {
+        toast({ title: "Error", description: "Network error", variant: "destructive" });
+    }
+};
 
     const renderSupplierCell = (item: any, columnKey: string, value: any) => {
         if (columnKey === 'is_active') {
@@ -346,31 +369,31 @@ export default function PurchasingPage() {
         return String(value || '');
     };
 
-    const renderPOCell = (item: any, columnKey: string, value: any) => {
-        if (columnKey === 'supplier_name') {
-            return item.suppliers ? item.suppliers.name : 'Unknown Supplier';
-        }
-        if (columnKey === 'branch_name') {
-            return item.branches ? item.branches.name : 'Unknown Branch';
-        }
-        if (columnKey === 'order_date') {
-            return new Date(value).toLocaleDateString();
-        }
-        if (columnKey === 'total_amount') {
-            return `₱${Number(value).toFixed(2)}`;
-        }
-        if (columnKey === 'status') {
-            const status = value as string;
-            let color = '';
-            if (status === 'pending') color = 'bg-yellow-100 text-yellow-700';
-            if (status === 'approved') color = 'bg-blue-100 text-blue-700';
-            if (status === 'ordered') color = 'bg-purple-100 text-purple-700';
-            if (status === 'delivered') color = 'bg-green-100 text-green-700';
-            if (status === 'cancelled') color = 'bg-red-100 text-red-700';
-            return <Badge className={`capitalize ${color}`}>{status}</Badge>;
-        }
-        return String(value || '');
-    };
+const renderPOCell = (item: any, columnKey: string, value: any) => {
+    if (columnKey === 'supplier_name') {
+        return item.supplier?.name || 'Unknown Supplier';
+    }
+    if (columnKey === 'branch_name') {
+        return item.branch?.name || 'Unknown Branch';
+    }
+    if (columnKey === 'order_date') {
+        return value ? new Date(value).toLocaleDateString() : 'No date';
+    }
+    if (columnKey === 'total_amount') {
+        return `₱${Number(value || 0).toFixed(2)}`;
+    }
+    if (columnKey === 'status') {
+        const status = value as string;
+        let color = '';
+        if (status === 'pending') color = 'bg-yellow-100 text-yellow-700';
+        if (status === 'approved') color = 'bg-blue-100 text-blue-700';
+        if (status === 'ordered') color = 'bg-purple-100 text-purple-700';
+        if (status === 'delivered') color = 'bg-green-100 text-green-700';
+        if (status === 'cancelled') color = 'bg-red-100 text-red-700';
+        return <Badge className={`capitalize ${color}`}>{status || 'pending'}</Badge>;
+    }
+    return String(value || '');
+};
 
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8">
