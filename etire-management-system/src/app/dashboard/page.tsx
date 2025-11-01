@@ -52,64 +52,57 @@ export default function DashboardPage() {
   const [showSecondaryStats, setShowSecondaryStats] = useState(false);
 
   // Enhanced color palette with better contrast
-  const cardColors = {
-    sales: { 
-      background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)', 
-      hover: 'linear-gradient(135deg, #bbf7d0 0%, #86efac 100%)', 
-      glow: 'rgba(34, 197, 94, 0.2)', 
-      icon: '#0f5c2c', 
-      text: '#0f5c2c'  // Darker green for better contrast
-    },
-    inventory: { 
-      background: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)', 
-      hover: 'linear-gradient(135deg, #c7d2fe 0%, #a5b4fc 100%)', 
-      glow: 'rgba(99, 102, 241, 0.2)', 
-      icon: '#3730a3', 
-      text: '#3730a3'  // Darker blue
-    },
-    customers: { 
-      background: 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)', 
-      hover: 'linear-gradient(135deg, #e9d5ff 0%, #d8b4fe 100%)', 
-      glow: 'rgba(168, 85, 247, 0.2)', 
-      icon: '#6b21a8', 
-      text: '#6b21a8'  // Darker purple
-    },
-    jobs: { 
-      background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', 
-      hover: 'linear-gradient(135deg, #fde68a 0%, #fcd34d 100%)', 
-      glow: 'rgba(245, 158, 11, 0.2)', 
-      icon: '#92400e', 
-      text: '#92400e'  // Darker amber
-    },
-    branches: { 
-      background: 'linear-gradient(135deg, #cffafe 0%, #a5f3fc 100%)', 
-      hover: 'linear-gradient(135deg, #a5f3fc 0%, #67e8f9 100%)', 
-      glow: 'rgba(6, 182, 212, 0.2)', 
-      icon: '#0e7490', 
-      text: '#0e7490'  // Darker cyan
-    },
-    suppliers: { 
-      background: 'linear-gradient(135deg, #ccfbf1 0%, #99f6e4 100%)', 
-      hover: 'linear-gradient(135deg, #99f6e4 0%, #5eead4 100%)', 
-      glow: 'rgba(20, 184, 166, 0.2)', 
-      icon: '#0f766e', 
-      text: '#0f766e'  // Darker teal
-    },
-    vehicles: { 
-      background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)', 
-      hover: 'linear-gradient(135deg, #bfdbfe 0%, #93c5fd 100%)', 
-      glow: 'rgba(59, 130, 246, 0.2)', 
-      icon: '#1e40af', 
-      text: '#1e40af'  // Darker blue
-    },
-    notifications: { 
-      background: 'linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%)', 
-      hover: 'linear-gradient(135deg, #fbcfe8 0%, #f9a8d4 100%)', 
-      glow: 'rgba(236, 72, 153, 0.2)', 
-      icon: '#be185d', 
-      text: '#be185d'  // Darker pink
-    }
-  };
+// Green, Teal, Cyan, Blue color palette
+const cardColors = {
+  sales: { 
+    background: '#dcfce7', // green-50
+    hover: '#bbf7d0', // green-100
+    icon: '#15803d', // green-700
+    text: '#15803d'
+  },
+  inventory: { 
+    background: '#ccfbf1', // teal-50
+    hover: '#99f6e4', // teal-100
+    icon: '#0f766e', // teal-700
+    text: '#0f766e'
+  },
+  customers: { 
+    background: '#cffafe', // cyan-50
+    hover: '#a5f3fc', // cyan-100
+    icon: '#0e7490', // cyan-700
+    text: '#0e7490'
+  },
+  jobs: { 
+    background: '#dbeafe', // blue-50
+    hover: '#bfdbfe', // blue-100
+    icon: '#1d4ed8', // blue-700
+    text: '#1d4ed8'
+  },
+  branches: { 
+    background: '#dcfce7', // green-50
+    hover: '#bbf7d0', // green-100
+    icon: '#15803d', // green-700
+    text: '#15803d'
+  },
+  suppliers: { 
+    background: '#ccfbf1', // teal-50
+    hover: '#99f6e4', // teal-100
+    icon: '#0f766e', // teal-700
+    text: '#0f766e'
+  },
+  vehicles: { 
+    background: '#cffafe', // cyan-50
+    hover: '#a5f3fc', // cyan-100
+    icon: '#0e7490', // cyan-700
+    text: '#0e7490'
+  },
+  notifications: { 
+    background: '#dbeafe', // blue-50
+    hover: '#bfdbfe', // blue-100
+    icon: '#1d4ed8', // blue-700
+    text: '#1d4ed8'
+  }
+};
 
     // Quick actions for Hick's Law
     const quickActions = [
@@ -160,320 +153,281 @@ export default function DashboardPage() {
     }
   };
 
-  // Keyboard navigation for accessibility
-  const handleCardKeyPress = (event: React.KeyboardEvent, cardId: string) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      handleCardClick(cardId);
-    }
-  };
+ // Keyboard navigation for accessibility
+const handleCardKeyPress = (event: React.KeyboardEvent, cardId: string) => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    handleCardClick(cardId);
+  }
+};
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+useEffect(() => {
+  setMounted(true);
+}, []);
 
-  // ===== ORIGINAL BACKEND LOGIC - 100% PRESERVED =====
-  const fetchDashboardData = useCallback(async () => {
-    if (!supabase) {
-      setError("Supabase client not available. Check credentials.");
-      setIsLoading(false);
-      return;
-    }
+// ===== ORIGINAL BACKEND LOGIC - 100% PRESERVED =====
+const fetchDashboardData = useCallback(async () => {
+  if (!supabase) {
+    setError("Supabase client not available. Check credentials.");
+    setIsLoading(false);
+    return;
+  }
 
-    if (!user?.user_id) {
-      setIsLoading(false);
-      return;
-    }
+  if (!user?.user_id) {
+    setIsLoading(false);
+    return;
+  }
 
-    setIsLoading(true);
-    setError(null);
-    try {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      
-      // Get sales data for the last 7 days
-      const { data: recentSales, error: salesError } = await supabase
-        .from('sale')
-        .select('sale_date, total_amount')
-        .gte('sale_date', sevenDaysAgo.toISOString())
-        .order('sale_date', { ascending: false });
+  setIsLoading(true);
+  setError(null);
+  try {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    // Get sales data for the last 7 days
+    const { data: recentSales, error: salesError } = await supabase
+      .from('sale')
+      .select('sale_date, total_amount')
+      .gte('sale_date', sevenDaysAgo.toISOString())
+      .order('sale_date', { ascending: false });
 
-      if (salesError) throw new Error(`Could not fetch sales data: ${salesError.message}`);
+    if (salesError) throw new Error(`Could not fetch sales data: ${salesError.message}`);
 
-      // Get inventory count
-      const { count: itemCount, error: itemError } = await supabase
-        .from('inventory_item')
-        .select('*', { count: 'exact', head: true });
-      if (itemError) throw new Error(`Could not count inventory: ${itemError.message}`);
+    // Get inventory count
+    const { count: itemCount, error: itemError } = await supabase
+      .from('inventory_item')
+      .select('*', { count: 'exact', head: true });
+    if (itemError) throw new Error(`Could not count inventory: ${itemError.message}`);
 
-      // Get user count
-      const { count: userCount, error: userError } = await supabase
-        .from('user')
-        .select('*', { count: 'exact', head: true });
-      if (userError) throw new Error(`Could not count users: ${userError.message}`);
+    // Get user count
+    const { count: userCount, error: userError } = await supabase
+      .from('user')
+      .select('*', { count: 'exact', head: true });
+    if (userError) throw new Error(`Could not count users: ${userError.message}`);
 
-      // Get pending service jobs count
-      const { count: jobCount, error: jobError } = await supabase
-        .from('service_job')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-      if (jobError) throw new Error(`Could not count service jobs: ${jobError.message}`);
+    // Get pending service jobs count
+    const { count: jobCount, error: jobError } = await supabase
+      .from('service_job')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+    if (jobError) throw new Error(`Could not count service jobs: ${jobError.message}`);
 
-      // Get additional stats
-      const [branchesRes, suppliersRes, customersRes, vehiclesRes, notificationsRes] = await Promise.all([
-        supabase.from('branch').select('*', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('supplier').select('*', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('customer').select('*', { count: 'exact', head: true }),
-        supabase.from('vehicle').select('*', { count: 'exact', head: true }),
-        supabase.from('notification').select('*', { count: 'exact', head: true }).eq('user_id', user.user_id).eq('is_read', false)
-      ]);
+    // Get additional stats
+    const [branchesRes, suppliersRes, customersRes, vehiclesRes, notificationsRes] = await Promise.all([
+      supabase.from('branch').select('*', { count: 'exact', head: true }).eq('is_active', true),
+      supabase.from('supplier').select('*', { count: 'exact', head: true }).eq('is_active', true),
+      supabase.from('customer').select('*', { count: 'exact', head: true }),
+      supabase.from('vehicle').select('*', { count: 'exact', head: true }),
+      supabase.from('notification').select('*', { count: 'exact', head: true }).eq('user_id', user.user_id).eq('is_read', false)
+    ]);
 
-      // Calculate total sales from recent sales data
-      const totalSales = recentSales?.reduce((acc: number, sale: any) => acc + sale.total_amount, 0) || 0;
+    // Calculate total sales from recent sales data
+    const totalSales = recentSales?.reduce((acc: number, sale: any) => acc + sale.total_amount, 0) || 0;
 
-      setStats({
-        total_sales: totalSales,
-        total_items: itemCount ?? 0,
-        total_customers: customersRes.count ?? 0,
-        pending_jobs: jobCount ?? 0,
-        total_branches: branchesRes.count ?? 0,
-        total_suppliers: suppliersRes.count ?? 0,
-        total_vehicles: vehiclesRes.count ?? 0,
-        unread_notifications: notificationsRes.count ?? 0,
+    setStats({
+      total_sales: totalSales,
+      total_items: itemCount ?? 0,
+      total_customers: customersRes.count ?? 0,
+      pending_jobs: jobCount ?? 0,
+      total_branches: branchesRes.count ?? 0,
+      total_suppliers: suppliersRes.count ?? 0,
+      total_vehicles: vehiclesRes.count ?? 0,
+      unread_notifications: notificationsRes.count ?? 0,
+    });
+
+    // Fetch recent notifications
+    const { data: notificationsData } = await supabase
+      .from('notification')
+      .select('*')
+      .eq('user_id', user.user_id)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    
+    setNotifications(notificationsData || []);
+
+    // Fetch low stock items
+    const { data: lowStockData } = await supabase
+      .from('inventory_item')
+      .select('*')
+      .lte('stock_quantity', 10)
+      .order('stock_quantity', { ascending: true })
+      .limit(10);
+    
+    setLowStockItems(lowStockData || []);
+
+    // Fetch recent sales for detailed view
+    const { data: recentSalesData } = await supabase
+      .from('sale_item')
+      .select(`
+        *,
+        inventory_item (name, category),
+        user (name)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    
+    setRecentSales(recentSalesData || []);
+
+    // Group sales by date and format for chart
+    const salesByDate = new Map();
+    recentSales?.forEach((sale: any) => {
+      const date = new Date(sale.sale_date).toDateString();
+      salesByDate.set(date, (salesByDate.get(date) || 0) + sale.total_amount);
+    });
+
+    // Format data for chart - last 7 days
+    const formattedSales = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateString = date.toDateString();
+      formattedSales.push({
+        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        sales: salesByDate.get(dateString) || 0
       });
-
-      // Fetch recent notifications
-      const { data: notificationsData } = await supabase
-        .from('notification')
-        .select('*')
-        .eq('user_id', user.user_id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      
-      setNotifications(notificationsData || []);
-
-      // Fetch low stock items
-      const { data: lowStockData } = await supabase
-        .from('inventory_item')
-        .select('*')
-        .lte('stock_quantity', 10)
-        .order('stock_quantity', { ascending: true })
-        .limit(10);
-      
-      setLowStockItems(lowStockData || []);
-
-      // Fetch recent sales for detailed view
-      const { data: recentSalesData } = await supabase
-        .from('sale_item')
-        .select(`
-          *,
-          inventory_item (name, category),
-          user (name)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      
-      setRecentSales(recentSalesData || []);
-
-      // Group sales by date and format for chart
-      const salesByDate = new Map();
-      recentSales?.forEach((sale: any) => {
-        const date = new Date(sale.sale_date).toDateString();
-        salesByDate.set(date, (salesByDate.get(date) || 0) + sale.total_amount);
-      });
-
-      // Format data for chart - last 7 days
-      const formattedSales = [];
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dateString = date.toDateString();
-        formattedSales.push({
-          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          sales: salesByDate.get(dateString) || 0
-        });
-      }
-      setSalesData(formattedSales);
-      setLastUpdated(new Date());
-
-    } catch (err: any) {
-      console.error('Dashboard data fetch error:', err);
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
     }
-  }, [user]);
+    setSalesData(formattedSales);
+    setLastUpdated(new Date());
 
-  useEffect(() => {
-    if (user?.user_id) {
-      fetchDashboardData();
-    }
-  }, [fetchDashboardData, user]);
+  } catch (err: any) {
+    console.error('Dashboard data fetch error:', err);
+    setError(err.message);
+  } finally {
+    setIsLoading(false);
+  }
+}, [user]);
 
-  const handleRefresh = () => {
+useEffect(() => {
+  if (user?.user_id) {
     fetchDashboardData();
-  };
+  }
+}, [fetchDashboardData, user]);
 
-  const primaryStats = [
-    { id: 'sales', title: "Total Sales", value: `₱${stats.total_sales.toLocaleString()}`, icon: DollarSign, desc: "Last 7 days", delay: "100", colors: cardColors.sales },
-    { id: 'inventory', title: "Inventory Items", value: stats.total_items.toLocaleString(), icon: Blocks, desc: "In stock", delay: "200", colors: cardColors.inventory },
-    { id: 'customers', title: "Customers", value: stats.total_customers.toLocaleString(), icon: Users, desc: "Registered", delay: "300", colors: cardColors.customers },
-    { id: 'jobs', title: "Pending Jobs", value: stats.pending_jobs.toLocaleString(), icon: Wrench, desc: "Needs attention", delay: "400", colors: cardColors.jobs }
-  ];
+const handleRefresh = () => {
+  fetchDashboardData();
+};
 
-  const secondaryStats = [
-    { id: 'branches', title: "Active Branches", value: stats.total_branches.toLocaleString(), icon: Building2, delay: "100", colors: cardColors.branches },
-    { id: 'suppliers', title: "Suppliers", value: stats.total_suppliers.toLocaleString(), icon: Package, delay: "200", colors: cardColors.suppliers },
-    { id: 'vehicles', title: "Vehicles", value: stats.total_vehicles.toLocaleString(), icon: Car, delay: "300", colors: cardColors.vehicles },
-    { id: 'notifications', title: "Notifications", value: stats.unread_notifications.toLocaleString(), icon: Bell, delay: "400", colors: cardColors.notifications }
-  ];
+const primaryStats = [
+  { id: 'sales', title: "Total Sales", value: `₱${stats.total_sales.toLocaleString()}`, icon: DollarSign, desc: "Last 7 days", delay: "100", colors: cardColors.sales },
+  { id: 'inventory', title: "Inventory Items", value: stats.total_items.toLocaleString(), icon: Blocks, desc: "In stock", delay: "200", colors: cardColors.inventory },
+  { id: 'customers', title: "Customers", value: stats.total_customers.toLocaleString(), icon: Users, desc: "Registered", delay: "300", colors: cardColors.customers },
+  { id: 'jobs', title: "Pending Jobs", value: stats.pending_jobs.toLocaleString(), icon: Wrench, desc: "Needs attention", delay: "400", colors: cardColors.jobs }
+];
 
-  // Focus styles for accessibility
-  const focusStyles = "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2";
+const secondaryStats = [
+  { id: 'branches', title: "Active Branches", value: stats.total_branches.toLocaleString(), icon: Building2, delay: "100", colors: cardColors.branches },
+  { id: 'suppliers', title: "Suppliers", value: stats.total_suppliers.toLocaleString(), icon: Package, delay: "200", colors: cardColors.suppliers },
+  { id: 'vehicles', title: "Vehicles", value: stats.total_vehicles.toLocaleString(), icon: Car, delay: "300", colors: cardColors.vehicles },
+  { id: 'notifications', title: "Notifications", value: stats.unread_notifications.toLocaleString(), icon: Bell, delay: "400", colors: cardColors.notifications }
+];
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 text-slate-800 font-poppins relative overflow-hidden">
-      {/* Dynamic background glow effects */}
-      <div className="absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute left-1/2 top-0 h-[40rem] w-[40rem] -translate-x-1/2 rounded-full bg-gradient-radial from-blue-100/20 to-transparent blur-3xl"></div>
-        <div className="absolute left-1/4 top-1/2 h-[35rem] w-[35rem] -translate-y-1/2 rounded-full bg-gradient-radial from-cyan-100/15 to-transparent blur-3xl"></div>
-        <div className="absolute right-1/4 bottom-0 h-[30rem] w-[30rem] translate-y-1/2 rounded-full bg-gradient-radial from-teal-100/10 to-transparent blur-3xl"></div>
-        
-        {/* Dynamic glow effects for hovered cards */}
-        {hoveredCard && (
-          <>
-            {hoveredCard === 'sales' && (
-              <div className="absolute inset-0 bg-gradient-to-br from-green-50/30 to-emerald-50/15 transition-all duration-500" />
-            )}
-            {hoveredCard === 'inventory' && (
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/30 to-purple-50/15 transition-all duration-500" />
-            )}
-            {hoveredCard === 'customers' && (
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-50/30 to-fuchsia-50/15 transition-all duration-500" />
-            )}
-            {hoveredCard === 'jobs' && (
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-50/30 to-orange-50/15 transition-all duration-500" />
-            )}
-            {hoveredCard === 'branches' && (
-              <div className="absolute inset-0 bg-gradient-to-br from-cyan-50/30 to-blue-50/15 transition-all duration-500" />
-            )}
-            {hoveredCard === 'suppliers' && (
-              <div className="absolute inset-0 bg-gradient-to-br from-teal-50/30 to-emerald-50/15 transition-all duration-500" />
-            )}
-            {hoveredCard === 'vehicles' && (
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 to-sky-50/15 transition-all duration-500" />
-            )}
-            {hoveredCard === 'notifications' && (
-              <div className="absolute inset-0 bg-gradient-to-br from-pink-50/30 to-rose-50/15 transition-all duration-500" />
-            )}
-          </>
-        )}
+// Focus styles for accessibility
+const focusStyles = "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2";
+
+return (
+  <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
+    
+    {/* TOP BACKGROUND SECTION */}
+    <div className="absolute top-0 left-0 w-full h-80 rounded-b-[40px] overflow-hidden">
+      {/* Background Image */}
+      <div 
+        className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
+        style={{ 
+          backgroundImage: "url('/images/art1.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center center"
+        }}
+      ></div>
+      
+      {/* Decorative elements */}
+      <div className="absolute top-0 left-0 w-32 h-32 bg-green-300/20 rounded-br-full"></div>
+      <div className="absolute top-0 right-0 w-32 h-32 bg-teal-300/20 rounded-bl-full"></div>
+      <div className="absolute bottom-10 left-20 w-16 h-16 bg-white/20 rounded-2xl rotate-45"></div>
+      <div className="absolute bottom-16 right-24 w-12 h-12 bg-white/15 rounded-full"></div>
+    </div>
+
+    {/* BOTTOM BACKGROUND SECTION */}
+    <div className="absolute top-80 left-0 w-full h-full bg-white">
+      <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-green-50/10 to-white"></div>
+    </div>
+
+    <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
+      
+      {/* PROFILE HEADER SECTION - Transparent Blur */}
+      <div className={`mb-8 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+        <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-6 flex items-center gap-6 shadow-lg">
+          {/* Welcome Text - Removed avatar circle */}
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold text-white mb-2 drop-shadow-lg">
+              Welcome back, {user?.name ?? 'User'}
+            </h1>
+            <p className="text-white/90 flex items-center gap-2 drop-shadow-md">
+              <Calendar className="h-5 w-5 opacity-90" />
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </p>
+          </div>
+          
+          {/* Refresh Button */}
+          <Button 
+            onClick={handleRefresh}
+            disabled={isLoading}
+            variant="outline" 
+            className="border-white/40 bg-white/20 hover:bg-white/30 hover:border-white/60 text-white backdrop-blur-sm transition-all min-h-[44px] px-6"
+            aria-label="Refresh dashboard data"
+          >
+            <RefreshCw className={`h-5 w-5 mr-2 opacity-90 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
-      <div className="container mx-auto p-4 sm:p-6 lg:p-8 relative z-10">
-        {/* Header Section */}
-        <div className={`mb-8 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-300 via-cyan-400 to-sky-400 bg-clip-text text-transparent mb-2">
-                Welcome back, {user?.name ?? 'User'}
-              </h1>
-              <div className="flex items-center gap-4 text-slate-600">
-                <p className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 opacity-80" />
-                  {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                </p>
-                {lastUpdated && (
-                  <p className="flex items-center gap-2 text-sm">
-                    <Clock className="h-3 w-3 opacity-70" />
-                    Updated {lastUpdated.toLocaleTimeString()}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <Button 
-                onClick={handleRefresh}
-                disabled={isLoading}
-                variant="outline" 
-                className={`border-slate-300 bg-white hover:border-cyan-500 hover:text-cyan-600 transition-all min-h-[44px] px-6 ${focusStyles}`}
-                aria-label="Refresh dashboard data"
+      {/* QUICK ACTIONS SECTION */}
+      <section className="mb-12" aria-labelledby="quick-actions-heading">
+        <h2 id="quick-actions-heading" className="text-2xl font-bold mb-8 text-slate-800">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+          {quickActions.map((action, index) => (
+            <div
+              key={action.label}
+              className={`transform transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+              style={{ transitionDelay: `${index * 150}ms` }}
+            >
+              <div 
+                className={`relative overflow-hidden rounded-2xl transition-all duration-500 group cursor-pointer h-32 ${focusStyles} ${
+                  hoveredCard === action.label ? 'shadow-lg scale-105 -translate-y-2' : 'hover:shadow-md hover:scale-105 hover:-translate-y-2'
+                }`}
+                style={{ 
+                  background: hoveredCard === action.label ? action.colors.hover : action.colors.background
+                }}
+                onClick={() => router.push(action.href)}
+                onKeyPress={(e) => e.key === 'Enter' && router.push(action.href)}
+                onMouseEnter={() => setHoveredCard(action.label)}
+                onMouseLeave={() => setHoveredCard(null)}
+                tabIndex={0}
+                role="button"
+                aria-label={`${action.label} - ${action.description}`}
               >
-                <RefreshCw className={`h-5 w-5 mr-2 opacity-80 ${isLoading ? 'animate-spin' : ''}`} />
-                Refresh Data
-              </Button>
-              <Button 
-                className={`bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 shadow-lg shadow-cyan-500/20 text-white min-h-[44px] px-6 ${focusStyles}`}
-                aria-label="View detailed reports"
-              >
-                <FileText className="h-5 w-5 mr-2 opacity-90" />
-                View Reports
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {error && (
-          <Alert variant="destructive" className="mb-8 border-2 border-rose-200 bg-rose-50 shadow-lg animate-slideIn" role="alert">
-            <AlertTriangle className="h-4 w-4 text-rose-600 opacity-90" aria-hidden="true" />
-            <AlertTitle className="text-rose-800">Dashboard Error</AlertTitle>
-            <AlertDescription className="text-rose-700">{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {/* === ADD QUICK ACTIONS SECTION HERE === */}
-        {/* Quick Actions Section - Unified Design */}
-        <section className="mb-12" aria-labelledby="quick-actions-heading">
-          <h2 id="quick-actions-heading" className="text-2xl font-bold mb-8 text-slate-800">Quick Actions</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-            {quickActions.map((action, index) => (
-              <div
-                key={action.label}
-                className={`transform transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-                style={{ transitionDelay: `${index * 150}ms` }}
-              >
-                <div 
-                  className={`relative overflow-hidden rounded-2xl shadow-lg transition-all duration-500 group cursor-pointer h-32 ${focusStyles} backdrop-blur-sm bg-white/90 border border-slate-100 hover:border-white/50 ${
-                    hoveredCard === action.label ? 'shadow-2xl scale-105 -translate-y-2 ring-2 ring-white/50' : 'hover:shadow-xl hover:scale-105 hover:-translate-y-2'
-                  }`}
-                  onClick={() => router.push(action.href)}
-                  onKeyPress={(e) => e.key === 'Enter' && router.push(action.href)}
-                  onMouseEnter={() => setHoveredCard(action.label)}
-                  onMouseLeave={() => setHoveredCard(null)}
-                  tabIndex={0}
-                  role="button"
-                  aria-label={`${action.label} - ${action.description}`}
-                >
-                  {/* Animated background accent */}
-                  <div className={`absolute top-0 left-0 w-1 h-full transition-all duration-500 group-hover:h-full group-hover:w-full group-hover:opacity-10 ${
-                    hoveredCard === action.label ? 'h-full w-full opacity-10' : 'opacity-30'
-                  }`} style={{ background: cardColors.sales.background }}></div>
-
-                  {/* Content */}
-                  <div className="relative p-6 h-full flex items-center justify-between z-10">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold mb-1 transition-all duration-300 group-hover:translate-x-1 text-slate-700">
-                        {action.label}
-                      </h3>
-                      <p className="text-sm text-slate-500 transition-all duration-300 group-hover:translate-x-1">
-                        {action.description}
-                      </p>
-                    </div>
-                    <div className={`transform transition-all duration-500 group-hover:scale-110 group-hover:rotate-12 ${
-                      hoveredCard === action.label ? 'animate-bounce' : ''
-                    }`}>
-                      <action.icon 
-                        className="h-10 w-10 opacity-80" 
-                        style={{ color: cardColors.sales.icon }}
-                        aria-hidden="true"
-                      />
-                    </div>
+                <div className="relative p-6 h-full flex items-center justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold mb-1 transition-all duration-300 group-hover:translate-x-1" style={{ color: action.colors.text }}>
+                      {action.label}
+                    </h3>
+                    <p className="text-sm transition-all duration-300 group-hover:translate-x-1" style={{ color: action.colors.text, opacity: 0.7 }}>
+                      {action.description}
+                    </p>
+                  </div>
+                  <div className={`transform transition-all duration-300 group-hover:scale-110`}>
+                    <action.icon 
+                      className="h-8 w-8" 
+                      style={{ color: action.colors.icon }}
+                      aria-hidden="true"
+                    />
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
+            </div>
+          ))}
+        </div>
+      </section>
 
         {/* Key Metrics Section - Clear Visual Hierarchy */}
         <section className="mb-8" aria-labelledby="key-metrics-heading">
@@ -914,6 +868,27 @@ export default function DashboardPage() {
           </div>
         </section>
       </div>
+
+       {/* ERROR DISPLAY */}
+    {error && (
+      <div className="w-full bg-red-50 border-t border-red-200 py-4">
+        <div className="container mx-auto px-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <span className="text-red-800">{error}</span>
+            </div>
+            <button 
+              onClick={() => setError(null)}
+              className="text-red-600 hover:text-red-800"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
 
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
