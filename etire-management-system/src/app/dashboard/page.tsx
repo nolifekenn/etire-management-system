@@ -53,16 +53,22 @@ export default function DashboardPage() {
 
   // ===== IMPROVEMENTS: Style Systems =====
   const buttonStyles = {
-    primary: "bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors border border-green-600",
-    secondary: "bg-white border border-slate-300 hover:border-green-500 hover:text-green-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors",
-    glass: "bg-white/20 backdrop-blur-md border border-white/30 hover:bg-white/30 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+    primary: "bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-green-600",
+    secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95", // Match Show More button
+    glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg"
   };
 
+  // Enhanced micro-animations with spring physics
   const microAnimations = {
-    cardHover: "transition-all duration-300 hover:scale-105 hover:shadow-lg",
+    cardHover: "transition-all duration-350 ease-spring hover:translate-y-[-6px] hover:shadow-2xl",
     buttonHover: "transition-all duration-200 hover:scale-105 active:scale-95",
-    fadeIn: "animate-in fade-in duration-500"
+    fadeIn: "animate-in fade-in duration-500",
+    iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
+    linkHover: "transition-all duration-300 ease-in-out hover:gap-2.5"
   };
+
+  // Spring easing for animations
+  const springEasing = "cubic-bezier(0.34, 1.56, 0.64, 1)";
 
   const accessibleColors = {
     primary: "#1e293b",
@@ -134,29 +140,29 @@ export default function DashboardPage() {
   };
 
   // Icon color system - standardized
-const iconCategories = {
-  financial: { background: 'rgba(16, 185, 129, 0.1)', icon: '#10b981' },
-  inventory: { background: 'rgba(6, 182, 212, 0.1)', icon: '#06b6d4' },
-  analytics: { background: 'rgba(99, 102, 241, 0.1)', icon: '#6366f1' },
-  service: { background: 'rgba(139, 92, 246, 0.1)', icon: '#8b5cf6' },
-  customers: { background: 'rgba(59, 130, 246, 0.1)', icon: '#3b82f6' },
-  branches: { background: 'rgba(16, 185, 129, 0.1)', icon: '#10b981' },
-  suppliers: { background: 'rgba(6, 182, 212, 0.1)', icon: '#06b6d4' },
-  vehicles: { background: 'rgba(59, 130, 246, 0.1)', icon: '#3b82f6' },
-  notifications: { background: 'rgba(139, 92, 246, 0.1)', icon: '#8b5cf6' }
-};
+  const iconCategories = {
+    financial: { background: 'rgba(16, 185, 129, 0.1)', icon: '#10b981' },
+    inventory: { background: 'rgba(6, 182, 212, 0.1)', icon: '#06b6d4' },
+    analytics: { background: 'rgba(99, 102, 241, 0.1)', icon: '#6366f1' },
+    service: { background: 'rgba(139, 92, 246, 0.1)', icon: '#8b5cf6' },
+    customers: { background: 'rgba(59, 130, 246, 0.1)', icon: '#3b82f6' },
+    branches: { background: 'rgba(16, 185, 129, 0.1)', icon: '#10b981' },
+    suppliers: { background: 'rgba(6, 182, 212, 0.1)', icon: '#06b6d4' },
+    vehicles: { background: 'rgba(59, 130, 246, 0.1)', icon: '#3b82f6' },
+    notifications: { background: 'rgba(139, 92, 246, 0.1)', icon: '#8b5cf6' }
+  };
 
   // ===== IMPROVEMENTS: Enhanced Components =====
   const MetricSkeleton = () => (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
       {Array(4).fill(0).map((_, i) => (
-        <div key={i} className="bg-white rounded-xl border border-slate-200 p-6 animate-pulse">
+        <div key={i} className="bg-white rounded-2xl border border-slate-200 p-6 animate-pulse">
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 bg-slate-200 rounded-lg"></div>
             <div className="w-5 h-5 bg-slate-200 rounded"></div>
           </div>
           <div className="space-y-2">
-            <div className="h-7 bg-slate-200 rounded w-3/4"></div>
+            <div className="h-12 bg-slate-200 rounded w-3/4"></div>
             <div className="h-4 bg-slate-200 rounded w-1/2"></div>
             <div className="h-3 bg-slate-200 rounded w-2/3"></div>
           </div>
@@ -165,70 +171,67 @@ const iconCategories = {
     </div>
   );
 
-  const EmptyState = ({ icon: Icon, title, description, action, metricValue }: { 
+  const EmptyState = ({ icon: Icon, title, description, action }: { 
     icon: any, 
     title: string, 
     description: string, 
-    action?: string,
-    metricValue?: string | number
+    action?: string 
   }) => (
-    <div className={`text-center py-12 px-6 rounded-xl bg-slate-50/80 border-2 border-dashed border-slate-300 ${metricValue === 0 || metricValue === '0' || metricValue === '₱0' ? 'animate-pulse' : ''}`}>
+    <div className="text-center py-12 px-6 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
       <Icon className="h-16 w-16 text-slate-400 mx-auto mb-4" />
       <h3 className="text-lg font-semibold text-slate-700 mb-2">{title}</h3>
-      <p className="text-slate-500 mb-4 max-w-sm mx-auto leading-relaxed">{description}</p>
+      <p className="text-slate-500 mb-4">{description}</p>
       {action && (
-        <Button className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+        <Button className={buttonStyles.primary}>
           {action}
         </Button>
       )}
     </div>
   );
 
+  // Enhanced Get Started Link Component
+  const GetStartedLink = ({ onClick, children }: { onClick: () => void, children: string }) => (
+    <button 
+      onClick={onClick}
+      className="group relative inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 transition-all duration-300 pb-1 text-xs font-medium"
+    >
+      <span>{children}</span>
+      <ArrowUpRight className="w-3 h-3 transition-transform duration-300 group-hover:translate-x-0.5" />
+      <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 transition-all duration-300 group-hover:w-[calc(100%-20px)] group-hover:left-2.5"></span>
+    </button>
+  );
+
   // Quick actions for Hick's Law
-const quickActions = [
-  { 
-    label: "Create Sale", 
-    icon: Plus, 
-    href: "/pos", 
-    description: "Point of Sale",
-    category: "financial"
-  },
-  { 
-    label: "Manage Inventory", 
-    icon: Package, 
-    href: "/inventory", 
-    description: "Stock items",
-    category: "inventory"
-  },
-  { 
-    label: "View Reports", 
-    icon: FileText, 
-    href: "/reports", 
-    description: "Analytics",
-    category: "analytics"
-  },
-  { 
-    label: "Service Jobs", 
-    icon: Wrench, 
-    href: "/service-jobs", 
-    description: "Manage jobs",
-    category: "service"
-  }
-];
-
-const primaryStats = [
-  { id: 'sales', title: "Total Sales", value: `₱${stats.total_sales.toLocaleString()}`, icon: DollarSign, desc: "Last 7 days", category: "financial" },
-  { id: 'inventory', title: "Inventory Items", value: stats.total_items.toLocaleString(), icon: Blocks, desc: "In stock", category: "inventory" },
-  { id: 'customers', title: "Customers", value: stats.total_customers.toLocaleString(), icon: Users, desc: "Registered", category: "customers" },
-  { id: 'jobs', title: "Pending Jobs", value: stats.pending_jobs.toLocaleString(), icon: Wrench, desc: "Needs attention", category: "service" }
-];
-
-const secondaryStats = [
-  { id: 'branches', title: "Active Branches", value: stats.total_branches.toLocaleString(), icon: Building2, category: "branches" },
-  { id: 'suppliers', title: "Suppliers", value: stats.total_suppliers.toLocaleString(), icon: Package, category: "suppliers" },
-  { id: 'vehicles', title: "Vehicles", value: stats.total_vehicles.toLocaleString(), icon: Car, category: "vehicles" },
-  { id: 'notifications', title: "Notifications", value: stats.unread_notifications.toLocaleString(), icon: Bell, category: "notifications" }
-];
+  const quickActions = [
+    { 
+      label: "Create Sale", 
+      icon: Plus, 
+      href: "/pos", 
+      description: "Point of Sale",
+      category: "financial"
+    },
+    { 
+      label: "Manage Inventory", 
+      icon: Package, 
+      href: "/inventory", 
+      description: "Stock items",
+      category: "inventory"
+    },
+    { 
+      label: "View Reports", 
+      icon: FileText, 
+      href: "/reports", 
+      description: "Analytics",
+      category: "analytics"
+    },
+    { 
+      label: "Service Jobs", 
+      icon: Wrench, 
+      href: "/service-jobs", 
+      description: "Manage jobs",
+      category: "service"
+    }
+  ];
 
   // Card click handlers for better user flow
   const handleCardClick = (cardId: string) => {
@@ -401,22 +404,36 @@ const secondaryStats = [
     fetchDashboardData();
   };
 
+  const primaryStats = [
+    { id: 'sales', title: "Total Sales", value: `₱${stats.total_sales.toLocaleString()}`, icon: DollarSign, desc: "Last 7 days", category: "financial" },
+    { id: 'inventory', title: "Inventory Items", value: stats.total_items.toLocaleString(), icon: Blocks, desc: "In stock", category: "inventory" },
+    { id: 'customers', title: "Customers", value: stats.total_customers.toLocaleString(), icon: Users, desc: "Registered", category: "customers" },
+    { id: 'jobs', title: "Pending Jobs", value: stats.pending_jobs.toLocaleString(), icon: Wrench, desc: "Needs attention", category: "service" }
+  ];
+
+  const secondaryStats = [
+    { id: 'branches', title: "Active Branches", value: stats.total_branches.toLocaleString(), icon: Building2, category: "branches" },
+    { id: 'suppliers', title: "Suppliers", value: stats.total_suppliers.toLocaleString(), icon: Package, category: "suppliers" },
+    { id: 'vehicles', title: "Vehicles", value: stats.total_vehicles.toLocaleString(), icon: Car, category: "vehicles" },
+    { id: 'notifications', title: "Notifications", value: stats.unread_notifications.toLocaleString(), icon: Bell, category: "notifications" }
+  ];
+
   // Focus styles for accessibility
-  const focusStyles = "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2";
+  const focusStyles = "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2";
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
       
       {/* TOP BACKGROUND SECTION */}
-      <div className="absolute top-0 left-0 w-full h-80 rounded-b-[40px] overflow-hidden">
-        {/* Background Image */}
-        <div 
-          className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
-          style={{ 
-            backgroundImage: "url('/images/art2.png')",
-            backgroundSize: "cover",
-            backgroundPosition: "center center"
-          }}
+      <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
+  {/* Background Image - adjust positioning */}
+  <div 
+    className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
+    style={{ 
+      backgroundImage: "url('/images/image.png')",
+      backgroundSize: "cover",
+      backgroundPosition: "center 30%" // Move image upward
+    }}
         ></div>
         
         {/* Decorative elements */}
@@ -427,244 +444,295 @@ const secondaryStats = [
       </div>
 
       {/* BOTTOM BACKGROUND SECTION */}
-      <div className="absolute top-80 left-0 w-full h-full bg-white">
-        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-green-50/10 to-white"></div>
-      </div>
+      <div className="absolute top-64 left-0 w-full h-full bg-white">
+  <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-green-50/10 to-white"></div>
+</div>
 
       <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
         
-        {/* PROFILE HEADER SECTION - IMPROVED */}
-<div className={`mb-12 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
-  <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
-    {/* Enhanced dark overlay for better contrast */}
-    <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
-    
-    <div className="relative z-10 flex-1">
-      <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
-        Welcome back, {user?.name ?? 'User'}
-      </h1>
-      <div className="flex items-center gap-6 text-white/90">
-        <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium">
-          <Calendar className="h-6 w-6 opacity-90" />
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
-        {/* REAL-TIME DATA INDICATORS */}
-        <div className="flex items-center gap-4 text-lg">
-          {lastUpdated && (
-            <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">
-              <Clock className="w-5 h-5" />
-              Updated {lastUpdated.toLocaleTimeString()}
+        {/* PROFILE HEADER SECTION - ENHANCED */}
+        <div className={`mb-12 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+          <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
+            {/* Enhanced dark overlay for better contrast */}
+            <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
+            
+            <div className="relative z-10 flex-1">
+              <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
+                Welcome back, {user?.name ?? 'User'}
+              </h1>
+              <div className="flex items-center gap-6 text-white/90">
+                <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium">
+                  <Calendar className="h-6 w-6 opacity-90" />
+                  {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </p>
+                {/* ENHANCED REAL-TIME DATA INDICATORS */}
+                <div className="flex items-center gap-4 text-lg">
+                  {lastUpdated && (
+                    <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">
+                      <Clock className="w-5 h-5" />
+                      Updated {lastUpdated.toLocaleTimeString()}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse-glow"></div>
+                    Live data
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
-          <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm">
-            <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-            Live data
+            
+            {/* ENHANCED Refresh Button with Glassmorphism */}
+            <Button 
+              onClick={handleRefresh}
+              disabled={isLoading}
+              className={buttonStyles.glass + " active:scale-95"}
+              aria-label="Refresh dashboard data"
+            >
+              <RefreshCw className={`h-6 w-6 mr-3 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh Data
+            </Button>
           </div>
         </div>
-      </div>
-    </div>
-    
-    {/* Enhanced Refresh Button */}
-    <Button 
-      onClick={handleRefresh}
-      disabled={isLoading}
-      className="relative z-10 bg-white/40 backdrop-blur-lg border border-white/50 hover:bg-white/60 text-white px-8 py-4 rounded-2xl font-semibold transition-all duration-300 hover:scale-105 hover:shadow-lg"
-      aria-label="Refresh dashboard data"
-    >
-      <RefreshCw className={`h-6 w-6 mr-3 ${isLoading ? 'animate-spin' : ''}`} />
-      Refresh Data
-    </Button>
-  </div>
-</div>
 
-        {/* QUICK ACTIONS SECTION - IMPROVED */}
-<section className="mb-12" aria-labelledby="quick-actions-heading">
-  <div className="flex items-center justify-between mb-8">
-    <h2 id="quick-actions-heading" className="text-2xl font-bold text-slate-900 mb-0">Quick Actions</h2>
-  </div>
-  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-    {quickActions.map((action, index) => (
-      <div
-        key={action.label}
-        className={`transform transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-        style={{ transitionDelay: `${index * 150}ms` }}
-      >
-        <div 
-          className="group bg-white border border-slate-200 rounded-xl p-6 transition-all duration-300 hover:border-indigo-300 hover:shadow-lg cursor-pointer h-full flex flex-col hover:scale-[1.02] hover:-translate-y-1"
-          onClick={() => router.push(action.href)}
-          onKeyPress={(e) => e.key === 'Enter' && router.push(action.href)}
-          tabIndex={0}
-          role="button"
-          aria-label={`${action.label} - ${action.description}`}
-        >
-          {/* STANDARDIZED ICON CONTAINER - MODERN ROUNDED SQUARES */}
-          <div className="flex items-center gap-4 mb-4">
-            <div 
-              className="w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-300 group-hover:scale-110 flex-shrink-0"
-              style={{ backgroundColor: (iconCategories as any)[action.category]?.background || 'rgba(99, 102, 241, 0.1)' }}
-            >
-              <action.icon 
-                className="w-6 h-6" 
-                style={{ color: (iconCategories as any)[action.category]?.icon || '#6366f1' }}
-              />
-            </div>
-          </div>
-          
-          {/* IMPROVED TEXT HIERARCHY */}
-          <div className="flex-1 flex flex-col">
-            <h3 className="font-semibold text-slate-900 group-hover:text-indigo-700 transition-colors text-lg leading-tight mb-2">
-              {action.label}
-            </h3>
-            
-            <p className="text-sm text-slate-600 leading-relaxed flex-1 mb-4">
-              {action.description}
-            </p>
-            
-            {/* ENHANCED CTA INDICATOR */}
-            <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100 group-hover:border-indigo-100 transition-colors">
-              <span className="text-xs font-medium text-slate-500 group-hover:text-indigo-600 transition-colors">
-                Quick access
-              </span>
-              <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-200" />
-            </div>
-          </div>
-        </div>
-      </div>
-    ))}
-  </div>
-</section>
-
-{/* Key Metrics Section - IMPROVED */}
-<section className="mb-12" aria-labelledby="key-metrics-heading">
-  <h2 id="key-metrics-heading" className="text-2xl font-bold text-slate-900 mb-8">Key Metrics</h2>
-  
-  {isLoading ? (
-    <MetricSkeleton />
-  ) : (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-      {primaryStats.map((stat, i) => (
-        <div
-          key={i}
-          className="group bg-white border border-slate-200 rounded-xl p-6 transition-all duration-300 hover:shadow-lg hover:border-indigo-200 cursor-pointer hover:scale-[1.02] hover:-translate-y-1"
-          onClick={() => handleCardClick(stat.id)}
-          onKeyPress={(e) => handleCardKeyPress(e, stat.id)}
-          tabIndex={0}
-          role="button"
-          aria-label={`View ${stat.title} details. Current value: ${stat.value}`}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div 
-              className="w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-300 group-hover:scale-110"
-              style={{ backgroundColor: (iconCategories as any)[stat.category]?.background || 'rgba(99, 102, 241, 0.1)' }}
-            >
-              <stat.icon 
-                className="w-6 h-6" 
-                style={{ color: (iconCategories as any)[stat.category]?.icon || '#6366f1' }} 
-              />
-            </div>
-            <TrendingUp className="w-5 h-5 text-green-500 opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110" />
-          </div>
-          
-          {/* IMPROVED TYPOGRAPHY HIERARCHY */}
-          <div className="space-y-2">
-            <p className="text-3xl font-bold text-slate-900 tracking-tight">{stat.value}</p>
-            <p className="text-sm font-semibold text-slate-700">{stat.title}</p>
-            <p className="text-xs text-slate-500 flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              {stat.desc}
-            </p>
-          </div>
-
-          {/* EMPTY STATE MESSAGING */}
-          {stat.value === '₱0' || stat.value === '0' ? (
-            <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-              <p className="text-xs text-slate-600 mb-2">No data yet</p>
-              <button 
-                className="text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  router.push(stat.id === 'sales' ? '/pos' : `/${stat.id}`);
+        {/* QUICK ACTIONS SECTION - ENHANCED */}
+        <section className="mb-12 mt-16" aria-labelledby="quick-actions-heading">
+          <h2 id="quick-actions-heading" className="text-2xl font-bold text-slate-900 mb-8">Quick Actions</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-10">
+            {quickActions.map((action, index) => (
+              <div
+                key={action.label}
+                className={`transform transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}
+                style={{ 
+                  transitionDelay: `${index * 50}ms`,
+                  transitionTimingFunction: springEasing
                 }}
               >
-                Get started →
-              </button>
-            </div>
-          ) : null}
-        </div>
-      ))}
-    </div>
-  )}
-</section>
-
-{/* Additional Metrics Section - IMPROVED */}
-<section className="mb-12" aria-labelledby="additional-metrics-heading">
-  <div className="flex items-center justify-between mb-8">
-    <h2 id="additional-metrics-heading" className="text-2xl font-bold text-slate-900">Additional Metrics</h2>
-    <Button
-      onClick={() => setShowSecondaryStats(!showSecondaryStats)}
-      variant="outline"
-      className="flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors"
-      aria-expanded={showSecondaryStats}
-      aria-controls="secondary-stats-section"
-    >
-      {showSecondaryStats ? (
-        <>
-          <ChevronUp className="h-4 w-4" aria-hidden="true" />
-          Show Less
-        </>
-      ) : (
-        <>
-          <ChevronDown className="h-4 w-4" aria-hidden="true" />
-          Show More
-        </>
-      )}
-    </Button>
-  </div>
-
-  {showSecondaryStats && (
-    <div id="secondary-stats-section" className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-      {secondaryStats.map((stat, i) => (
-        <div
-          key={i}
-          className="group bg-white border border-slate-200 rounded-xl p-6 transition-all duration-300 hover:shadow-lg hover:border-indigo-200 cursor-pointer hover:scale-[1.02] hover:-translate-y-1"
-          onClick={() => handleCardClick(stat.id)}
-          onKeyPress={(e) => handleCardKeyPress(e, stat.id)}
-          tabIndex={0}
-          role="button"
-          aria-label={`View ${stat.title} details. Current value: ${stat.value}`}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div 
-              className="w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-300 group-hover:scale-110"
-              style={{ backgroundColor: (iconCategories as any)[stat.category]?.background || 'rgba(99, 102, 241, 0.1)' }}
-            >
-              <stat.icon 
-                className="w-6 h-6" 
-                style={{ color: (iconCategories as any)[stat.category]?.icon || '#6366f1' }} 
-              />
-            </div>
-            <TrendingUp className="w-5 h-5 text-green-500 opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110" />
+                <div 
+                  className={`group bg-white border border-slate-200 rounded-2xl p-6 cursor-pointer h-full flex flex-col shadow-sm hover:border-indigo-300/25 active:scale-[0.98] ${microAnimations.cardHover} ${focusStyles}`}
+                  onClick={() => router.push(action.href)}
+                  onKeyPress={(e) => e.key === 'Enter' && router.push(action.href)}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`${action.label} - ${action.description}`}
+                  style={{ transitionTimingFunction: springEasing }}
+                >
+                  {/* ENHANCED ICON CONTAINER */}
+                  <div className="flex items-center gap-4 mb-4">
+                    <div 
+                      className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${microAnimations.iconHover}`}
+                      style={{ 
+                        backgroundColor: (iconCategories as any)[action.category]?.background || 'rgba(99, 102, 241, 0.1)',
+                        transitionTimingFunction: springEasing
+                      }}
+                    >
+                      <action.icon 
+                        className="w-6 h-6" 
+                        style={{ color: (iconCategories as any)[action.category]?.icon || '#6366f1' }}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* ENHANCED TEXT HIERARCHY */}
+                  <div className="flex-1 flex flex-col">
+                    <h3 className="text-lg font-semibold text-slate-900 group-hover:text-indigo-700 transition-colors leading-tight mb-2">
+                      {action.label}
+                    </h3>
+                    
+                    <p className="text-sm text-slate-600 leading-relaxed flex-1 mb-4">
+                      {action.description}
+                    </p>
+                    
+                    {/* ENHANCED CTA INDICATOR */}
+                    <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100 group-hover:border-indigo-100 transition-colors">
+                      <span className="text-xs font-medium text-slate-500 group-hover:text-indigo-600 transition-colors">
+                        Quick access
+                      </span>
+                      <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-200" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
+        </section>
+
+        {/* Key Metrics Section - ENHANCED */}
+        <section className="mb-12" aria-labelledby="key-metrics-heading">
+          <h2 id="key-metrics-heading" className="text-2xl font-bold text-slate-900 mb-8">Key Metrics</h2>
           
-          <div className="space-y-2">
-            <p className="text-3xl font-bold text-slate-900 tracking-tight">{stat.value}</p>
-            <p className="text-sm font-semibold text-slate-700">{stat.title}</p>
+          {isLoading ? (
+            <MetricSkeleton />
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+              {primaryStats.map((stat, i) => (
+                <div
+                  key={i}
+                  className={`group bg-white border border-slate-200 rounded-2xl p-6 cursor-pointer shadow-sm hover:border-indigo-300/25 active:scale-[0.98] ${microAnimations.cardHover} ${focusStyles}`}
+                  onClick={() => handleCardClick(stat.id)}
+                  onKeyPress={(e) => handleCardKeyPress(e, stat.id)}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`View ${stat.title} details. Current value: ${stat.value}`}
+                  style={{ 
+                    transitionTimingFunction: springEasing,
+                    transitionDelay: `${250 + i * 50}ms`,
+                    transform: mounted ? 'translateY(0)' : 'translateY(20px)',
+                    opacity: mounted ? 1 : 0,
+                    transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)'
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div 
+                      className={`w-12 h-12 rounded-lg flex items-center justify-center ${microAnimations.iconHover}`}
+                      style={{ 
+                        backgroundColor: (iconCategories as any)[stat.category]?.background || 'rgba(99, 102, 241, 0.1)',
+                        transitionTimingFunction: springEasing
+                      }}
+                    >
+                      <stat.icon 
+                        className="w-6 h-6" 
+                        style={{ color: (iconCategories as any)[stat.category]?.icon || '#6366f1' }} 
+                      />
+                    </div>
+                    {/* ENHANCED TREND INDICATOR */}
+                    <div 
+                      className="w-9 h-9 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-400 scale-90 translate-y-1 group-hover:scale-100 group-hover:translate-y-0"
+                      style={{ 
+                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                        transitionTimingFunction: springEasing,
+                        transitionDelay: '0.1s'
+                      }}
+                    >
+                      <TrendingUp className="w-5 h-5 text-green-600" />
+                    </div>
+                  </div>
+                  
+                  {/* ENHANCED TYPOGRAPHY HIERARCHY */}
+                  <div className="space-y-3">
+                    <p 
+                      className={`text-5xl font-extrabold tracking-tight tabular-nums leading-none mb-3 ${
+                        stat.value === '₱0' || stat.value === '0' ? 'text-slate-300' : 'text-slate-900'
+                      }`}
+                      style={{ letterSpacing: '-0.03em' }}
+                    >
+                      {stat.value}
+                    </p>
+                    <p className="text-base font-semibold text-slate-700">{stat.title}</p>
+                    <p className="text-xs text-slate-500 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {stat.desc}
+                    </p>
+                  </div>
+
+                  {/* ENHANCED EMPTY STATE MESSAGING */}
+                  {stat.value === '₱0' || stat.value === '0' ? (
+                    <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <p className="text-xs text-slate-400 opacity-70 italic mb-2">No data yet</p>
+                      <GetStartedLink 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(stat.id === 'sales' ? '/pos' : `/${stat.id}`);
+                        }}
+                      >
+                        Get started
+                      </GetStartedLink>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Additional Metrics Section - ENHANCED */}
+        <section className="mb-12" aria-labelledby="additional-metrics-heading">
+          <div className="flex items-center justify-between mb-8">
+            <h2 id="additional-metrics-heading" className="text-2xl font-bold text-slate-900">Additional Metrics</h2>
+            <Button
+              onClick={() => setShowSecondaryStats(!showSecondaryStats)}
+              variant="outline"
+              className="flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95"
+              aria-expanded={showSecondaryStats}
+              aria-controls="secondary-stats-section"
+            >
+              {showSecondaryStats ? (
+                <>
+                  <ChevronUp className="h-4 w-4" aria-hidden="true" />
+                  Show Less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                  Show More
+                </>
+              )}
+            </Button>
           </div>
 
-          {/* Empty state for secondary metrics */}
-          {stat.value === '0' ? (
-            <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-              <p className="text-xs text-slate-600">No data available</p>
+          {showSecondaryStats && (
+            <div id="secondary-stats-section" className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+              {secondaryStats.map((stat, i) => (
+                <div
+                  key={i}
+                  className={`group bg-white border border-slate-200 rounded-2xl p-6 cursor-pointer shadow-sm hover:border-indigo-300/25 active:scale-[0.98] ${microAnimations.cardHover} ${focusStyles}`}
+                  onClick={() => handleCardClick(stat.id)}
+                  onKeyPress={(e) => handleCardKeyPress(e, stat.id)}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`View ${stat.title} details. Current value: ${stat.value}`}
+                  style={{ transitionTimingFunction: springEasing }}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div 
+                      className={`w-12 h-12 rounded-lg flex items-center justify-center ${microAnimations.iconHover}`}
+                      style={{ 
+                        backgroundColor: (iconCategories as any)[stat.category]?.background || 'rgba(99, 102, 241, 0.1)',
+                        transitionTimingFunction: springEasing
+                      }}
+                    >
+                      <stat.icon 
+                        className="w-6 h-6" 
+                        style={{ color: (iconCategories as any)[stat.category]?.icon || '#6366f1' }} 
+                      />
+                    </div>
+                    {/* ENHANCED TREND INDICATOR */}
+                    <div 
+                      className="w-9 h-9 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-400 scale-90 translate-y-1 group-hover:scale-100 group-hover:translate-y-0"
+                      style={{ 
+                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                        transitionTimingFunction: springEasing,
+                        transitionDelay: '0.1s'
+                      }}
+                    >
+                      <TrendingUp className="w-5 h-5 text-green-600" />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <p 
+                      className={`text-5xl font-extrabold tracking-tight tabular-nums leading-none ${
+                        stat.value === '0' ? 'text-slate-300' : 'text-slate-900'
+                      }`}
+                      style={{ letterSpacing: '-0.03em' }}
+                    >
+                      {stat.value}
+                    </p>
+                    <p className="text-base font-semibold text-slate-700">{stat.title}</p>
+                  </div>
+
+                  {/* Enhanced empty state for secondary metrics */}
+                  {stat.value === '0' ? (
+                    <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <p className="text-xs text-slate-400 opacity-70 italic">No data available</p>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
             </div>
-          ) : null}
-        </div>
-      ))}
-    </div>
-  )}
-</section>
+          )}
+        </section>
 
-
-        {/* Performance & Analytics Section - IMPROVED */}
+        {/* Performance & Analytics Section */}
         <section className="mb-8" aria-labelledby="performance-heading">
           <div className="flex items-center justify-between mb-6">
             <h2 id="performance-heading" className="text-2xl font-bold text-slate-800">Performance & Analytics</h2>
@@ -756,7 +824,7 @@ const secondaryStats = [
               </CardContent>
             </Card>
 
-            {/* Low Stock Alerts - IMPROVED */}
+            {/* Low Stock Alerts */}
             <Card 
               className="bg-white border-slate-200 shadow-lg transition-all duration-300 hover:shadow-xl"
               role="region"
@@ -809,7 +877,7 @@ const secondaryStats = [
           </div>
         </section>
 
-        {/* Recent Activity Section - IMPROVED */}
+        {/* Recent Activity Section */}
         <section aria-labelledby="recent-activity-heading">
           <h2 id="recent-activity-heading" className="text-2xl font-bold mb-6 text-slate-800">Recent Activity</h2>
           <div className="grid lg:grid-cols-2 gap-6">
@@ -828,12 +896,17 @@ const secondaryStats = [
                     </CardTitle>
                     <CardDescription className="text-slate-600">Latest transactions</CardDescription>
                   </div>
-                  <Button asChild size="sm" className={buttonStyles.secondary}>
-                    <Link href="/pos">
-                      View POS
-                      <ArrowUpRight className="h-4 w-4 ml-1" aria-hidden="true" />
-                    </Link>
-                  </Button>
+                  <Button 
+  asChild 
+  size="sm" 
+  className="flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-700 hover:text-indigo-800 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 hover:bg-indigo-50"
+>
+  <Link href="/pos">
+    View POS
+    <ArrowUpRight className="h-4 w-4 ml-1" aria-hidden="true" />
+  </Link>
+</Button>
+
                 </div>
               </CardHeader>
               <CardContent>
@@ -897,12 +970,16 @@ const secondaryStats = [
                     </CardTitle>
                     <CardDescription className="text-slate-600">Latest system alerts</CardDescription>
                   </div>
-                  <Button asChild size="sm" className={buttonStyles.secondary}>
-                    <Link href="/notifications">
-                      View All
-                      <ArrowUpRight className="h-4 w-4 ml-1" aria-hidden="true" />
-                    </Link>
-                  </Button>
+                  <Button 
+  asChild 
+  size="sm" 
+  className="flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-700 hover:text-indigo-800 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 hover:bg-indigo-50"
+>
+  <Link href="/notifications">
+    View All
+    <ArrowUpRight className="h-4 w-4 ml-1" aria-hidden="true" />
+  </Link>
+</Button>
                 </div>
               </CardHeader>
               <CardContent>
@@ -982,18 +1059,58 @@ const secondaryStats = [
           font-family: 'Poppins', sans-serif;
         }
 
-        @keyframes slideIn {
+        /* Spring easing for animations */
+        .ease-spring {
+          transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* Enhanced pulse animation for live badge */
+        @keyframes pulse-glow {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+          }
+          50% {
+            opacity: 0.8;
+            transform: scale(0.95);
+            box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+          }
+        }
+        
+        .animate-pulse-glow {
+          animation: pulse-glow 2s infinite ease-in-out;
+        }
+
+        /* Stagger animations for page load */
+        @keyframes fadeSlideIn {
           from {
             opacity: 0;
-            transform: translateY(-10px);
+            transform: translateY(20px);
           }
           to {
             opacity: 1;
             transform: translateY(0);
           }
         }
-        .animate-slideIn {
-          animation: slideIn 0.5s ease-out;
+
+        .animate-fade-slide-in {
+          animation: fadeSlideIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+        }
+
+        /* Focus styles for accessibility */
+        .focus-visible\:ring-2:focus-visible {
+          outline: 2px solid #4A90E2;
+          outline-offset: 2px;
+        }
+
+        /* Performance optimizations */
+        .will-change-transform {
+          will-change: transform;
+        }
+
+        .will-change-opacity {
+          will-change: opacity;
         }
 
         /* Smooth transitions for background glow */

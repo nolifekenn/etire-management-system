@@ -19,6 +19,9 @@ import {
   Database,
   ChevronLeft,
   ChevronRight,
+  TrendingUp,
+  BarChart,
+  DollarSign,
 } from 'lucide-react';
 import {
   SidebarHeader,
@@ -40,11 +43,12 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, requiredRole: 1 },
   { href: '/inventory', label: 'Inventory', icon: Boxes, requiredRole: 1 },
   { href: '/pos', label: 'POS', icon: ShoppingCart, requiredRole: 1 },
-  { href: '/services', label: 'Service Mgt', icon: Wrench, requiredRole: 1 },
+  { href: '/service-jobs', label: 'Service Jobs', icon: Wrench, requiredRole: 1 },
   { href: '/branches', label: 'Branches', icon: Building2, requiredRole: 1 },
   { href: '/purchasing', label: 'Purchasing', icon: Package, requiredRole: 1 },
   { href: '/customers', label: 'Customers', icon: Users, requiredRole: 1 },
   { href: '/notifications', label: 'Notifications', icon: Bell, requiredRole: 1 },
+  { href: '/reports', label: 'Reports', icon: BarChart, requiredRole: 1 },
   { href: '/backup', label: 'Backup', icon: Database, requiredRole: 1 },
 ];
 
@@ -52,12 +56,77 @@ const adminNavItems = [
     { href: '/admin', label: 'Admin', icon: Shield, requiredRole: 2 }
 ]
 
+// Add interface for user with branch_id
+interface UserWithBranch {
+  user_id: string;
+  name: string;
+  username: string;
+  role: number;
+  branch_id?: string;
+}
+
 export function SidebarNav() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [branches, setBranches] = useState<any[]>([]);
   const [currentBranch, setCurrentBranch] = useState<any>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Updated color system with purple/blue focus
+  const colors = {
+    primary: {
+      gradient: 'bg-gradient-to-r from-purple-500 to-blue-500',
+      solid: 'bg-purple-600',
+      hover: 'hover:bg-purple-700',
+      text: 'text-white',
+      border: 'border-purple-600'
+    },
+    secondary: {
+      background: 'bg-transparent',
+      hover: 'hover:bg-white/30',
+      text: 'text-gray-700',
+      border: 'border-white/30'
+    },
+    active: {
+      background: 'bg-gradient-to-r from-purple-500 to-blue-500',
+      text: 'text-white',
+      icon: 'text-white',
+      shadow: 'shadow-lg shadow-purple-200/50'
+    },
+    inactive: {
+      background: 'bg-transparent',
+      text: 'text-gray-700',
+      icon: 'text-gray-600',
+      hover: {
+        background: 'hover:bg-white/30',
+        text: 'hover:text-purple-600',
+        icon: 'hover:text-purple-600'
+      }
+    }
+  };
+
+  // Icon color categories updated with purple/blue theme
+  const iconCategories = {
+    dashboard: { background: 'rgba(168, 85, 247, 0.1)', icon: '#a855f7' },
+    inventory: { background: 'rgba(59, 130, 246, 0.1)', icon: '#3b82f6' },
+    sales: { background: 'rgba(139, 92, 246, 0.1)', icon: '#8b5cf6' },
+    service: { background: 'rgba(16, 185, 129, 0.1)', icon: '#10b981' },
+    analytics: { background: 'rgba(99, 102, 241, 0.1)', icon: '#6366f1' },
+    customers: { background: 'rgba(168, 85, 247, 0.1)', icon: '#a855f7' },
+    branches: { background: 'rgba(59, 130, 246, 0.1)', icon: '#3b82f6' },
+    notifications: { background: 'rgba(139, 92, 246, 0.1)', icon: '#8b5cf6' },
+    admin: { background: 'rgba(99, 102, 241, 0.1)', icon: '#6366f1' }
+  };
+
+  // Micro-animations matching dashboard
+  const microAnimations = {
+    cardHover: "transition-all duration-350 ease-spring hover:translate-y-[-2px]",
+    buttonHover: "transition-all duration-200 hover:scale-105 active:scale-95",
+    iconHover: "transition-all duration-350 ease-spring group-hover:scale-110",
+    linkHover: "transition-all duration-300 ease-in-out"
+  };
+
+  const springEasing = "cubic-bezier(0.34, 1.56, 0.64, 1)";
 
   // Debug logging
   console.log('SidebarNav - User:', user);
@@ -73,15 +142,14 @@ export function SidebarNav() {
 
   // Broadcast collapse state changes to parent layout
   useEffect(() => {
-    // Dispatch custom event when collapse state changes
     window.dispatchEvent(new CustomEvent('sidebarCollapse', { 
       detail: { isCollapsed } 
     }));
   }, [isCollapsed]);
 
-  // Fetch branches for admin branch switching
+  // Fetch branches for admin branch switching - FIXED
   const fetchBranches = useCallback(async () => {
-    if (!supabase || !user || user.role !== 3) return; // Only for admins
+    if (!supabase || !user || user.role !== 3) return;
     
     const { data, error } = await supabase
       .from('branch')
@@ -93,8 +161,9 @@ export function SidebarNav() {
       console.error('Error fetching branches:', error);
     } else {
       setBranches(data || []);
-      // Set current branch to user's assigned branch or first branch
-      const userBranch = data?.find(b => b.branch_id === user.branch_id);
+      // FIX: Use type assertion for branch_id
+      const userWithBranch = user as UserWithBranch;
+      const userBranch = data?.find(b => b.branch_id === userWithBranch.branch_id);
       setCurrentBranch(userBranch || data?.[0] || null);
     }
   }, [user]);
@@ -104,12 +173,11 @@ export function SidebarNav() {
   }, [fetchBranches]);
 
   const handleBranchSwitch = async (branchId: string) => {
-    if (!supabase || !user || user.role !== 3) return; // Only for admins
+    if (!supabase || !user || user.role !== 3) return;
     
     const selectedBranch = branches.find(b => b.branch_id === branchId);
     if (selectedBranch) {
       setCurrentBranch(selectedBranch);
-      // Store current branch in localStorage for persistence
       localStorage.setItem('currentBranch', JSON.stringify(selectedBranch));
     }
   };
@@ -120,50 +188,71 @@ export function SidebarNav() {
     localStorage.setItem('sidebarCollapsed', String(newState));
   };
 
+  // Get icon color based on category
+  const getIconColor = (itemLabel: string) => {
+    const categoryMap: { [key: string]: string } = {
+      'Dashboard': 'dashboard',
+      'Inventory': 'inventory',
+      'POS': 'sales',
+      'Service Jobs': 'service',
+      'Branches': 'branches',
+      'Purchasing': 'inventory',
+      'Customers': 'customers',
+      'Notifications': 'notifications',
+      'Reports': 'analytics',
+      'Backup': 'analytics',
+      'Admin': 'admin'
+    };
+    
+    return iconCategories[categoryMap[itemLabel] as keyof typeof iconCategories] || iconCategories.dashboard;
+  };
+
   return (
     <div
       className={`
         flex flex-col h-full
-        bg-white text-gray-700
-        shadow-lg border-r border-gray-200
+        bg-white/40 backdrop-blur-2xl text-gray-700
+        shadow-xl shadow-purple-100/50 border-r border-white/30
         transition-all duration-300 ease-in-out
-        ${isCollapsed ? 'w-16' : 'w-64'}
+        ${isCollapsed ? 'w-20' : 'w-64'}
+        font-poppins
       `}
       style={{
-        width: isCollapsed ? '4rem' : '16rem',
-        minWidth: isCollapsed ? '4rem' : '16rem',
-        maxWidth: isCollapsed ? '4rem' : '16rem',
+        width: isCollapsed ? '5rem' : '16rem',
+        minWidth: isCollapsed ? '5rem' : '16rem',
+        maxWidth: isCollapsed ? '5rem' : '16rem',
       }}
     >
-      <SidebarHeader className="p-4 bg-white border-b border-gray-100">
+      {/* Enhanced Sidebar Header with glassmorphism */}
+      <SidebarHeader className="p-6 bg-white/60 backdrop-blur-sm border-b border-white/30">
         <div className="flex items-center justify-between gap-3">
           {isCollapsed ? (
             <button 
               onClick={toggleSidebar}
-              className="flex items-center justify-center w-full cursor-pointer hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600/20 rounded-md p-2"
+              className="flex items-center justify-center w-full cursor-pointer hover:opacity-90 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 rounded-xl p-2"
               title="Expand sidebar"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-8 w-8 text-red-600 flex-shrink-0">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v2h-2v-2zm0 4h2v6h-2v-6z"/>
-              </svg>
+              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center backdrop-blur-sm shadow-lg">
+                <LayoutDashboard className="h-6 w-6 text-white" />
+              </div>
             </button>
           ) : (
             <>
               <button 
                 onClick={toggleSidebar}
-                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600/20 rounded-md"
+                className="flex items-center gap-4 cursor-pointer hover:opacity-90 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 rounded-xl p-2 -ml-2"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-8 w-8 text-red-600 flex-shrink-0">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v2h-2v-2zm0 4h2v6h-2v-6z"/>
-                </svg>
-                <div className="flex flex-col">
-                  <h2 className="text-lg font-semibold text-gray-900">eTire Manager</h2>
-                  <p className="text-xs text-gray-600">Q.R T&V Shop</p>
+                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-white/30 shadow-lg">
+                  <LayoutDashboard className="h-7 w-7 text-white" />
+                </div>
+                <div className="flex flex-col text-left">
+                  <h2 className="text-xl font-bold text-gray-800 tracking-tight">eTire Manager</h2>
+                  <p className="text-sm text-gray-600 font-medium">Q.R T&V Shop</p>
                 </div>
               </button>
               <button
                 onClick={toggleSidebar}
-                className="p-1 hover:bg-gray-100 rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600/20"
+                className="p-2 hover:bg-white/30 rounded-xl transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50"
                 aria-label="Collapse sidebar"
               >
                 <ChevronLeft className="h-5 w-5 text-gray-600" />
@@ -172,22 +261,26 @@ export function SidebarNav() {
           )}
         </div>
         
-        {/* Branch Switcher for Admins */}
+        {/* Enhanced Branch Switcher for Admins */}
         {!isCollapsed && user && user.role === 3 && branches.length > 0 && (
-          <div className="mt-4">
-            <label className="text-xs font-medium text-gray-600 mb-2 block">
+          <div className="mt-6">
+            <label className="text-sm font-semibold text-gray-700 mb-3 block">
               Current Branch
             </label>
             <Select 
               value={currentBranch?.branch_id || ''} 
               onValueChange={handleBranchSwitch}
             >
-              <SelectTrigger className="w-full bg-white border border-gray-200 rounded-md text-sm hover:border-gray-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-50">
+              <SelectTrigger className="w-full bg-white/60 backdrop-blur-md border border-white/30 text-gray-700 rounded-xl text-sm hover:bg-white/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50">
                 <SelectValue placeholder="Select branch" />
               </SelectTrigger>
-              <SelectContent className="bg-white">
+              <SelectContent className="bg-white/80 backdrop-blur-md border border-white/30 rounded-xl shadow-xl">
                 {branches.map((branch) => (
-                  <SelectItem key={branch.branch_id} value={branch.branch_id}>
+                  <SelectItem 
+                    key={branch.branch_id} 
+                    value={branch.branch_id}
+                    className="focus:bg-purple-50 focus:text-purple-700 rounded-lg"
+                  >
                     {branch.name}
                   </SelectItem>
                 ))}
@@ -196,12 +289,15 @@ export function SidebarNav() {
           </div>
         )}
       </SidebarHeader>
-      <SidebarContent className="p-2 overflow-y-auto flex-1 bg-white">
+
+      {/* Enhanced Sidebar Content with glassmorphism */}
+      <SidebarContent className="p-3 overflow-y-auto flex-1 bg-transparent">
         <SidebarMenu>
           {navItems.map((item) => {
             const hasAccess = user && user.role >= item.requiredRole;
             if (!hasAccess) return null;
             const active = pathname === item.href;
+            const iconColor = getIconColor(item.label);
             
             return (
               <SidebarMenuItem key={item.href}>
@@ -212,103 +308,185 @@ export function SidebarNav() {
                 >
                   <Link
                     href={item.href}
-                    className={`group flex items-center gap-3 px-3 py-2 transition-colors text-sm rounded-md
-                      ${active ? 'bg-[#991B1B] text-white font-medium' : 'bg-white text-gray-800 hover:bg-[#FEF2F2] hover:text-[#991B1B]'}
-                      focus:outline-none focus-visible:ring-2 focus-visible:ring-[#991B1B]/20
+                    className={`group flex items-center gap-3 px-4 py-3 transition-all duration-300 text-sm rounded-xl
+                      ${active 
+                        ? `${colors.active.background} text-white font-semibold ${colors.active.shadow}` 
+                        : 'bg-transparent text-gray-700 hover:bg-white/30 hover:text-purple-600 border border-transparent'
+                      }
+                      focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50
+                      ${microAnimations.cardHover}
                       ${isCollapsed ? 'justify-center' : ''}
                     `}
                     title={isCollapsed ? item.label : undefined}
+                    style={{ transitionTimingFunction: springEasing }}
                   >
-                    <item.icon className={`w-5 h-5 flex-shrink-0 ${active ? 'text-white' : 'text-gray-500 group-hover:text-[#991B1B]'} transition-colors`} />
-                    {!isCollapsed && <span>{item.label}</span>}
+                    <div 
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                        active 
+                          ? 'bg-white/20' 
+                          : 'bg-white/50 group-hover:bg-white/70'
+                      } ${microAnimations.iconHover}`}
+                      style={{ 
+                        backgroundColor: active ? 'rgba(255,255,255,0.2)' : iconColor.background,
+                        transitionTimingFunction: springEasing
+                      }}
+                    >
+                      <item.icon 
+                        className="w-5 h-5 flex-shrink-0"
+                        style={{ 
+                          color: active ? 'white' : iconColor.icon
+                        }}
+                      />
+                    </div>
+                    {!isCollapsed && (
+                      <span className="font-medium tracking-wide">{item.label}</span>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             );
           })}
 
-          {/* Admin Navigation */}
+          {/* Enhanced Admin Navigation */}
           {user && (user.role === 2 || user.role === 3) && (
             <SidebarMenuItem key="/admin">
               <SidebarMenuButton
                 asChild
                 isActive={pathname === '/admin'}
-                tooltip={isCollapsed ? "Admin Panel - Manage users and roles" : undefined}
+                tooltip={isCollapsed ? "Admin Panel" : undefined}
               >
                 <Link
                   href="/admin"
-                  className={`group flex items-center gap-3 px-3 py-2 transition-colors text-sm rounded-md
-                    ${pathname === '/admin' ? 'bg-[#991B1B] text-white font-medium' : 'bg-white text-gray-800 hover:bg-[#FEF2F2] hover:text-[#991B1B]'}
-                    focus:outline-none focus-visible:ring-2 focus-visible:ring-[#991B1B]/20
+                  className={`group flex items-center gap-3 px-4 py-3 transition-all duration-300 text-sm rounded-xl
+                    ${pathname === '/admin' 
+                      ? `${colors.active.background} text-white font-semibold ${colors.active.shadow}` 
+                      : 'bg-transparent text-gray-700 hover:bg-white/30 hover:text-purple-600 border border-transparent'
+                    }
+                    focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50
+                    ${microAnimations.cardHover}
                     ${isCollapsed ? 'justify-center' : ''}
                   `}
                   title={isCollapsed ? "Admin" : undefined}
+                  style={{ transitionTimingFunction: springEasing }}
                 >
-                  <Shield className={`w-5 h-5 flex-shrink-0 ${pathname === '/admin' ? 'text-white' : 'text-gray-500 group-hover:text-[#991B1B]'}`} />
-                  {!isCollapsed && <span>Admin</span>}
+                  <div 
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                      pathname === '/admin' 
+                        ? 'bg-white/20' 
+                        : 'bg-white/50 group-hover:bg-white/70'
+                    } ${microAnimations.iconHover}`}
+                    style={{ 
+                      backgroundColor: pathname === '/admin' ? 'rgba(255,255,255,0.2)' : iconCategories.admin.background,
+                      transitionTimingFunction: springEasing
+                    }}
+                  >
+                    <Shield 
+                      className="w-5 h-5 flex-shrink-0"
+                      style={{ 
+                        color: pathname === '/admin' ? 'white' : iconCategories.admin.icon
+                      }}
+                    />
+                  </div>
+                  {!isCollapsed && (
+                    <span className="font-medium tracking-wide">Admin</span>
+                  )}
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
-          
-          {/* Debug info for development */}
-          {!isCollapsed && process.env.NODE_ENV === 'development' && user && (
-            <SidebarMenuItem key="debug">
-              <div className="px-3 py-2 text-xs text-slate-400">
-                Debug: Role {user.role} ({user.role === 3 ? 'Admin' : user.role === 2 ? 'Branch Manager' : user.role === 1 ? 'Staff' : 'Guest'})
-              </div>
-            </SidebarMenuItem>
-          )}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarSeparator className="border-gray-100" />
-      <SidebarFooter className="p-4 flex flex-col gap-2 bg-white border-t border-gray-100">
+
+      {/* Enhanced Sidebar Footer with glassmorphism */}
+      <SidebarSeparator className="border-white/30" />
+      <SidebarFooter className="p-4 flex flex-col gap-2 bg-white/40 backdrop-blur-sm border-t border-white/30">
         {!isCollapsed ? (
           <>
-            <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10 ring-1 ring-gray-100 bg-white flex-shrink-0">
-                <AvatarImage src="https://placehold.co/100x100.png" alt="User Avatar" data-ai-hint="person avatar" />
-                <AvatarFallback>{user?.name?.charAt(0) ?? 'U'}</AvatarFallback>
+            {/* Enhanced User Profile */}
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-white/60 backdrop-blur-sm border border-white/30">
+              <Avatar className="h-12 w-12 ring-2 ring-white/50 shadow-sm bg-white flex-shrink-0">
+                <AvatarImage src="https://placehold.co/100x100.png" alt="User Avatar" />
+                <AvatarFallback className="bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 font-semibold">
+                  {user?.name?.charAt(0) ?? 'U'}
+                </AvatarFallback>
               </Avatar>
               <div className="flex flex-col flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{user?.name ?? 'Loading...'}</p>
+                <p className="text-sm font-semibold text-gray-800 truncate">{user?.name ?? 'Loading...'}</p>
                 <p className="text-xs text-gray-600 truncate">{user?.username ?? ''}</p>
+                <p className="text-xs text-purple-600 font-medium mt-1">
+                  {user?.role === 3 ? 'Administrator' : user?.role === 2 ? 'Manager' : 'Staff'}
+                </p>
               </div>
             </div>
-            <Button asChild variant="ghost" className="w-full justify-start hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600/20">
-              <Link href="/settings" className="group flex items-center gap-2 w-full text-gray-700">
-                <Settings className="mr-2 h-4 w-4 text-gray-500 group-hover:text-red-700" /> Settings
+
+            {/* Enhanced Footer Buttons */}
+            <Button 
+              asChild 
+              variant="ghost" 
+              className="w-full justify-start hover:bg-white/30 hover:text-purple-600 text-gray-700 rounded-xl py-3 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50"
+            >
+              <Link href="/settings" className="group flex items-center gap-2 w-full">
+                <Settings className="w-4 h-4 text-gray-600 group-hover:text-purple-600 transition-colors" /> 
+                Settings
               </Link>
             </Button>
-            <Button asChild variant="ghost" className="w-full justify-start hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600/20">
-              <Link href="/support" className="group flex items-center gap-2 w-full text-gray-700">
-                <LifeBuoy className="mr-2 h-4 w-4 text-gray-500 group-hover:text-red-700" /> Support
+            <Button 
+              asChild 
+              variant="ghost" 
+              className="w-full justify-start hover:bg-white/30 hover:text-purple-600 text-gray-700 rounded-xl py-3 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50"
+            >
+              <Link href="/support" className="group flex items-center gap-2 w-full">
+                <LifeBuoy className="w-4 h-4 text-gray-600 group-hover:text-purple-600 transition-colors" /> 
+                Support
               </Link>
             </Button>
-            <Button variant="ghost" className="w-full justify-start hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600/20" onClick={logout}>
-                <LogOut className="mr-2 h-4 w-4 text-gray-500 group-hover:text-red-700" /> Logout
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start hover:bg-white/30 hover:text-purple-600 text-gray-700 rounded-xl py-3 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50" 
+              onClick={logout}
+            >
+              <LogOut className="w-4 h-4 text-gray-600 group-hover:text-purple-600 transition-colors mr-2" /> 
+              Logout
             </Button>
           </>
         ) : (
           <>
-            <div className="flex justify-center w-full">
-              <Avatar className="h-10 w-10 ring-1 ring-gray-100 bg-white">
-                <AvatarImage src="https://placehold.co/100x100.png" alt="User Avatar" data-ai-hint="person avatar" />
-                <AvatarFallback>{user?.name?.charAt(0) ?? 'U'}</AvatarFallback>
+            {/* Collapsed Footer */}
+            <div className="flex justify-center w-full mb-2">
+              <Avatar className="h-12 w-12 ring-2 ring-white/50 shadow-sm bg-gradient-to-r from-purple-100 to-blue-100">
+                <AvatarImage src="https://placehold.co/100x100.png" alt="User Avatar" />
+                <AvatarFallback className="bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 font-semibold">
+                  {user?.name?.charAt(0) ?? 'U'}
+                </AvatarFallback>
               </Avatar>
             </div>
-            <Button asChild variant="ghost" className="w-full justify-center hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600/20 p-2" title="Settings">
+            <Button 
+              asChild 
+              variant="ghost" 
+              className="w-full justify-center hover:bg-white/30 rounded-xl p-3 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50" 
+              title="Settings"
+            >
               <Link href="/settings" className="group flex items-center justify-center w-full text-gray-700">
-                <Settings className="h-4 w-4 text-gray-500 group-hover:text-red-700" />
+                <Settings className="w-5 h-5 text-gray-600 group-hover:text-purple-600 transition-colors" />
               </Link>
             </Button>
-            <Button asChild variant="ghost" className="w-full justify-center hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600/20 p-2" title="Support">
+            <Button 
+              asChild 
+              variant="ghost" 
+              className="w-full justify-center hover:bg-white/30 rounded-xl p-3 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50" 
+              title="Support"
+            >
               <Link href="/support" className="group flex items-center justify-center w-full text-gray-700">
-                <LifeBuoy className="h-4 w-4 text-gray-500 group-hover:text-red-700" />
+                <LifeBuoy className="w-5 h-5 text-gray-600 group-hover:text-purple-600 transition-colors" />
               </Link>
             </Button>
-            <Button variant="ghost" className="w-full justify-center hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600/20 p-2" onClick={logout} title="Logout">
-                <LogOut className="h-4 w-4 text-gray-500 group-hover:text-red-700" />
+            <Button 
+              variant="ghost" 
+              className="w-full justify-center hover:bg-white/30 rounded-xl p-3 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50" 
+              onClick={logout} 
+              title="Logout"
+            >
+              <LogOut className="w-5 h-5 text-gray-600 group-hover:text-purple-600 transition-colors" />
             </Button>
           </>
         )}
