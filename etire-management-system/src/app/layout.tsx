@@ -1,13 +1,11 @@
-
 "use client";
 
-import React from 'react';
-import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
+import React, { useEffect, useState } from 'react';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import { SidebarNav } from '@/components/SidebarNav';
 import { AuthProvider } from '@/hooks/useAuth';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
-import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import './globals.css';
 
@@ -15,6 +13,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user && pathname !== '/login') {
@@ -38,6 +37,25 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoading, pathname, router]);
 
+  useEffect(() => {
+    // Listen for sidebar collapse events
+    const handleSidebarCollapse = (event: CustomEvent) => {
+      setIsCollapsed(event.detail.isCollapsed);
+    };
+
+    window.addEventListener('sidebarCollapse', handleSidebarCollapse as EventListener);
+
+    // Load initial state from localStorage
+    const savedState = localStorage.getItem('sidebarCollapsed');
+    if (savedState !== null) {
+      setIsCollapsed(savedState === 'true');
+    }
+
+    return () => {
+      window.removeEventListener('sidebarCollapse', handleSidebarCollapse as EventListener);
+    };
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -50,18 +68,23 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     return null; // Will redirect to login
   }
 
+  // Routes that don't need the sidebar
   if (pathname === '/login' || pathname === '/guest-access') {
     return <>{children}</>;
   }
 
+  // Routes with sidebar
   return (
-    <SidebarProvider defaultOpen>
-      <Sidebar>
+    <SidebarProvider>
+      <div className="flex h-screen w-full overflow-hidden bg-gray-50">
+        {/* Sidebar */}
         <SidebarNav />
-      </Sidebar>
-      <SidebarInset>
-        {children}
-      </SidebarInset>
+
+        {/* Main Content */}
+        <main className="flex-1 overflow-auto">
+          {children}
+        </main>
+      </div>
     </SidebarProvider>
   );
 }
