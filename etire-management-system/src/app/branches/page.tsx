@@ -246,10 +246,6 @@ export default function BranchesPage() {
                 title="Branch Management" 
                 description="Manage your business branches and locations."
             >
-                <Button size="sm" onClick={handleOpenAddDialog} disabled={isLoading}>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Branch
-                </Button>
             </PageHeader>
 
             <Dialog open={isAddDialogOpen || isEditDialogOpen} onOpenChange={(isOpen) => {

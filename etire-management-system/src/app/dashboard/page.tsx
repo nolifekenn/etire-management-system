@@ -241,7 +241,7 @@ export default function DashboardPage() {
       customers: '/customers',
       jobs: '/service-jobs',
       branches: '/branches',
-      suppliers: '/suppliers',
+      suppliers: '/purchasing',
       vehicles: '/vehicles',
       notifications: '/notifications'
     };
@@ -263,136 +263,151 @@ export default function DashboardPage() {
   }, []);
 
   // ===== ORIGINAL BACKEND LOGIC - 100% PRESERVED =====
+    // ...existing code...
   const fetchDashboardData = useCallback(async () => {
-    if (!supabase) {
-      setError("Supabase client not available. Check credentials.");
-      setIsLoading(false);
-      return;
-    }
-
-    if (!user?.user_id) {
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    try {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      
-      // Get sales data for the last 7 days
-      const { data: recentSales, error: salesError } = await supabase
-        .from('sale')
-        .select('sale_date, total_amount')
-        .gte('sale_date', sevenDaysAgo.toISOString())
-        .order('sale_date', { ascending: false });
-
-      if (salesError) throw new Error(`Could not fetch sales data: ${salesError.message}`);
-
-      // Get inventory count
-      const { count: itemCount, error: itemError } = await supabase
-        .from('inventory_item')
-        .select('*', { count: 'exact', head: true });
-      if (itemError) throw new Error(`Could not count inventory: ${itemError.message}`);
-
-      // Get user count
-      const { count: userCount, error: userError } = await supabase
-        .from('user')
-        .select('*', { count: 'exact', head: true });
-      if (userError) throw new Error(`Could not count users: ${userError.message}`);
-
-      // Get pending service jobs count
-      const { count: jobCount, error: jobError } = await supabase
-        .from('service_job')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-      if (jobError) throw new Error(`Could not count service jobs: ${jobError.message}`);
-
-      // Get additional stats
-      const [branchesRes, suppliersRes, customersRes, vehiclesRes, notificationsRes] = await Promise.all([
-        supabase.from('branch').select('*', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('supplier').select('*', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('customer').select('*', { count: 'exact', head: true }),
-        supabase.from('vehicle').select('*', { count: 'exact', head: true }),
-        supabase.from('notification').select('*', { count: 'exact', head: true }).eq('user_id', user.user_id).eq('is_read', false)
-      ]);
-
-      // Calculate total sales from recent sales data
-      const totalSales = recentSales?.reduce((acc: number, sale: any) => acc + sale.total_amount, 0) || 0;
-
-      setStats({
-        total_sales: totalSales,
-        total_items: itemCount ?? 0,
-        total_customers: customersRes.count ?? 0,
-        pending_jobs: jobCount ?? 0,
-        total_branches: branchesRes.count ?? 0,
-        total_suppliers: suppliersRes.count ?? 0,
-        total_vehicles: vehiclesRes.count ?? 0,
-        unread_notifications: notificationsRes.count ?? 0,
-      });
-
-      // Fetch recent notifications
-      const { data: notificationsData } = await supabase
-        .from('notification')
-        .select('*')
-        .eq('user_id', user.user_id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      
-      setNotifications(notificationsData || []);
-
-      // Fetch low stock items
-      const { data: lowStockData } = await supabase
-        .from('inventory_item')
-        .select('*')
-        .lte('stock_quantity', 10)
-        .order('stock_quantity', { ascending: true })
-        .limit(10);
-      
-      setLowStockItems(lowStockData || []);
-
-      // Fetch recent sales for detailed view
-      const { data: recentSalesData } = await supabase
-        .from('sale_item')
-        .select(`
-          *,
-          inventory_item (name, category),
-          user (name)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      
-      setRecentSales(recentSalesData || []);
-
-      // Group sales by date and format for chart
-      const salesByDate = new Map();
-      recentSales?.forEach((sale: any) => {
-        const date = new Date(sale.sale_date).toDateString();
-        salesByDate.set(date, (salesByDate.get(date) || 0) + sale.total_amount);
-      });
-
-      // Format data for chart - last 7 days
-      const formattedSales = [];
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dateString = date.toDateString();
-        formattedSales.push({
-          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          sales: salesByDate.get(dateString) || 0
-        });
+      if (!supabase) {
+        setError("Supabase client not available. Check credentials.");
+        setIsLoading(false);
+        return;
       }
-      setSalesData(formattedSales);
-      setLastUpdated(new Date());
-
-    } catch (err: any) {
-      console.error('Dashboard data fetch error:', err);
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user]);
+  
+      if (!user?.user_id) {
+        setIsLoading(false);
+        return;
+      }
+  
+      setIsLoading(true);
+      setError(null);
+      try {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        // Get sales data from sale_item (quantity * price_at_sale)
+        const { data: recentSales, error: salesError } = await supabase
+          .from('sale_item')
+          .select('created_at, quantity, price_at_sale, sale:sale_id(sale_date)')
+          .gte('created_at', sevenDaysAgo.toISOString())
+          .order('created_at', { ascending: false });
+  
+        if (salesError) throw new Error(`Could not fetch sales data: ${salesError.message}`);
+  
+        // Get inventory count
+        const { count: itemCount, error: itemError } = await supabase
+          .from('inventory_item')
+          .select('*', { count: 'exact', head: true });
+        if (itemError) throw new Error(`Could not count inventory: ${itemError.message}`);
+  
+        // Get user count
+        const { count: userCount, error: userError } = await supabase
+          .from('user')
+          .select('*', { count: 'exact', head: true });
+        if (userError) throw new Error(`Could not count users: ${userError.message}`);
+  
+        // Get pending service jobs count
+        const { count: jobCount, error: jobError } = await supabase
+          .from('service_job')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending');
+        if (jobError) throw new Error(`Could not count service jobs: ${jobError.message}`);
+  
+        // Get additional stats
+        const [branchesRes, suppliersRes, customersRes, vehiclesRes, notificationsRes] = await Promise.all([
+          supabase.from('branch').select('*', { count: 'exact', head: true }).eq('is_active', true),
+          supabase.from('supplier').select('*', { count: 'exact', head: true }).eq('is_active', true),
+          supabase.from('customer').select('*', { count: 'exact', head: true }),
+          supabase.from('vehicle').select('*', { count: 'exact', head: true }),
+          supabase.from('notification').select('*', { count: 'exact', head: true }).eq('user_id', user.user_id).eq('is_read', false)
+        ]);
+  
+        // Calculate total sales from sale_item (quantity * price_at_sale)
+        const totalSales = recentSales?.reduce(
+          (acc: number, item: any) => acc + (Number(item.quantity || 0) * Number(item.price_at_sale || 0)), 
+          0
+        ) || 0;
+  
+        setStats({
+          total_sales: totalSales,
+          total_items: itemCount ?? 0,
+          total_customers: customersRes.count ?? 0,
+          pending_jobs: jobCount ?? 0,
+          total_branches: branchesRes.count ?? 0,
+          total_suppliers: suppliersRes.count ?? 0,
+          total_vehicles: vehiclesRes.count ?? 0,
+          unread_notifications: notificationsRes.count ?? 0,
+        });
+  
+        // Fetch recent notifications
+        const { data: notificationsData } = await supabase
+          .from('notification')
+          .select('*')
+          .eq('user_id', user.user_id)
+          .order('created_at', { ascending: false })
+          .limit(5);
+        
+        setNotifications(notificationsData || []);
+        
+        // Fetch ALL inventory items first
+        const { data: allInventory } = await supabase
+          .from('inventory_item')
+          .select('*');
+        
+        // Filter low stock items in JavaScript (where stock_quantity <= reorder_level)
+        const lowStockData = (allInventory || [])
+          .filter(item => item.stock_quantity <= item.reorder_level)
+          .sort((a, b) => a.stock_quantity - b.stock_quantity)
+          .slice(0, 10);
+        
+        setLowStockItems(lowStockData || []);
+  
+        // Fetch recent sales for detailed view
+        const { data: recentSalesData } = await supabase
+          .from('sale_item')
+          .select(`
+            *,
+            inventory_item:item_id(name, category),
+            sale:sale_id(user:user_id(name))
+          `)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        
+        // Flatten user data
+        const formattedSales = (recentSalesData || []).map(item => ({
+          ...item,
+          user: item.sale?.user || null
+        }));
+        
+        setRecentSales(formattedSales);
+  
+        // Group sales by date and format for chart
+        const salesByDate = new Map();
+        recentSales?.forEach((item: any) => {
+          const date = new Date(item.sale?.sale_date || item.created_at).toDateString();
+          const amount = Number(item.quantity || 0) * Number(item.price_at_sale || 0);
+          salesByDate.set(date, (salesByDate.get(date) || 0) + amount);
+        });
+  
+        // Format data for chart - last 7 days
+        const formattedSalesChart = [];
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          const dateString = date.toDateString();
+          formattedSalesChart.push({
+            date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            sales: salesByDate.get(dateString) || 0
+          });
+        }
+        setSalesData(formattedSalesChart);
+        setLastUpdated(new Date());
+  
+      } catch (err: any) {
+        console.error('Dashboard data fetch error:', err);
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    }, [user]);
+  // ...existing code...
 
   useEffect(() => {
     if (user?.user_id) {
@@ -470,7 +485,7 @@ export default function DashboardPage() {
                   {lastUpdated && (
                     <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">
                       <Clock className="w-5 h-5" />
-                      Updated {lastUpdated.toLocaleTimeString()}
+                      Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                     </div>
                   )}
                   <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm">

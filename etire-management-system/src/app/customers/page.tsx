@@ -506,10 +506,6 @@ export default function CustomersPage() {
                 <TabsContent value="customers" className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h3 className="text-lg font-semibold">Customer Management</h3>
-                        <Button size="sm" onClick={handleOpenCustomerDialog} disabled={isCustomerLoading}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Add Customer
-                        </Button>
                     </div>
 
                     {customerError && (
@@ -540,10 +536,6 @@ export default function CustomersPage() {
                 <TabsContent value="vehicles" className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h3 className="text-lg font-semibold">Vehicle Management</h3>
-                        <Button size="sm" onClick={handleOpenVehicleDialog} disabled={isVehicleLoading}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Add Vehicle
-                        </Button>
                     </div>
 
                     {vehicleError && (
@@ -574,10 +566,6 @@ export default function CustomersPage() {
                 <TabsContent value="history" className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h3 className="text-lg font-semibold">Tire Service History</h3>
-                        <Button size="sm" onClick={handleOpenHistoryDialog} disabled={isHistoryLoading}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Add History
-                        </Button>
                     </div>
 
                     {historyError && (

@@ -415,10 +415,6 @@ const handleDelete = async () => {
                 <TabsContent value="suppliers" className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h3 className="text-lg font-semibold">Supplier Management</h3>
-                        <Button size="sm" onClick={handleOpenSupplierDialog} disabled={isSupplierLoading}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Add Supplier
-                        </Button>
                     </div>
 
                     {supplierError && (
@@ -449,10 +445,6 @@ const handleDelete = async () => {
                 <TabsContent value="purchase-orders" className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h3 className="text-lg font-semibold">Purchase Orders</h3>
-                        <Button size="sm" onClick={handleOpenPODialog} disabled={isPOLoading}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Create PO
-                        </Button>
                     </div>
 
                     {poError && (

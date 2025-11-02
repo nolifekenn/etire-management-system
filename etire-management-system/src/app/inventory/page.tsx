@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { StatCard } from '@/components/StatCard';
 import { PageHeader } from '@/components/PageHeader';
 import { DataTableWrapper } from '@/components/DataTableWrapper';
-import { Archive, Coins, AlertTriangle, PlusCircle, PackageSearch, Loader2 } from 'lucide-react';
+import { Archive, Coins, AlertTriangle, PlusCircle, PackageSearch, Loader2, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -65,6 +65,9 @@ export default function InventoryPage() {
 
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<InventoryItem | null>(null);
+
+  // Filter state
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'tire' | 'tool' | 'accessory'>('all');
 
   // Form state for Add/Edit dialog
   const [itemName, setItemName] = useState('');
@@ -202,9 +205,14 @@ export default function InventoryPage() {
     }
   };
 
-  const totalStockValue = items.reduce((acc, p) => acc + (p.sale_price * p.stock_quantity), 0);
-  const lowStockCount = items.filter(p => p.stock_quantity <= 5).length; // Assuming low stock is 5 or less
-  const outOfStockCount = items.filter(p => p.stock_quantity === 0).length;
+  // Filter items based on category
+  const filteredItems = categoryFilter === 'all' 
+    ? items 
+    : items.filter(item => item.category === categoryFilter);
+
+  const totalStockValue = filteredItems.reduce((acc, p) => acc + (p.sale_price * p.stock_quantity), 0);
+  const lowStockCount = filteredItems.filter(p => p.stock_quantity <= 5).length;
+  const outOfStockCount = filteredItems.filter(p => p.stock_quantity === 0).length;
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -212,10 +220,20 @@ export default function InventoryPage() {
         title="Inventory Management" 
         description="Track all products, stock levels, and pricing."
       >
-        <Button size="sm" onClick={handleOpenAddDialog} disabled={isLoading}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-           Add Item
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as typeof categoryFilter)}>
+            <SelectTrigger className="w-[140px]">
+              <Filter className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Filter..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Items</SelectItem>
+              <SelectItem value="tire">Tires</SelectItem>
+              <SelectItem value="tool">Tools</SelectItem>
+              <SelectItem value="accessory">Accessories</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </PageHeader>
 
       {fetchError && (
@@ -307,7 +325,7 @@ export default function InventoryPage() {
       </AlertDialog>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-        <StatCard title="Total Items" value={isLoading ? "..." : String(items.length)} icon={Archive} description="Distinct item types" iconClassName="text-blue-500" />
+        <StatCard title="Total Items" value={isLoading ? "..." : String(filteredItems.length)} icon={Archive} description="Distinct item types" iconClassName="text-blue-500" />
         <StatCard title="Total Stock Value" value={isLoading ? "..." : `₱${totalStockValue.toLocaleString()}`} icon={Coins} description="Based on sale price" iconClassName="text-green-500" />
         <StatCard title="Low Stock Alerts" value={isLoading ? "..." : String(lowStockCount)} icon={AlertTriangle} description="Needs reordering" iconClassName="text-yellow-500" />
         <StatCard title="Out of Stock" value={isLoading ? "..." : String(outOfStockCount)} icon={PackageSearch} description="Urgently require attention" iconClassName="text-red-500" />
@@ -321,7 +339,7 @@ export default function InventoryPage() {
       <DataTableWrapper
         title="Inventory List"
         columns={columns}
-        data={items.map(i => ({...i, id: i.item_id}))}
+        data={filteredItems.map(i => ({...i, id: i.item_id}))}
         onAddNew={handleOpenAddDialog}
         onEdit={handleOpenEditDialog}
         onDelete={handleOpenDeleteDialog}
