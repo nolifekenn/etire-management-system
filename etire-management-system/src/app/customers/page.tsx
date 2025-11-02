@@ -126,10 +126,10 @@ export default function CustomersPage() {
         if (!supabase) return;
         setIsCustomerLoading(true);
         const { data, error } = await supabase
-            .from('customers')
-            .select('*, vehicle(count)')
+            .from('customer')
+            .select('*, vehicle(vehicle_id)') // Changed to get vehicle IDs instead of count
             .order('name', { ascending: true });
-
+    
         if (error) {
             setCustomerError(`Could not fetch customers: ${error.message}`);
             setCustomers([]);
@@ -145,7 +145,7 @@ export default function CustomersPage() {
         setIsVehicleLoading(true);
         const { data, error } = await supabase
             .from('vehicle')
-            .select('*, customers(name)')
+            .select('*, customer:customer_id(name)') // Changed from 'customers(name)' to 'customer:customer_id(name)'
             .order('plate_number', { ascending: true });
 
         if (error) {
@@ -163,7 +163,7 @@ export default function CustomersPage() {
         setIsHistoryLoading(true);
         const { data, error } = await supabase
             .from('tire_history')
-            .select('*, vehicle(plate_number), inventory_item(name), user(name)')
+            .select('*, vehicle:vehicle_id(plate_number), inventory_item:item_id(name), user:created_by(name)')
             .order('service_date', { ascending: false });
 
         if (error) {
@@ -293,13 +293,13 @@ export default function CustomersPage() {
         let error;
         if (editingCustomer) {
             const { error: updateError } = await supabase
-                .from('customers')
+                .from('customer') // Changed from 'customers'
                 .update(customerData)
                 .eq('customer_id', editingCustomer.customer_id);
             error = updateError;
         } else {
             const { error: insertError } = await supabase
-                .from('customers')
+                .from('customer') // Changed from 'customers'
                 .insert([customerData]);
             error = insertError;
         }
@@ -355,6 +355,7 @@ export default function CustomersPage() {
             toast({ title: "Success", description: `Vehicle ${editingVehicle ? 'updated' : 'created'} successfully.` });
             setIsVehicleDialogOpen(false);
             fetchVehicles();
+            fetchCustomers();
         }
     };
 
@@ -424,6 +425,7 @@ export default function CustomersPage() {
                 fetchCustomers();
             } else if (deletingItem.type === 'vehicle') {
                 fetchVehicles();
+                fetchCustomers();
             } else {
                 fetchTireHistory();
             }
@@ -432,7 +434,8 @@ export default function CustomersPage() {
 
     const renderCustomerCell = (item: any, columnKey: string, value: any) => {
         if (columnKey === 'vehicle_count') {
-            return item.vehicles ? item.vehicles.length : 0;
+            // Changed from item.vehicles to item.vehicle
+            return item.vehicle && Array.isArray(item.vehicle) ? item.vehicle.length : 0;
         }
         if (columnKey === 'phone' && !value) {
             return <span className="text-muted-foreground">No phone</span>;
@@ -445,10 +448,9 @@ export default function CustomersPage() {
         }
         return String(value || '');
     };
-
     const renderVehicleCell = (item: any, columnKey: string, value: any) => {
         if (columnKey === 'customer_name') {
-            return item.customers ? item.customers.name : 'Unknown Customer';
+            return item.customer?.name || 'Unknown Customer'; // Changed from 'customers' to 'customer'
         }
         if (columnKey === 'year' && !value) {
             return <span className="text-muted-foreground">-</span>;
@@ -467,10 +469,10 @@ export default function CustomersPage() {
 
     const renderHistoryCell = (item: any, columnKey: string, value: any) => {
         if (columnKey === 'plate_number') {
-            return item.vehicles ? item.vehicles.plate_number : 'Unknown Vehicle';
+            return item.vehicle?.plate_number || 'Unknown Vehicle'; // Changed from 'vehicles'
         }
         if (columnKey === 'item_name') {
-            return item.inventory ? item.inventory.name : 'Unknown Item';
+            return item.inventory_item?.name || 'Unknown Item'; // Changed from 'inventory'
         }
         if (columnKey === 'service_type') {
             return <Badge variant="outline" className="capitalize">{value}</Badge>;
@@ -482,7 +484,7 @@ export default function CustomersPage() {
             return <span className="text-muted-foreground">-</span>;
         }
         if (columnKey === 'created_by_name') {
-            return item.users ? item.users.name : 'Unknown User';
+            return item.user?.name || 'Unknown User'; // Changed from 'users'
         }
         return String(value || '');
     };
@@ -788,7 +790,7 @@ export default function CustomersPage() {
                                 <SelectContent>
                                     {vehicles.map(vehicle => (
                                         <SelectItem key={vehicle.vehicle_id} value={vehicle.vehicle_id}>
-                                            {vehicle.plate_number} - {vehicle.customers?.name || 'Unknown Customer'}
+                                            {vehicle.plate_number} - {vehicle.customer?.name || 'Unknown Customer'}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

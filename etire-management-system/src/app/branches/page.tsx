@@ -73,9 +73,12 @@ export default function BranchesPage() {
         setIsLoading(true);
         const { data, error } = await supabase
             .from('branch')
-            .select('*, user(name)')
+            .select(`
+                *,
+                user:manager_id(user_id, name)
+            `)
             .order('name', { ascending: true });
-
+    
         if (error) {
             setFetchError(`Could not fetch branches: ${error.message}`);
             setBranches([]);
@@ -89,13 +92,14 @@ export default function BranchesPage() {
     const fetchManagers = useCallback(async () => {
         if (!supabase) return;
         const { data, error } = await supabase
-            .from('users')
+            .from('user') // Changed from 'users' to 'user'
             .select('user_id, name')
             .in('role', [1, 2]) // Staff and Admin roles
             .order('name', { ascending: true });
-
+    
         if (error) {
             console.error('Error fetching managers:', error);
+            setManagers([]);
         } else {
             setManagers(data as User[]);
         }
@@ -151,7 +155,7 @@ export default function BranchesPage() {
             address: address || null,
             phone: phone || null,
             email: email || null,
-            manager_id: managerId || null,
+            manager_id: managerId && managerId !== 'none' ? managerId : null, // Handle "none" value
             is_active: isActive,
         };
 
@@ -201,7 +205,8 @@ export default function BranchesPage() {
 
     const renderCell = (item: any, columnKey: string, value: any) => {
         if (columnKey === 'manager_name') {
-            return item.users ? item.users.name : 'No Manager';
+            // Check both 'user' (from API) and 'users' (from direct Supabase) for compatibility
+            return item.manager?.name || item.user?.name || 'No Manager';
         }
         if (columnKey === 'is_active') {
             return (
@@ -308,7 +313,7 @@ export default function BranchesPage() {
                                     <SelectValue placeholder="Select a manager" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">No Manager</SelectItem>
+                                    <SelectItem value="none">No Manager</SelectItem> {/* Changed from empty string to "none" */}
                                     {managers.map(manager => (
                                         <SelectItem key={manager.user_id} value={manager.user_id}>
                                             {manager.name}

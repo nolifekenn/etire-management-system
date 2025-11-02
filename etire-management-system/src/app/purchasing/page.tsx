@@ -43,6 +43,7 @@ const supplierColumns = [
   { key: 'contact_person', header: 'Contact Person' },
   { key: 'phone', header: 'Phone' },
   { key: 'email', header: 'Email' },
+  { key: 'payment_terms', header: 'Payment Terms'},
   { key: 'is_active', header: 'Status' },
 ];
 
@@ -366,34 +367,37 @@ const handleDelete = async () => {
         if (columnKey === 'email' && !value) {
             return <span className="text-muted-foreground">No email</span>;
         }
+        if (columnKey === 'payment_terms' && !value) { // Add this condition
+            return <span className="text-muted-foreground">No terms</span>;
+        }
         return String(value || '');
     };
 
-const renderPOCell = (item: any, columnKey: string, value: any) => {
-    if (columnKey === 'supplier_name') {
-        return item.supplier?.name || 'Unknown Supplier';
-    }
-    if (columnKey === 'branch_name') {
-        return item.branch?.name || 'Unknown Branch';
-    }
-    if (columnKey === 'order_date') {
-        return value ? new Date(value).toLocaleDateString() : 'No date';
-    }
-    if (columnKey === 'total_amount') {
-        return `₱${Number(value || 0).toFixed(2)}`;
-    }
-    if (columnKey === 'status') {
-        const status = value as string;
-        let color = '';
-        if (status === 'pending') color = 'bg-yellow-100 text-yellow-700';
-        if (status === 'approved') color = 'bg-blue-100 text-blue-700';
-        if (status === 'ordered') color = 'bg-purple-100 text-purple-700';
-        if (status === 'delivered') color = 'bg-green-100 text-green-700';
-        if (status === 'cancelled') color = 'bg-red-100 text-red-700';
-        return <Badge className={`capitalize ${color}`}>{status || 'pending'}</Badge>;
-    }
-    return String(value || '');
-};
+    const renderPOCell = (item: any, columnKey: string, value: any) => {
+        if (columnKey === 'supplier_name') {
+            return item.supplier?.name || 'Unknown Supplier';
+        }
+        if (columnKey === 'branch_name') {
+            return item.branch?.name || 'Unknown Branch';
+        }
+        if (columnKey === 'order_date') {
+            return value ? new Date(value).toLocaleDateString() : 'No date';
+        }
+        if (columnKey === 'total_amount') {
+            return `₱${Number(value || 0).toFixed(2)}`;
+        }
+        if (columnKey === 'status') {
+            const status = value as string;
+            let color = '';
+            if (status === 'pending') color = 'bg-yellow-100 text-yellow-700';
+            if (status === 'approved') color = 'bg-blue-100 text-blue-700';
+            if (status === 'ordered') color = 'bg-purple-100 text-purple-700';
+            if (status === 'delivered') color = 'bg-green-100 text-green-700';
+            if (status === 'cancelled') color = 'bg-red-100 text-red-700';
+            return <Badge className={`capitalize ${color}`}>{status || 'pending'}</Badge>;
+        }
+        return String(value || '');
+    };
 
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8">

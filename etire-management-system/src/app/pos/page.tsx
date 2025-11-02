@@ -17,7 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { receiptGenerator } from '@/lib/receiptGenerator';
 
 interface Customer {
-    user_id: string;
+    customer_id: string; // Changed from user_id to customer_id
     name: string;
 }
 
@@ -82,10 +82,10 @@ export default function POSPage() {
         setIsLoading(true);
         setFetchError(null);
         try {
-            // Fetch customers (users) and inventory in parallel
+            // Fetch customers and inventory in parallel
             const [inventoryRes, customersRes] = await Promise.all([
                 supabase.from('inventory_item').select('*').gt('stock_quantity', 0), // Only fetch items in stock
-                supabase.from('user').select('user_id, name')
+                supabase.from('customer').select('customer_id, name') // Changed from 'user' to 'customer'
             ]);
 
             if (inventoryRes.error) throw inventoryRes.error;
@@ -96,7 +96,7 @@ export default function POSPage() {
         } catch (error: any) {
             let errorMessage = `Failed to load data: ${error.message}.`;
             if (error.message.includes('relation') && error.message.includes('does not exist')) {
-                 errorMessage += ` Make sure the 'inventory' and 'users' tables exist and have been created via the schema script.`;
+                errorMessage += ` Make sure the 'inventory_item' and 'customer' tables exist and have been created via the schema script.`;
             }
             setFetchError(errorMessage);
             toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
@@ -330,12 +330,12 @@ USING (true);`}
                                     <SelectTrigger id="customer-select">
                                         <SelectValue placeholder="Select a customer" />
                                     </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={ANONYMOUS_CUSTOMER_ID}>Walk-in Customer</SelectItem>
-                                        {customers.map(c => (
-                                            <SelectItem key={c.user_id} value={c.user_id}>{c.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
+                                        <SelectContent>
+                                            <SelectItem value={ANONYMOUS_CUSTOMER_ID}>Walk-in Customer</SelectItem>
+                                            {customers.map(c => (
+                                                <SelectItem key={c.customer_id} value={c.customer_id}>{c.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
                                 </Select>
                            </div>
                            <div className="max-h-64 overflow-y-auto space-y-2 pr-2">
