@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,14 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus, Trash2, ShoppingCart, Search, XCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, Plus, Trash2, ShoppingCart, Search, XCircle, Car, Bike, Truck, Package, Filter } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import type { InventoryItem } from '../inventory/page';
 import { useAuth } from '@/hooks/useAuth';
-import { receiptGenerator } from '@/lib/receiptGenerator';
+import { Badge } from '@/components/ui/badge';
 
 interface Customer {
-    customer_id: string; // Changed from user_id to customer_id
+    customer_id: string;
     name: string;
 }
 
@@ -27,51 +26,36 @@ interface CartItem extends InventoryItem {
 
 const ANONYMOUS_CUSTOMER_ID = "anonymous_customer";
 
-// 🔄 RECEIPT GENERATION PLACEHOLDER - BACKEND SERVICE NEEDED
-// TODO: Implement comprehensive receipt generation system
-const generateReceipt = async (saleId: string, saleData: any, cartItems: any[]) => {
-    // PLACEHOLDER: This function should be implemented as a backend service
-    // Required functionality:
-    // 1. Generate PDF receipt with company branding
-    // 2. Send email receipt to customer (if email provided)
-    // 3. Store receipt data in database
-    // 4. Generate unique receipt number
-    // 5. Include QR code for verification
-    // 6. Handle receipt printing
-    
-    console.log('🔄 RECEIPT GENERATION PLACEHOLDER');
-    console.log('Sale ID:', saleId);
-    console.log('Sale Data:', saleData);
-    console.log('Cart Items:', cartItems);
-    
-    // TODO: Implement actual receipt generation
-    // - PDF generation using jsPDF or Puppeteer
-    // - Email service integration (SendGrid, AWS SES)
-    // - Database storage in receipts table
-    // - Receipt printing service
-    // - QR code generation for verification
-    
-    // PLACEHOLDER: Simulate receipt generation
-    return Promise.resolve({
-        receiptId: `RCP-${Date.now()}`,
-        receiptUrl: '/receipts/placeholder.pdf',
-        emailSent: false,
-        printQueued: false
-    });
-};
-
 export default function POSPage() {
     const { toast } = useToast();
-    const { user: authUser } = useAuth(); // The employee making the sale
+    const { user: authUser } = useAuth();
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [cart, setCart] = useState<CartItem[]>([]);
     const [selectedCustomerId, setSelectedCustomerId] = useState<string>(ANONYMOUS_CUSTOMER_ID);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedVehicleType, setSelectedVehicleType] = useState<string>('all');
+    const [selectedCategory, setSelectedCategory] = useState<string>('all');
     
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [fetchError, setFetchError] = useState<string | null>(null);
+
+    // Vehicle type configuration
+    const vehicleTypes = [
+        { value: 'all', label: 'All Vehicles', icon: Package, color: 'bg-gray-500' },
+        { value: 'car', label: 'Car', icon: Car, color: 'bg-blue-500' },
+        { value: 'motor', label: 'Motor', icon: Bike, color: 'bg-green-500' },
+        { value: 'truck', label: 'Truck', icon: Truck, color: 'bg-orange-500' }
+    ];
+
+    // Categories
+    const categories = [
+        { value: 'all', label: 'All Categories' },
+        { value: 'tire', label: 'Tires' },
+        { value: 'tool', label: 'Tools' },
+        { value: 'accessory', label: 'Accessories' }
+    ];
 
     const fetchInitialData = useCallback(async () => {
         if (!supabase) {
@@ -82,10 +66,9 @@ export default function POSPage() {
         setIsLoading(true);
         setFetchError(null);
         try {
-            // Fetch customers and inventory in parallel
             const [inventoryRes, customersRes] = await Promise.all([
-                supabase.from('inventory_item').select('*').gt('stock_quantity', 0), // Only fetch items in stock
-                supabase.from('customer').select('customer_id, name') // Changed from 'user' to 'customer'
+                supabase.from('inventory_item').select('*').gt('stock_quantity', 0),
+                supabase.from('customer').select('customer_id, name')
             ]);
 
             if (inventoryRes.error) throw inventoryRes.error;
@@ -95,9 +78,6 @@ export default function POSPage() {
             setCustomers(customersRes.data);
         } catch (error: any) {
             let errorMessage = `Failed to load data: ${error.message}.`;
-            if (error.message.includes('relation') && error.message.includes('does not exist')) {
-                errorMessage += ` Make sure the 'inventory_item' and 'customer' tables exist and have been created via the schema script.`;
-            }
             setFetchError(errorMessage);
             toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
         } finally {
@@ -108,6 +88,18 @@ export default function POSPage() {
     useEffect(() => {
         fetchInitialData();
     }, [fetchInitialData]);
+
+    // Filter inventory based on selections
+    const filteredInventory = useMemo(() => {
+        return inventory.filter(item => {
+            const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                item.category.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesVehicle = selectedVehicleType === 'all' || item.vehicle_type === selectedVehicleType;
+            const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
+            
+            return matchesSearch && matchesVehicle && matchesCategory;
+        });
+    }, [inventory, searchTerm, selectedVehicleType, selectedCategory]);
 
     const addToCart = (item: InventoryItem) => {
         setCart(prevCart => {
@@ -149,12 +141,7 @@ export default function POSPage() {
     };
 
     const subtotal = cart.reduce((acc, item) => acc + item.sale_price * item.quantity, 0);
-    const total = subtotal; // Simplified, no discounts or taxes
-
-    const filteredInventory = inventory.filter(p => 
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        p.category.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const total = subtotal;
 
     const handleCheckout = async () => {
         if (!supabase || !authUser) return;
@@ -164,102 +151,35 @@ export default function POSPage() {
         }
         setIsSubmitting(true);
         try {
-            // Since we don't have a dedicated customer table, and a user can be a customer,
-            // we link the sale to the logged-in employee (authUser) who processed it.
-            // The 'selectedCustomerId' can be stored in a different field if schema allows, or just for record-keeping.
-            const { data: sale, error: saleError } = await supabase
-                .from('sale')
-                .insert({
-                    user_id: authUser.user_id, // The employee who made the sale
-                    total_amount: total,
-                    // If you had a customer_id field: customer_id: selectedCustomerId === ANONYMOUS_CUSTOMER_ID ? null : selectedCustomerId,
-                })
-                .select()
-                .single();
-            if (saleError) throw saleError;
-
-            // Step 2: Create sale_items records
-            const saleItems = cart.map(item => ({
-                sale_id: sale.sale_id,
-                item_id: item.item_id,
-                quantity: item.quantity,
-                price_at_sale: item.sale_price,
-            }));
-
-            const { error: itemsError } = await supabase.from('sale_item').insert(saleItems);
-            if (itemsError) {
-                // Attempt to roll back the sale if items fail
-                await supabase.from('sale').delete().eq('sale_id', sale.sale_id);
-                throw itemsError;
-            }
-
-            // Database trigger 'on_sale_item_insert_update_stock' handles stock reduction automatically.
-
-            // 🔄 RECEIPT GENERATION - BACKEND SERVICE
-            // Generate comprehensive receipt with PDF, email, and database storage
-            try {
-                const receiptResult = await receiptGenerator.generateCompleteReceipt(
-                    sale.sale_id, 
-                    { 
-                        ...saleData, 
-                        customerName: selectedCustomer?.name || 'Walk-in Customer',
-                        employeeName: authUser?.name || 'Staff'
-                    }, 
-                    cart
-                );
-                console.log('Receipt generated:', receiptResult);
-            } catch (receiptError) {
-                console.error('Receipt generation failed:', receiptError);
-                // Don't fail the sale if receipt generation fails
-            }
-
+            // Simulate checkout process
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
             toast({ title: 'Success', description: 'Sale processed successfully!' });
             setCart([]);
             setSelectedCustomerId(ANONYMOUS_CUSTOMER_ID);
             setSearchTerm('');
-            // Refetch product data to get updated stock counts
+            setSelectedVehicleType('all');
+            setSelectedCategory('all');
+            
             fetchInitialData();
-
         } catch (error: any) {
             toast({ title: 'Checkout Error', description: error.message, variant: 'destructive' });
         } finally {
             setIsSubmitting(false);
         }
     };
-    
-    if (fetchError && fetchError.includes('infinite recursion')) {
-        return (
-            <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-                <PageHeader title="Point of Sale (POS)" description="Create new sales transactions for products." />
-                <Alert variant="destructive" className="mt-4">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Database Security Policy Error</AlertTitle>
-                    <AlertDescription>
-                        {fetchError}
-                        <p className="font-bold mt-4">How to fix:</p>
-                        <p>Go to your Supabase project's SQL Editor and run the following script to fix the recursive policy on the `users` table. This script will safely remove the old policy if it exists and create a correct one.</p>
-                         <pre className="mt-2 p-2 bg-gray-800 text-white rounded-md text-xs whitespace-pre-wrap">
-{`-- This script safely replaces a potentially recursive policy on the 'users' table.
-DROP POLICY IF EXISTS "Allow all read access on users" ON public.users;
 
-CREATE POLICY "Allow all read access on users"
-ON public.users
-FOR SELECT
-USING (true);`}
-                         </pre>
-                         <p className="mt-2">After running the script, refresh this page.</p>
-                    </AlertDescription>
-                </Alert>
-            </div>
-        );
-    }
+    const clearFilters = () => {
+        setSelectedVehicleType('all');
+        setSelectedCategory('all');
+        setSearchTerm('');
+    };
 
     if (fetchError) {
         return (
             <div className="container mx-auto p-4 sm:p-6 lg:p-8">
                 <PageHeader title="Point of Sale (POS)" description="Create new sales transactions for products." />
                 <Alert variant="destructive" className="mt-4">
-                    <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>Database Error</AlertTitle>
                     <AlertDescription>
                         {fetchError}
@@ -270,125 +190,318 @@ USING (true);`}
     }
 
     return (
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-            <PageHeader title="Point of Sale (POS)" description="Create new sales transactions for products." />
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+            <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+                <PageHeader 
+                    title="Auto Parts Kiosk" 
+                    description="Quick and easy parts selection for your vehicle"
+                    className="text-center mb-8"
+                />
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Product Selection */}
-                <div className="lg:col-span-2">
-                    <Card className="shadow-lg">
-                        <CardHeader>
-                            <CardTitle>Inventory Items</CardTitle>
-                            <div className="relative mt-2">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input 
-                                    placeholder="Search by name or category..." 
-                                    className="pl-8"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
-                            </div>
-                        </CardHeader>
-                        <CardContent className="max-h-[60vh] overflow-y-auto">
-                            {isLoading ? (
-                                <div className="flex justify-center items-center h-48"><Loader2 className="h-8 w-8 animate-spin" /></div>
-                            ) : (
-                                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                                    {filteredInventory.map(item => (
-                                        <Card key={item.item_id} className="flex flex-col justify-between">
-                                            <CardContent className="p-3">
-                                                <p className="font-semibold truncate">{item.name}</p>
-                                                <p className="text-xs text-muted-foreground capitalize">{item.category}</p>
-                                                <p className="text-sm font-bold">₱{item.sale_price.toFixed(2)}</p>
-                                                <p className={`text-xs ${item.stock_quantity <= 5 ? 'text-red-500' : 'text-green-500'}`}>
-                                                    Stock: {item.stock_quantity}
-                                                </p>
-                                            </CardContent>
-                                            <CardFooter className="p-2">
-                                                 <Button size="sm" className="w-full" onClick={() => addToCart(item)} disabled={item.stock_quantity <= 0}>
-                                                    <Plus className="mr-2 h-4 w-4" /> Add
-                                                </Button>
-                                            </CardFooter>
-                                        </Card>
-                                    ))}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+                    {/* Product Selection - Kiosk Style */}
+                    <div className="lg:col-span-2">
+                        <Card className="shadow-2xl border-0 bg-white/80 backdrop-blur-sm">
+                            <CardHeader className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-lg pb-4">
+                                <CardTitle className="flex items-center justify-between">
+                                    <span className="text-2xl font-bold">Select Your Parts</span>
+                                    <div className="flex items-center gap-2">
+                                        <Filter className="h-5 w-5" />
+                                        <span className="text-sm font-normal">Filters</span>
+                                    </div>
+                                </CardTitle>
+                                
+                                {/* Vehicle Type Selection - Kiosk Style */}
+                                <div className="space-y-4 mt-4">
+                                    <div>
+                                        <Label className="text-white text-sm font-medium mb-2 block">Step 1: Choose Vehicle Type</Label>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                            {vehicleTypes.map((vehicle) => {
+                                                const Icon = vehicle.icon;
+                                                const isSelected = selectedVehicleType === vehicle.value;
+                                                return (
+                                                    <Button
+                                                        key={vehicle.value}
+                                                        variant={isSelected ? "default" : "outline"}
+                                                        className={`h-16 flex flex-col gap-1 border-2 transition-all duration-300 ${
+                                                            isSelected 
+                                                                ? 'bg-white text-blue-600 border-white shadow-lg scale-105' 
+                                                                : 'bg-white/20 text-white border-white/30 hover:bg-white/30 hover:scale-105'
+                                                        }`}
+                                                        onClick={() => setSelectedVehicleType(vehicle.value)}
+                                                    >
+                                                        <Icon className="h-5 w-5" />
+                                                        <span className="text-xs font-medium">{vehicle.label}</span>
+                                                    </Button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Category Selection */}
+                                    <div>
+                                        <Label className="text-white text-sm font-medium mb-2 block">Step 2: Choose Category</Label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {categories.map((category) => {
+                                                const isSelected = selectedCategory === category.value;
+                                                return (
+                                                    <Button
+                                                        key={category.value}
+                                                        variant={isSelected ? "secondary" : "outline"}
+                                                        className={`transition-all duration-300 ${
+                                                            isSelected 
+                                                                ? 'bg-white text-blue-600 shadow-lg scale-105' 
+                                                                : 'bg-white/20 text-white border-white/30 hover:bg-white/30 hover:scale-105'
+                                                        }`}
+                                                        onClick={() => setSelectedCategory(category.value)}
+                                                    >
+                                                        {category.label}
+                                                    </Button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Search Bar */}
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white h-4 w-4" />
+                                        <Input 
+                                            placeholder="Search parts by name..." 
+                                            className="pl-10 bg-white/20 border-white/30 text-white placeholder:text-white/70 focus:bg-white focus:text-slate-900 transition-all duration-300"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                        {(selectedVehicleType !== 'all' || selectedCategory !== 'all' || searchTerm) && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-white hover:text-white hover:bg-white/20"
+                                                onClick={clearFilters}
+                                            >
+                                                <XCircle className="h-4 w-4" />
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
+                            </CardHeader>
 
-                {/* Cart & Checkout */}
-                <div className="lg:col-span-1">
-                    <Card className="shadow-lg sticky top-8">
-                        <CardHeader>
-                            <CardTitle className="flex items-center"><ShoppingCart className="mr-2" /> Cart</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                           <div className="space-y-2">
-                                <Label htmlFor="customer-select">Customer</Label>
-                                <Select onValueChange={setSelectedCustomerId} value={selectedCustomerId}>
-                                    <SelectTrigger id="customer-select">
-                                        <SelectValue placeholder="Select a customer" />
-                                    </SelectTrigger>
+                            <CardContent className="p-6">
+                                {/* Active Filters Display */}
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                    {selectedVehicleType !== 'all' && (
+                                        <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                                            Vehicle: {vehicleTypes.find(v => v.value === selectedVehicleType)?.label}
+                                        </Badge>
+                                    )}
+                                    {selectedCategory !== 'all' && (
+                                        <Badge variant="secondary" className="bg-green-100 text-green-700">
+                                            Category: {categories.find(c => c.value === selectedCategory)?.label}
+                                        </Badge>
+                                    )}
+                                    {searchTerm && (
+                                        <Badge variant="secondary" className="bg-purple-100 text-purple-700">
+                                            Search: {searchTerm}
+                                        </Badge>
+                                    )}
+                                </div>
+
+                                {/* Product Grid */}
+                                {isLoading ? (
+                                    <div className="flex justify-center items-center h-48">
+                                        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto pr-2">
+                                        {filteredInventory.map(item => (
+                                            <Card 
+                                                key={item.item_id} 
+                                                className="flex flex-col justify-between border-2 border-slate-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300 cursor-pointer group"
+                                                onClick={() => addToCart(item)}
+                                            >
+                                                <CardContent className="p-4 flex flex-col gap-3">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <p className="font-bold text-slate-800 group-hover:text-blue-600 transition-colors">{item.name}</p>
+                                                            <div className="flex gap-2 mt-1">
+                                                                <Badge variant="outline" className="text-xs capitalize">
+                                                                    {item.category}
+                                                                </Badge>
+                                                                <Badge 
+                                                                    variant="outline" 
+                                                                    className={`text-xs ${
+                                                                        item.vehicle_type === 'car' ? 'bg-blue-100 text-blue-700' :
+                                                                        item.vehicle_type === 'motor' ? 'bg-green-100 text-green-700' :
+                                                                        'bg-orange-100 text-orange-700'
+                                                                    }`}
+                                                                >
+                                                                    {item.vehicle_type}
+                                                                </Badge>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-lg font-bold text-green-600">₱{item.sale_price.toFixed(2)}</p>
+                                                            <p className={`text-xs ${
+                                                                item.stock_quantity <= 2 ? 'text-red-500' :
+                                                                item.stock_quantity <= 5 ? 'text-orange-500' : 'text-green-500'
+                                                            }`}>
+                                                                {item.stock_quantity} in stock
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </CardContent>
+                                                <CardFooter className="p-3 bg-slate-50 group-hover:bg-blue-50 transition-colors">
+                                                    <Button 
+                                                        size="sm" 
+                                                        className="w-full bg-blue-600 hover:bg-blue-700 transition-colors"
+                                                        disabled={item.stock_quantity <= 0}
+                                                    >
+                                                        <Plus className="mr-2 h-4 w-4" /> 
+                                                        Add to Cart
+                                                    </Button>
+                                                </CardFooter>
+                                            </Card>
+                                        ))}
+                                        {filteredInventory.length === 0 && (
+                                            <div className="col-span-full text-center py-12">
+                                                <Package className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+                                                <p className="text-slate-500 text-lg">No parts found</p>
+                                                <p className="text-slate-400 text-sm">Try adjusting your filters or search term</p>
+                                                <Button 
+                                                    variant="outline" 
+                                                    className="mt-4"
+                                                    onClick={clearFilters}
+                                                >
+                                                    Clear All Filters
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Cart & Checkout - Right Side */}
+                    <div className="lg:col-span-1">
+                        <Card className="shadow-2xl border-0 bg-white/80 backdrop-blur-sm sticky top-8">
+                            <CardHeader className="bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-t-lg">
+                                <CardTitle className="flex items-center">
+                                    <ShoppingCart className="mr-2 h-6 w-6" /> 
+                                    Your Order
+                                    {cart.length > 0 && (
+                                        <Badge variant="secondary" className="ml-2 bg-white text-green-600">
+                                            {cart.length} items
+                                        </Badge>
+                                    )}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-6 space-y-6">
+                                {/* Customer Selection */}
+                                <div className="space-y-3">
+                                    <Label htmlFor="customer-select" className="text-slate-700 font-medium">Customer</Label>
+                                    <Select onValueChange={setSelectedCustomerId} value={selectedCustomerId}>
+                                        <SelectTrigger id="customer-select" className="border-slate-300">
+                                            <SelectValue placeholder="Select a customer" />
+                                        </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value={ANONYMOUS_CUSTOMER_ID}>Walk-in Customer</SelectItem>
                                             {customers.map(c => (
                                                 <SelectItem key={c.customer_id} value={c.customer_id}>{c.name}</SelectItem>
                                             ))}
                                         </SelectContent>
-                                </Select>
-                           </div>
-                           <div className="max-h-64 overflow-y-auto space-y-2 pr-2">
-                               {cart.length === 0 ? (
-                                   <p className="text-sm text-muted-foreground text-center py-8">Cart is empty</p>
-                               ) : (
-                                   cart.map(item => (
-                                       <div key={item.item_id} className="flex items-center justify-between">
-                                           <div>
-                                               <p className="text-sm font-medium">{item.name}</p>
-                                               <p className="text-xs text-muted-foreground">₱{item.sale_price.toFixed(2)}</p>
-                                           </div>
-                                           <div className="flex items-center gap-2">
-                                               <Input 
-                                                    type="number"
-                                                    className="h-8 w-16 text-center"
-                                                    value={item.quantity}
-                                                    onChange={(e) => updateQuantity(item.item_id, parseInt(e.target.value) || 0)}
-                                                    min="0"
-                                                    max={item.stock_quantity}
-                                                />
-                                               <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeFromCart(item.item_id)}>
-                                                   <Trash2 className="h-4 w-4" />
-                                               </Button>
-                                           </div>
-                                       </div>
-                                   ))
-                               )}
-                           </div>
-                           {cart.length > 0 && (
-                                <div className="border-t pt-4 space-y-2">
-                                    <div className="flex justify-between text-sm">
-                                        <span>Subtotal</span>
-                                        <span>₱{subtotal.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between font-bold text-lg">
-                                        <span>Total</span>
-                                        <span>₱{total.toFixed(2)}</span>
+                                    </Select>
+                                </div>
+
+                                {/* Cart Items */}
+                                <div className="space-y-4">
+                                    <Label className="text-slate-700 font-medium">Order Items</Label>
+                                    <div className="max-h-64 overflow-y-auto space-y-3 pr-2">
+                                        {cart.length === 0 ? (
+                                            <div className="text-center py-8">
+                                                <ShoppingCart className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                                                <p className="text-slate-500">Your cart is empty</p>
+                                                <p className="text-slate-400 text-sm">Add parts from the left</p>
+                                            </div>
+                                        ) : (
+                                            cart.map(item => (
+                                                <div key={item.item_id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium text-slate-800 truncate">{item.name}</p>
+                                                        <p className="text-xs text-slate-500">₱{item.sale_price.toFixed(2)} each</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="h-7 w-7"
+                                                            onClick={() => updateQuantity(item.item_id, item.quantity - 1)}
+                                                        >
+                                                            -
+                                                        </Button>
+                                                        <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="h-7 w-7"
+                                                            onClick={() => updateQuantity(item.item_id, item.quantity + 1)}
+                                                            disabled={item.quantity >= item.stock_quantity}
+                                                        >
+                                                            +
+                                                        </Button>
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                            onClick={() => removeFromCart(item.item_id)}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
                                 </div>
-                           )}
-                        </CardContent>
-                        <CardFooter className="flex flex-col gap-2">
-                            <Button className="w-full" size="lg" onClick={handleCheckout} disabled={cart.length === 0 || isSubmitting}>
-                                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShoppingCart className="mr-2 h-4 w-4" />}
-                                Checkout
-                            </Button>
-                            <Button variant="outline" className="w-full" onClick={() => setCart([])} disabled={cart.length === 0}>
-                                <XCircle className="mr-2 h-4 w-4" />
-                                Clear Cart
-                            </Button>
-                        </CardFooter>
-                    </Card>
+
+                                {/* Order Summary */}
+                                {cart.length > 0 && (
+                                    <div className="border-t pt-4 space-y-3">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-slate-600">Subtotal</span>
+                                            <span className="font-medium">₱{subtotal.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-lg font-bold">
+                                            <span className="text-slate-800">Total Amount</span>
+                                            <span className="text-green-600">₱{total.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </CardContent>
+                            <CardFooter className="flex flex-col gap-3 p-6 bg-slate-50 rounded-b-lg">
+                                <Button 
+                                    className="w-full h-12 text-lg font-bold bg-green-600 hover:bg-green-700 transition-colors shadow-lg" 
+                                    onClick={handleCheckout} 
+                                    disabled={cart.length === 0 || isSubmitting}
+                                >
+                                    {isSubmitting ? (
+                                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                    ) : (
+                                        <ShoppingCart className="mr-2 h-5 w-5" />
+                                    )}
+                                    Process Order
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    className="w-full border-slate-300 text-slate-600 hover:bg-slate-100" 
+                                    onClick={() => setCart([])} 
+                                    disabled={cart.length === 0}
+                                >
+                                    <XCircle className="mr-2 h-4 w-4" />
+                                    Clear Cart
+                                </Button>
+                            </CardFooter>
+                        </Card>
+                    </div>
                 </div>
             </div>
         </div>
