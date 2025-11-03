@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -28,6 +27,11 @@ import { useFormFieldPersistence } from '@/hooks/useFormPersistence';
 import { FormPersistenceIndicator } from '@/components/FormPersistenceIndicator';
 
 // Interfaces based on the user's schema
+interface VehicleType {
+    vehicle_type_id: string;
+    name: string;
+}
+
 interface ServiceJob {
     job_id: string;
     user_id: string;
@@ -36,8 +40,9 @@ interface ServiceJob {
     status: 'pending' | 'in-progress' | 'completed' | 'cancelled';
     service_fee: number;
     remarks: string | null;
-    // Joined data
+    vehicle_type_id: string | null;
     user?: { name: string } | null;
+    vehicle_type?: VehicleType | null;
 }
 
 interface Customer {
@@ -47,6 +52,7 @@ interface Customer {
 
 const columns = [
   { key: 'job_description', header: 'Description' },
+  { key: 'vehicle_type', header: 'Vehicle Type' },
   { key: 'user_name', header: 'Employee' },
   { key: 'job_date', header: 'Date' },
   { key: 'service_fee', header: 'Fee (₱)' },
@@ -60,6 +66,7 @@ export default function ServiceManagementPage() {
     const { user: authUser } = useAuth();
     const [serviceJobs, setServiceJobs] = useState<ServiceJob[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
+    const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
     
     const [isLoading, setIsLoading] = useState(true);
     const [isDataLoading, setIsDataLoading] = useState(true);
@@ -75,7 +82,8 @@ export default function ServiceManagementPage() {
     const { value: remarks, setValue: setRemarks } = useFormFieldPersistence('service-job-form', 'remarks', '');
     const { value: jobStatus, setValue: setJobStatus } = useFormFieldPersistence('service-job-form', 'jobStatus', 'pending');
     const { value: serviceFee, setValue: setServiceFee } = useFormFieldPersistence('service-job-form', 'serviceFee', '0');
-    
+    const { value: vehicleTypeId, setValue: setVehicleTypeId } = useFormFieldPersistence('service-job-form', 'vehicleTypeId', '');
+
     const fetchJobs = useCallback(async () => {
         setIsLoading(true);
         try {
@@ -101,12 +109,9 @@ export default function ServiceManagementPage() {
         if (!supabase) return;
         setIsDataLoading(true);
         try {
-            // Since customers cannot register, we only need to fetch employees/admins
-            // For service jobs, we'll use the current employee's ID
             const { data, error } = await supabase.from('user').select('user_id, name');
             if (error) throw error;
             
-            // Set customers to just the current user and a walk-in option
             setCustomers([
                 { user_id: ANONYMOUS_CUSTOMER_ID, name: 'Walk-in Customer' },
                 ...(data || [])
@@ -123,10 +128,27 @@ export default function ServiceManagementPage() {
         }
     }, [toast]);
 
+    const fetchVehicleTypes = useCallback(async () => {
+        try {
+            const res = await fetch('/services/api?type=vehicle-types');
+            const body = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(body.error?.message || 'Failed to fetch vehicle types');
+            }
+            
+            setVehicleTypes(body || []);
+        } catch (error: any) {
+            console.error('Vehicle types fetch error:', error);
+            toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        }
+    }, [toast]);
+
     useEffect(() => {
         fetchJobs();
         fetchCustomers();
-    }, [fetchJobs, fetchCustomers]);
+        fetchVehicleTypes();
+    }, [fetchJobs, fetchCustomers, fetchVehicleTypes]);
 
     const resetForm = () => {
         setCustomerId(ANONYMOUS_CUSTOMER_ID);
@@ -134,6 +156,7 @@ export default function ServiceManagementPage() {
         setRemarks('');
         setJobStatus('pending');
         setServiceFee('0');
+        setVehicleTypeId('');
         setEditingJob(null);
     };
 
@@ -149,11 +172,15 @@ export default function ServiceManagementPage() {
         setRemarks(job.remarks || '');
         setJobStatus(job.status);
         setServiceFee(String(job.service_fee));
+        setVehicleTypeId(job.vehicle_type_id || '');
         setIsEditDialogOpen(true);
     };
 
     const handleSubmit = async () => {
-        if (!authUser) return;
+        if (!authUser) {
+            toast({ title: 'Error', description: 'You must be logged in to create a job.', variant: 'destructive'});
+            return;
+        }
         if (!jobDescription) {
             toast({ title: 'Validation Error', description: 'Job description is required.', variant: 'destructive'});
             return;
@@ -162,21 +189,21 @@ export default function ServiceManagementPage() {
         setIsLoading(true);
         
         try {
-            // In this system, service jobs are always associated with the employee who creates them
-            // The customer selection is just for reference/notes
             const customerName = customerId === ANONYMOUS_CUSTOMER_ID ? 'Walk-in Customer' : 
                                 customers.find(c => c.user_id === customerId)?.name || 'Unknown Customer';
             
             const jobData = {
-                user_id: authUser.user_id, // Always use the current employee's ID
+                user_id: authUser.user_id,
                 job_description: jobDescription,
                 status: jobStatus,
-                service_fee: parseFloat(serviceFee),
+                service_fee: parseFloat(serviceFee) || 0,
                 remarks: `Customer: ${customerName}${remarks ? '\n\nRemarks: ' + remarks : ''}`,
+                vehicle_type_id: vehicleTypeId && vehicleTypeId !== '' ? vehicleTypeId : null,
             };
 
+            console.log('Submitting job data:', jobData);
+
             if (editingJob) {
-                // Update existing job
                 const res = await fetch('/services/api', {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -185,15 +212,17 @@ export default function ServiceManagementPage() {
                 
                 const body = await res.json();
                 
+                console.log('Update response:', res.status, body);
+                
                 if (!res.ok) {
                     throw new Error(body.error?.message || 'Failed to update job');
                 }
                 
                 toast({ title: 'Success', description: 'Service job updated.' });
                 setIsEditDialogOpen(false);
-                fetchJobs();
+                resetForm();
+                await fetchJobs();
             } else {
-                // Create new job
                 const res = await fetch('/services/api', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -202,28 +231,60 @@ export default function ServiceManagementPage() {
                 
                 const body = await res.json();
                 
+                console.log('Create response:', res.status, body);
+                
                 if (!res.ok) {
                     throw new Error(body.error?.message || 'Failed to create job');
                 }
                 
                 toast({ title: 'Success', description: 'New service job created.' });
                 setIsAddDialogOpen(false);
-                fetchJobs();
+                resetForm();
+                await fetchJobs();
             }
         } catch (error: any) {
+            console.error('Submit error:', error);
             toast({ title: 'Error', description: error.message, variant: 'destructive' });
         } finally {
             setIsLoading(false);
         }
     };
+
+    const handleDelete = async (jobId: string) => {
+        if (confirm('Are you sure you want to delete this job?')) {
+            setIsLoading(true);
+            try {
+                const res = await fetch(`/services/api?job_id=${jobId}`, {
+                    method: 'DELETE',
+                });
+                const body = await res.json();
+                if (!res.ok) {
+                    throw new Error(body.error?.message || 'Failed to delete job');
+                }
+                toast({ title: 'Success', description: 'Service job deleted.' });
+                fetchJobs();
+            } catch (error: any) {
+                toast({ title: 'Error', description: error.message, variant: 'destructive' });
+            } finally {
+                setIsLoading(false);
+            }
+        }
+    };
     
     const renderCell = (item: any, columnKey: string, value: any) => {
         if (columnKey === 'user_name') {
-            // Since service jobs are now associated with employees, show the employee name
             return item.user ? item.user.name : 'Unknown Employee';
         }
+        if (columnKey === 'vehicle_type') {
+            if (!item.vehicle_type) return <Badge variant="outline">N/A</Badge>;
+            const vehicleName = item.vehicle_type.name;
+            const color = vehicleName === 'car' ? 'bg-blue-100 text-blue-700' :
+                         vehicleName === 'motor' ? 'bg-green-100 text-green-700' :
+                         'bg-orange-100 text-orange-700';
+            return <Badge className={`capitalize ${color}`}>{vehicleName}</Badge>;
+        }
         if (columnKey === 'job_date') {
-             return new Date(value).toLocaleDateString();
+            return new Date(value).toLocaleDateString();
         }
         if (columnKey === 'service_fee') {
             return `₱${Number(value).toFixed(2)}`;
@@ -235,7 +296,7 @@ export default function ServiceManagementPage() {
             if(status === 'in-progress') color='bg-blue-100 text-blue-700';
             if(status === 'completed') color='bg-green-100 text-green-700';
             if(status === 'cancelled') color='bg-red-100 text-red-700';
-            return <Badge className={`capitalize ${color}`}>{status.replace('_', ' ')}</Badge>
+            return <Badge className={`capitalize ${color}`}>{status.replace('-', ' ')}</Badge>
         }
         return String(value);
     };
@@ -289,7 +350,7 @@ USING (true);`}
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Service Job
                 </Button>
             </PageHeader>
-
+    
             <Dialog open={isAddDialogOpen || isEditDialogOpen} onOpenChange={(isOpen) => {
                 if (!isOpen) { setIsAddDialogOpen(false); setIsEditDialogOpen(false); resetForm(); }
             }}>
@@ -301,7 +362,7 @@ USING (true);`}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4 max-h-[70vh] overflow-y-auto">
                         <FormPersistenceIndicator formId="service-job-form" />
                         <div className="space-y-2">
-                            <Label>Customer Reference</Label>
+                            <Label>Customer</Label>
                             <Select value={customerId} onValueChange={setCustomerId}>
                                 <SelectTrigger><SelectValue placeholder="Select customer reference..."/></SelectTrigger>
                                 <SelectContent>
@@ -310,7 +371,31 @@ USING (true);`}
                                 </SelectContent>
                             </Select>
                         </div>
-                         <div className="space-y-2">
+                        <div className="space-y-2">
+                            <Label>Vehicle Type</Label>
+                            <Select value={vehicleTypeId || undefined} onValueChange={(val) => setVehicleTypeId(val)}>
+                                <SelectTrigger><SelectValue placeholder="Select vehicle type..."/></SelectTrigger>
+                                <SelectContent>
+                                    {vehicleTypes.map(vt => (
+                                        <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id}>
+                                            {vt.name.charAt(0).toUpperCase() + vt.name.slice(1)}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {vehicleTypeId && (
+                                <Button 
+                                    type="button" 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => setVehicleTypeId('')}
+                                    className="text-xs"
+                                >
+                                    Clear selection
+                                </Button>
+                            )}
+                        </div>
+                        <div className="space-y-2">
                             <Label>Status</Label>
                             <Select value={jobStatus} onValueChange={val => setJobStatus(val as any)}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
@@ -330,7 +415,7 @@ USING (true);`}
                             <Label>Service Fee</Label>
                             <Input type="number" value={serviceFee} onChange={e => setServiceFee(e.target.value)} placeholder="0.00"/>
                         </div>
-                         <div className="md:col-span-2 space-y-2">
+                        <div className="md:col-span-2 space-y-2">
                             <Label>Remarks</Label>
                             <Textarea value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Customer notes or internal remarks..."/>
                         </div>
@@ -341,7 +426,7 @@ USING (true);`}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-
+    
             {(isLoading && serviceJobs.length === 0) ? (
                 <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
             ) : (
@@ -351,6 +436,7 @@ USING (true);`}
                     data={serviceJobs.map(job => ({ ...job, id: job.job_id }))}
                     onAddNew={handleOpenAddDialog}
                     onEdit={handleOpenEditDialog}
+                    onDelete={handleDelete}
                     renderCell={renderCell}
                 />
             )}

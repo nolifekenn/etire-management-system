@@ -7,11 +7,26 @@ export async function GET(req: Request) {
     const type = searchParams.get('type');
     const user_id = searchParams.get('user_id');
 
-    // Get all service jobs
+    // Get vehicle types from database
+    if (type === 'vehicle-types') {
+      const { data, error } = await supabase
+        .from('vehicle_type')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error('Vehicle types fetch error:', error);
+        return NextResponse.json({ error: { message: error.message } }, { status: 500 });
+      }
+
+      return NextResponse.json(data || []);
+    }
+
+    // Get all service jobs with vehicle type details
     if (type === 'all' || !type) {
       const { data, error } = await supabase
         .from('service_job')
-        .select('*, user:user_id(name)')
+        .select('*, user:user_id(name), vehicle_type:vehicle_type_id(vehicle_type_id, name)')
         .order('job_date', { ascending: false });
 
       if (error) {
@@ -31,7 +46,7 @@ export async function GET(req: Request) {
 
       const { data, error } = await supabase
         .from('service_job')
-        .select('*, user:user_id(name)')
+        .select('*, user:user_id(name), vehicle_type:vehicle_type_id(vehicle_type_id, name)')
         .eq('status', status)
         .order('job_date', { ascending: false });
 
@@ -51,7 +66,7 @@ export async function GET(req: Request) {
 
       const { data, error } = await supabase
         .from('service_job')
-        .select('*, user:user_id(name)')
+        .select('*, user:user_id(name), vehicle_type:vehicle_type_id(vehicle_type_id, name)')
         .eq('user_id', user_id)
         .order('job_date', { ascending: false });
 
@@ -108,7 +123,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { user_id, job_description, status, service_fee, remarks } = body;
+    const { user_id, job_description, status, service_fee, remarks, vehicle_type_id } = body;
 
     if (!user_id || !job_description) {
       return NextResponse.json(
@@ -123,6 +138,7 @@ export async function POST(req: Request) {
       status: status || 'pending',
       service_fee: parseFloat(service_fee) || 0,
       remarks: remarks || null,
+      vehicle_type_id: vehicle_type_id || null,
     };
 
     const { data, error } = await supabase.from('service_job').insert([jobData]).select().single();
@@ -145,7 +161,7 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { job_id, job_description, status, service_fee, remarks } = body;
+    const { job_id, job_description, status, service_fee, remarks, vehicle_type_id } = body;
 
     if (!job_id) {
       return NextResponse.json({ error: { message: 'job_id is required' } }, { status: 400 });
@@ -156,6 +172,7 @@ export async function PUT(req: Request) {
     if (status !== undefined) updateData.status = status;
     if (service_fee !== undefined) updateData.service_fee = parseFloat(service_fee);
     if (remarks !== undefined) updateData.remarks = remarks;
+    if (vehicle_type_id !== undefined) updateData.vehicle_type_id = vehicle_type_id;
 
     const { data, error } = await supabase
       .from('service_job')

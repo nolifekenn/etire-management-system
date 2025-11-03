@@ -49,6 +49,7 @@ const customerColumns = [
 const vehicleColumns = [
   { key: 'plate_number', header: 'Plate Number' },
   { key: 'customer_name', header: 'Customer' },
+  { key: 'vehicle_type', header: 'Type' },
   { key: 'make', header: 'Make' },
   { key: 'model', header: 'Model' },
   { key: 'year', header: 'Year' },
@@ -65,6 +66,11 @@ const historyColumns = [
   { key: 'created_by_name', header: 'Service By' },
 ];
 
+interface VehicleType {
+    vehicle_type_id: string;
+    name: string;
+}
+
 export default function CustomersPage() {
     const { toast } = useToast();
     const { user: authUser } = useAuth();
@@ -79,6 +85,8 @@ export default function CustomersPage() {
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [isVehicleLoading, setIsVehicleLoading] = useState(true);
     const [vehicleError, setVehicleError] = useState<string | null>(null);
+    const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
+    const [selectedVehicleType, setSelectedVehicleType] = useState('');
     
     // Tire History state
     const [tireHistory, setTireHistory] = useState<TireHistory[]>([]);
@@ -145,7 +153,7 @@ export default function CustomersPage() {
         setIsVehicleLoading(true);
         const { data, error } = await supabase
             .from('vehicle')
-            .select('*, customer:customer_id(name)') // Changed from 'customers(name)' to 'customer:customer_id(name)'
+            .select('*, customer:customer_id(name), vehicle_type:vehicle_type_id(vehicle_type_id, name)')
             .order('plate_number', { ascending: true });
 
         if (error) {
@@ -156,6 +164,16 @@ export default function CustomersPage() {
             setVehicleError(null);
         }
         setIsVehicleLoading(false);
+    }, []);
+
+    const fetchVehicleTypes = useCallback(async () => {
+        if (!supabase) return;
+        const { data, error } = await supabase
+            .from('vehicle_type')
+            .select('*')
+            .order('name');
+
+        if (data) setVehicleTypes(data as VehicleType[]);
     }, []);
 
     const fetchTireHistory = useCallback(async () => {
@@ -193,7 +211,8 @@ export default function CustomersPage() {
         fetchVehicles();
         fetchTireHistory();
         fetchSupportingData();
-    }, [fetchCustomers, fetchVehicles, fetchTireHistory, fetchSupportingData]);
+        fetchVehicleTypes();
+    }, [fetchCustomers, fetchVehicles, fetchTireHistory, fetchSupportingData, fetchVehicleTypes]);
 
     const resetCustomerForm = () => {
         setCustomerName('');
@@ -210,6 +229,7 @@ export default function CustomersPage() {
         setModel('');
         setYear('');
         setColor('');
+        setSelectedVehicleType('');
         setEditingVehicle(null);
     };
 
@@ -255,6 +275,7 @@ export default function CustomersPage() {
         setModel(vehicle.model || '');
         setYear(vehicle.year?.toString() || '');
         setColor(vehicle.color || '');
+        setSelectedVehicleType(vehicle.vehicle_type_id || '');
         setIsVehicleDialogOpen(true);
     };
 
@@ -331,6 +352,7 @@ export default function CustomersPage() {
             model: model || null,
             year: year ? parseInt(year) : null,
             color: color || null,
+            vehicle_type_id: selectedVehicleType || null,
         };
 
         let error;
@@ -450,7 +472,15 @@ export default function CustomersPage() {
     };
     const renderVehicleCell = (item: any, columnKey: string, value: any) => {
         if (columnKey === 'customer_name') {
-            return item.customer?.name || 'Unknown Customer'; // Changed from 'customers' to 'customer'
+            return item.customer?.name || 'Unknown Customer';
+        }
+        if (columnKey === 'vehicle_type') {
+            if (!item.vehicle_type) return <Badge variant="outline">N/A</Badge>;
+            const vehicleName = item.vehicle_type.name;
+            const color = vehicleName === 'car' ? 'bg-blue-100 text-blue-700' :
+                        vehicleName === 'motor' ? 'bg-green-100 text-green-700' :
+                        'bg-orange-100 text-orange-700';
+            return <Badge className={`capitalize ${color}`}>{vehicleName}</Badge>;
         }
         if (columnKey === 'year' && !value) {
             return <span className="text-muted-foreground">-</span>;
@@ -699,6 +729,21 @@ export default function CustomersPage() {
                                 onChange={(e) => setPlateNumber(e.target.value)} 
                                 placeholder="ABC-1234"
                             />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="vehicle-type">Vehicle Type</Label>
+                            <Select value={selectedVehicleType} onValueChange={setSelectedVehicleType}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select vehicle type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {vehicleTypes.map(vt => (
+                                        <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id}>
+                                            {vt.name.charAt(0).toUpperCase() + vt.name.slice(1)}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
