@@ -47,11 +47,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-// Interface based on the user's 'inventory' table schema
+// Update the InventoryItem interface
 export interface InventoryItem {
   item_id: string;
   name: string;
   category: 'tire' | 'tool' | 'accessory';
+  vehicle_type: 'car' | 'motor' | 'truck';  
   stock_quantity: number;
   cost_price: number;
   sale_price: number;
@@ -64,8 +65,9 @@ export interface InventoryItem {
 interface FilterState {
   search: string;
   category: 'all' | 'tire' | 'tool' | 'accessory';
-  stockStatus: 'all' | 'inStock' | 'lowStock' | 'outOfStock' | 'critical';
-  sortBy: 'name' | 'stock' | 'price' | 'updated';
+  vehicleType: 'all' | 'car' | 'motor' | 'truck';
+  stockStatus: 'all' | 'inStock' | 'lowStock' | 'critical' | 'outOfStock';
+  sortBy: 'name' | 'stock' | 'price' | 'updated' | 'vehicleType';
   sortOrder: 'asc' | 'desc';
 }
 
@@ -76,8 +78,18 @@ const quickFilters = [
   { label: "Out of Stock", value: "outOfStock", icon: AlertTriangle },
   { label: "Tires", value: "tire", icon: PackageSearch },
   { label: "Tools", value: "tool", icon: PackageSearch },
-  { label: "Accessories", value: "accessory", icon: PackageSearch } // Add this line
+  { label: "Accessories", value: "accessory", icon: PackageSearch },
+  { label: "Car Items", value: "car", icon: PackageSearch },
+  { label: "Motor Items", value: "motor", icon: PackageSearch },
+  { label: "Truck Items", value: "truck", icon: PackageSearch }
 ];
+
+// Vehicle type configuration - FIXED: Ensure all vehicle types are properly defined
+const vehicleTypeConfig: Record<'car' | 'motor' | 'truck', { label: string; color: string }> = {
+  car: { label: 'Car', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  motor: { label: 'Motor', color: 'bg-green-100 text-green-700 border-green-200' },
+  truck: { label: 'Truck', color: 'bg-orange-100 text-orange-700 border-orange-200' }
+};
 
 // ===== ENHANCED DESIGN SYSTEM =====
 const buttonStyles = {
@@ -135,6 +147,18 @@ const StockLevelIndicator = ({ quantity, reorderLevel = 5 }: { quantity: number;
   );
 };
 
+// Vehicle Type Badge Component - FIXED: Added proper type checking and fallback
+const VehicleTypeBadge = ({ type }: { type: 'car' | 'motor' | 'truck' }) => {
+  // Use the config if it exists, otherwise use a default fallback
+  const config = vehicleTypeConfig[type] || { label: type, color: 'bg-gray-100 text-gray-700 border-gray-200' };
+  
+  return (
+    <Badge variant="outline" className={`capitalize ${config.color}`}>
+      {config.label}
+    </Badge>
+  );
+};
+
 // Enhanced Filter Component
 const AdvancedFilters = ({ 
   filters, 
@@ -149,9 +173,11 @@ const AdvancedFilters = ({
 
   const getFilterActiveState = (filterValue: string) => {
     if (filterValue === 'all') {
-      return filters.category === 'all' && filters.stockStatus === 'all';
+      return filters.category === 'all' && filters.stockStatus === 'all' && filters.vehicleType === 'all';
     } else if (['tire', 'tool', 'accessory'].includes(filterValue)) {
       return filters.category === filterValue;
+    } else if (['car', 'motor', 'truck'].includes(filterValue)) {
+      return filters.vehicleType === filterValue;
     } else {
       return filters.stockStatus === filterValue;
     }
@@ -191,7 +217,7 @@ const AdvancedFilters = ({
         </Button>
 
         {/* Clear Filters */}
-        {(filters.search || filters.category !== 'all' || filters.stockStatus !== 'all') && (
+        {(filters.search || filters.category !== 'all' || filters.stockStatus !== 'all' || filters.vehicleType !== 'all') && (
           <Button
             variant="outline"
             onClick={onClearFilters}
@@ -221,9 +247,11 @@ const AdvancedFilters = ({
                 if (filter.value === 'all') {
                   onClearFilters();
                 } else if (['tire', 'tool', 'accessory'].includes(filter.value)) {
-                  onFiltersChange({ ...filters, category: filter.value as any, stockStatus: 'all' });
+                  onFiltersChange({ ...filters, category: filter.value as any, vehicleType: 'all', stockStatus: 'all' });
+                } else if (['car', 'motor', 'truck'].includes(filter.value)) {
+                  onFiltersChange({ ...filters, vehicleType: filter.value as any, category: 'all', stockStatus: 'all' });
                 } else {
-                  onFiltersChange({ ...filters, stockStatus: filter.value as any, category: 'all' });
+                  onFiltersChange({ ...filters, stockStatus: filter.value as any, category: 'all', vehicleType: 'all' });
                 }
               }}
             >
@@ -236,7 +264,7 @@ const AdvancedFilters = ({
 
       {/* Advanced Filters (Collapsible) */}
       {isExpanded && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-slate-200">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 pt-4 border-t border-slate-200">
           {/* Category Filter */}
           <div>
             <Label className="text-sm font-medium text-slate-700 mb-2 block">Category</Label>
@@ -252,6 +280,25 @@ const AdvancedFilters = ({
                 <SelectItem value="tire">Tires</SelectItem>
                 <SelectItem value="tool">Tools</SelectItem>
                 <SelectItem value="accessory">Accessories</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Vehicle Type Filter */}
+          <div>
+            <Label className="text-sm font-medium text-slate-700 mb-2 block">Vehicle Type</Label>
+            <Select
+              value={filters.vehicleType}
+              onValueChange={(value) => onFiltersChange({ ...filters, vehicleType: value as any })}
+            >
+              <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300">
+                <SelectValue placeholder="All vehicle types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Vehicle Types</SelectItem>
+                <SelectItem value="car">Car</SelectItem>
+                <SelectItem value="motor">Motor</SelectItem>
+                <SelectItem value="truck">Truck</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -290,6 +337,7 @@ const AdvancedFilters = ({
                 <SelectItem value="name">Name (A-Z)</SelectItem>
                 <SelectItem value="stock">Stock Level</SelectItem>
                 <SelectItem value="price">Price</SelectItem>
+                <SelectItem value="vehicleType">Vehicle Type</SelectItem>
                 <SelectItem value="updated">Last Updated</SelectItem>
               </SelectContent>
             </Select>
@@ -327,7 +375,7 @@ const EnhancedEmptyState = ({
   onClearFilters: () => void;
   onAddItem: () => void;
 }) => {
-  const hasActiveFilters = filters.search || filters.category !== 'all' || filters.stockStatus !== 'all';
+  const hasActiveFilters = filters.search || filters.category !== 'all' || filters.stockStatus !== 'all' || filters.vehicleType !== 'all';
 
   if (hasActiveFilters) {
     return (
@@ -625,7 +673,10 @@ const CriticalStockDetails = ({
                   <div key={item.item_id} className="flex items-center justify-between p-3 bg-white/80 rounded-lg border border-purple-200/50 backdrop-blur-sm">
                     <div>
                       <div className="font-medium text-purple-900">{item.name}</div>
-                      <div className="text-sm text-purple-700">Only {item.stock_quantity} units remaining</div>
+                      <div className="text-sm text-purple-700 flex items-center gap-2">
+                        <VehicleTypeBadge type={item.vehicle_type} />
+                        <span>Only {item.stock_quantity} units remaining</span>
+                      </div>
                     </div>
                     <Badge className="bg-red-100 text-red-800 border-red-200">Critical</Badge>
                   </div>
@@ -646,7 +697,10 @@ const CriticalStockDetails = ({
                   <div key={item.item_id} className="flex items-center justify-between p-3 bg-white/80 rounded-lg border border-teal-200/50 backdrop-blur-sm">
                     <div>
                       <div className="font-medium text-teal-900">{item.name}</div>
-                      <div className="text-sm text-teal-700">{item.stock_quantity} units remaining</div>
+                      <div className="text-sm text-teal-700 flex items-center gap-2">
+                        <VehicleTypeBadge type={item.vehicle_type} />
+                        <span>{item.stock_quantity} units remaining</span>
+                      </div>
                     </div>
                     <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Low Stock</Badge>
                   </div>
@@ -754,6 +808,7 @@ const ViewMoreDialog = ({
               <TableRow>
                 <TableHead>Product Name</TableHead>
                 <TableHead>Category</TableHead>
+                <TableHead>Vehicle Type</TableHead>
                 <TableHead>Stock Level</TableHead>
                 <TableHead>Adjust Stock</TableHead>
                 <TableHead>Cost (₱)</TableHead>
@@ -776,6 +831,9 @@ const ViewMoreDialog = ({
                       <Badge variant="outline" className="capitalize">
                         {item.category}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <VehicleTypeBadge type={item.vehicle_type} />
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -859,6 +917,7 @@ export default function EnhancedInventoryPage() {
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     category: 'all',
+    vehicleType: 'all',
     stockStatus: 'all',
     sortBy: 'name',
     sortOrder: 'asc'
@@ -867,6 +926,7 @@ export default function EnhancedInventoryPage() {
   // Form state for Add/Edit dialog
   const [itemName, setItemName] = useState('');
   const [itemCategory, setItemCategory] = useState<InventoryItem['category']>('tire');
+  const [itemVehicleType, setItemVehicleType] = useState<InventoryItem['vehicle_type']>('car');
   const [itemCostPrice, setItemCostPrice] = useState('');
   const [itemSalePrice, setItemSalePrice] = useState('');
   const [itemStockQuantity, setItemStockQuantity] = useState('0');
@@ -920,6 +980,11 @@ export default function EnhancedInventoryPage() {
       filtered = filtered.filter(item => item.category === filters.category);
     }
 
+    // Apply vehicle type filter
+    if (filters.vehicleType !== 'all') {
+      filtered = filtered.filter(item => item.vehicle_type === filters.vehicleType);
+    }
+
     // Apply stock status filter
     if (filters.stockStatus !== 'all') {
       switch (filters.stockStatus) {
@@ -955,6 +1020,10 @@ export default function EnhancedInventoryPage() {
           aValue = a.sale_price;
           bValue = b.sale_price;
           break;
+        case 'vehicleType':
+          aValue = a.vehicle_type;
+          bValue = b.vehicle_type;
+          break;
         case 'updated':
           aValue = new Date(a.updated_at || a.created_at || '');
           bValue = new Date(b.updated_at || b.created_at || '');
@@ -977,6 +1046,7 @@ export default function EnhancedInventoryPage() {
   const enhancedColumns = [
     { key: 'name', header: 'Product Name' },
     { key: 'category', header: 'Category' },
+    { key: 'vehicle_type', header: 'Vehicle Type' },
     { key: 'stock_quantity', header: 'Stock Level' },
     { key: 'adjust_stock', header: 'Adjust Stock' },
     { key: 'cost_price', header: 'Cost (₱)' },
@@ -994,6 +1064,7 @@ export default function EnhancedInventoryPage() {
   const resetForm = () => {
     setItemName('');
     setItemCategory('tire');
+    setItemVehicleType('car');
     setItemCostPrice('');
     setItemSalePrice('');
     setItemStockQuantity('0');
@@ -1003,6 +1074,7 @@ export default function EnhancedInventoryPage() {
   const populateForm = (product: InventoryItem) => {
     setItemName(product.name);
     setItemCategory(product.category);
+    setItemVehicleType(product.vehicle_type);
     setItemCostPrice(String(product.cost_price));
     setItemSalePrice(String(product.sale_price));
     setItemStockQuantity(String(product.stock_quantity));
@@ -1041,6 +1113,7 @@ export default function EnhancedInventoryPage() {
     const itemData = {
       name: itemName,
       category: itemCategory,
+      vehicle_type: itemVehicleType,
       cost_price: parseFloat(itemCostPrice),
       sale_price: parseFloat(itemSalePrice),
       stock_quantity: parseInt(itemStockQuantity, 10),
@@ -1131,6 +1204,7 @@ export default function EnhancedInventoryPage() {
     setFilters({
       search: '',
       category: 'all',
+      vehicleType: 'all',
       stockStatus: 'all',
       sortBy: 'name',
       sortOrder: 'asc'
@@ -1139,7 +1213,7 @@ export default function EnhancedInventoryPage() {
 
   // Enhanced Excel Export with better formatting
   const handleExportExcel = () => {
-    const headers = ['Product Name', 'Category', 'Stock Level', 'Cost Price (₱)', 'Sale Price (₱)', 'Margin %', 'Status'];
+    const headers = ['Product Name', 'Category', 'Vehicle Type', 'Stock Level', 'Cost Price (₱)', 'Sale Price (₱)', 'Margin %', 'Status'];
     
     const csvContent = [
       headers.join(','),
@@ -1152,6 +1226,7 @@ export default function EnhancedInventoryPage() {
         return [
           `"${item.name}"`,
           item.category,
+          item.vehicle_type,
           item.stock_quantity,
           item.cost_price.toFixed(2),
           item.sale_price.toFixed(2),
@@ -1260,7 +1335,7 @@ export default function EnhancedInventoryPage() {
           <div className="flex items-center justify-between mb-6">
             <h2 id="inventory-list-heading" className="text-2xl font-bold text-slate-900">
               Inventory Items
-              {filters.search || filters.category !== 'all' || filters.stockStatus !== 'all' ? (
+              {filters.search || filters.category !== 'all' || filters.stockStatus !== 'all' || filters.vehicleType !== 'all' ? (
                 <span className="text-sm font-normal text-slate-500 ml-2">
                   (Filtered: {processedItems.length} of {items.length} items)
                 </span>
@@ -1324,6 +1399,9 @@ export default function EnhancedInventoryPage() {
                             {String(value)}
                           </Badge>
                         );
+                      
+                      case 'vehicle_type':
+                        return <VehicleTypeBadge type={inventoryItem.vehicle_type} />;
                       
                       case 'stock_quantity':
                         return <StockLevelIndicator quantity={Number(value)} reorderLevel={inventoryItem.reorder_level} />;
@@ -1405,6 +1483,19 @@ export default function EnhancedInventoryPage() {
                     <SelectItem value="tire">Tire</SelectItem>
                     <SelectItem value="tool">Tool</SelectItem>
                     <SelectItem value="accessory">Accessory</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="itemVehicleType" className="text-slate-700 font-medium">Vehicle Type</Label>
+                <Select value={itemVehicleType} onValueChange={(v) => setItemVehicleType(v as InventoryItem['vehicle_type'])}>
+                  <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80">
+                    <SelectValue placeholder="Select vehicle type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="car">Car</SelectItem>
+                    <SelectItem value="motor">Motor</SelectItem>
+                    <SelectItem value="truck">Truck</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
