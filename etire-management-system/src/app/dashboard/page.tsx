@@ -190,17 +190,20 @@ export default function DashboardPage() {
   );
 
   // Enhanced Get Started Link Component
-  const GetStartedLink = ({ onClick, children }: { onClick: () => void, children: string }) => (
+  const GetStartedLink = ({ onClick, children }: { 
+    onClick: (e: React.MouseEvent) => void; 
+    children: string 
+  }) => (
     <button 
       onClick={onClick}
-      className="group relative inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 transition-all duration-300 pb-1 text-xs font-medium"
+      className="group relative inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 transition-all duration-300 pb-1 text-xs font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"
     >
       <span>{children}</span>
       <ArrowUpRight className="w-3 h-3 transition-transform duration-300 group-hover:translate-x-0.5" />
       <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 transition-all duration-300 group-hover:w-[calc(100%-20px)] group-hover:left-2.5"></span>
     </button>
   );
-
+  
   // Quick actions for Hick's Law
   const quickActions = [
     { 
@@ -445,7 +448,7 @@ export default function DashboardPage() {
   <div 
     className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
     style={{ 
-      backgroundImage: "url('/images/image.png')",
+      backgroundImage: "url('/images/image2.jpg')",
       backgroundSize: "cover",
       backgroundPosition: "center 30%" // Move image upward
     }}
@@ -458,9 +461,9 @@ export default function DashboardPage() {
         <div className="absolute bottom-16 right-24 w-12 h-12 bg-white/15 rounded-full"></div>
       </div>
 
-      {/* BOTTOM BACKGROUND SECTION */}
-      <div className="absolute top-64 left-0 w-full h-full bg-white">
-  <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-green-50/10 to-white"></div>
+      {/* BOTTOM BACKGROUND SECTION - Updated with subtle blue */}
+<div className="absolute top-64 left-0 w-full h-full bg-blue-50/10">
+  <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-blue-100/15 to-blue-50/10"></div>
 </div>
 
       <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
