@@ -884,7 +884,6 @@ export default function EnhancedInventoryPage() {
                   title=""
                   columns={enhancedColumns}
                   data={processedItems.map(i => ({...i, id: i.item_id}))}
-                  onAddNew={handleOpenAddDialog}
                   onEdit={handleOpenEditDialog}
                   onDelete={handleOpenDeleteDialog}
                   renderCell={(item, columnKey, value) => {
