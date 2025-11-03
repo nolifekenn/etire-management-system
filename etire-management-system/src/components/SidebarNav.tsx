@@ -43,7 +43,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, requiredRole: 1 },
   { href: '/inventory', label: 'Inventory', icon: Boxes, requiredRole: 1 },
   { href: '/pos', label: 'POS', icon: ShoppingCart, requiredRole: 1 },
-  { href: '/service-jobs', label: 'Service Jobs', icon: Wrench, requiredRole: 1 },
+  { href: '/services', label: 'Service Jobs', icon: Wrench, requiredRole: 1 },
   { href: '/branches', label: 'Branches', icon: Building2, requiredRole: 1 },
   { href: '/purchasing', label: 'Purchasing', icon: Package, requiredRole: 1 },
   { href: '/customers', label: 'Customers', icon: Users, requiredRole: 1 },

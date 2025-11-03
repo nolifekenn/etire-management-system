@@ -37,7 +37,7 @@ interface ServiceJob {
     service_fee: number;
     remarks: string | null;
     // Joined data
-    users: { name: string } | null;
+    user?: { name: string } | null;
 }
 
 interface Customer {
@@ -77,26 +77,24 @@ export default function ServiceManagementPage() {
     const { value: serviceFee, setValue: setServiceFee } = useFormFieldPersistence('service-job-form', 'serviceFee', '0');
     
     const fetchJobs = useCallback(async () => {
-        if (!supabase) {
-          setFetchError("Supabase client not available.");
-          setIsLoading(false);
-          return;
-        }
         setIsLoading(true);
-        const { data, error } = await supabase
-            .from('service_jobs')
-            .select('*, user(name)')
-            .order('job_date', { ascending: false });
-
-        if (error) {
-            let errorMessage = `Could not fetch service jobs: ${error.message}`;
-            setFetchError(errorMessage);
-            toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
-        } else {
-            setServiceJobs(data as any);
+        try {
+            const res = await fetch('/services/api?type=all');
+            const body = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(body.error?.message || 'Failed to fetch service jobs');
+            }
+            
+            setServiceJobs(body || []);
             setFetchError(null);
+        } catch (error: any) {
+            console.error('Service jobs fetch error:', error);
+            setFetchError(error.message);
+            toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     }, [toast]);
 
     const fetchCustomers = useCallback(async () => {
@@ -155,7 +153,7 @@ export default function ServiceManagementPage() {
     };
 
     const handleSubmit = async () => {
-        if (!supabase || !authUser) return;
+        if (!authUser) return;
         if (!jobDescription) {
             toast({ title: 'Validation Error', description: 'Job description is required.', variant: 'destructive'});
             return;
@@ -179,31 +177,41 @@ export default function ServiceManagementPage() {
 
             if (editingJob) {
                 // Update existing job
-                const { error } = await supabase
-                    .from('service_jobs')
-                    .update(jobData)
-                    .eq('job_id', editingJob.job_id);
+                const res = await fetch('/services/api', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...jobData, job_id: editingJob.job_id }),
+                });
                 
-                if (error) {
-                    toast({ title: 'Update Error', description: error.message, variant: 'destructive' });
-                } else {
-                    toast({ title: 'Success', description: 'Service job updated.' });
-                    setIsEditDialogOpen(false);
-                    fetchJobs();
+                const body = await res.json();
+                
+                if (!res.ok) {
+                    throw new Error(body.error?.message || 'Failed to update job');
                 }
+                
+                toast({ title: 'Success', description: 'Service job updated.' });
+                setIsEditDialogOpen(false);
+                fetchJobs();
             } else {
                 // Create new job
-                const { error } = await supabase.from('service_jobs').insert(jobData);
-                if (error) {
-                    toast({ title: 'Creation Error', description: error.message, variant: 'destructive' });
-                } else {
-                    toast({ title: 'Success', description: 'New service job created.' });
-                    setIsAddDialogOpen(false);
-                    fetchJobs();
+                const res = await fetch('/services/api', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(jobData),
+                });
+                
+                const body = await res.json();
+                
+                if (!res.ok) {
+                    throw new Error(body.error?.message || 'Failed to create job');
                 }
+                
+                toast({ title: 'Success', description: 'New service job created.' });
+                setIsAddDialogOpen(false);
+                fetchJobs();
             }
         } catch (error: any) {
-            toast({ title: 'Error', description: 'An unexpected error occurred: ' + error.message, variant: 'destructive' });
+            toast({ title: 'Error', description: error.message, variant: 'destructive' });
         } finally {
             setIsLoading(false);
         }
@@ -212,7 +220,7 @@ export default function ServiceManagementPage() {
     const renderCell = (item: any, columnKey: string, value: any) => {
         if (columnKey === 'user_name') {
             // Since service jobs are now associated with employees, show the employee name
-            return item.users ? item.users.name : 'Unknown Employee';
+            return item.user ? item.user.name : 'Unknown Employee';
         }
         if (columnKey === 'job_date') {
              return new Date(value).toLocaleDateString();

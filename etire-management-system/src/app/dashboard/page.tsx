@@ -227,7 +227,7 @@ export default function DashboardPage() {
     { 
       label: "Service Jobs", 
       icon: Wrench, 
-      href: "/service-jobs", 
+      href: "/services", 
       description: "Manage jobs",
       category: "service"
     }
@@ -239,7 +239,7 @@ export default function DashboardPage() {
       sales: '/reports/sales',
       inventory: '/inventory',
       customers: '/customers',
-      jobs: '/service-jobs',
+      jobs: '/services',
       branches: '/branches',
       suppliers: '/purchasing',
       vehicles: '/vehicles',
