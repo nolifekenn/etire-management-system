@@ -285,10 +285,10 @@ export default function DashboardPage() {
 
       if (salesError) throw new Error(`Could not fetch sales data: ${salesError.message}`);
 
-      // Get counts in parallel
+      // Get counts in parallel - FIXED: Changed from 'user' table to 'customer' table
       const [itemsRes, customersRes, jobsRes, branchesRes, suppliersRes, vehiclesRes, notificationsRes] = await Promise.all([
         supabase.from('inventory_item').select('*', { count: 'exact', head: true }),
-        supabase.from('user').select('*', { count: 'exact', head: true }).eq('role', 'customer'),
+        supabase.from('customer').select('*', { count: 'exact', head: true }), // ✅ CHANGED: from 'user' to 'customer'
         supabase.from('service_job').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         supabase.from('branch').select('*', { count: 'exact', head: true }).eq('is_active', true),
         supabase.from('supplier').select('*', { count: 'exact', head: true }).eq('is_active', true),
