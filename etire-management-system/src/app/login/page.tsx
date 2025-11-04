@@ -67,78 +67,88 @@ export default function LoginPage() {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsLoading(true);
-        setRegistrationError(null);
-        if (!loginUsername || !loginPassword) {
-            toast({ title: 'Error', description: 'Username and password are required.', variant: 'destructive' });
-            setIsLoading(false);
-            return;
-        }
+  e.preventDefault();
+  setIsLoading(true);
+  setRegistrationError(null);
 
-        try {
-            const success = await login(loginUsername, loginPassword);
-            if (success) {
-                toast({ title: 'Success', description: 'Logged in successfully!' });
-                router.push('/dashboard');
-            } else {
-                toast({ title: 'Login Failed', description: 'Invalid username or password.', variant: 'destructive' });
-            }
-        } catch (error: any) {
-            toast({ title: 'Login Error', description: error.message, variant: 'destructive' });
-        } finally {
-            setIsLoading(false);
-        }
-    };
+  if (!loginUsername || !loginPassword) {
+    toast({ title: 'Error', description: 'Username and password are required.', variant: 'destructive' });
+    setIsLoading(false);
+    return;
+  }
+
+  try {
+    // useAuth() now handles calling /api/login internally
+    const success = await login(loginUsername, loginPassword);
+    if (success) {
+      toast({ title: 'Success', description: 'Logged in successfully!' });
+      router.push('/dashboard');
+    } else {
+      toast({ title: 'Login Failed', description: 'Invalid username or password.', variant: 'destructive' });
+    }
+  } catch (error: any) {
+    toast({ title: 'Login Error', description: error.message, variant: 'destructive' });
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
     const handleRegister = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setRegistrationError(null);
-        if (registerPassword !== confirmPassword) {
-            toast({ title: 'Error', description: 'Passwords do not match.', variant: 'destructive' });
-            return;
-        }
-        if (!firstName || !lastName || !registerUsername || !registerPassword) {
-             toast({ title: 'Error', description: 'All fields are required.', variant: 'destructive' });
-            return;
-        }
-        
-        setIsLoading(true);
+  e.preventDefault();
+  setRegistrationError(null);
 
-        if (!supabase) {
-             toast({ title: 'Configuration Error', description: "Database client is not available.", variant: 'destructive' });
-             setIsLoading(false);
-             return;
-        }
+  if (registerPassword !== confirmPassword) {
+    toast({ title: 'Error', description: 'Passwords do not match.', variant: 'destructive' });
+    return;
+  }
 
-        const { data, error } = await supabase.from('user').insert({
-            name: `${firstName} ${lastName}`,
-            username: registerUsername,
-            password: registerPassword, 
-            role: 0
-        }).select().single();
+  if (!firstName || !lastName || !registerUsername || !registerPassword) {
+    toast({ title: 'Error', description: 'All fields are required.', variant: 'destructive' });
+    return;
+  }
 
-        if (error) {
-             if (error.message.includes('infinite recursion') || error.message.includes('policy')) {
-                setRegistrationError(`Database Security Policy Error: ${error.message}`);
-             } else if (error.message.includes('unique constraint') || error.code === '23505') {
-                 toast({ title: 'Registration Error', description: 'This username is already taken.', variant: 'destructive' });
-             } else {
-                console.error('Registration error:', error);
-                toast({ title: 'Registration Error', description: error.message || 'An unexpected error occurred.', variant: 'destructive' });
-             }
-        } else if (data) {
-            toast({ title: 'Success', description: 'Registration successful! Please log in.' });
-            setIsLogin(true);
-            setFirstName('');
-            setLastName('');
-            setRegisterUsername('');
-            setRegisterPassword('');
-            setConfirmPassword('');
-        }
-        
-        setIsLoading(false);
-    };
+  setIsLoading(true);
+
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "register",
+        firstName,
+        lastName,
+        username: registerUsername,
+        password: registerPassword,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Registration failed");
+    }
+
+    toast({ title: "Success", description: "Registration successful! Please log in." });
+
+    // Reset fields and switch to login view
+    setIsLogin(true);
+    setFirstName("");
+    setLastName("");
+    setRegisterUsername("");
+    setRegisterPassword("");
+    setConfirmPassword("");
+  } catch (error: any) {
+    toast({
+      title: "Registration Error",
+      description: error.message,
+      variant: "destructive",
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
     return (
         <div className="min-h-screen flex relative overflow-hidden">
