@@ -84,32 +84,45 @@ export default function ServiceManagementPage() {
     const { value: serviceFee, setValue: setServiceFee } = useFormFieldPersistence('service-job-form', 'serviceFee', '0');
     const { value: vehicleTypeId, setValue: setVehicleTypeId } = useFormFieldPersistence('service-job-form', 'vehicleTypeId', '');
 
+    // ===== SUPABASE DIRECT API CALLS =====
+    
     const fetchJobs = useCallback(async () => {
+        if (!supabase) return;
         setIsLoading(true);
+        
         try {
-            const res = await fetch('/services/api?type=all');
-            const body = await res.json();
+            const { data, error } = await supabase
+                .from('service_job')
+                .select('*, user:user_id(name), vehicle_type:vehicle_type_id(vehicle_type_id, name)')
+                .order('job_date', { ascending: false });
             
-            if (!res.ok) {
-                throw new Error(body.error?.message || 'Failed to fetch service jobs');
+            if (error) {
+                setFetchError(error.message);
+                setServiceJobs([]);
+                toast({ title: 'Error', description: error.message, variant: 'destructive' });
+            } else {
+                setServiceJobs(data as any);
+                setFetchError(null);
             }
-            
-            setServiceJobs(body || []);
-            setFetchError(null);
         } catch (error: any) {
             console.error('Service jobs fetch error:', error);
             setFetchError(error.message);
+            setServiceJobs([]);
             toast({ title: 'Error', description: error.message, variant: 'destructive' });
-        } finally {
-            setIsLoading(false);
         }
+        
+        setIsLoading(false);
     }, [toast]);
 
     const fetchCustomers = useCallback(async () => {
         if (!supabase) return;
         setIsDataLoading(true);
+        
         try {
-            const { data, error } = await supabase.from('user').select('user_id, name');
+            const { data, error } = await supabase
+                .from('user')
+                .select('user_id, name');
+            
             if (error) throw error;
             
             setCustomers([
@@ -117,27 +130,29 @@ export default function ServiceManagementPage() {
                 ...(data || [])
             ]);
         } catch (error: any) {
-             let errorMessage = `Failed to load users: ${error.message}`;
-             if (error.message.includes('infinite recursion')) {
+            let errorMessage = `Failed to load users: ${error.message}`;
+            if (error.message.includes('infinite recursion')) {
                 errorMessage = `A database security policy is misconfigured. Error: "${error.message}". This usually happens when a Row Level Security (RLS) policy on the 'users' table refers to itself. Please check your RLS policies in the Supabase dashboard.`;
             }
             setFetchError(errorMessage);
             toast({ title: 'Error', description: errorMessage, variant: 'destructive'});
-        } finally {
-            setIsDataLoading(false);
         }
+        
+        setIsDataLoading(false);
     }, [toast]);
 
     const fetchVehicleTypes = useCallback(async () => {
+        if (!supabase) return;
+        
         try {
-            const res = await fetch('/services/api?type=vehicle-types');
-            const body = await res.json();
+            const { data, error } = await supabase
+                .from('vehicle_type')
+                .select('*')
+                .order('name');
             
-            if (!res.ok) {
-                throw new Error(body.error?.message || 'Failed to fetch vehicle types');
-            }
+            if (error) throw error;
             
-            setVehicleTypes(body || []);
+            setVehicleTypes(data as VehicleType[]);
         } catch (error: any) {
             console.error('Vehicle types fetch error:', error);
             toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -177,10 +192,8 @@ export default function ServiceManagementPage() {
     };
 
     const handleSubmit = async () => {
-        if (!authUser) {
-            toast({ title: 'Error', description: 'You must be logged in to create a job.', variant: 'destructive'});
-            return;
-        }
+        if (!supabase || !authUser) return;
+        
         if (!jobDescription) {
             toast({ title: 'Validation Error', description: 'Job description is required.', variant: 'destructive'});
             return;
@@ -203,71 +216,61 @@ export default function ServiceManagementPage() {
 
             console.log('Submitting job data:', jobData);
 
+            let error;
+            
             if (editingJob) {
-                const res = await fetch('/services/api', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ...jobData, job_id: editingJob.job_id }),
-                });
-                
-                const body = await res.json();
-                
-                console.log('Update response:', res.status, body);
-                
-                if (!res.ok) {
-                    throw new Error(body.error?.message || 'Failed to update job');
-                }
-                
-                toast({ title: 'Success', description: 'Service job updated.' });
+                const { error: updateError } = await supabase
+                    .from('service_job')
+                    .update(jobData)
+                    .eq('job_id', editingJob.job_id);
+                error = updateError;
+            } else {
+                const { error: insertError } = await supabase
+                    .from('service_job')
+                    .insert([jobData]);
+                error = insertError;
+            }
+
+            if (error) {
+                toast({ title: 'Save Error', description: error.message, variant: 'destructive' });
+            } else {
+                toast({ title: 'Success', description: `Service job ${editingJob ? 'updated' : 'created'} successfully.` });
+                setIsAddDialogOpen(false);
                 setIsEditDialogOpen(false);
                 resetForm();
-                await fetchJobs();
-            } else {
-                const res = await fetch('/services/api', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(jobData),
-                });
-                
-                const body = await res.json();
-                
-                console.log('Create response:', res.status, body);
-                
-                if (!res.ok) {
-                    throw new Error(body.error?.message || 'Failed to create job');
-                }
-                
-                toast({ title: 'Success', description: 'New service job created.' });
-                setIsAddDialogOpen(false);
-                resetForm();
-                await fetchJobs();
+                fetchJobs();
             }
         } catch (error: any) {
             console.error('Submit error:', error);
             toast({ title: 'Error', description: error.message, variant: 'destructive' });
-        } finally {
-            setIsLoading(false);
         }
+        
+        setIsLoading(false);
     };
 
     const handleDelete = async (jobId: string) => {
+        if (!supabase) return;
+        
         if (confirm('Are you sure you want to delete this job?')) {
             setIsLoading(true);
+            
             try {
-                const res = await fetch(`/services/api?job_id=${jobId}`, {
-                    method: 'DELETE',
-                });
-                const body = await res.json();
-                if (!res.ok) {
-                    throw new Error(body.error?.message || 'Failed to delete job');
+                const { error } = await supabase
+                    .from('service_job')
+                    .delete()
+                    .eq('job_id', jobId);
+
+                if (error) {
+                    toast({ title: 'Delete Error', description: error.message, variant: 'destructive' });
+                } else {
+                    toast({ title: 'Success', description: 'Service job deleted successfully.' });
+                    fetchJobs();
                 }
-                toast({ title: 'Success', description: 'Service job deleted.' });
-                fetchJobs();
             } catch (error: any) {
                 toast({ title: 'Error', description: error.message, variant: 'destructive' });
-            } finally {
-                setIsLoading(false);
             }
+            
+            setIsLoading(false);
         }
     };
     

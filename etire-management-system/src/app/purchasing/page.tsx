@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -41,8 +41,8 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
 import { Supplier, PurchaseOrder, Branch, InventoryItem, User } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { StatCard } from '@/components/StatCard';
 
+// ... rest of your code stays exactly the same
 // ===== DESIGN SYSTEM =====
 const buttonStyles = {
   primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl",
@@ -56,8 +56,6 @@ const microAnimations = {
   fadeIn: "animate-in fade-in duration-500",
   iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
 };
-
-const springEasing = "cubic-bezier(0.34, 1.56, 0.64, 1)";
 
 // Supplier Management
 const supplierColumns = [
@@ -91,7 +89,6 @@ const StatsOverview = ({ suppliers, purchaseOrders }: { suppliers: any[], purcha
   
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {/* Active Suppliers - Purple to Indigo */}
         <div className={`bg-gradient-to-br from-purple-500 via-purple-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
           <div className="flex items-center justify-between">
             <div>
@@ -108,7 +105,6 @@ const StatsOverview = ({ suppliers, purchaseOrders }: { suppliers: any[], purcha
           </div>
         </div>
   
-        {/* Pending POs - Blue to Sky Blue */}
         <div className={`bg-gradient-to-br from-blue-500 via-blue-600 to-sky-700 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
           <div className="flex items-center justify-between">
             <div>
@@ -125,7 +121,6 @@ const StatsOverview = ({ suppliers, purchaseOrders }: { suppliers: any[], purcha
           </div>
         </div>
   
-        {/* Delivered This Month - Teal to Cyan to Green */}
         <div className={`bg-gradient-to-br from-teal-400 via-cyan-500 to-green-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
           <div className="flex items-center justify-between">
             <div>
@@ -142,7 +137,6 @@ const StatsOverview = ({ suppliers, purchaseOrders }: { suppliers: any[], purcha
           </div>
         </div>
   
-        {/* Total PO Value - Purple to Blue to Cyan */}
         <div className={`bg-gradient-to-br from-purple-500 via-blue-500 to-cyan-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
           <div className="flex items-center justify-between">
             <div>
@@ -160,7 +154,7 @@ const StatsOverview = ({ suppliers, purchaseOrders }: { suppliers: any[], purcha
         </div>
       </div>
     );
-  };
+};
 
 const QuickActions = ({ onAddSupplier, onAddPO }: { onAddSupplier: () => void, onAddPO: () => void }) => {
   const actions = [
@@ -286,46 +280,61 @@ export default function EnhancedPurchasingPage() {
         setMounted(true);
     }, []);
 
+    // ===== SUPABASE DIRECT API CALLS =====
     
-
     const fetchSuppliers = useCallback(async () => {
+        if (!supabase) return;
         setIsSupplierLoading(true);
+        
         try {
-            const res = await fetch('/purchasing/api');
-            const data = await res.json();
+            const { data, error } = await supabase
+                .from('supplier')
+                .select('*')
+                .order('name');
             
-            if (!res.ok) {
-                setSupplierError(data.error?.message || 'Failed to fetch suppliers');
+            if (error) {
+                setSupplierError(error.message);
                 setSuppliers([]);
             } else {
-                setSuppliers(data);
+                setSuppliers(data as Supplier[]);
                 setSupplierError(null);
             }
-        } catch (error) {
+        } catch (error: any) {
             setSupplierError('Network error');
             setSuppliers([]);
         }
+        
         setIsSupplierLoading(false);
         setLastUpdated(new Date());
     }, []);
 
     const fetchPurchaseOrders = useCallback(async () => {
+        if (!supabase) return;
         setIsPOLoading(true);
+        
         try {
-            const res = await fetch('/purchasing/api?type=purchase-orders');
-            const data = await res.json();
+            const { data, error } = await supabase
+                .from('purchase_order')
+                .select(`
+                    *,
+                    supplier:supplier_id(name),
+                    branch:branch_id(name),
+                    user:user_id(name)
+                `)
+                .order('order_date', { ascending: false });
             
-            if (!res.ok) {
-                setPOError(data.error?.message || 'Failed to fetch purchase orders');
+            if (error) {
+                setPOError(error.message);
                 setPurchaseOrders([]);
             } else {
-                setPurchaseOrders(data);
+                setPurchaseOrders(data as any);
                 setPOError(null);
             }
-        } catch (error) {
+        } catch (error: any) {
             setPOError('Network error');
             setPurchaseOrders([]);
         }
+        
         setIsPOLoading(false);
         setLastUpdated(new Date());
     }, []);
@@ -336,7 +345,7 @@ export default function EnhancedPurchasingPage() {
         const [branchesRes, inventoryRes, usersRes] = await Promise.all([
             supabase.from('branch').select('branch_id, name').eq('is_active', true),
             supabase.from('inventory_item').select('item_id, name, category'),
-            supabase.from('user').select('user_id, name').in('role', [1, 2])
+            supabase.from('user').select('user_id, name').in('role', ['admin', 'manager'])
         ]);
 
         if (branchesRes.data) setBranches(branchesRes.data as Branch[]);
@@ -414,7 +423,7 @@ export default function EnhancedPurchasingPage() {
     };
 
     const handleSubmitSupplier = async () => {
-        if (!authUser) return;
+        if (!supabase || !authUser) return;
         if (!supplierName) {
             toast({ title: "Validation Error", description: "Supplier name is required.", variant: "destructive" });
             return;
@@ -433,36 +442,38 @@ export default function EnhancedPurchasingPage() {
         };
 
         try {
-            const method = editingSupplier ? 'PATCH' : 'POST';
-            const body = editingSupplier 
-                ? { supplier_id: editingSupplier.supplier_id, ...supplierData }
-                : supplierData;
+            let error;
+            
+            if (editingSupplier) {
+                const { error: updateError } = await supabase
+                    .from('supplier')
+                    .update(supplierData)
+                    .eq('supplier_id', editingSupplier.supplier_id);
+                error = updateError;
+            } else {
+                const { error: insertError } = await supabase
+                    .from('supplier')
+                    .insert([supplierData]);
+                error = insertError;
+            }
 
-            const res = await fetch('/purchasing/api', {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                toast({ title: "Save Error", description: data.error?.message || 'Failed to save supplier', variant: "destructive" });
+            if (error) {
+                toast({ title: "Save Error", description: error.message, variant: "destructive" });
             } else {
                 toast({ title: "Success", description: `Supplier ${editingSupplier ? 'updated' : 'created'} successfully.` });
                 setIsSupplierDialogOpen(false);
                 resetSupplierForm();
                 fetchSuppliers();
             }
-        } catch (error) {
-            toast({ title: "Error", description: "Network error", variant: "destructive" });
+        } catch (error: any) {
+            toast({ title: "Error", description: error.message, variant: "destructive" });
         }
 
         setIsSupplierLoading(false);
     };
 
     const handleSubmitPO = async () => {
-        if (!authUser) return;
+        if (!supabase || !authUser) return;
         if (!poNumber || !selectedSupplier || !selectedBranch) {
             toast({ title: "Validation Error", description: "PO Number, Supplier, and Branch are required.", variant: "destructive" });
             return;
@@ -477,59 +488,64 @@ export default function EnhancedPurchasingPage() {
             user_id: authUser.user_id,
             expected_delivery_date: expectedDelivery || null,
             notes: poNotes || null,
+            status: 'pending',
         };
 
         try {
-            const method = editingPO ? 'PATCH' : 'POST';
-            const body = editingPO 
-                ? { po_id: editingPO.po_id, ...poData }
-                : poData;
+            let error;
+            
+            if (editingPO) {
+                const { error: updateError } = await supabase
+                    .from('purchase_order')
+                    .update(poData)
+                    .eq('po_id', editingPO.po_id);
+                error = updateError;
+            } else {
+                const { error: insertError } = await supabase
+                    .from('purchase_order')
+                    .insert([poData]);
+                error = insertError;
+            }
 
-            const res = await fetch('/purchasing/api?type=purchase-orders', {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                toast({ title: "Save Error", description: data.error?.message || 'Failed to save purchase order', variant: "destructive" });
+            if (error) {
+                toast({ title: "Save Error", description: error.message, variant: "destructive" });
             } else {
                 toast({ title: "Success", description: `Purchase order ${editingPO ? 'updated' : 'created'} successfully.` });
                 setIsPODialogOpen(false);
                 resetPOForm();
                 fetchPurchaseOrders();
             }
-        } catch (error) {
-            toast({ title: "Error", description: "Network error", variant: "destructive" });
+        } catch (error: any) {
+            toast({ title: "Error", description: error.message, variant: "destructive" });
         }
 
         setIsPOLoading(false);
     };
 
     const handleDelete = async () => {
-        if (!deletingItem) return;
+        if (!supabase || !deletingItem) return;
 
         try {
-            let url = '/purchasing/api?';
+            let error;
             
             if (deletingItem.type === 'supplier') {
-                url += `supplier_id=${deletingItem.supplier_id}`;
+                const { error: deleteError } = await supabase
+                    .from('supplier')
+                    .delete()
+                    .eq('supplier_id', deletingItem.supplier_id);
+                error = deleteError;
             } else {
-                url += `type=purchase-orders&po_id=${deletingItem.po_id}`;
+                const { error: deleteError } = await supabase
+                    .from('purchase_order')
+                    .delete()
+                    .eq('po_id', deletingItem.po_id);
+                error = deleteError;
             }
-            
-            const res = await fetch(url, {
-                method: 'DELETE',
-            });
 
-            const data = await res.json();
-
-            if (!res.ok) {
-                toast({ title: "Delete Error", description: data.error?.message || 'Failed to delete', variant: "destructive" });
+            if (error) {
+                toast({ title: "Delete Error", description: error.message, variant: "destructive" });
             } else {
-                toast({ title: "Success", description: `${deletingItem.type} deleted successfully.` });
+                toast({ title: "Success", description: `${deletingItem.type === 'supplier' ? 'Supplier' : 'Purchase order'} deleted successfully.` });
                 setIsDeleteDialogOpen(false);
                 if (deletingItem.type === 'supplier') {
                     fetchSuppliers();
@@ -537,8 +553,8 @@ export default function EnhancedPurchasingPage() {
                     fetchPurchaseOrders();
                 }
             }
-        } catch (error) {
-            toast({ title: "Error", description: "Network error", variant: "destructive" });
+        } catch (error: any) {
+            toast({ title: "Error", description: error.message, variant: "destructive" });
         }
     };
 
@@ -655,6 +671,7 @@ export default function EnhancedPurchasingPage() {
                 </div>
 
                 <div className="mt-12"></div>
+                
                 {/* Stats Overview */}
                 <StatsOverview suppliers={suppliers} purchaseOrders={purchaseOrders} />
 
@@ -743,7 +760,7 @@ export default function EnhancedPurchasingPage() {
                     </TabsContent>
                 </EnhancedTabs>
 
-                {/* Enhanced Supplier Dialog */}
+                {/* Supplier Dialog */}
                 <Dialog open={isSupplierDialogOpen} onOpenChange={(isOpen) => {
                     if (!isOpen) {
                         setIsSupplierDialogOpen(false);
@@ -846,7 +863,7 @@ export default function EnhancedPurchasingPage() {
                     </DialogContent>
                 </Dialog>
 
-                {/* Enhanced Purchase Order Dialog */}
+                {/* Purchase Order Dialog */}
                 <Dialog open={isPODialogOpen} onOpenChange={(isOpen) => {
                     if (!isOpen) {
                         setIsPODialogOpen(false);
@@ -940,13 +957,13 @@ export default function EnhancedPurchasingPage() {
                     </DialogContent>
                 </Dialog>
 
-                {/* Enhanced Delete Confirmation Dialog */}
+                {/* Delete Confirmation Dialog */}
                 <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                 <AlertDialogContent className="bg-gradient-to-br from-slate-50 to-indigo-50/30 border-0 shadow-2xl mt-20">
+                    <AlertDialogContent className="bg-gradient-to-br from-slate-50 to-indigo-50/30 border-0 shadow-2xl mt-20">
                         <AlertDialogHeader>
                             <AlertDialogTitle className="text-slate-900">Confirm Deletion</AlertDialogTitle>
                             <AlertDialogDescription className="text-slate-600">
-                                Are you sure you want to delete this {deletingItem?.type}? This action cannot be undone.
+                                Are you sure you want to delete this {deletingItem?.type === 'supplier' ? 'supplier' : 'purchase order'}? This action cannot be undone.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
