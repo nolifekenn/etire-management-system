@@ -1,14 +1,67 @@
-// Token-based authentication utilities
-export interface AuthToken {
-  token: string;
-  user: {
-    user_id: string;
-    name: string;
-    username: string;
-    role: number;
-  };
-  expiresAt: number;
+// /lib/tokenAuth.ts
+import { Session, User } from "@supabase/supabase-js";
+
+// LocalStorage key for Supabase session
+export const TOKEN_KEY = "etire_auth_session";
+export const FORM_STATE_PREFIX = "etire_form_";
+
+// ============================
+// 🔐 AUTH SESSION MANAGEMENT
+// ============================
+
+// Save Supabase session to localStorage
+export function saveAuthSession(session: Session): void {
+  try {
+    localStorage.setItem(TOKEN_KEY, JSON.stringify(session));
+  } catch (error) {
+    console.error("Failed to save auth session:", error);
+  }
 }
+
+// Retrieve Supabase session from localStorage
+export function getAuthSession(): Session | null {
+  try {
+    const sessionData = localStorage.getItem(TOKEN_KEY);
+    if (!sessionData) return null;
+    const parsed = JSON.parse(sessionData) as Session;
+
+    // Check expiration
+    if (parsed.expires_at && parsed.expires_at * 1000 < Date.now()) {
+      clearAuthSession();
+      return null;
+    }
+
+    return parsed;
+  } catch (error) {
+    console.error("Failed to get auth session:", error);
+    return null;
+  }
+}
+
+// Clear Supabase session
+export function clearAuthSession(): void {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch (error) {
+    console.error("Failed to clear auth session:", error);
+  }
+}
+
+// Check if user is authenticated
+export function isAuthenticated(): boolean {
+  const session = getAuthSession();
+  return !!session && !!session.access_token;
+}
+
+// Get the current user from session
+export function getCurrentUser(): User | null {
+  const session = getAuthSession();
+  return session?.user ?? null;
+}
+
+// ============================
+// 🧾 FORM STATE MANAGEMENT
+// ============================
 
 export interface FormState {
   formId: string;
@@ -16,100 +69,38 @@ export interface FormState {
   timestamp: number;
 }
 
-// Token management
-export const TOKEN_KEY = 'etire_auth_token';
-export const FORM_STATE_PREFIX = 'etire_form_';
-
-// Generate a secure token
-export function generateToken(): string {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
-// Save authentication token to localStorage
-export function saveAuthToken(tokenData: AuthToken): void {
-  try {
-    localStorage.setItem(TOKEN_KEY, JSON.stringify(tokenData));
-  } catch (error) {
-    console.error('Failed to save auth token:', error);
-  }
-}
-
-// Get authentication token from localStorage
-export function getAuthToken(): AuthToken | null {
-  try {
-    const tokenData = localStorage.getItem(TOKEN_KEY);
-    if (!tokenData) return null;
-    
-    const parsed = JSON.parse(tokenData) as AuthToken;
-    
-    // Check if token is expired
-    if (Date.now() > parsed.expiresAt) {
-      clearAuthToken();
-      return null;
-    }
-    
-    return parsed;
-  } catch (error) {
-    console.error('Failed to get auth token:', error);
-    clearAuthToken();
-    return null;
-  }
-}
-
-// Clear authentication token
-export function clearAuthToken(): void {
-  try {
-    localStorage.removeItem(TOKEN_KEY);
-  } catch (error) {
-    console.error('Failed to clear auth token:', error);
-  }
-}
-
-// Check if user is authenticated
-export function isAuthenticated(): boolean {
-  const token = getAuthToken();
-  return token !== null;
-}
-
-// Get current user from token
-export function getCurrentUser() {
-  const token = getAuthToken();
-  return token?.user || null;
-}
-
-// Form state management
+// Save form state for recovery
 export function saveFormState(formId: string, data: Record<string, any>): void {
   try {
     const formState: FormState = {
       formId,
       data,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
     localStorage.setItem(`${FORM_STATE_PREFIX}${formId}`, JSON.stringify(formState));
   } catch (error) {
-    console.error('Failed to save form state:', error);
+    console.error("Failed to save form state:", error);
   }
 }
 
+// Retrieve a saved form state
 export function getFormState(formId: string): Record<string, any> | null {
   try {
     const formState = localStorage.getItem(`${FORM_STATE_PREFIX}${formId}`);
     if (!formState) return null;
-    
+
     const parsed = JSON.parse(formState) as FormState;
-    
-    // Check if form state is too old (24 hours)
-    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+
+    // Expire after 24 hours
+    const maxAge = 24 * 60 * 60 * 1000;
     if (Date.now() - parsed.timestamp > maxAge) {
       clearFormState(formId);
       return null;
     }
-    
+
     return parsed.data;
   } catch (error) {
-    console.error('Failed to get form state:', error);
+    console.error("Failed to get form state:", error);
     return null;
   }
 }
@@ -118,33 +109,19 @@ export function clearFormState(formId: string): void {
   try {
     localStorage.removeItem(`${FORM_STATE_PREFIX}${formId}`);
   } catch (error) {
-    console.error('Failed to clear form state:', error);
+    console.error("Failed to clear form state:", error);
   }
 }
 
 export function clearAllFormStates(): void {
   try {
     const keys = Object.keys(localStorage);
-    keys.forEach(key => {
+    keys.forEach((key) => {
       if (key.startsWith(FORM_STATE_PREFIX)) {
         localStorage.removeItem(key);
       }
     });
   } catch (error) {
-    console.error('Failed to clear form states:', error);
+    console.error("Failed to clear form states:", error);
   }
-}
-
-// Create auth token from user data
-export function createAuthToken(user: any): AuthToken {
-  return {
-    token: generateToken(),
-    user: {
-      user_id: user.user_id,
-      name: user.name,
-      username: user.username,
-      role: user.role
-    },
-    expiresAt: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
-  };
 }

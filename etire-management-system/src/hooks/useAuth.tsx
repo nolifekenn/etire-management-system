@@ -1,157 +1,102 @@
-
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { User } from '@/lib/types';
-import { supabase } from '@/lib/supabaseClient';
-import { 
-    getAuthToken, 
-    saveAuthToken, 
-    clearAuthToken, 
-    getCurrentUser, 
-    createAuthToken,
-    isAuthenticated 
-} from '@/lib/tokenAuth';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+
+interface ExtendedUser {
+  user_id: string;
+  name: string;
+  username: string;
+  role: number;
+}
 
 interface AuthContextType {
-    user: User | null;
-    isLoading: boolean;
-    login: (username: string, password: string) => Promise<boolean>;
-    logout: () => void;
+  user: ExtendedUser | null;
+  isLoading: boolean;
+  login: (username: string, password: string) => Promise<boolean>;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
-    user: null,
-    isLoading: false,
-    login: async () => false,
-    logout: () => {},
+  user: null,
+  isLoading: false,
+  login: async () => false,
+  logout: () => {},
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-    const [user, setUser] = useState<User | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<ExtendedUser | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-    useEffect(() => {
-        // Check for existing token on mount
-        const checkAuthToken = async () => {
-            try {
-                const token = getAuthToken();
-                if (token) {
-                    // Verify token is still valid by checking with database
-                    if (supabase) {
-                        const { data: userData, error } = await supabase
-                            .from('user')
-                            .select('*')
-                            .eq('user_id', token.user.user_id)
-                            .single();
-                        
-                        if (userData && !error) {
-                            setUser(userData);
-                        } else {
-                            // Token is invalid, clear it
-                            clearAuthToken();
-                        }
-                    } else {
-                        // Use token data if no database connection
-                        setUser(token.user as User);
-                    }
-                }
-            } catch (error) {
-                console.error('Error checking auth token:', error);
-                clearAuthToken();
-            } finally {
-                setIsLoading(false);
-            }
-        };
+  // 🟢 Try loading stored user from localStorage
+  useEffect(() => {
+    const storedUser = localStorage.getItem("etire_user");
+    if (storedUser) setUser(JSON.parse(storedUser));
+  }, []);
 
-        checkAuthToken();
-    }, []);
+  // 🟣 Login directly from public.user (no Supabase Auth)
+  const login = async (username: string, password: string): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      console.log("🔐 Attempting local DB login for:", username);
 
-    const login = async (username: string, password: string): Promise<boolean> => {
-        console.log('Supabase client status:', supabase ? 'Available' : 'NULL');
-        console.log('Environment variables:', {
-            url: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Missing',
-            key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Set' : 'Missing'
-        });
-        
-        if (!supabase) {
-            console.error('Supabase client not available. Please check your environment configuration.');
-            return false;
-        }
+      const { data, error } = await supabase
+        .from("user")
+        .select("user_id, name, username, password, role")
+        .eq("username", username)
+        .single();
 
-        try {
-            setIsLoading(true);
-            
-            // First, find the user in our user table
-            console.log('Attempting to login user:', username);
-            const { data: userData, error: userError } = await supabase
-                .from('user')
-                .select('*')
-                .eq('username', username)
-                .single();
+      if (error) {
+        console.error("❌ Login DB error:", error.message);
+        return false;
+      }
 
-            console.log('Database query result:', { userData, userError });
+      if (!data) {
+        console.warn("⚠️ No user found for:", username);
+        return false;
+      }
 
-            if (userError) {
-                console.error('Database error:', userError);
-                if (userError.code === 'PGRST116') {
-                    console.error('User not found in database. Please check if the user exists.');
-                } else {
-                    console.error('Database connection error. Please check your Supabase configuration.');
-                }
-                return false;
-            }
+      if (data.password !== password) {
+        console.warn("⚠️ Incorrect password for user:", username);
+        return false;
+      }
 
-            if (!userData) {
-                console.error('User not found:', username);
-                return false;
-            }
+      const loggedInUser: ExtendedUser = {
+        user_id: data.user_id,
+        name: data.name,
+        username: data.username,
+        role: data.role,
+      };
 
-            console.log('User found:', userData);
+      console.log(`✅ Login successful for ${data.username}, Role: ${data.role}`);
 
-            // Check password (in a real app, this should be hashed)
-            console.log('Password check:', { 
-                provided: password, 
-                stored: userData.password, 
-                match: userData.password === password 
-            });
-            
-            if (userData.password !== password) {
-                console.error('Invalid password for user:', username);
-                return false;
-            }
+      setUser(loggedInUser);
+      localStorage.setItem("etire_user", JSON.stringify(loggedInUser));
+      return true;
+    } catch (err) {
+      console.error("Login error:", err);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-            // Create and save auth token
-            const authToken = createAuthToken(userData);
-            saveAuthToken(authToken);
-            
-            // Set the user in our context
-            setUser(userData);
-            return true;
-        } catch (error) {
-            console.error('Login error:', error);
-            return false;
-        } finally {
-            setIsLoading(false);
-        }
-    };
+  const logout = () => {
+    console.log("🚪 Logging out...");
+    setUser(null);
+    localStorage.removeItem("etire_user");
+  };
 
-    const logout = () => {
-        setUser(null);
-        clearAuthToken();
-    };
-
-    return (
-        <AuthContext.Provider value={{ user, isLoading, login, logout }}>
-            {children}
-        </AuthContext.Provider>
-    );
+  return (
+    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {
-    const context = useContext(AuthContext);
-    if (context === undefined) {
-        throw new Error('useAuth must be used within an AuthProvider');
-    }
-    return context;
+  const context = useContext(AuthContext);
+  if (!context)
+    throw new Error("useAuth must be used within an AuthProvider");
+  return context;
 };
