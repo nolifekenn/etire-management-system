@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -29,14 +28,53 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, PlusCircle, AlertTriangle, Users, Car, History, Wrench } from 'lucide-react';
+import { 
+  Loader2, PlusCircle, AlertTriangle, Users, Car, History, Wrench, 
+  RefreshCw, Clock, Edit, Trash2, Search, Filter, X, MapPin, Phone, Mail,
+  Bike, Truck, Bus, CarTaxiFront
+} from 'lucide-react';
 import { DataTableWrapper } from '@/components/DataTableWrapper';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
 import { Customer, Vehicle, TireHistory, InventoryItem, User } from '@/lib/types';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
-// Customer Management
+const buttonStyles = {
+  primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl",
+  secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95",
+  glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg"
+};
+
+// Vehicle Type Icons Mapping
+const VehicleIcons = {
+  car: Car,
+  motorcycle: Bike,
+  truck: Truck,
+  bus: Bus,
+  suv: CarTaxiFront,
+  default: Car
+};
+
+const getVehicleIcon = (vehicleType: string) => {
+  const type = vehicleType?.toLowerCase();
+  return VehicleIcons[type as keyof typeof VehicleIcons] || VehicleIcons.default;
+};
+
+// Service Type Colors
+const serviceTypeColors = {
+  repair: "bg-orange-100 text-orange-700 border-orange-200",
+  replacement: "bg-blue-100 text-blue-700 border-blue-200",
+  rotation: "bg-green-100 text-green-700 border-green-200",
+  balancing: "bg-purple-100 text-purple-700 border-purple-200"
+};
+
+interface VehicleType {
+    vehicle_type_id: string;
+    name: string;
+}
+
+// Column definitions
 const customerColumns = [
   { key: 'name', header: 'Customer Name' },
   { key: 'phone', header: 'Phone' },
@@ -45,7 +83,6 @@ const customerColumns = [
   { key: 'vehicle_count', header: 'Vehicles' },
 ];
 
-// Vehicle Management
 const vehicleColumns = [
   { key: 'plate_number', header: 'Plate Number' },
   { key: 'customer_name', header: 'Customer' },
@@ -56,7 +93,6 @@ const vehicleColumns = [
   { key: 'color', header: 'Color' },
 ];
 
-// Tire History
 const historyColumns = [
   { key: 'plate_number', header: 'Vehicle' },
   { key: 'item_name', header: 'Tire/Item' },
@@ -66,15 +102,12 @@ const historyColumns = [
   { key: 'created_by_name', header: 'Service By' },
 ];
 
-interface VehicleType {
-    vehicle_type_id: string;
-    name: string;
-}
-
-export default function CustomersPage() {
+export default function EnhancedCustomersPage() {
     const { toast } = useToast();
     const { user: authUser } = useAuth();
     const [activeTab, setActiveTab] = useState('customers');
+    const [mounted, setMounted] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     
     // Customers state
     const [customers, setCustomers] = useState<Customer[]>([]);
@@ -86,7 +119,6 @@ export default function CustomersPage() {
     const [isVehicleLoading, setIsVehicleLoading] = useState(true);
     const [vehicleError, setVehicleError] = useState<string | null>(null);
     const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
-    const [selectedVehicleType, setSelectedVehicleType] = useState('');
     
     // Tire History state
     const [tireHistory, setTireHistory] = useState<TireHistory[]>([]);
@@ -108,6 +140,12 @@ export default function CustomersPage() {
     const [editingHistory, setEditingHistory] = useState<TireHistory | null>(null);
     const [deletingItem, setDeletingItem] = useState<any>(null);
 
+    // Filter states
+    const [searchTerm, setSearchTerm] = useState('');
+    const [customerFilter, setCustomerFilter] = useState('all');
+    const [vehicleTypeFilter, setVehicleTypeFilter] = useState('all');
+    const [serviceTypeFilter, setServiceTypeFilter] = useState('all');
+
     // Customer form state
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
@@ -121,6 +159,7 @@ export default function CustomersPage() {
     const [model, setModel] = useState('');
     const [year, setYear] = useState('');
     const [color, setColor] = useState('');
+    const [selectedVehicleType, setSelectedVehicleType] = useState('');
 
     // History form state
     const [selectedVehicle, setSelectedVehicle] = useState('');
@@ -130,12 +169,16 @@ export default function CustomersPage() {
     const [mileage, setMileage] = useState('');
     const [historyNotes, setHistoryNotes] = useState('');
 
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const fetchCustomers = useCallback(async () => {
         if (!supabase) return;
         setIsCustomerLoading(true);
         const { data, error } = await supabase
             .from('customer')
-            .select('*, vehicle(vehicle_id)') // Changed to get vehicle IDs instead of count
+            .select('*, vehicle(vehicle_id)')
             .order('name', { ascending: true });
     
         if (error) {
@@ -146,6 +189,7 @@ export default function CustomersPage() {
             setCustomerError(null);
         }
         setIsCustomerLoading(false);
+        setLastUpdated(new Date());
     }, []);
 
     const fetchVehicles = useCallback(async () => {
@@ -213,6 +257,48 @@ export default function CustomersPage() {
         fetchSupportingData();
         fetchVehicleTypes();
     }, [fetchCustomers, fetchVehicles, fetchTireHistory, fetchSupportingData, fetchVehicleTypes]);
+
+    // Filter functions
+    const filteredCustomers = customers.filter(customer => {
+        const matchesSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            customer.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            customer.address?.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesSearch;
+    });
+
+    const filteredVehicles = vehicles.filter(vehicle => {
+        const matchesSearch = vehicle.plate_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            vehicle.make?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            vehicle.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            vehicle.customer?.name.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesType = vehicleTypeFilter === 'all' || 
+                           vehicle.vehicle_type_id === vehicleTypeFilter;
+
+        const matchesCustomer = customerFilter === 'all' || 
+                              vehicle.customer_id === customerFilter;
+
+        return matchesSearch && matchesType && matchesCustomer;
+    });
+
+    const filteredHistory = tireHistory.filter(history => {
+        const matchesSearch = history.vehicle?.plate_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            history.inventory_item?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            history.vehicle?.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesService = serviceTypeFilter === 'all' || 
+                             history.service_type === serviceTypeFilter;
+
+        return matchesSearch && matchesService;
+    });
+
+    const clearFilters = () => {
+        setSearchTerm('');
+        setCustomerFilter('all');
+        setVehicleTypeFilter('all');
+        setServiceTypeFilter('all');
+    };
 
     const resetCustomerForm = () => {
         setCustomerName('');
@@ -295,6 +381,14 @@ export default function CustomersPage() {
         setIsDeleteDialogOpen(true);
     };
 
+    const handleRefresh = () => {
+        fetchCustomers();
+        fetchVehicles();
+        fetchTireHistory();
+        fetchSupportingData();
+        fetchVehicleTypes();
+    };
+
     const handleSubmitCustomer = async () => {
         if (!supabase || !authUser) return;
         if (!customerName) {
@@ -314,13 +408,13 @@ export default function CustomersPage() {
         let error;
         if (editingCustomer) {
             const { error: updateError } = await supabase
-                .from('customer') // Changed from 'customers'
+                .from('customer')
                 .update(customerData)
                 .eq('customer_id', editingCustomer.customer_id);
             error = updateError;
         } else {
             const { error: insertError } = await supabase
-                .from('customer') // Changed from 'customers'
+                .from('customer')
                 .insert([customerData]);
             error = insertError;
         }
@@ -454,22 +548,23 @@ export default function CustomersPage() {
         }
     };
 
+    // Custom cell renderers for DataTableWrapper
     const renderCustomerCell = (item: any, columnKey: string, value: any) => {
         if (columnKey === 'vehicle_count') {
-            // Changed from item.vehicles to item.vehicle
             return item.vehicle && Array.isArray(item.vehicle) ? item.vehicle.length : 0;
         }
         if (columnKey === 'phone' && !value) {
-            return <span className="text-muted-foreground">No phone</span>;
+            return <span className="text-slate-400">No phone</span>;
         }
         if (columnKey === 'email' && !value) {
-            return <span className="text-muted-foreground">No email</span>;
+            return <span className="text-slate-400">No email</span>;
         }
         if (columnKey === 'address' && !value) {
-            return <span className="text-muted-foreground">No address</span>;
+            return <span className="text-slate-400">No address</span>;
         }
         return String(value || '');
     };
+
     const renderVehicleCell = (item: any, columnKey: string, value: any) => {
         if (columnKey === 'customer_name') {
             return item.customer?.name || 'Unknown Customer';
@@ -477,450 +572,790 @@ export default function CustomersPage() {
         if (columnKey === 'vehicle_type') {
             if (!item.vehicle_type) return <Badge variant="outline">N/A</Badge>;
             const vehicleName = item.vehicle_type.name;
-            const color = vehicleName === 'car' ? 'bg-blue-100 text-blue-700' :
-                        vehicleName === 'motor' ? 'bg-green-100 text-green-700' :
-                        'bg-orange-100 text-orange-700';
-            return <Badge className={`capitalize ${color}`}>{vehicleName}</Badge>;
+            const VehicleIcon = getVehicleIcon(vehicleName);
+            return (
+                <Badge variant="outline" className="flex items-center gap-1 bg-slate-100 text-slate-700 border-slate-300 capitalize">
+                    <VehicleIcon className="h-3 w-3" />
+                    {vehicleName}
+                </Badge>
+            );
         }
         if (columnKey === 'year' && !value) {
-            return <span className="text-muted-foreground">-</span>;
+            return <span className="text-slate-400">-</span>;
         }
         if (columnKey === 'make' && !value) {
-            return <span className="text-muted-foreground">-</span>;
+            return <span className="text-slate-400">-</span>;
         }
         if (columnKey === 'model' && !value) {
-            return <span className="text-muted-foreground">-</span>;
+            return <span className="text-slate-400">-</span>;
         }
         if (columnKey === 'color' && !value) {
-            return <span className="text-muted-foreground">-</span>;
+            return <span className="text-slate-400">-</span>;
         }
         return String(value || '');
     };
 
     const renderHistoryCell = (item: any, columnKey: string, value: any) => {
         if (columnKey === 'plate_number') {
-            return item.vehicle?.plate_number || 'Unknown Vehicle'; // Changed from 'vehicles'
+            return item.vehicle?.plate_number || 'Unknown Vehicle';
         }
         if (columnKey === 'item_name') {
-            return item.inventory_item?.name || 'Unknown Item'; // Changed from 'inventory'
+            return item.inventory_item?.name || 'Unknown Item';
         }
         if (columnKey === 'service_type') {
-            return <Badge variant="outline" className="capitalize">{value}</Badge>;
+            return (
+                <Badge className={`capitalize ${serviceTypeColors[item.service_type]}`}>
+                    {value}
+                </Badge>
+            );
         }
         if (columnKey === 'service_date') {
             return new Date(value).toLocaleDateString();
         }
         if (columnKey === 'mileage' && !value) {
-            return <span className="text-muted-foreground">-</span>;
+            return <span className="text-slate-400">-</span>;
         }
         if (columnKey === 'created_by_name') {
-            return item.user?.name || 'Unknown User'; // Changed from 'users'
+            return item.user?.name || 'Unknown User';
         }
         return String(value || '');
     };
 
-    return (
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-            <PageHeader 
-                title="Customer & Vehicle History" 
-                description="Manage customers, vehicles, and tire service history."
-            />
-
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="customers">Customers</TabsTrigger>
-                    <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
-                    <TabsTrigger value="history">Tire History</TabsTrigger>
+    const EnhancedTabs = ({ value, onValueChange, children }: any) => {
+        return (
+            <Tabs value={value} onValueChange={onValueChange} className="w-full">
+                <TabsList className="grid w-full grid-cols-3 p-1 bg-slate-100 rounded-2xl">
+                    <TabsTrigger 
+                        value="customers" 
+                        className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300"
+                    >
+                        <Users className="h-4 w-4 mr-2" />
+                        Customers
+                    </TabsTrigger>
+                    <TabsTrigger 
+                        value="vehicles" 
+                        className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300"
+                    >
+                        <Car className="h-4 w-4 mr-2" />
+                        Vehicles
+                    </TabsTrigger>
+                    <TabsTrigger 
+                        value="history" 
+                        className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300"
+                    >
+                        <History className="h-4 w-4 mr-2" />
+                        Tire History
+                    </TabsTrigger>
                 </TabsList>
-
-                <TabsContent value="customers" className="space-y-4">
-                    <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-semibold">Customer Management</h3>
-                    </div>
-
-                    {customerError && (
-                        <Alert variant="destructive">
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertTitle>Error</AlertTitle>
-                            <AlertDescription>{customerError}</AlertDescription>
-                        </Alert>
-                    )}
-
-                    {(isCustomerLoading && customers.length === 0) ? (
-                        <div className="flex justify-center items-center h-64">
-                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        </div>
-                    ) : (
-                        <DataTableWrapper
-                            title="Customers"
-                            columns={customerColumns}
-                            data={customers.map(customer => ({ ...customer, id: customer.customer_id }))}
-                            onAddNew={handleOpenCustomerDialog}
-                            onEdit={handleEditCustomer}
-                            onDelete={(item) => handleDeleteItem(item, 'customer')}
-                            renderCell={renderCustomerCell}
-                        />
-                    )}
-                </TabsContent>
-
-                <TabsContent value="vehicles" className="space-y-4">
-                    <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-semibold">Vehicle Management</h3>
-                    </div>
-
-                    {vehicleError && (
-                        <Alert variant="destructive">
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertTitle>Error</AlertTitle>
-                            <AlertDescription>{vehicleError}</AlertDescription>
-                        </Alert>
-                    )}
-
-                    {(isVehicleLoading && vehicles.length === 0) ? (
-                        <div className="flex justify-center items-center h-64">
-                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        </div>
-                    ) : (
-                        <DataTableWrapper
-                            title="Vehicles"
-                            columns={vehicleColumns}
-                            data={vehicles.map(vehicle => ({ ...vehicle, id: vehicle.vehicle_id }))}
-                            onAddNew={handleOpenVehicleDialog}
-                            onEdit={handleEditVehicle}
-                            onDelete={(item) => handleDeleteItem(item, 'vehicle')}
-                            renderCell={renderVehicleCell}
-                        />
-                    )}
-                </TabsContent>
-
-                <TabsContent value="history" className="space-y-4">
-                    <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-semibold">Tire Service History</h3>
-                    </div>
-
-                    {historyError && (
-                        <Alert variant="destructive">
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertTitle>Error</AlertTitle>
-                            <AlertDescription>{historyError}</AlertDescription>
-                        </Alert>
-                    )}
-
-                    {(isHistoryLoading && tireHistory.length === 0) ? (
-                        <div className="flex justify-center items-center h-64">
-                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        </div>
-                    ) : (
-                        <DataTableWrapper
-                            title="Tire History"
-                            columns={historyColumns}
-                            data={tireHistory.map(history => ({ ...history, id: history.history_id }))}
-                            onAddNew={handleOpenHistoryDialog}
-                            onEdit={handleEditHistory}
-                            onDelete={(item) => handleDeleteItem(item, 'history')}
-                            renderCell={renderHistoryCell}
-                        />
-                    )}
-                </TabsContent>
+                {children}
             </Tabs>
+        );
+    };
 
-            {/* Customer Dialog */}
-            <Dialog open={isCustomerDialogOpen} onOpenChange={(isOpen) => {
-                if (!isOpen) {
-                    setIsCustomerDialogOpen(false);
-                    resetCustomerForm();
-                }
-            }}>
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>{editingCustomer ? 'Edit Customer' : 'Add New Customer'}</DialogTitle>
-                        <DialogDescription>
-                            {editingCustomer ? `Update details for ${editingCustomer.name}.` : 'Enter the details for the new customer.'}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="customer-name">Customer Name *</Label>
-                            <Input 
-                                id="customer-name" 
-                                value={customerName} 
-                                onChange={(e) => setCustomerName(e.target.value)} 
-                                placeholder="John Doe"
-                            />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="customer-phone">Phone</Label>
-                                <Input 
-                                    id="customer-phone" 
-                                    value={customerPhone} 
-                                    onChange={(e) => setCustomerPhone(e.target.value)} 
-                                    placeholder="+1-555-0101"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="customer-email">Email</Label>
-                                <Input 
-                                    id="customer-email" 
-                                    type="email"
-                                    value={customerEmail} 
-                                    onChange={(e) => setCustomerEmail(e.target.value)} 
-                                    placeholder="john@example.com"
-                                />
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="customer-address">Address</Label>
-                            <Textarea 
-                                id="customer-address" 
-                                value={customerAddress} 
-                                onChange={(e) => setCustomerAddress(e.target.value)} 
-                                placeholder="123 Main Street, City, State"
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <DialogClose asChild>
-                            <Button type="button" variant="outline">Cancel</Button>
-                        </DialogClose>
-                        <Button onClick={handleSubmitCustomer} disabled={isCustomerLoading}>
-                            {isCustomerLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {editingCustomer ? 'Save Changes' : 'Create Customer'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+    return (
+        <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
+            
+            {/* Background Sections */}
+            <div className="absolute top-0 left-0 w-full h-80 rounded-b-[40px] overflow-hidden">
+                <div 
+                    className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
+                    style={{ 
+                        backgroundImage: "url('/images/image2.jpg')",
+                        backgroundSize: "cover",
+                        backgroundPosition: "center 30%"
+                    }}
+                ></div>
+                <div className="absolute top-0 left-0 w-32 h-32 bg-purple-300/20 rounded-br-full"></div>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-300/20 rounded-bl-full"></div>
+            </div>
 
-            {/* Vehicle Dialog */}
-            <Dialog open={isVehicleDialogOpen} onOpenChange={(isOpen) => {
-                if (!isOpen) {
-                    setIsVehicleDialogOpen(false);
-                    resetVehicleForm();
-                }
-            }}>
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>{editingVehicle ? 'Edit Vehicle' : 'Add New Vehicle'}</DialogTitle>
-                        <DialogDescription>
-                            {editingVehicle ? `Update details for ${editingVehicle.plate_number}.` : 'Enter the details for the new vehicle.'}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="customer">Customer *</Label>
-                            <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select customer" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {customers.map(customer => (
-                                        <SelectItem key={customer.customer_id} value={customer.customer_id}>
-                                            {customer.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="plate-number">Plate Number *</Label>
-                            <Input 
-                                id="plate-number" 
-                                value={plateNumber} 
-                                onChange={(e) => setPlateNumber(e.target.value)} 
-                                placeholder="ABC-1234"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="vehicle-type">Vehicle Type</Label>
-                            <Select value={selectedVehicleType} onValueChange={setSelectedVehicleType}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select vehicle type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {vehicleTypes.map(vt => (
-                                        <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id}>
-                                            {vt.name.charAt(0).toUpperCase() + vt.name.slice(1)}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="make">Make</Label>
-                                <Input 
-                                    id="make" 
-                                    value={make} 
-                                    onChange={(e) => setMake(e.target.value)} 
-                                    placeholder="Toyota"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="model">Model</Label>
-                                <Input 
-                                    id="model" 
-                                    value={model} 
-                                    onChange={(e) => setModel(e.target.value)} 
-                                    placeholder="Camry"
-                                />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="year">Year</Label>
-                                <Input 
-                                    id="year" 
-                                    type="number"
-                                    value={year} 
-                                    onChange={(e) => setYear(e.target.value)} 
-                                    placeholder="2020"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="color">Color</Label>
-                                <Input 
-                                    id="color" 
-                                    value={color} 
-                                    onChange={(e) => setColor(e.target.value)} 
-                                    placeholder="White"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <DialogClose asChild>
-                            <Button type="button" variant="outline">Cancel</Button>
-                        </DialogClose>
-                        <Button onClick={handleSubmitVehicle} disabled={isVehicleLoading}>
-                            {isVehicleLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {editingVehicle ? 'Save Changes' : 'Create Vehicle'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <div className="absolute top-80 left-0 w-full h-full bg-indigo-50/10">
+                <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-indigo-100/15 to-indigo-50/10"></div>
+            </div>
 
-            {/* History Dialog */}
-            <Dialog open={isHistoryDialogOpen} onOpenChange={(isOpen) => {
-                if (!isOpen) {
-                    setIsHistoryDialogOpen(false);
-                    resetHistoryForm();
-                }
-            }}>
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>{editingHistory ? 'Edit Tire History' : 'Add Tire History'}</DialogTitle>
-                        <DialogDescription>
-                            {editingHistory ? `Update tire service record.` : 'Record a new tire service for a vehicle.'}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="vehicle">Vehicle *</Label>
-                            <Select value={selectedVehicle} onValueChange={setSelectedVehicle}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select vehicle" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {vehicles.map(vehicle => (
-                                        <SelectItem key={vehicle.vehicle_id} value={vehicle.vehicle_id}>
-                                            {vehicle.plate_number} - {vehicle.customer?.name || 'Unknown Customer'}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="item">Tire/Item *</Label>
-                            <Select value={selectedItem} onValueChange={setSelectedItem}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select tire/item" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {inventory.map(item => (
-                                        <SelectItem key={item.item_id} value={item.item_id}>
-                                            {item.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="service-type">Service Type *</Label>
-                            <Select value={serviceType} onValueChange={(value: any) => setServiceType(value)}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="repair">Repair</SelectItem>
-                                    <SelectItem value="replacement">Replacement</SelectItem>
-                                    <SelectItem value="rotation">Rotation</SelectItem>
-                                    <SelectItem value="balancing">Balancing</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="service-date">Service Date *</Label>
-                                <Input 
-                                    id="service-date" 
-                                    type="date"
-                                    value={serviceDate} 
-                                    onChange={(e) => setServiceDate(e.target.value)} 
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="mileage">Mileage</Label>
-                                <Input 
-                                    id="mileage" 
-                                    type="number"
-                                    value={mileage} 
-                                    onChange={(e) => setMileage(e.target.value)} 
-                                    placeholder="50000"
-                                />
+            <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
+                
+                {/* Header Section */}
+                <div className={`mb-8 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+                    <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
+                        
+                        <div className="relative z-10 flex-1">
+                            <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
+                                Customer & Vehicle Management
+                            </h1>
+                            <div className="flex items-center gap-6 text-white/90">
+                                <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium">
+                                    <Users className="h-6 w-6 opacity-90" />
+                                    Manage customers, vehicles, and tire service history
+                                </p>
+                                {lastUpdated && (
+                                    <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">
+                                        <Clock className="w-5 h-5" />
+                                        Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                    </div>
+                                )}
                             </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="history-notes">Notes</Label>
-                            <Textarea 
-                                id="history-notes" 
-                                value={historyNotes} 
-                                onChange={(e) => setHistoryNotes(e.target.value)} 
-                                placeholder="Additional notes about the service..."
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <DialogClose asChild>
-                            <Button type="button" variant="outline">Cancel</Button>
-                        </DialogClose>
-                        <Button onClick={handleSubmitHistory} disabled={isHistoryLoading}>
-                            {isHistoryLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {editingHistory ? 'Save Changes' : 'Create History'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Delete Confirmation Dialog */}
-            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to delete this {deletingItem?.type}? This action cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction 
-                            onClick={handleDelete} 
-                            className="bg-destructive hover:bg-destructive/90"
+                        
+                        <Button 
+                            onClick={handleRefresh}
+                            disabled={isCustomerLoading || isVehicleLoading || isHistoryLoading}
+                            className={buttonStyles.glass + " active:scale-95"}
                         >
-                            Delete
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                            <RefreshCw className={`h-6 w-6 mr-3 ${isCustomerLoading || isVehicleLoading || isHistoryLoading ? 'animate-spin' : ''}`} />
+                            Refresh Data
+                        </Button>
+                    </div>
+                </div>
+
+                <EnhancedTabs value={activeTab} onValueChange={setActiveTab}>
+                    {/* Customers Tab */}
+                    <TabsContent value="customers" className="space-y-6">
+                        <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
+                            <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-purple-50/50 border-b border-slate-200/50">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <CardTitle className="text-2xl font-bold text-slate-900">Customer Management</CardTitle>
+                                        <CardDescription className="text-slate-600">
+                                            {filteredCustomers.length} of {customers.length} customer{filteredCustomers.length !== 1 ? 's' : ''} shown
+                                        </CardDescription>
+                                    </div>
+                                    <Button 
+                                        onClick={handleOpenCustomerDialog}
+                                        className={buttonStyles.primary}
+                                    >
+                                        <PlusCircle className="h-5 w-5 mr-2" />
+                                        Add Customer
+                                    </Button>
+                                </div>
+
+                                {/* Filter Bar */}
+                                <div className="flex flex-col sm:flex-row gap-4 mt-6 p-4 bg-white/60 rounded-xl border border-slate-200/50">
+                                    <div className="flex-1">
+                                        <Label htmlFor="search-customers" className="text-sm font-medium text-slate-700 mb-2 block">Search Customers</Label>
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                            <Input 
+                                                id="search-customers"
+                                                placeholder="Search by name, phone, email, or address..." 
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="pl-10 pr-4 py-2 border-slate-300 focus:border-indigo-400 bg-white/80"
+                                            />
+                                            {searchTerm && (
+                                                <button 
+                                                    onClick={() => setSearchTerm('')}
+                                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            
+                            <CardContent className="p-6">
+                                {customerError && (
+                                    <Alert variant="destructive" className="mb-6">
+                                        <AlertTriangle className="h-4 w-4" />
+                                        <AlertTitle>Error</AlertTitle>
+                                        <AlertDescription>{customerError}</AlertDescription>
+                                    </Alert>
+                                )}
+
+                                {(isCustomerLoading && customers.length === 0) ? (
+                                    <div className="flex justify-center items-center h-64">
+                                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                    </div>
+                                ) : (
+                                    <DataTableWrapper
+                                        title="Customers"
+                                        columns={customerColumns}
+                                        data={filteredCustomers.map(customer => ({ 
+                                            ...customer, 
+                                            id: customer.customer_id 
+                                        }))}
+                                        onAddNew={handleOpenCustomerDialog}
+                                        onEdit={handleEditCustomer}
+                                        onDelete={(item) => handleDeleteItem(item, 'customer')}
+                                        renderCell={renderCustomerCell}
+                                        searchTerm={searchTerm}
+                                        onSearchChange={setSearchTerm}
+                                    />
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* Vehicles Tab */}
+                    <TabsContent value="vehicles" className="space-y-6">
+                        <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
+                            <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-blue-50/50 border-b border-slate-200/50">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <CardTitle className="text-2xl font-bold text-slate-900">Vehicle Management</CardTitle>
+                                        <CardDescription className="text-slate-600">
+                                            {filteredVehicles.length} of {vehicles.length} vehicle{filteredVehicles.length !== 1 ? 's' : ''} shown
+                                        </CardDescription>
+                                    </div>
+                                    <Button 
+                                        onClick={handleOpenVehicleDialog}
+                                        className={buttonStyles.primary}
+                                    >
+                                        <PlusCircle className="h-5 w-5 mr-2" />
+                                        Add Vehicle
+                                    </Button>
+                                </div>
+
+                                {/* Filter Bar */}
+                                <div className="flex flex-col sm:flex-row gap-4 mt-6 p-4 bg-white/60 rounded-xl border border-slate-200/50">
+                                    <div className="flex-1">
+                                        <Label htmlFor="search-vehicles" className="text-sm font-medium text-slate-700 mb-2 block">Search Vehicles</Label>
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                            <Input 
+                                                id="search-vehicles"
+                                                placeholder="Search by plate, make, model, or customer..." 
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="pl-10 pr-4 py-2 border-slate-300 focus:border-indigo-400 bg-white/80"
+                                            />
+                                            {searchTerm && (
+                                                <button 
+                                                    onClick={() => setSearchTerm('')}
+                                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="sm:w-48">
+                                        <Label htmlFor="customer-filter" className="text-sm font-medium text-slate-700 mb-2 block">Customer</Label>
+                                        <Select value={customerFilter} onValueChange={setCustomerFilter}>
+                                            <SelectTrigger className="border-slate-300 focus:border-indigo-400 bg-white/80">
+                                                <SelectValue placeholder="All customers" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Customers</SelectItem>
+                                                {customers.map(customer => (
+                                                    <SelectItem key={customer.customer_id} value={customer.customer_id}>
+                                                        {customer.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div className="sm:w-48">
+                                        <Label htmlFor="vehicle-type-filter" className="text-sm font-medium text-slate-700 mb-2 block">Vehicle Type</Label>
+                                        <Select value={vehicleTypeFilter} onValueChange={setVehicleTypeFilter}>
+                                            <SelectTrigger className="border-slate-300 focus:border-indigo-400 bg-white/80">
+                                                <SelectValue placeholder="All types" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Types</SelectItem>
+                                                {vehicleTypes.map(type => (
+                                                    <SelectItem key={type.vehicle_type_id} value={type.vehicle_type_id}>
+                                                        {type.name.charAt(0).toUpperCase() + type.name.slice(1)}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    {(searchTerm || customerFilter !== 'all' || vehicleTypeFilter !== 'all') && (
+                                        <div className="flex items-end">
+                                            <Button 
+                                                onClick={clearFilters}
+                                                variant="outline" 
+                                                className="h-10 border-slate-300 text-slate-600 hover:text-slate-700"
+                                            >
+                                                <X className="h-4 w-4 mr-2" />
+                                                Clear
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardHeader>
+                            
+                            <CardContent className="p-6">
+                                {vehicleError && (
+                                    <Alert variant="destructive" className="mb-6">
+                                        <AlertTriangle className="h-4 w-4" />
+                                        <AlertTitle>Error</AlertTitle>
+                                        <AlertDescription>{vehicleError}</AlertDescription>
+                                    </Alert>
+                                )}
+
+                                {(isVehicleLoading && vehicles.length === 0) ? (
+                                    <div className="flex justify-center items-center h-64">
+                                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                    </div>
+                                ) : (
+                                    <DataTableWrapper
+                                        title="Vehicles"
+                                        columns={vehicleColumns}
+                                        data={filteredVehicles.map(vehicle => ({ 
+                                            ...vehicle, 
+                                            id: vehicle.vehicle_id 
+                                        }))}
+                                        onAddNew={handleOpenVehicleDialog}
+                                        onEdit={handleEditVehicle}
+                                        onDelete={(item) => handleDeleteItem(item, 'vehicle')}
+                                        renderCell={renderVehicleCell}
+                                        searchTerm={searchTerm}
+                                        onSearchChange={setSearchTerm}
+                                    />
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* Tire History Tab */}
+                    <TabsContent value="history" className="space-y-6">
+                        <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
+                            <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-green-50/50 border-b border-slate-200/50">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <CardTitle className="text-2xl font-bold text-slate-900">Tire Service History</CardTitle>
+                                        <CardDescription className="text-slate-600">
+                                            {filteredHistory.length} of {tireHistory.length} service record{filteredHistory.length !== 1 ? 's' : ''} shown
+                                        </CardDescription>
+                                    </div>
+                                    <Button 
+                                        onClick={handleOpenHistoryDialog}
+                                        className={buttonStyles.primary}
+                                    >
+                                        <PlusCircle className="h-5 w-5 mr-2" />
+                                        Add Service Record
+                                    </Button>
+                                </div>
+
+                                {/* Filter Bar */}
+                                <div className="flex flex-col sm:flex-row gap-4 mt-6 p-4 bg-white/60 rounded-xl border border-slate-200/50">
+                                    <div className="flex-1">
+                                        <Label htmlFor="search-history" className="text-sm font-medium text-slate-700 mb-2 block">Search History</Label>
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                            <Input 
+                                                id="search-history"
+                                                placeholder="Search by plate number, item, or customer..." 
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="pl-10 pr-4 py-2 border-slate-300 focus:border-indigo-400 bg-white/80"
+                                            />
+                                            {searchTerm && (
+                                                <button 
+                                                    onClick={() => setSearchTerm('')}
+                                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="sm:w-48">
+                                        <Label htmlFor="service-type-filter" className="text-sm font-medium text-slate-700 mb-2 block">Service Type</Label>
+                                        <Select value={serviceTypeFilter} onValueChange={setServiceTypeFilter}>
+                                            <SelectTrigger className="border-slate-300 focus:border-indigo-400 bg-white/80">
+                                                <SelectValue placeholder="All services" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Services</SelectItem>
+                                                <SelectItem value="repair">Repair</SelectItem>
+                                                <SelectItem value="replacement">Replacement</SelectItem>
+                                                <SelectItem value="rotation">Rotation</SelectItem>
+                                                <SelectItem value="balancing">Balancing</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    {(searchTerm || serviceTypeFilter !== 'all') && (
+                                        <div className="flex items-end">
+                                            <Button 
+                                                onClick={clearFilters}
+                                                variant="outline" 
+                                                className="h-10 border-slate-300 text-slate-600 hover:text-slate-700"
+                                            >
+                                                <X className="h-4 w-4 mr-2" />
+                                                Clear
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardHeader>
+                            
+                            <CardContent className="p-6">
+                                {historyError && (
+                                    <Alert variant="destructive" className="mb-6">
+                                        <AlertTriangle className="h-4 w-4" />
+                                        <AlertTitle>Error</AlertTitle>
+                                        <AlertDescription>{historyError}</AlertDescription>
+                                    </Alert>
+                                )}
+
+                                {(isHistoryLoading && tireHistory.length === 0) ? (
+                                    <div className="flex justify-center items-center h-64">
+                                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                    </div>
+                                ) : (
+                                    <DataTableWrapper
+                                        title="Tire History"
+                                        columns={historyColumns}
+                                        data={filteredHistory.map(history => ({ 
+                                            ...history, 
+                                            id: history.history_id 
+                                        }))}
+                                        onAddNew={handleOpenHistoryDialog}
+                                        onEdit={handleEditHistory}
+                                        onDelete={(item) => handleDeleteItem(item, 'history')}
+                                        renderCell={renderHistoryCell}
+                                        searchTerm={searchTerm}
+                                        onSearchChange={setSearchTerm}
+                                    />
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </EnhancedTabs>
+
+                {/* Enhanced Customer Dialog */}
+                <Dialog open={isCustomerDialogOpen} onOpenChange={(isOpen) => {
+                    if (!isOpen) {
+                        setIsCustomerDialogOpen(false);
+                        resetCustomerForm();
+                    }
+                }}>
+                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-50 to-indigo-50/30 border-0 shadow-2xl mt-20">
+                        <DialogHeader>
+                            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                                {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
+                            </DialogTitle>
+                            <DialogDescription className="text-slate-600">
+                                {editingCustomer ? `Update details for ${editingCustomer.name}.` : 'Enter the details for the new customer.'}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="customer-name" className="text-slate-700 font-medium">Customer Name *</Label>
+                                <Input 
+                                    id="customer-name" 
+                                    value={customerName} 
+                                    onChange={(e) => setCustomerName(e.target.value)} 
+                                    placeholder="John Doe"
+                                    className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="customer-phone" className="text-slate-700 font-medium">Phone</Label>
+                                    <Input 
+                                        id="customer-phone" 
+                                        value={customerPhone} 
+                                        onChange={(e) => setCustomerPhone(e.target.value)} 
+                                        placeholder="+1-555-0101"
+                                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="customer-email" className="text-slate-700 font-medium">Email</Label>
+                                    <Input 
+                                        id="customer-email" 
+                                        type="email"
+                                        value={customerEmail} 
+                                        onChange={(e) => setCustomerEmail(e.target.value)} 
+                                        placeholder="john@example.com"
+                                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="customer-address" className="text-slate-700 font-medium">Address</Label>
+                                <Textarea 
+                                    id="customer-address" 
+                                    value={customerAddress} 
+                                    onChange={(e) => setCustomerAddress(e.target.value)} 
+                                    placeholder="123 Main Street, City, State"
+                                    className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <DialogClose asChild>
+                                <Button type="button" variant="outline" className={buttonStyles.secondary}>
+                                    Cancel
+                                </Button>
+                            </DialogClose>
+                            <Button onClick={handleSubmitCustomer} disabled={isCustomerLoading} className={buttonStyles.primary}>
+                                {isCustomerLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {editingCustomer ? 'Save Changes' : 'Create Customer'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Enhanced Vehicle Dialog */}
+                <Dialog open={isVehicleDialogOpen} onOpenChange={(isOpen) => {
+                    if (!isOpen) {
+                        setIsVehicleDialogOpen(false);
+                        resetVehicleForm();
+                    }
+                }}>
+                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-50 to-indigo-50/30 border-0 shadow-2xl mt-20">
+                        <DialogHeader>
+                            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                                {editingVehicle ? 'Edit Vehicle' : 'Add New Vehicle'}
+                            </DialogTitle>
+                            <DialogDescription className="text-slate-600">
+                                {editingVehicle ? `Update details for ${editingVehicle.plate_number}.` : 'Enter the details for the new vehicle.'}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="customer" className="text-slate-700 font-medium">Customer *</Label>
+                                <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
+                                    <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80">
+                                        <SelectValue placeholder="Select customer" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {customers.map(customer => (
+                                            <SelectItem key={customer.customer_id} value={customer.customer_id}>
+                                                {customer.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="plate-number" className="text-slate-700 font-medium">Plate Number *</Label>
+                                <Input 
+                                    id="plate-number" 
+                                    value={plateNumber} 
+                                    onChange={(e) => setPlateNumber(e.target.value)} 
+                                    placeholder="ABC-1234"
+                                    className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="vehicle-type" className="text-slate-700 font-medium">Vehicle Type</Label>
+                                <Select value={selectedVehicleType} onValueChange={setSelectedVehicleType}>
+                                    <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80">
+                                        <SelectValue placeholder="Select vehicle type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {vehicleTypes.map(vt => (
+                                            <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id}>
+                                                {vt.name.charAt(0).toUpperCase() + vt.name.slice(1)}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="make" className="text-slate-700 font-medium">Make</Label>
+                                    <Input 
+                                        id="make" 
+                                        value={make} 
+                                        onChange={(e) => setMake(e.target.value)} 
+                                        placeholder="Toyota"
+                                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="model" className="text-slate-700 font-medium">Model</Label>
+                                    <Input 
+                                        id="model" 
+                                        value={model} 
+                                        onChange={(e) => setModel(e.target.value)} 
+                                        placeholder="Camry"
+                                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="year" className="text-slate-700 font-medium">Year</Label>
+                                    <Input 
+                                        id="year" 
+                                        type="number"
+                                        value={year} 
+                                        onChange={(e) => setYear(e.target.value)} 
+                                        placeholder="2020"
+                                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="color" className="text-slate-700 font-medium">Color</Label>
+                                    <Input 
+                                        id="color" 
+                                        value={color} 
+                                        onChange={(e) => setColor(e.target.value)} 
+                                        placeholder="White"
+                                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <DialogClose asChild>
+                                <Button type="button" variant="outline" className={buttonStyles.secondary}>
+                                    Cancel
+                                </Button>
+                            </DialogClose>
+                            <Button onClick={handleSubmitVehicle} disabled={isVehicleLoading} className={buttonStyles.primary}>
+                                {isVehicleLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {editingVehicle ? 'Save Changes' : 'Create Vehicle'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Enhanced History Dialog */}
+                <Dialog open={isHistoryDialogOpen} onOpenChange={(isOpen) => {
+                    if (!isOpen) {
+                        setIsHistoryDialogOpen(false);
+                        resetHistoryForm();
+                    }
+                }}>
+                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-50 to-indigo-50/30 border-0 shadow-2xl mt-20">
+                        <DialogHeader>
+                            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                                {editingHistory ? 'Edit Tire History' : 'Add Tire History'}
+                            </DialogTitle>
+                            <DialogDescription className="text-slate-600">
+                                {editingHistory ? `Update tire service record.` : 'Record a new tire service for a vehicle.'}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="vehicle" className="text-slate-700 font-medium">Vehicle *</Label>
+                                <Select value={selectedVehicle} onValueChange={setSelectedVehicle}>
+                                    <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80">
+                                        <SelectValue placeholder="Select vehicle" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {vehicles.map(vehicle => (
+                                            <SelectItem key={vehicle.vehicle_id} value={vehicle.vehicle_id}>
+                                                {vehicle.plate_number} - {vehicle.customer?.name || 'Unknown Customer'}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="item" className="text-slate-700 font-medium">Tire/Item *</Label>
+                                <Select value={selectedItem} onValueChange={setSelectedItem}>
+                                    <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80">
+                                        <SelectValue placeholder="Select tire/item" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {inventory.map(item => (
+                                            <SelectItem key={item.item_id} value={item.item_id}>
+                                                {item.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="service-type" className="text-slate-700 font-medium">Service Type *</Label>
+                                <Select value={serviceType} onValueChange={(value: any) => setServiceType(value)}>
+                                    <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="repair">Repair</SelectItem>
+                                        <SelectItem value="replacement">Replacement</SelectItem>
+                                        <SelectItem value="rotation">Rotation</SelectItem>
+                                        <SelectItem value="balancing">Balancing</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="service-date" className="text-slate-700 font-medium">Service Date *</Label>
+                                    <Input 
+                                        id="service-date" 
+                                        type="date"
+                                        value={serviceDate} 
+                                        onChange={(e) => setServiceDate(e.target.value)} 
+                                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="mileage" className="text-slate-700 font-medium">Mileage</Label>
+                                    <Input 
+                                        id="mileage" 
+                                        type="number"
+                                        value={mileage} 
+                                        onChange={(e) => setMileage(e.target.value)} 
+                                        placeholder="50000"
+                                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="history-notes" className="text-slate-700 font-medium">Notes</Label>
+                                <Textarea 
+                                    id="history-notes" 
+                                    value={historyNotes} 
+                                    onChange={(e) => setHistoryNotes(e.target.value)} 
+                                    placeholder="Additional notes about the service..."
+                                    className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <DialogClose asChild>
+                                <Button type="button" variant="outline" className={buttonStyles.secondary}>
+                                    Cancel
+                                </Button>
+                            </DialogClose>
+                            <Button onClick={handleSubmitHistory} disabled={isHistoryLoading} className={buttonStyles.primary}>
+                                {isHistoryLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {editingHistory ? 'Save Changes' : 'Create History'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Enhanced Delete Confirmation Dialog */}
+                <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                    <AlertDialogContent className="bg-gradient-to-br from-slate-50 to-indigo-50/30 border-0 shadow-2xl mt-20">
+                        <AlertDialogHeader>
+                            <AlertDialogTitle className="text-slate-900">Confirm Deletion</AlertDialogTitle>
+                            <AlertDialogDescription className="text-slate-600">
+                                Are you sure you want to delete this {deletingItem?.type}? This action cannot be undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel className={buttonStyles.secondary}>
+                                Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction 
+                                onClick={handleDelete} 
+                                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-red-600 active:scale-95"
+                            >
+                                Delete
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </div>
+
+            <style jsx global>{`
+                @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+                
+                .font-poppins {
+                    font-family: 'Poppins', sans-serif;
+                }
+            `}</style>
         </div>
     );
 }
