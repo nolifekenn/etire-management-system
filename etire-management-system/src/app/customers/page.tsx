@@ -777,7 +777,6 @@ export default function EnhancedCustomersPage() {
                                             ...customer, 
                                             id: customer.customer_id 
                                         }))}
-                                        onAddNew={handleOpenCustomerDialog}
                                         onEdit={handleEditCustomer}
                                         onDelete={(item) => handleDeleteItem(item, 'customer')}
                                         renderCell={renderCustomerCell}
