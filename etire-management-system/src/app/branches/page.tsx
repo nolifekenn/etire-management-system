@@ -246,60 +246,66 @@ export default function EnhancedBranchesPage() {
         <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
             
             {/* Background Sections */}
-            <div className="absolute top-0 left-0 w-full h-80 rounded-b-[40px] overflow-hidden">
-                <div 
-                    className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
-                    style={{ 
-                        backgroundImage: "url('/images/image2.jpg')",
-                        backgroundSize: "cover",
-                        backgroundPosition: "center 30%"
-                    }}
-                ></div>
-                <div className="absolute top-0 left-0 w-32 h-32 bg-purple-300/20 rounded-br-full"></div>
-                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-300/20 rounded-bl-full"></div>
-            </div>
+<div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
+    <div 
+        className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
+        style={{ 
+            backgroundImage: "url('/images/image2.jpg')",
+            backgroundSize: "cover",
+            backgroundPosition: "center 30%"
+        }}
+    ></div>
+    <div className="absolute top-0 left-0 w-32 h-32 bg-purple-300/20 rounded-br-full"></div>
+    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-300/20 rounded-bl-full"></div>
+</div>
 
-            <div className="absolute top-80 left-0 w-full h-full bg-indigo-50/10">
-                <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-indigo-100/15 to-indigo-50/10"></div>
-            </div>
+<div className="absolute top-64 left-0 w-full h-full bg-indigo-50/10">
+    <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-indigo-100/15 to-indigo-50/10"></div>
+</div>
 
-            <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-                
-                {/* Header Section - Consistent Size */}
-                <div className={`mb-8 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
-                    <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
-                        
-                        <div className="relative z-10 flex-1">
-                            <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
-                                Branch Management
-                            </h1>
-                            <div className="flex items-center gap-6 text-white/90">
-                                <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium">
-                                    <Building2 className="h-6 w-6 opacity-90" />
-                                    Manage your business branches and locations
-                                </p>
-                                {lastUpdated && (
-                                    <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">
-                                        <Clock className="w-5 h-5" />
-                                        Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                                    </div>
-                                )}
+<div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
+    
+    {/* Header Section - Updated to match Service Management */}
+    <div className={`mb-8 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+        <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
+            
+            <div className="relative z-10 flex-1">
+                <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
+                    Branch Management
+                </h1>
+                <div className="flex items-center gap-6 text-white/90">
+                    <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium font-poppins">
+                        <Building2 className="h-6 w-6 opacity-90" />
+                        Manage your business branches and locations
+                    </p>
+                    <div className="flex items-center gap-4 text-lg">
+                        {lastUpdated && (
+                            <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
+                                <Clock className="w-5 h-5" />
+                                Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                             </div>
-                        </div>
-                        
-                        <div className="relative z-10">
-                            <Button 
-                                onClick={handleRefresh}
-                                disabled={isLoading}
-                                className={buttonStyles.glass + " active:scale-95"}
-                            >
-                                <RefreshCw className={`h-6 w-6 mr-3 ${isLoading ? 'animate-spin' : ''}`} />
-                                Refresh Data
-                            </Button>
+                        )}
+                        <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
+                            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                            Live data
                         </div>
                     </div>
                 </div>
+            </div>
+            
+            <Button 
+                onClick={handleRefresh}
+                disabled={isLoading}
+                className={buttonStyles.glass + " active:scale-95 font-poppins"}
+            >
+                <RefreshCw className={`h-6 w-6 mr-3 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh Data
+            </Button>
+        </div>
+    </div>
+
+    <div className="mt-12"></div>
 
                 {/* Modal-style Table Card */}
                 <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
