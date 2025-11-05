@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -31,7 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   Loader2, PlusCircle, AlertTriangle, Users, Car, History, Wrench, 
   RefreshCw, Clock, Edit, Trash2, Search, Filter, X, MapPin, Phone, Mail,
-  Bike, Truck, Bus, CarTaxiFront
+  Bike, Truck, Bus, CarTaxiFront, ArrowLeft
 } from 'lucide-react';
 import { DataTableWrapper } from '@/components/DataTableWrapper';
 import { Badge } from '@/components/ui/badge';
@@ -41,9 +41,10 @@ import { Customer, Vehicle, TireHistory, InventoryItem, User } from '@/lib/types
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 const buttonStyles = {
-  primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl",
-  secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95",
-  glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg"
+  primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins",
+  secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 font-poppins",
+  glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins",
+  back: "flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-slate-300 hover:border-slate-400 font-poppins"
 };
 
 // Vehicle Type Icons Mapping
@@ -102,6 +103,84 @@ const historyColumns = [
   { key: 'created_by_name', header: 'Service By' },
 ];
 
+// Custom Date Input Component with better styling
+const CustomDateInput = ({ value, onChange, id, className = "" }: { value: string; onChange: (value: string) => void; id: string; className?: string }) => {
+  return (
+    <div className="relative">
+      <Input
+        id={id}
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${className} border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins custom-date-input`}
+      />
+    </div>
+  );
+};
+
+// Optimized Search Input Component
+const SearchInput = ({ 
+  value, 
+  onChange, 
+  placeholder, 
+  id 
+}: { 
+  value: string; 
+  onChange: (value: string) => void; 
+  placeholder: string; 
+  id: string;
+}) => {
+  const [localValue, setLocalValue] = useState(value);
+  const timeoutRef = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  const handleChange = (newValue: string) => {
+    setLocalValue(newValue);
+    
+    // Clear previous timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    // Set new timeout for debounced update
+    timeoutRef.current = setTimeout(() => {
+      onChange(newValue);
+    }, 150); // Reduced debounce time for better responsiveness
+  };
+
+  const handleClear = () => {
+    setLocalValue('');
+    onChange('');
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+      <Input 
+        id={id}
+        placeholder={placeholder} 
+        value={localValue}
+        onChange={(e) => handleChange(e.target.value)}
+        className="pl-10 pr-4 py-2 border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
+      />
+      {localValue && (
+        <button 
+          onClick={handleClear}
+          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors duration-200"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
+};
+
 export default function EnhancedCustomersPage() {
     const { toast } = useToast();
     const { user: authUser } = useAuth();
@@ -140,8 +219,11 @@ export default function EnhancedCustomersPage() {
     const [editingHistory, setEditingHistory] = useState<TireHistory | null>(null);
     const [deletingItem, setDeletingItem] = useState<any>(null);
 
-    // Filter states
-    const [searchTerm, setSearchTerm] = useState('');
+    // Separate search terms for each tab to prevent unnecessary re-renders
+    const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+    const [vehicleSearchTerm, setVehicleSearchTerm] = useState('');
+    const [historySearchTerm, setHistorySearchTerm] = useState('');
+    
     const [customerFilter, setCustomerFilter] = useState('all');
     const [vehicleTypeFilter, setVehicleTypeFilter] = useState('all');
     const [serviceTypeFilter, setServiceTypeFilter] = useState('all');
@@ -258,43 +340,51 @@ export default function EnhancedCustomersPage() {
         fetchVehicleTypes();
     }, [fetchCustomers, fetchVehicles, fetchTireHistory, fetchSupportingData, fetchVehicleTypes]);
 
-    // Filter functions
-    const filteredCustomers = customers.filter(customer => {
-        const matchesSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            customer.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            customer.address?.toLowerCase().includes(searchTerm.toLowerCase());
-        return matchesSearch;
-    });
+    // Optimized filter functions with useMemo
+    const filteredCustomers = useMemo(() => {
+        return customers.filter(customer => {
+            const matchesSearch = customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
+                                customer.phone?.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
+                                customer.email?.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
+                                customer.address?.toLowerCase().includes(customerSearchTerm.toLowerCase());
+            return matchesSearch;
+        });
+    }, [customers, customerSearchTerm]);
 
-    const filteredVehicles = vehicles.filter(vehicle => {
-        const matchesSearch = vehicle.plate_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            vehicle.make?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            vehicle.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            vehicle.customer?.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const filteredVehicles = useMemo(() => {
+        return vehicles.filter(vehicle => {
+            const matchesSearch = vehicle.plate_number.toLowerCase().includes(vehicleSearchTerm.toLowerCase()) ||
+                                vehicle.make?.toLowerCase().includes(vehicleSearchTerm.toLowerCase()) ||
+                                vehicle.model?.toLowerCase().includes(vehicleSearchTerm.toLowerCase()) ||
+                                vehicle.customer?.name.toLowerCase().includes(vehicleSearchTerm.toLowerCase());
 
-        const matchesType = vehicleTypeFilter === 'all' || 
-                           vehicle.vehicle_type_id === vehicleTypeFilter;
+            const matchesType = vehicleTypeFilter === 'all' || 
+                               vehicle.vehicle_type_id === vehicleTypeFilter;
 
-        const matchesCustomer = customerFilter === 'all' || 
-                              vehicle.customer_id === customerFilter;
+            const matchesCustomer = customerFilter === 'all' || 
+                                  vehicle.customer_id === customerFilter;
 
-        return matchesSearch && matchesType && matchesCustomer;
-    });
+            return matchesSearch && matchesType && matchesCustomer;
+        });
+    }, [vehicles, vehicleSearchTerm, vehicleTypeFilter, customerFilter]);
 
-    const filteredHistory = tireHistory.filter(history => {
-        const matchesSearch = history.vehicle?.plate_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            history.inventory_item?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            history.vehicle?.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const filteredHistory = useMemo(() => {
+        return tireHistory.filter(history => {
+            const matchesSearch = history.vehicle?.plate_number.toLowerCase().includes(historySearchTerm.toLowerCase()) ||
+                                history.inventory_item?.name.toLowerCase().includes(historySearchTerm.toLowerCase()) ||
+                                history.vehicle?.customer?.name?.toLowerCase().includes(historySearchTerm.toLowerCase());
 
-        const matchesService = serviceTypeFilter === 'all' || 
-                             history.service_type === serviceTypeFilter;
+            const matchesService = serviceTypeFilter === 'all' || 
+                                 history.service_type === serviceTypeFilter;
 
-        return matchesSearch && matchesService;
-    });
+            return matchesSearch && matchesService;
+        });
+    }, [tireHistory, historySearchTerm, serviceTypeFilter]);
 
     const clearFilters = () => {
-        setSearchTerm('');
+        setCustomerSearchTerm('');
+        setVehicleSearchTerm('');
+        setHistorySearchTerm('');
         setCustomerFilter('all');
         setVehicleTypeFilter('all');
         setServiceTypeFilter('all');
@@ -574,7 +664,7 @@ export default function EnhancedCustomersPage() {
             const vehicleName = item.vehicle_type.name;
             const VehicleIcon = getVehicleIcon(vehicleName);
             return (
-                <Badge variant="outline" className="flex items-center gap-1 bg-slate-100 text-slate-700 border-slate-300 capitalize">
+                <Badge variant="outline" className="flex items-center gap-1 bg-slate-100 text-slate-700 border-slate-300 capitalize font-poppins">
                     <VehicleIcon className="h-3 w-3" />
                     {vehicleName}
                 </Badge>
@@ -604,7 +694,7 @@ export default function EnhancedCustomersPage() {
         }
         if (columnKey === 'service_type') {
             return (
-                <Badge className={`capitalize ${serviceTypeColors[item.service_type]}`}>
+                <Badge className={`capitalize ${serviceTypeColors[item.service_type]} font-poppins`}>
                     {value}
                 </Badge>
             );
@@ -623,25 +713,25 @@ export default function EnhancedCustomersPage() {
 
     const EnhancedTabs = ({ value, onValueChange, children }: any) => {
         return (
-            <Tabs value={value} onValueChange={onValueChange} className="w-full">
+            <Tabs value={value} onValueChange={onValueChange} className="w-full font-poppins">
                 <TabsList className="grid w-full grid-cols-3 p-1 bg-slate-100 rounded-2xl">
                     <TabsTrigger 
                         value="customers" 
-                        className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300"
+                        className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins"
                     >
                         <Users className="h-4 w-4 mr-2" />
                         Customers
                     </TabsTrigger>
                     <TabsTrigger 
                         value="vehicles" 
-                        className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300"
+                        className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins"
                     >
                         <Car className="h-4 w-4 mr-2" />
                         Vehicles
                     </TabsTrigger>
                     <TabsTrigger 
                         value="history" 
-                        className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300"
+                        className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins"
                     >
                         <History className="h-4 w-4 mr-2" />
                         Tire History
@@ -685,12 +775,12 @@ export default function EnhancedCustomersPage() {
                                 Customer & Vehicle Management
                             </h1>
                             <div className="flex items-center gap-6 text-white/90">
-                                <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium">
+                                <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium font-poppins">
                                     <Users className="h-6 w-6 opacity-90" />
                                     Manage customers, vehicles, and tire service history
                                 </p>
                                 {lastUpdated && (
-                                    <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">
+                                    <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
                                         <Clock className="w-5 h-5" />
                                         Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                                     </div>
@@ -701,7 +791,7 @@ export default function EnhancedCustomersPage() {
                         <Button 
                             onClick={handleRefresh}
                             disabled={isCustomerLoading || isVehicleLoading || isHistoryLoading}
-                            className={buttonStyles.glass + " active:scale-95"}
+                            className={buttonStyles.glass + " active:scale-95 font-poppins"}
                         >
                             <RefreshCw className={`h-6 w-6 mr-3 ${isCustomerLoading || isVehicleLoading || isHistoryLoading ? 'animate-spin' : ''}`} />
                             Refresh Data
@@ -716,49 +806,30 @@ export default function EnhancedCustomersPage() {
                             <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-purple-50/50 border-b border-slate-200/50">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <CardTitle className="text-2xl font-bold text-slate-900">Customer Management</CardTitle>
-                                        <CardDescription className="text-slate-600">
+                                        <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Customer Management</CardTitle>
+                                        <CardDescription className="text-slate-600 font-poppins">
                                             {filteredCustomers.length} of {customers.length} customer{filteredCustomers.length !== 1 ? 's' : ''} shown
                                         </CardDescription>
                                     </div>
-                                    <Button 
-                                        onClick={handleOpenCustomerDialog}
-                                        className={buttonStyles.primary}
-                                    >
-                                        <PlusCircle className="h-5 w-5 mr-2" />
-                                        Add Customer
-                                    </Button>
                                 </div>
 
                                 {/* Filter Bar */}
                                 <div className="flex flex-col sm:flex-row gap-4 mt-6 p-4 bg-white/60 rounded-xl border border-slate-200/50">
                                     <div className="flex-1">
-                                        <Label htmlFor="search-customers" className="text-sm font-medium text-slate-700 mb-2 block">Search Customers</Label>
-                                        <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                            <Input 
-                                                id="search-customers"
-                                                placeholder="Search by name, phone, email, or address..." 
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                                className="pl-10 pr-4 py-2 border-slate-300 focus:border-indigo-400 bg-white/80"
-                                            />
-                                            {searchTerm && (
-                                                <button 
-                                                    onClick={() => setSearchTerm('')}
-                                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                </button>
-                                            )}
-                                        </div>
+                                        <Label htmlFor="search-customers" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Search Customers</Label>
+                                        <SearchInput 
+                                            id="search-customers"
+                                            value={customerSearchTerm}
+                                            onChange={setCustomerSearchTerm}
+                                            placeholder="Search by name, phone, email, or address..."
+                                        />
                                     </div>
                                 </div>
                             </CardHeader>
                             
                             <CardContent className="p-6">
                                 {customerError && (
-                                    <Alert variant="destructive" className="mb-6">
+                                    <Alert variant="destructive" className="mb-6 font-poppins">
                                         <AlertTriangle className="h-4 w-4" />
                                         <AlertTitle>Error</AlertTitle>
                                         <AlertDescription>{customerError}</AlertDescription>
@@ -780,8 +851,9 @@ export default function EnhancedCustomersPage() {
                                         onEdit={handleEditCustomer}
                                         onDelete={(item) => handleDeleteItem(item, 'customer')}
                                         renderCell={renderCustomerCell}
-                                        searchTerm={searchTerm}
-                                        onSearchChange={setSearchTerm}
+                                        searchTerm={customerSearchTerm}
+                                        onSearchChange={setCustomerSearchTerm}
+                                        onAddNew={handleOpenCustomerDialog}
                                     />
                                 )}
                             </CardContent>
@@ -794,54 +866,35 @@ export default function EnhancedCustomersPage() {
                             <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-blue-50/50 border-b border-slate-200/50">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <CardTitle className="text-2xl font-bold text-slate-900">Vehicle Management</CardTitle>
-                                        <CardDescription className="text-slate-600">
+                                        <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Vehicle Management</CardTitle>
+                                        <CardDescription className="text-slate-600 font-poppins">
                                             {filteredVehicles.length} of {vehicles.length} vehicle{filteredVehicles.length !== 1 ? 's' : ''} shown
                                         </CardDescription>
                                     </div>
-                                    <Button 
-                                        onClick={handleOpenVehicleDialog}
-                                        className={buttonStyles.primary}
-                                    >
-                                        <PlusCircle className="h-5 w-5 mr-2" />
-                                        Add Vehicle
-                                    </Button>
                                 </div>
 
                                 {/* Filter Bar */}
                                 <div className="flex flex-col sm:flex-row gap-4 mt-6 p-4 bg-white/60 rounded-xl border border-slate-200/50">
                                     <div className="flex-1">
-                                        <Label htmlFor="search-vehicles" className="text-sm font-medium text-slate-700 mb-2 block">Search Vehicles</Label>
-                                        <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                            <Input 
-                                                id="search-vehicles"
-                                                placeholder="Search by plate, make, model, or customer..." 
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                                className="pl-10 pr-4 py-2 border-slate-300 focus:border-indigo-400 bg-white/80"
-                                            />
-                                            {searchTerm && (
-                                                <button 
-                                                    onClick={() => setSearchTerm('')}
-                                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                </button>
-                                            )}
-                                        </div>
+                                        <Label htmlFor="search-vehicles" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Search Vehicles</Label>
+                                        <SearchInput 
+                                            id="search-vehicles"
+                                            value={vehicleSearchTerm}
+                                            onChange={setVehicleSearchTerm}
+                                            placeholder="Search by plate, make, model, or customer..."
+                                        />
                                     </div>
                                     
                                     <div className="sm:w-48">
-                                        <Label htmlFor="customer-filter" className="text-sm font-medium text-slate-700 mb-2 block">Customer</Label>
+                                        <Label htmlFor="customer-filter" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Customer</Label>
                                         <Select value={customerFilter} onValueChange={setCustomerFilter}>
-                                            <SelectTrigger className="border-slate-300 focus:border-indigo-400 bg-white/80">
+                                            <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
                                                 <SelectValue placeholder="All customers" />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="all">All Customers</SelectItem>
                                                 {customers.map(customer => (
-                                                    <SelectItem key={customer.customer_id} value={customer.customer_id}>
+                                                    <SelectItem key={customer.customer_id} value={customer.customer_id} className="font-poppins">
                                                         {customer.name}
                                                     </SelectItem>
                                                 ))}
@@ -850,15 +903,15 @@ export default function EnhancedCustomersPage() {
                                     </div>
 
                                     <div className="sm:w-48">
-                                        <Label htmlFor="vehicle-type-filter" className="text-sm font-medium text-slate-700 mb-2 block">Vehicle Type</Label>
+                                        <Label htmlFor="vehicle-type-filter" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Vehicle Type</Label>
                                         <Select value={vehicleTypeFilter} onValueChange={setVehicleTypeFilter}>
-                                            <SelectTrigger className="border-slate-300 focus:border-indigo-400 bg-white/80">
+                                            <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
                                                 <SelectValue placeholder="All types" />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="all">All Types</SelectItem>
                                                 {vehicleTypes.map(type => (
-                                                    <SelectItem key={type.vehicle_type_id} value={type.vehicle_type_id}>
+                                                    <SelectItem key={type.vehicle_type_id} value={type.vehicle_type_id} className="font-poppins">
                                                         {type.name.charAt(0).toUpperCase() + type.name.slice(1)}
                                                     </SelectItem>
                                                 ))}
@@ -866,12 +919,16 @@ export default function EnhancedCustomersPage() {
                                         </Select>
                                     </div>
 
-                                    {(searchTerm || customerFilter !== 'all' || vehicleTypeFilter !== 'all') && (
+                                    {(vehicleSearchTerm || customerFilter !== 'all' || vehicleTypeFilter !== 'all') && (
                                         <div className="flex items-end">
                                             <Button 
-                                                onClick={clearFilters}
+                                                onClick={() => {
+                                                    setVehicleSearchTerm('');
+                                                    setCustomerFilter('all');
+                                                    setVehicleTypeFilter('all');
+                                                }}
                                                 variant="outline" 
-                                                className="h-10 border-slate-300 text-slate-600 hover:text-slate-700"
+                                                className="h-10 border-slate-300 text-slate-600 hover:text-slate-700 font-poppins"
                                             >
                                                 <X className="h-4 w-4 mr-2" />
                                                 Clear
@@ -883,7 +940,7 @@ export default function EnhancedCustomersPage() {
                             
                             <CardContent className="p-6">
                                 {vehicleError && (
-                                    <Alert variant="destructive" className="mb-6">
+                                    <Alert variant="destructive" className="mb-6 font-poppins">
                                         <AlertTriangle className="h-4 w-4" />
                                         <AlertTitle>Error</AlertTitle>
                                         <AlertDescription>{vehicleError}</AlertDescription>
@@ -906,8 +963,8 @@ export default function EnhancedCustomersPage() {
                                         onEdit={handleEditVehicle}
                                         onDelete={(item) => handleDeleteItem(item, 'vehicle')}
                                         renderCell={renderVehicleCell}
-                                        searchTerm={searchTerm}
-                                        onSearchChange={setSearchTerm}
+                                        searchTerm={vehicleSearchTerm}
+                                        onSearchChange={setVehicleSearchTerm}
                                     />
                                 )}
                             </CardContent>
@@ -920,48 +977,29 @@ export default function EnhancedCustomersPage() {
                             <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-green-50/50 border-b border-slate-200/50">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <CardTitle className="text-2xl font-bold text-slate-900">Tire Service History</CardTitle>
-                                        <CardDescription className="text-slate-600">
+                                        <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Tire Service History</CardTitle>
+                                        <CardDescription className="text-slate-600 font-poppins">
                                             {filteredHistory.length} of {tireHistory.length} service record{filteredHistory.length !== 1 ? 's' : ''} shown
                                         </CardDescription>
                                     </div>
-                                    <Button 
-                                        onClick={handleOpenHistoryDialog}
-                                        className={buttonStyles.primary}
-                                    >
-                                        <PlusCircle className="h-5 w-5 mr-2" />
-                                        Add Service Record
-                                    </Button>
                                 </div>
 
                                 {/* Filter Bar */}
                                 <div className="flex flex-col sm:flex-row gap-4 mt-6 p-4 bg-white/60 rounded-xl border border-slate-200/50">
                                     <div className="flex-1">
-                                        <Label htmlFor="search-history" className="text-sm font-medium text-slate-700 mb-2 block">Search History</Label>
-                                        <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                            <Input 
-                                                id="search-history"
-                                                placeholder="Search by plate number, item, or customer..." 
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                                className="pl-10 pr-4 py-2 border-slate-300 focus:border-indigo-400 bg-white/80"
-                                            />
-                                            {searchTerm && (
-                                                <button 
-                                                    onClick={() => setSearchTerm('')}
-                                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                </button>
-                                            )}
-                                        </div>
+                                        <Label htmlFor="search-history" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Search History</Label>
+                                        <SearchInput 
+                                            id="search-history"
+                                            value={historySearchTerm}
+                                            onChange={setHistorySearchTerm}
+                                            placeholder="Search by plate number, item, or customer..."
+                                        />
                                     </div>
                                     
                                     <div className="sm:w-48">
-                                        <Label htmlFor="service-type-filter" className="text-sm font-medium text-slate-700 mb-2 block">Service Type</Label>
+                                        <Label htmlFor="service-type-filter" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Service Type</Label>
                                         <Select value={serviceTypeFilter} onValueChange={setServiceTypeFilter}>
-                                            <SelectTrigger className="border-slate-300 focus:border-indigo-400 bg-white/80">
+                                            <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
                                                 <SelectValue placeholder="All services" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -974,12 +1012,15 @@ export default function EnhancedCustomersPage() {
                                         </Select>
                                     </div>
 
-                                    {(searchTerm || serviceTypeFilter !== 'all') && (
+                                    {(historySearchTerm || serviceTypeFilter !== 'all') && (
                                         <div className="flex items-end">
                                             <Button 
-                                                onClick={clearFilters}
+                                                onClick={() => {
+                                                    setHistorySearchTerm('');
+                                                    setServiceTypeFilter('all');
+                                                }}
                                                 variant="outline" 
-                                                className="h-10 border-slate-300 text-slate-600 hover:text-slate-700"
+                                                className="h-10 border-slate-300 text-slate-600 hover:text-slate-700 font-poppins"
                                             >
                                                 <X className="h-4 w-4 mr-2" />
                                                 Clear
@@ -991,7 +1032,7 @@ export default function EnhancedCustomersPage() {
                             
                             <CardContent className="p-6">
                                 {historyError && (
-                                    <Alert variant="destructive" className="mb-6">
+                                    <Alert variant="destructive" className="mb-6 font-poppins">
                                         <AlertTriangle className="h-4 w-4" />
                                         <AlertTitle>Error</AlertTitle>
                                         <AlertDescription>{historyError}</AlertDescription>
@@ -1014,8 +1055,8 @@ export default function EnhancedCustomersPage() {
                                         onEdit={handleEditHistory}
                                         onDelete={(item) => handleDeleteItem(item, 'history')}
                                         renderCell={renderHistoryCell}
-                                        searchTerm={searchTerm}
-                                        onSearchChange={setSearchTerm}
+                                        searchTerm={historySearchTerm}
+                                        onSearchChange={setHistorySearchTerm}
                                     />
                                 )}
                             </CardContent>
@@ -1030,63 +1071,64 @@ export default function EnhancedCustomersPage() {
                         resetCustomerForm();
                     }
                 }}>
-                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-50 to-indigo-50/30 border-0 shadow-2xl mt-20">
+                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins">
                         <DialogHeader>
-                            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
                                 {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
                             </DialogTitle>
-                            <DialogDescription className="text-slate-600">
+                            <DialogDescription className="text-slate-600 font-poppins">
                                 {editingCustomer ? `Update details for ${editingCustomer.name}.` : 'Enter the details for the new customer.'}
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
                             <div className="space-y-2">
-                                <Label htmlFor="customer-name" className="text-slate-700 font-medium">Customer Name *</Label>
+                                <Label htmlFor="customer-name" className="text-slate-700 font-medium font-poppins">Customer Name *</Label>
                                 <Input 
                                     id="customer-name" 
                                     value={customerName} 
                                     onChange={(e) => setCustomerName(e.target.value)} 
                                     placeholder="John Doe"
-                                    className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="customer-phone" className="text-slate-700 font-medium">Phone</Label>
+                                    <Label htmlFor="customer-phone" className="text-slate-700 font-medium font-poppins">Phone</Label>
                                     <Input 
                                         id="customer-phone" 
                                         value={customerPhone} 
                                         onChange={(e) => setCustomerPhone(e.target.value)} 
                                         placeholder="+1-555-0101"
-                                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="customer-email" className="text-slate-700 font-medium">Email</Label>
+                                    <Label htmlFor="customer-email" className="text-slate-700 font-medium font-poppins">Email</Label>
                                     <Input 
                                         id="customer-email" 
                                         type="email"
                                         value={customerEmail} 
                                         onChange={(e) => setCustomerEmail(e.target.value)} 
                                         placeholder="john@example.com"
-                                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
                                     />
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="customer-address" className="text-slate-700 font-medium">Address</Label>
+                                <Label htmlFor="customer-address" className="text-slate-700 font-medium font-poppins">Address</Label>
                                 <Textarea 
                                     id="customer-address" 
                                     value={customerAddress} 
                                     onChange={(e) => setCustomerAddress(e.target.value)} 
                                     placeholder="123 Main Street, City, State"
-                                    className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
                                 />
                             </div>
                         </div>
                         <DialogFooter>
                             <DialogClose asChild>
-                                <Button type="button" variant="outline" className={buttonStyles.secondary}>
+                                <Button type="button" variant="outline" className={buttonStyles.back}>
+                                    <ArrowLeft className="h-4 w-4 mr-2" />
                                     Cancel
                                 </Button>
                             </DialogClose>
@@ -1105,25 +1147,25 @@ export default function EnhancedCustomersPage() {
                         resetVehicleForm();
                     }
                 }}>
-                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-50 to-indigo-50/30 border-0 shadow-2xl mt-20">
+                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins">
                         <DialogHeader>
-                            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
                                 {editingVehicle ? 'Edit Vehicle' : 'Add New Vehicle'}
                             </DialogTitle>
-                            <DialogDescription className="text-slate-600">
+                            <DialogDescription className="text-slate-600 font-poppins">
                                 {editingVehicle ? `Update details for ${editingVehicle.plate_number}.` : 'Enter the details for the new vehicle.'}
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
                             <div className="space-y-2">
-                                <Label htmlFor="customer" className="text-slate-700 font-medium">Customer *</Label>
+                                <Label htmlFor="customer" className="text-slate-700 font-medium font-poppins">Customer *</Label>
                                 <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-                                    <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80">
+                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
                                         <SelectValue placeholder="Select customer" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {customers.map(customer => (
-                                            <SelectItem key={customer.customer_id} value={customer.customer_id}>
+                                            <SelectItem key={customer.customer_id} value={customer.customer_id} className="font-poppins">
                                                 {customer.name}
                                             </SelectItem>
                                         ))}
@@ -1131,24 +1173,24 @@ export default function EnhancedCustomersPage() {
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="plate-number" className="text-slate-700 font-medium">Plate Number *</Label>
+                                <Label htmlFor="plate-number" className="text-slate-700 font-medium font-poppins">Plate Number *</Label>
                                 <Input 
                                     id="plate-number" 
                                     value={plateNumber} 
                                     onChange={(e) => setPlateNumber(e.target.value)} 
                                     placeholder="ABC-1234"
-                                    className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="vehicle-type" className="text-slate-700 font-medium">Vehicle Type</Label>
+                                <Label htmlFor="vehicle-type" className="text-slate-700 font-medium font-poppins">Vehicle Type</Label>
                                 <Select value={selectedVehicleType} onValueChange={setSelectedVehicleType}>
-                                    <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80">
+                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
                                         <SelectValue placeholder="Select vehicle type" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {vehicleTypes.map(vt => (
-                                            <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id}>
+                                            <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id} className="font-poppins">
                                                 {vt.name.charAt(0).toUpperCase() + vt.name.slice(1)}
                                             </SelectItem>
                                         ))}
@@ -1157,53 +1199,54 @@ export default function EnhancedCustomersPage() {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="make" className="text-slate-700 font-medium">Make</Label>
+                                    <Label htmlFor="make" className="text-slate-700 font-medium font-poppins">Make</Label>
                                     <Input 
                                         id="make" 
                                         value={make} 
                                         onChange={(e) => setMake(e.target.value)} 
                                         placeholder="Toyota"
-                                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="model" className="text-slate-700 font-medium">Model</Label>
+                                    <Label htmlFor="model" className="text-slate-700 font-medium font-poppins">Model</Label>
                                     <Input 
                                         id="model" 
                                         value={model} 
                                         onChange={(e) => setModel(e.target.value)} 
                                         placeholder="Camry"
-                                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
                                     />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="year" className="text-slate-700 font-medium">Year</Label>
+                                    <Label htmlFor="year" className="text-slate-700 font-medium font-poppins">Year</Label>
                                     <Input 
                                         id="year" 
                                         type="number"
                                         value={year} 
                                         onChange={(e) => setYear(e.target.value)} 
                                         placeholder="2020"
-                                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="color" className="text-slate-700 font-medium">Color</Label>
+                                    <Label htmlFor="color" className="text-slate-700 font-medium font-poppins">Color</Label>
                                     <Input 
                                         id="color" 
                                         value={color} 
                                         onChange={(e) => setColor(e.target.value)} 
                                         placeholder="White"
-                                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
                                     />
                                 </div>
                             </div>
                         </div>
                         <DialogFooter>
                             <DialogClose asChild>
-                                <Button type="button" variant="outline" className={buttonStyles.secondary}>
+                                <Button type="button" variant="outline" className={buttonStyles.back}>
+                                    <ArrowLeft className="h-4 w-4 mr-2" />
                                     Cancel
                                 </Button>
                             </DialogClose>
@@ -1222,25 +1265,25 @@ export default function EnhancedCustomersPage() {
                         resetHistoryForm();
                     }
                 }}>
-                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-slate-50 to-indigo-50/30 border-0 shadow-2xl mt-20">
+                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins">
                         <DialogHeader>
-                            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
                                 {editingHistory ? 'Edit Tire History' : 'Add Tire History'}
                             </DialogTitle>
-                            <DialogDescription className="text-slate-600">
+                            <DialogDescription className="text-slate-600 font-poppins">
                                 {editingHistory ? `Update tire service record.` : 'Record a new tire service for a vehicle.'}
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
                             <div className="space-y-2">
-                                <Label htmlFor="vehicle" className="text-slate-700 font-medium">Vehicle *</Label>
+                                <Label htmlFor="vehicle" className="text-slate-700 font-medium font-poppins">Vehicle *</Label>
                                 <Select value={selectedVehicle} onValueChange={setSelectedVehicle}>
-                                    <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80">
+                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
                                         <SelectValue placeholder="Select vehicle" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {vehicles.map(vehicle => (
-                                            <SelectItem key={vehicle.vehicle_id} value={vehicle.vehicle_id}>
+                                            <SelectItem key={vehicle.vehicle_id} value={vehicle.vehicle_id} className="font-poppins">
                                                 {vehicle.plate_number} - {vehicle.customer?.name || 'Unknown Customer'}
                                             </SelectItem>
                                         ))}
@@ -1248,14 +1291,14 @@ export default function EnhancedCustomersPage() {
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="item" className="text-slate-700 font-medium">Tire/Item *</Label>
+                                <Label htmlFor="item" className="text-slate-700 font-medium font-poppins">Tire/Item *</Label>
                                 <Select value={selectedItem} onValueChange={setSelectedItem}>
-                                    <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80">
+                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
                                         <SelectValue placeholder="Select tire/item" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {inventory.map(item => (
-                                            <SelectItem key={item.item_id} value={item.item_id}>
+                                            <SelectItem key={item.item_id} value={item.item_id} className="font-poppins">
                                                 {item.name}
                                             </SelectItem>
                                         ))}
@@ -1263,56 +1306,55 @@ export default function EnhancedCustomersPage() {
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="service-type" className="text-slate-700 font-medium">Service Type *</Label>
+                                <Label htmlFor="service-type" className="text-slate-700 font-medium font-poppins">Service Type *</Label>
                                 <Select value={serviceType} onValueChange={(value: any) => setServiceType(value)}>
-                                    <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80">
+                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="repair">Repair</SelectItem>
-                                        <SelectItem value="replacement">Replacement</SelectItem>
-                                        <SelectItem value="rotation">Rotation</SelectItem>
-                                        <SelectItem value="balancing">Balancing</SelectItem>
+                                        <SelectItem value="repair" className="font-poppins">Repair</SelectItem>
+                                        <SelectItem value="replacement" className="font-poppins">Replacement</SelectItem>
+                                        <SelectItem value="rotation" className="font-poppins">Rotation</SelectItem>
+                                        <SelectItem value="balancing" className="font-poppins">Balancing</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="service-date" className="text-slate-700 font-medium">Service Date *</Label>
-                                    <Input 
-                                        id="service-date" 
-                                        type="date"
-                                        value={serviceDate} 
-                                        onChange={(e) => setServiceDate(e.target.value)} 
-                                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                    <Label htmlFor="service-date" className="text-slate-700 font-medium font-poppins">Service Date *</Label>
+                                    <CustomDateInput
+                                        id="service-date"
+                                        value={serviceDate}
+                                        onChange={setServiceDate}
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="mileage" className="text-slate-700 font-medium">Mileage</Label>
+                                    <Label htmlFor="mileage" className="text-slate-700 font-medium font-poppins">Mileage (km)</Label>
                                     <Input 
                                         id="mileage" 
                                         type="number"
                                         value={mileage} 
                                         onChange={(e) => setMileage(e.target.value)} 
-                                        placeholder="50000"
-                                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                        placeholder="50000 (km)"
+                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
                                     />
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="history-notes" className="text-slate-700 font-medium">Notes</Label>
+                                <Label htmlFor="history-notes" className="text-slate-700 font-medium font-poppins">Notes</Label>
                                 <Textarea 
                                     id="history-notes" 
                                     value={historyNotes} 
                                     onChange={(e) => setHistoryNotes(e.target.value)} 
                                     placeholder="Additional notes about the service..."
-                                    className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
                                 />
                             </div>
                         </div>
                         <DialogFooter>
                             <DialogClose asChild>
-                                <Button type="button" variant="outline" className={buttonStyles.secondary}>
+                                <Button type="button" variant="outline" className={buttonStyles.back}>
+                                    <ArrowLeft className="h-4 w-4 mr-2" />
                                     Cancel
                                 </Button>
                             </DialogClose>
@@ -1326,20 +1368,21 @@ export default function EnhancedCustomersPage() {
 
                 {/* Enhanced Delete Confirmation Dialog */}
                 <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                    <AlertDialogContent className="bg-gradient-to-br from-slate-50 to-indigo-50/30 border-0 shadow-2xl mt-20">
+                    <AlertDialogContent className="bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins">
                         <AlertDialogHeader>
-                            <AlertDialogTitle className="text-slate-900">Confirm Deletion</AlertDialogTitle>
-                            <AlertDialogDescription className="text-slate-600">
+                            <AlertDialogTitle className="text-slate-900 font-poppins">Confirm Deletion</AlertDialogTitle>
+                            <AlertDialogDescription className="text-slate-600 font-poppins">
                                 Are you sure you want to delete this {deletingItem?.type}? This action cannot be undone.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                            <AlertDialogCancel className={buttonStyles.secondary}>
+                            <AlertDialogCancel className={buttonStyles.back}>
+                                <ArrowLeft className="h-4 w-4 mr-2" />
                                 Cancel
                             </AlertDialogCancel>
                             <AlertDialogAction 
                                 onClick={handleDelete} 
-                                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-red-600 active:scale-95"
+                                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-red-600 active:scale-95 font-poppins"
                             >
                                 Delete
                             </AlertDialogAction>
@@ -1353,6 +1396,29 @@ export default function EnhancedCustomersPage() {
                 
                 .font-poppins {
                     font-family: 'Poppins', sans-serif;
+                }
+
+                /* Custom date input styling */
+                .custom-date-input::-webkit-calendar-picker-indicator {
+                    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%236b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>');
+                    cursor: pointer;
+                    padding: 4px;
+                    border-radius: 4px;
+                }
+
+                .custom-date-input::-webkit-calendar-picker-indicator:hover {
+                    background-color: #f3f4f6;
+                }
+
+                /* Improved focus styles for all inputs */
+                input:focus, textarea:focus, select:focus {
+                    outline: none;
+                    ring: 2px;
+                }
+
+                /* Smooth transitions for all interactive elements */
+                button, input, select, textarea {
+                    transition: all 0.3s ease;
                 }
             `}</style>
         </div>
