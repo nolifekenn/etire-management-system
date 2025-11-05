@@ -255,42 +255,44 @@ export default function EnhancedCustomersPage() {
         setMounted(true);
     }, []);
 
-    const fetchCustomers = useCallback(async () => {
-        if (!supabase) return;
-        setIsCustomerLoading(true);
-        const { data, error } = await supabase
-            .from('customer')
-            .select('*, vehicle(vehicle_id)')
-            .order('name', { ascending: true });
+// ✅ UPDATE: fetchCustomers function
+const fetchCustomers = useCallback(async () => {
+    if (!supabase) return;
+    setIsCustomerLoading(true);
     
-        if (error) {
-            setCustomerError(`Could not fetch customers: ${error.message}`);
-            setCustomers([]);
-        } else {
-            setCustomers(data as any);
-            setCustomerError(null);
-        }
-        setIsCustomerLoading(false);
-        setLastUpdated(new Date());
-    }, []);
+    const { data, error } = await supabase
+        .rpc('get_customers_with_vehicles');
 
-    const fetchVehicles = useCallback(async () => {
-        if (!supabase) return;
-        setIsVehicleLoading(true);
-        const { data, error } = await supabase
-            .from('vehicle')
-            .select('*, customer:customer_id(name), vehicle_type:vehicle_type_id(vehicle_type_id, name)')
-            .order('plate_number', { ascending: true });
+    if (error) {
+        setCustomerError(`Could not fetch customers: ${error.message}`);
+        setCustomers([]);
+    } else {
+        // ✅ FIX: Parse JSON response
+        setCustomers((data || []) as Customer[]);
+        setCustomerError(null);
+    }
+    setIsCustomerLoading(false);
+    setLastUpdated(new Date());
+}, []);
 
-        if (error) {
-            setVehicleError(`Could not fetch vehicles: ${error.message}`);
-            setVehicles([]);
-        } else {
-            setVehicles(data as any);
-            setVehicleError(null);
-        }
-        setIsVehicleLoading(false);
-    }, []);
+ // ✅ UPDATE: fetchVehicles function
+const fetchVehicles = useCallback(async () => {
+    if (!supabase) return;
+    setIsVehicleLoading(true);
+    
+    const { data, error } = await supabase
+        .rpc('get_vehicles_complete');
+
+    if (error) {
+        setVehicleError(`Could not fetch vehicles: ${error.message}`);
+        setVehicles([]);
+    } else {
+        // ✅ FIX: Parse JSON response
+        setVehicles((data || []) as Vehicle[]);
+        setVehicleError(null);
+    }
+    setIsVehicleLoading(false);
+}, []);
 
     const fetchVehicleTypes = useCallback(async () => {
         if (!supabase) return;
@@ -302,23 +304,24 @@ export default function EnhancedCustomersPage() {
         if (data) setVehicleTypes(data as VehicleType[]);
     }, []);
 
-    const fetchTireHistory = useCallback(async () => {
-        if (!supabase) return;
-        setIsHistoryLoading(true);
-        const { data, error } = await supabase
-            .from('tire_history')
-            .select('*, vehicle:vehicle_id(plate_number), inventory_item:item_id(name), user:created_by(name)')
-            .order('service_date', { ascending: false });
+// ✅ UPDATE: fetchTireHistory function
+const fetchTireHistory = useCallback(async () => {
+    if (!supabase) return;
+    setIsHistoryLoading(true);
+    
+    const { data, error } = await supabase
+        .rpc('get_tire_history_complete');
 
-        if (error) {
-            setHistoryError(`Could not fetch tire history: ${error.message}`);
-            setTireHistory([]);
-        } else {
-            setTireHistory(data as any);
-            setHistoryError(null);
-        }
-        setIsHistoryLoading(false);
-    }, []);
+    if (error) {
+        setHistoryError(`Could not fetch tire history: ${error.message}`);
+        setTireHistory([]);
+    } else {
+        // ✅ FIX: Parse JSON response
+        setTireHistory((data || []) as TireHistory[]);
+        setHistoryError(null);
+    }
+    setIsHistoryLoading(false);
+}, []);
 
     const fetchSupportingData = useCallback(async () => {
         if (!supabase) return;
@@ -641,7 +644,8 @@ export default function EnhancedCustomersPage() {
     // Custom cell renderers for DataTableWrapper
     const renderCustomerCell = (item: any, columnKey: string, value: any) => {
         if (columnKey === 'vehicle_count') {
-            return item.vehicle && Array.isArray(item.vehicle) ? item.vehicle.length : 0;
+            // ✅ FIX: Use the vehicle_count from SQL function
+            return item.vehicle_count || 0;
         }
         if (columnKey === 'phone' && !value) {
             return <span className="text-slate-400">No phone</span>;

@@ -23,6 +23,7 @@ export interface Branch {
 }
 
 // Supplier Management
+// Also update Supplier with the new fields
 export interface Supplier {
   supplier_id: string;
   name: string;
@@ -34,22 +35,42 @@ export interface Supplier {
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
+  // ✅ Add calculated fields from RPC function
+  purchase_order_count?: number;  // Calculated count
+  total_orders_value?: number;    // Calculated total
 }
 
 // Purchase Order Management
+// Purchase Order Management
 export interface PurchaseOrder {
-  po_id: string;
+  po_id: string;                  // ✅ Correct primary key
   po_number: string;
   supplier_id: string;
   branch_id: string;
   user_id: string;
   order_date: string;
   expected_delivery_date?: string;
-  status: 'pending' | 'approved' | 'ordered' | 'delivered' | 'cancelled';
-  total_amount: number;
+  status: 'pending' | 'approved' | 'ordered' | 'delivered' | 'cancelled';  // ✅ Keep this!
   notes?: string;
   created_at?: string;
   updated_at?: string;
+  // ✅ Add calculated/joined fields from RPC function
+  total_amount?: number;          // Calculated from purchase_order_item
+  supplier?: {                    // Joined data
+    supplier_id: string;
+    name: string;
+    contact_person?: string;
+    phone?: string;
+  };
+  branch?: {                      // Joined data
+    branch_id: string;
+    name: string;
+    address?: string;
+  };
+  user?: {                        // Joined data
+    user_id: string;
+    name: string;
+  };
 }
 
 export interface PurchaseOrderItem {
@@ -84,13 +105,14 @@ export interface DeliveryItem {
 
 // Customer & Vehicle Management
 export interface Customer {
-  customer_id: string;
-  name: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  created_at?: string;
-  updated_at?: string;
+    customer_id: string;
+    name: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    vehicle_count?: number;
+    created_at?: string;
+    updated_at?: string;
 }
 
 export interface Vehicle {
