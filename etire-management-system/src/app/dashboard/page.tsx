@@ -25,6 +25,30 @@ interface DashboardStats {
   total_suppliers: number;
   total_vehicles: number;
   unread_notifications: number;
+  low_stock_count?: number;
+}
+
+interface SalesDataPoint {
+  date: string;
+  sales: number;
+}
+
+interface RecentSale {
+  sale_item_id: string;
+  quantity: number;
+  price_at_sale: number;
+  created_at: string;
+  item_name: string;
+  item_category: string;
+  user_name: string;
+}
+
+interface LowStockItem {
+  item_id: string;
+  name: string;
+  category: string;
+  stock_quantity: number;
+  reorder_level: number;
 }
 
 export default function DashboardPage() {
@@ -39,19 +63,18 @@ export default function DashboardPage() {
     total_suppliers: 0,
     total_vehicles: 0,
     unread_notifications: 0,
+    low_stock_count: 0,
   });
-  const [salesData, setSalesData] = useState<any[]>([]);
+  const [salesData, setSalesData] = useState<SalesDataPoint[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [lowStockItems, setLowStockItems] = useState<any[]>([]);
-  const [recentSales, setRecentSales] = useState<any[]>([]);
+  const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([]);
+  const [recentSales, setRecentSales] = useState<RecentSale[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [showSecondaryStats, setShowSecondaryStats] = useState(false);
 
-  // ===== IMPROVEMENTS: Style Systems =====
   const buttonStyles = {
     primary: "bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-green-600",
     secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95",
@@ -60,81 +83,10 @@ export default function DashboardPage() {
 
   const microAnimations = {
     cardHover: "transition-all duration-350 ease-spring hover:translate-y-[-6px] hover:shadow-2xl",
-    buttonHover: "transition-all duration-200 hover:scale-105 active:scale-95",
-    fadeIn: "animate-in fade-in duration-500",
     iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
-    linkHover: "transition-all duration-300 ease-in-out hover:gap-2.5"
   };
 
   const springEasing = "cubic-bezier(0.34, 1.56, 0.64, 1)";
-
-  const accessibleColors = {
-    primary: "#1e293b",
-    secondary: "#475569",
-    muted: "#64748b",
-    success: "#059669",
-    warning: "#d97706",
-    error: "#dc2626"
-  };
-
-  const cardColors = {
-    sales: { 
-      background: '#dcfce7',
-      hover: '#bbf7d0',
-      icon: '#15803d',
-      text: '#15803d',
-      glow: 'rgba(21, 128, 61, 0.2)'
-    },
-    inventory: { 
-      background: '#ccfbf1',
-      hover: '#99f6e4',
-      icon: '#0f766e',
-      text: '#0f766e',
-      glow: 'rgba(15, 118, 110, 0.2)'
-    },
-    customers: { 
-      background: '#cffafe',
-      hover: '#a5f3fc',
-      icon: '#0e7490',
-      text: '#0e7490',
-      glow: 'rgba(14, 116, 144, 0.2)'
-    },
-    jobs: { 
-      background: '#dbeafe',
-      hover: '#bfdbfe',
-      icon: '#1d4ed8',
-      text: '#1d4ed8',
-      glow: 'rgba(29, 78, 216, 0.2)'
-    },
-    branches: { 
-      background: '#dcfce7',
-      hover: '#bbf7d0',
-      icon: '#15803d',
-      text: '#15803d',
-      glow: 'rgba(21, 128, 61, 0.2)'
-    },
-    suppliers: { 
-      background: '#ccfbf1',
-      hover: '#99f6e4',
-      icon: '#0f766e',
-      text: '#0f766e',
-      glow: 'rgba(15, 118, 110, 0.2)'
-    },
-    vehicles: { 
-      background: '#cffafe',
-      hover: '#a5f3fc',
-      icon: '#0e7490',
-      text: '#0e7490',
-      glow: 'rgba(14, 116, 144, 0.2)'
-    },
-    notifications: { 
-      background: '#dbeafe',
-      hover: '#bfdbfe',
-      icon: '#1d4ed8',
-      text: '#1d4ed8',
-      glow: 'rgba(29, 78, 216, 0.2)'
-    }
-  };
 
   const iconCategories = {
     financial: { background: 'rgba(16, 185, 129, 0.1)', icon: '#10b981' },
@@ -146,6 +98,10 @@ export default function DashboardPage() {
     suppliers: { background: 'rgba(6, 182, 212, 0.1)', icon: '#06b6d4' },
     vehicles: { background: 'rgba(59, 130, 246, 0.1)', icon: '#3b82f6' },
     notifications: { background: 'rgba(139, 92, 246, 0.1)', icon: '#8b5cf6' }
+  };
+
+  const cardColors = {
+    sales: { icon: '#15803d' }
   };
 
   const MetricSkeleton = () => (
@@ -199,34 +155,10 @@ export default function DashboardPage() {
   );
   
   const quickActions = [
-    { 
-      label: "Create Sale", 
-      icon: Plus, 
-      href: "/pos", 
-      description: "Point of Sale",
-      category: "financial"
-    },
-    { 
-      label: "Manage Inventory", 
-      icon: Package, 
-      href: "/inventory", 
-      description: "Stock items",
-      category: "inventory"
-    },
-    { 
-      label: "View Reports", 
-      icon: FileText, 
-      href: "/reports", 
-      description: "Analytics",
-      category: "analytics"
-    },
-    { 
-      label: "Service Jobs", 
-      icon: Wrench, 
-      href: "/services", 
-      description: "Manage jobs",
-      category: "service"
-    }
+    { label: "Create Sale", icon: Plus, href: "/pos", description: "Point of Sale", category: "financial" },
+    { label: "Manage Inventory", icon: Package, href: "/inventory", description: "Stock items", category: "inventory" },
+    { label: "View Reports", icon: FileText, href: "/reports", description: "Analytics", category: "analytics" },
+    { label: "Service Jobs", icon: Wrench, href: "/services", description: "Manage jobs", category: "service" }
   ];
 
   const handleCardClick = (cardId: string) => {
@@ -256,15 +188,9 @@ export default function DashboardPage() {
     setMounted(true);
   }, []);
 
-  // ===== SUPABASE DIRECT API CALLS =====
+  // ✅ OPTIMIZED: Single RPC call for all stats + parallel queries for details
   const fetchDashboardData = useCallback(async () => {
-    if (!supabase) {
-      setError("Supabase client not available. Check credentials.");
-      setIsLoading(false);
-      return;
-    }
-
-    if (!user?.user_id) {
+    if (!supabase || !user?.user_id) {
       setIsLoading(false);
       return;
     }
@@ -273,108 +199,32 @@ export default function DashboardPage() {
     setError(null);
     
     try {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      // ✅ OPTIMIZATION 1: Single RPC call for all dashboard stats
+      const { data: statsData, error: statsError } = await supabase
+        .rpc('get_dashboard_stats', { user_uuid: user.user_id });
       
-      // Get sales data from sale_item (quantity * price_at_sale)
-      const { data: recentSalesData, error: salesError } = await supabase
-        .from('sale_item')
-        .select('created_at, quantity, price_at_sale, sale:sale_id(sale_date)')
-        .gte('created_at', sevenDaysAgo.toISOString())
-        .order('created_at', { ascending: false });
+      if (statsError) throw statsError;
 
-      if (salesError) throw new Error(`Could not fetch sales data: ${salesError.message}`);
-
-      // Get counts in parallel - FIXED: Changed from 'user' table to 'customer' table
-      const [itemsRes, customersRes, jobsRes, branchesRes, suppliersRes, vehiclesRes, notificationsRes] = await Promise.all([
-        supabase.from('inventory_item').select('*', { count: 'exact', head: true }),
-        supabase.from('customer').select('*', { count: 'exact', head: true }), // ✅ CHANGED: from 'user' to 'customer'
-        supabase.from('service_job').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('branch').select('*', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('supplier').select('*', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.from('vehicle').select('*', { count: 'exact', head: true }),
-        supabase.from('notification').select('*', { count: 'exact', head: true }).eq('user_id', user.user_id).eq('is_read', false)
+      // ✅ OPTIMIZATION 2: Parallel queries for additional data
+      const [salesChartRes, lowStockRes, notificationsRes, recentSalesRes] = await Promise.all([
+        supabase.rpc('get_weekly_sales'),
+        supabase.from('low_stock_items').select('*').limit(10),
+        supabase
+          .from('notification')
+          .select('notification_id, title, message, type, is_read, created_at')
+          .eq('user_id', user.user_id)
+          .order('created_at', { ascending: false })
+          .limit(5),
+        supabase.rpc('get_recent_sales', { limit_count: 10 })
       ]);
 
-      // Calculate total sales from sale_item (quantity * price_at_sale)
-      const totalSales = (recentSalesData || []).reduce(
-        (acc: number, item: any) => acc + (Number(item.quantity || 0) * Number(item.price_at_sale || 0)), 
-        0
-      );
+      // Set stats from RPC function
+      setStats(statsData as DashboardStats);
+      setSalesData(salesChartRes.data as SalesDataPoint[] || []);
+      setLowStockItems(lowStockRes.data as LowStockItem[] || []);
+      setNotifications(notificationsRes.data || []);
+      setRecentSales(recentSalesRes.data as RecentSale[] || []);
 
-      setStats({
-        total_sales: totalSales,
-        total_items: itemsRes.count ?? 0,
-        total_customers: customersRes.count ?? 0,
-        pending_jobs: jobsRes.count ?? 0,
-        total_branches: branchesRes.count ?? 0,
-        total_suppliers: suppliersRes.count ?? 0,
-        total_vehicles: vehiclesRes.count ?? 0,
-        unread_notifications: notificationsRes.count ?? 0,
-      });
-
-      // Fetch recent notifications
-      const { data: notificationsData } = await supabase
-        .from('notification')
-        .select('*')
-        .eq('user_id', user.user_id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      
-      setNotifications(notificationsData || []);
-      
-      // Fetch ALL inventory items first
-      const { data: allInventory } = await supabase
-        .from('inventory_item')
-        .select('*');
-      
-      // Filter low stock items in JavaScript (where stock_quantity <= reorder_level)
-      const lowStockData = (allInventory || [])
-        .filter(item => item.stock_quantity <= item.reorder_level)
-        .sort((a, b) => a.stock_quantity - b.stock_quantity)
-        .slice(0, 10);
-      
-      setLowStockItems(lowStockData);
-
-      // Fetch recent sales for detailed view
-      const { data: recentSalesDetail } = await supabase
-        .from('sale_item')
-        .select(`
-          *,
-          inventory_item:item_id(name, category),
-          sale:sale_id(user:user_id(name))
-        `)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      
-      // Flatten user data
-      const formattedSales = (recentSalesDetail || []).map(item => ({
-        ...item,
-        user: item.sale?.user || null
-      }));
-      
-      setRecentSales(formattedSales);
-
-      // Group sales by date and format for chart
-      const salesByDate = new Map();
-      (recentSalesData || []).forEach((item: any) => {
-        const date = new Date(item.sale?.sale_date || item.created_at).toDateString();
-        const amount = Number(item.quantity || 0) * Number(item.price_at_sale || 0);
-        salesByDate.set(date, (salesByDate.get(date) || 0) + amount);
-      });
-
-      // Format data for chart - last 7 days
-      const formattedSalesChart = [];
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dateString = date.toDateString();
-        formattedSalesChart.push({
-          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          sales: salesByDate.get(dateString) || 0
-        });
-      }
-      setSalesData(formattedSalesChart);
       setLastUpdated(new Date());
 
     } catch (err: any) {
@@ -772,12 +622,12 @@ export default function DashboardPage() {
                           contentStyle={{
                             backgroundColor: "rgba(255, 255, 255, 0.95)",
                             backdropFilter: "blur(12px)",
-                            border: `1px solid ${cardColors.sales.background.split(' ')[2]}20`,
+                            border: `1px solid rgba(21, 128, 61, 0.2)`,
                             borderRadius: "12px",
                             boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
                             color: "#1e293b"
                           }}
-                          formatter={(value) => [`₱${value.toLocaleString()}`, 'Sales']}
+                          formatter={(value) => [`₱${Number(value).toLocaleString()}`, 'Sales']}
                         />
                         <Area 
                           type="monotone" 
@@ -895,18 +745,18 @@ export default function DashboardPage() {
                       onKeyPress={(e) => e.key === 'Enter' && router.push('/pos')}
                       tabIndex={0}
                       role="button"
-                      aria-label={`Recent sale: ${sale.inventory_item?.name || 'Unknown Item'}, amount: ₱${((sale.quantity || 0) * (sale.price_at_sale || 0)).toLocaleString()}`}
+                      aria-label={`Recent sale: ${sale.item_name || 'Unknown Item'}, amount: ₱${((sale.quantity || 0) * (sale.price_at_sale || 0)).toLocaleString()}`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <p className="font-semibold text-slate-800 group-hover:text-slate-900 transition-colors">
-                            {sale.inventory_item?.name || 'Unknown Item'}
+                            {sale.item_name || 'Unknown Item'}
                           </p>
                           <p className="text-sm text-slate-600 mt-1">
                             {sale.quantity} × ₱{sale.price_at_sale?.toLocaleString() || '0'}
                           </p>
                           <p className="text-xs text-slate-500 mt-1">
-                            Sold by: {sale.user?.name || 'Unknown'}
+                            Sold by: {sale.user_name || 'Unknown'}
                           </p>
                         </div>
                         <div className="text-right">
@@ -1054,38 +904,6 @@ export default function DashboardPage() {
         
         .animate-pulse-glow {
           animation: pulse-glow 2s infinite ease-in-out;
-        }
-
-        @keyframes fadeSlideIn {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .animate-fade-slide-in {
-          animation: fadeSlideIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) backwards;
-        }
-
-        .focus-visible\\:ring-2:focus-visible {
-          outline: 2px solid #4A90E2;
-          outline-offset: 2px;
-        }
-
-        .will-change-transform {
-          will-change: transform;
-        }
-
-        .will-change-opacity {
-          will-change: opacity;
-        }
-
-        .absolute.inset-0 {
-          transition: all 0.5s ease-in-out;
         }
       `}</style>
     </div>
