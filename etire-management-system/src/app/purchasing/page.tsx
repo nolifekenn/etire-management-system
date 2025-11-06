@@ -364,21 +364,21 @@ export default function EnhancedPurchasingPage() {
 
     // ===== SUPABASE DIRECT API CALLS =====
     
+    // ✅ OPTIMIZED: Replace fetchSuppliers (around line 367)
     const fetchSuppliers = useCallback(async () => {
         if (!supabase) return;
         setIsSupplierLoading(true);
         
         try {
+            // 🔥 Single optimized RPC call with calculated totals!
             const { data, error } = await supabase
-                .from('supplier')
-                .select('*')
-                .order('name');
-            
+                .rpc('get_suppliers_complete');
+
             if (error) {
-                setSupplierError(error.message);
+                setSupplierError(`Could not fetch suppliers: ${error.message}`);
                 setSuppliers([]);
             } else {
-                setSuppliers(data as Supplier[]);
+                setSuppliers((data || []) as Supplier[]);
                 setSupplierError(null);
             }
         } catch (error: any) {
@@ -390,26 +390,21 @@ export default function EnhancedPurchasingPage() {
         setLastUpdated(new Date());
     }, []);
 
+    // ✅ OPTIMIZED: Replace fetchPurchaseOrders (around line 389)
     const fetchPurchaseOrders = useCallback(async () => {
         if (!supabase) return;
         setIsPOLoading(true);
         
         try {
+            // 🔥 Single optimized RPC call with all joins and calculated total!
             const { data, error } = await supabase
-                .from('purchase_order')
-                .select(`
-                    *,
-                    supplier:supplier_id(name),
-                    branch:branch_id(name),
-                    user:user_id(name)
-                `)
-                .order('order_date', { ascending: false });
-            
+                .rpc('get_purchase_orders_complete');
+
             if (error) {
-                setPOError(error.message);
+                setPOError(`Could not fetch purchase orders: ${error.message}`);
                 setPurchaseOrders([]);
             } else {
-                setPurchaseOrders(data as any);
+                setPurchaseOrders((data || []) as any);
                 setPOError(null);
             }
         } catch (error: any) {
