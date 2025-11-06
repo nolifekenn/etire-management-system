@@ -322,7 +322,7 @@ export default function EnhancedBranchesPage() {
                                 className={buttonStyles.primary}
                             >
                                 <PlusCircle className="h-5 w-5 mr-2" />
-                                Add New Branch
+                                New Branch
                             </Button>
                         </div>
 

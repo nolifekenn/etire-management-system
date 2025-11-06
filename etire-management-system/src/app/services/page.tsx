@@ -89,19 +89,21 @@ interface VehicleType {
 
 interface ServiceJob {
     job_id: string;
-    user_id: string;
+    user_id: string;        // Employee who performed the service
+    customer_id?: string;   // ✅ Add this - Customer who owns the vehicle
     job_description: string;
     job_date: string;
     status: 'pending' | 'in-progress' | 'completed' | 'cancelled';
     service_fee: number;
     remarks: string | null;
     vehicle_type_id: string | null;
-    user?: { name: string } | null;
+    user?: { name: string } | null;  // Employee name
     vehicle_type?: VehicleType | null;
 }
 
+// ✅ FIXED: Use customer_id instead of user_id
 interface Customer {
-    user_id: string;
+    customer_id: string;  // ✅ Changed from user_id
     name: string;
 }
 
@@ -490,28 +492,31 @@ export default function EnhancedServiceManagementPage() {
         setLastUpdated(new Date());
     }, [toast]);
 
+    // ✅ FIXED: Fetch from customer table instead of user table
     const fetchCustomers = useCallback(async () => {
         if (!supabase) return;
         setIsDataLoading(true);
         
         try {
             const { data, error } = await supabase
-                .from('user')
-                .select('user_id, name');
+                .from('customer')  // ✅ Changed from 'user' to 'customer'
+                .select('customer_id, name, phone')  // ✅ Changed user_id to customer_id
+                .order('name');
             
             if (error) throw error;
             
             setCustomers([
-                { user_id: ANONYMOUS_CUSTOMER_ID, name: 'Walk-in Customer' },
+                { customer_id: ANONYMOUS_CUSTOMER_ID, name: 'Walk-in Customer' },  // ✅ Changed field name
                 ...(data || [])
             ]);
         } catch (error: any) {
-            let errorMessage = `Failed to load users: ${error.message}`;
-            if (error.message.includes('infinite recursion')) {
-                errorMessage = `A database security policy is misconfigured. Error: "${error.message}". This usually happens when a Row Level Security (RLS) policy on the 'users' table refers to itself. Please check your RLS policies in the Supabase dashboard.`;
-            }
-            setFetchError(errorMessage);
-            toast({ title: 'Error', description: errorMessage, variant: 'destructive'});
+            console.error('Customer fetch error:', error);
+            setFetchError(`Failed to load customers: ${error.message}`);
+            toast({ 
+                title: 'Error', 
+                description: `Failed to load customers: ${error.message}`, 
+                variant: 'destructive'
+            });
         }
         
         setIsDataLoading(false);
@@ -658,24 +663,25 @@ export default function EnhancedServiceManagementPage() {
             toast({ title: 'Validation Error', description: 'Job description is required.', variant: 'destructive'});
             return;
         }
-
+    
         setIsLoading(true);
         
         try {
             const customerName = customerId === ANONYMOUS_CUSTOMER_ID ? 'Walk-in Customer' : 
-                                customers.find(c => c.user_id === customerId)?.name || 'Unknown Customer';
+                                customers.find(c => c.customer_id === customerId)?.name || 'Unknown Customer';  // ✅ Changed to customer_id
             
             const jobData = {
-                user_id: authUser.user_id,
+                user_id: authUser.user_id,  // ✅ This is the EMPLOYEE who created the job
+                customer_id: customerId === ANONYMOUS_CUSTOMER_ID ? null : customerId,  // ✅ Add customer_id field
                 job_description: jobDescription,
                 status: jobStatus,
                 service_fee: parseFloat(serviceFee) || 0,
                 remarks: `Customer: ${customerName}${remarks ? '\n\nRemarks: ' + remarks : ''}`,
                 vehicle_type_id: vehicleTypeId && vehicleTypeId !== '' ? vehicleTypeId : null,
             };
-
+    
             console.log('Submitting job data:', jobData);
-
+    
             let error;
             
             if (editingJob) {
@@ -690,7 +696,7 @@ export default function EnhancedServiceManagementPage() {
                     .insert([jobData]);
                 error = insertError;
             }
-
+    
             if (error) {
                 toast({ title: 'Save Error', description: error.message, variant: 'destructive' });
             } else {
@@ -1066,8 +1072,10 @@ USING (true);`}
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value={ANONYMOUS_CUSTOMER_ID} className="font-poppins">Walk-in Customer</SelectItem>
-                                        {customers.filter(c => c.user_id !== ANONYMOUS_CUSTOMER_ID).map(c => (
-                                            <SelectItem key={c.user_id} value={c.user_id} className="font-poppins">{c.name}</SelectItem>
+                                        {customers.filter(c => c.customer_id !== ANONYMOUS_CUSTOMER_ID).map(c => (  // ✅ Changed to customer_id
+                                            <SelectItem key={c.customer_id} value={c.customer_id} className="font-poppins">
+                                                {c.name}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
