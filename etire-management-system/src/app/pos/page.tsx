@@ -43,6 +43,7 @@ import {
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import type { InventoryItem } from '../inventory/page';
 
+
 // ============================================
 // INTERFACES & TYPES
 // ============================================
@@ -273,7 +274,10 @@ function DataTableWrapper({
 export default function POSPage() {
     const { toast } = useToast();
     const { user: authUser } = useAuth();
-    
+        useEffect(() => {
+  console.log("🧩 Auth user in POS:", authUser);
+}, [authUser]);
+
     // State for POS
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
@@ -409,70 +413,62 @@ export default function POSPage() {
     const subtotal = cart.reduce((acc, item) => acc + item.sale_price * item.quantity, 0);
     const total = subtotal;
 
-    const handleCheckout = async () => {
-        if (!supabase || !authUser) return;
-        if (cart.length === 0) {
-            toast({ title: 'Empty Cart', description: 'Cannot process an empty cart.', variant: 'destructive' });
-            return;
-        }
-        setIsSubmitting(true);
-        try {
-            // Create sale transaction
-            const { data: saleData, error: saleError } = await supabase
-                .from('sale')
-                .insert({
-                    user_id: authUser.id,
-                    customer_id: selectedCustomerId === ANONYMOUS_CUSTOMER_ID ? null : selectedCustomerId,
-                    sale_date: new Date().toISOString(),
-                    payment_method: 'cash',
-                    discount_amount: 0,
-                    tax_amount: 0
-                })
-                .select()
-                .single();
+  // 🧾 NEW handleProcessSale (replaces handleCheckout)
+const handleProcessSale = async () => {
+  if (cart.length === 0) {
+    toast({ 
+      title: "Empty Cart", 
+      description: "Please add items before processing a sale.", 
+      variant: "destructive" 
+    });
+    return;
+  }
 
-            if (saleError) throw saleError;
+  setIsSubmitting(true);
 
-            // Create sale items
-            const saleItems = cart.map(item => ({
-                sale_id: saleData.sale_id,
-                item_id: item.item_id,
-                quantity: item.quantity,
-                price_at_sale: item.sale_price
-            }));
+  try {
+    const response = await fetch("/api/sales", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerId: selectedCustomerId === ANONYMOUS_CUSTOMER_ID ? null : selectedCustomerId,
+        cartItems: cart,
+        paymentMethod: "cash",
+        userId: authUser?.user_id,
+        branchId: "main_branch",
+      }),
+    });
 
-            const { error: itemsError } = await supabase
-                .from('sale_item')
-                .insert(saleItems);
+    const data = await response.json();
 
-            if (itemsError) throw itemsError;
+    if (!response.ok) throw new Error(data.error || "Failed to process sale");
 
-            // Update inventory stock
-            for (const cartItem of cart) {
-                const { error: updateError } = await supabase
-                    .from('inventory_item')
-                    .update({ 
-                        stock_quantity: cartItem.stock_quantity - cartItem.quantity 
-                    })
-                    .eq('item_id', cartItem.item_id);
+    toast({
+      title: "Sale Complete ✅",
+      description: "Receipt is ready for download.",
+    });
 
-                if (updateError) throw updateError;
-            }
-            
-            toast({ title: 'Success', description: 'Sale processed successfully!' });
-            setCart([]);
-            setSelectedCustomerId(ANONYMOUS_CUSTOMER_ID);
-            setSearchTerm('');
-            setSelectedVehicleType('all');
-            setSelectedCategory('all');
-            
-            fetchInitialData();
-        } catch (error: any) {
-            toast({ title: 'Checkout Error', description: error.message, variant: 'destructive' });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
+    // 🧾 Automatically open receipt PDF if available
+    if (data.receipt?.pdfUrl) {
+      window.open(data.receipt.pdfUrl, "_blank");
+    }
+
+    // Clear cart and refresh
+    setCart([]);
+    setSelectedCustomerId(ANONYMOUS_CUSTOMER_ID);
+    fetchInitialData();
+  } catch (err: any) {
+    toast({
+      title: "Checkout Failed ❌",
+      description: err.message,
+      variant: "destructive",
+    });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
+
 
     const clearFilters = () => {
         setSelectedVehicleType('all');
@@ -959,7 +955,7 @@ export default function POSPage() {
                 <CardFooter className="flex flex-col gap-3">
                   <Button 
                     className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300" 
-                    onClick={handleCheckout} 
+                    onClick={handleProcessSale} 
                     disabled={cart.length === 0 || isSubmitting}
                   >
                     {isSubmitting ? (
