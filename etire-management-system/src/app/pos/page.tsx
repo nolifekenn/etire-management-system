@@ -297,7 +297,7 @@ export default function POSPage() {
     const vehicleTypes = [
         { value: 'all', label: 'All Vehicles', icon: Package, color: 'bg-slate-500' },
         { value: 'car', label: 'Car', icon: Car, color: 'bg-blue-500' },
-        { value: 'motor', label: 'Motor', icon: Bike, color: 'bg-green-500' },
+        { value: 'motor', label: 'Motorcycle', icon: Bike, color: 'bg-green-500' },
         { value: 'truck', label: 'Truck', icon: Truck, color: 'bg-orange-500' }
     ];
 
