@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -48,12 +47,53 @@ const microAnimations = {
   iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
 };
 
+// Updated columns with sortable flags and custom render functions
 const columns = [
-  { key: 'name', header: 'Name' },
-  { key: 'username', header: 'Username' },
-  { key: 'password_display', header: 'Password' },
-  { key: 'role_display', header: 'Role' },
-  { key: 'status', header: 'Status' },
+  { 
+    key: 'name', 
+    header: 'Name',
+    sortable: true
+  },
+  { 
+    key: 'username', 
+    header: 'Username',
+    sortable: true
+  },
+  { 
+    key: 'password_display', 
+    header: 'Password',
+    sortable: false
+  },
+  { 
+    key: 'role_display', 
+    header: 'Role',
+    sortable: true,
+    render: (value: any, item: any) => {
+      const role = (item as User).role;
+      if (role === 3) return <Badge variant="default" className="bg-red-600 hover:bg-red-700 text-white">Admin</Badge>;
+      if (role === 2) return <Badge variant="default" className="bg-purple-600 hover:bg-purple-700 text-white">Branch Manager</Badge>;
+      if (role === 1) return <Badge variant="default" className="bg-blue-600 hover:bg-blue-700 text-white">Staff</Badge>;
+      return <Badge variant="outline" className="text-slate-600">Guest</Badge>;
+    }
+  },
+  { 
+    key: 'status', 
+    header: 'Status',
+    sortable: true,
+    render: (value: any, item: any) => {
+      const role = (item as User).role;
+      if (role === 0) {
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-600 border-yellow-300">Pending Approval</Badge>;
+      } else if (role === 1) {
+        return <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-300">Active Staff</Badge>;
+      } else if (role === 2) {
+        return <Badge variant="outline" className="bg-purple-50 text-purple-600 border-purple-300">Manager</Badge>;
+      } else if (role === 3) {
+        return <Badge variant="outline" className="bg-red-50 text-red-600 border-red-300">Administrator</Badge>;
+      }
+      return <Badge variant="outline">Unknown</Badge>;
+    }
+  },
 ];
 
 export default function AdminPage() {
@@ -283,13 +323,6 @@ export default function AdminPage() {
                         
                         <div className="flex gap-2">
                             <Button 
-                                onClick={handleOpenAddDialog}
-                                className="bg-white/20 backdrop-blur-lg border border-white/30 hover:bg-white/30 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg active:scale-95"
-                            >
-                                <UserPlus className="h-4 w-4 mr-2" />
-                                Add User
-                            </Button>
-                            <Button 
                                 onClick={refreshData}
                                 disabled={isLoading}
                                 className="bg-white/20 backdrop-blur-lg border border-white/30 hover:bg-white/30 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg active:scale-95"
@@ -480,42 +513,24 @@ export default function AdminPage() {
                         </AlertDialogContent>
                     </AlertDialog>
 
-                    <div className={`bg-white border border-slate-200 rounded-xl shadow-lg transition-all duration-300 ${microAnimations.cardHover}`}>
-                        <DataTableWrapper
-                            title="Registered Users"
-                            columns={columns}
-                            data={users.map(u => ({
-                                ...u,
-                                id: u.user_id,
-                                password_display: '••••••••',
-                                role_display: getRoleName(u.role),
-                            }))}
-                            onEdit={handleOpenEditDialog}
-                            onDelete={handleOpenDeleteDialog}
-                            renderCell={(item, columnKey, value) => {
-                                if (columnKey === 'role_display') {
-                                    const role = (item as User).role;
-                                    if (role === 3) return <Badge variant="default" className="bg-red-600 hover:bg-red-700">Admin</Badge>
-                                    if (role === 2) return <Badge variant="default" className="bg-purple-600 hover:bg-purple-700">Branch Manager</Badge>
-                                    if (role === 1) return <Badge variant="secondary" className="bg-blue-600 hover:bg-blue-700">Staff</Badge>
-                                    return <Badge variant="outline">Guest</Badge>
-                                }
-                                if (columnKey === 'status') {
-                                    const role = (item as User).role;
-                                    if (role === 0) {
-                                        return <Badge variant="outline" className="text-yellow-600 border-yellow-600">Pending Approval</Badge>
-                                    } else if (role === 1) {
-                                        return <Badge variant="secondary" className="text-blue-600">Active Staff</Badge>
-                                    } else if (role === 2) {
-                                        return <Badge variant="default" className="text-purple-600">Branch Manager</Badge>
-                                    } else if (role === 3) {
-                                        return <Badge variant="default" className="text-red-600">Administrator</Badge>
-                                    }
-                                }
-                                return String(value);
-                            }}
-                        />
-                    </div>
+                    {/* Enhanced DataTableWrapper with all features */}
+                    <DataTableWrapper
+                        title="Registered Users"
+                        columns={columns}
+                        data={users.map(u => ({
+                            ...u,
+                            id: u.user_id,
+                            password_display: '••••••••',
+                            role_display: getRoleName(u.role),
+                        }))}
+                        rowsPerPageOptions={[5, 10, 25, 50]}
+                        onAddNew={handleOpenAddDialog}
+                        onEdit={handleOpenEditDialog}
+                        onDelete={handleOpenDeleteDialog}
+                        onRowClick={(user) => {
+                            console.log('User clicked:', user);
+                        }}
+                    />
                 </div>
             </div>
 

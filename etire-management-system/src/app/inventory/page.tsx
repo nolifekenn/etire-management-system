@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { StatCard } from '@/components/StatCard';
 import { PageHeader } from '@/components/PageHeader';
 import { DataTableWrapper } from '@/components/DataTableWrapper';
 import { 
@@ -38,14 +37,6 @@ import { supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 // Update the InventoryItem interface
 export interface InventoryItem {
@@ -80,14 +71,14 @@ const quickFilters = [
   { label: "Tools", value: "tool", icon: PackageSearch },
   { label: "Accessories", value: "accessory", icon: PackageSearch },
   { label: "Car Items", value: "car", icon: PackageSearch },
-  { label: "Motor Items", value: "motor", icon: PackageSearch },
+  { label: "Motorcycle Items", value: "motor", icon: PackageSearch },
   { label: "Truck Items", value: "truck", icon: PackageSearch }
 ];
 
 // Vehicle type configuration - FIXED: Ensure all vehicle types are properly defined
 const vehicleTypeConfig: Record<'car' | 'motor' | 'truck', { label: string; color: string }> = {
   car: { label: 'Car', color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  motor: { label: 'Motor', color: 'bg-green-100 text-green-700 border-green-200' },
+  motor: { label: 'Motorcycle', color: 'bg-green-100 text-green-700 border-green-200' },
   truck: { label: 'Truck', color: 'bg-orange-100 text-orange-700 border-orange-200' }
 };
 
@@ -297,7 +288,7 @@ const AdvancedFilters = ({
               <SelectContent>
                 <SelectItem value="all">All Vehicle Types</SelectItem>
                 <SelectItem value="car">Car</SelectItem>
-                <SelectItem value="motor">Motor</SelectItem>
+                <SelectItem value="motor">Motorcycle</SelectItem>
                 <SelectItem value="truck">Truck</SelectItem>
               </SelectContent>
             </Select>
@@ -802,88 +793,6 @@ const ViewMoreDialog = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Product Name</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Vehicle Type</TableHead>
-                <TableHead>Stock Level</TableHead>
-                <TableHead>Adjust Stock</TableHead>
-                <TableHead>Cost (₱)</TableHead>
-                <TableHead>Price (₱)</TableHead>
-                <TableHead>Margin %</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item) => {
-                const margin = calculateMargin(item);
-                const status = item.stock_quantity === 0 ? 'Out of Stock' : 
-                              item.stock_quantity <= 2 ? 'Critical' : 
-                              item.stock_quantity <= 5 ? 'Low Stock' : 'In Stock';
-                
-                return (
-                  <TableRow key={item.item_id}>
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="capitalize">
-                        {item.category}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <VehicleTypeBadge type={item.vehicle_type} />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{item.stock_quantity}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-1"
-                      >
-                        <ArrowUpDown className="h-3 w-3" />
-                        Adjust
-                      </Button>
-                    </TableCell>
-                    <TableCell>₱{item.cost_price.toFixed(2)}</TableCell>
-                    <TableCell>₱{item.sale_price.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant={margin >= 30 ? "default" : "outline"}
-                        className={
-                          margin >= 30 ? 'bg-green-100 text-green-700 border-green-200' :
-                          margin >= 15 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-                          'bg-red-100 text-red-700 border-red-200'
-                        }
-                      >
-                        {margin.toFixed(1)}%
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant="outline"
-                        className={
-                          status === 'Out of Stock' ? 'bg-red-100 text-red-700 border-red-200' :
-                          status === 'Critical' ? 'bg-red-100 text-red-700 border-red-200' :
-                          status === 'Low Stock' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-                          'bg-green-100 text-green-700 border-green-200'
-                        }
-                      >
-                        {status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-
         <DialogFooter>
           <Button onClick={onClose} variant="outline">
             Close
@@ -1042,16 +951,79 @@ export default function EnhancedInventoryPage() {
     return filtered;
   }, [items, filters]);
 
-  // Enhanced columns with Adjust Stock column beside Stock Level
+  // Enhanced columns for DataTableWrapper
   const enhancedColumns = [
-    { key: 'name', header: 'Product Name' },
-    { key: 'category', header: 'Category' },
-    { key: 'vehicle_type', header: 'Vehicle Type' },
-    { key: 'stock_quantity', header: 'Stock Level' },
-    { key: 'adjust_stock', header: 'Adjust Stock' },
-    { key: 'cost_price', header: 'Cost (₱)' },
-    { key: 'sale_price', header: 'Price (₱)' },
-    { key: 'profit_margin', header: 'Margin %' },
+    { 
+      key: 'name', 
+      header: 'Product Name',
+      sortable: true
+    },
+    { 
+      key: 'category', 
+      header: 'Category',
+      render: (value: any, item: any) => (
+        <Badge variant="outline" className="capitalize bg-slate-100 text-slate-700 border-slate-300">
+          {String(value)}
+        </Badge>
+      )
+    },
+    { 
+      key: 'vehicle_type', 
+      header: 'Vehicle Type',
+      render: (value: any, item: any) => <VehicleTypeBadge type={item.vehicle_type} />
+    },
+    { 
+      key: 'stock_quantity', 
+      header: 'Stock Level',
+      sortable: true,
+      render: (value: any, item: any) => <StockLevelIndicator quantity={Number(value)} reorderLevel={item.reorder_level} />
+    },
+    { 
+      key: 'adjust_stock', 
+      header: 'Adjust Stock',
+      render: (value: any, item: any) => (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleOpenStockAdjustment(item)}
+          className="flex items-center gap-1"
+        >
+          <ArrowUpDown className="h-3 w-3" />
+          Adjust Stock
+        </Button>
+      )
+    },
+    { 
+      key: 'cost_price', 
+      header: 'Cost (₱)',
+      sortable: true,
+      render: (value: any) => `₱${Number(value).toFixed(2)}`
+    },
+    { 
+      key: 'sale_price', 
+      header: 'Price (₱)',
+      sortable: true,
+      render: (value: any) => `₱${Number(value).toFixed(2)}`
+    },
+    { 
+      key: 'profit_margin', 
+      header: 'Margin %',
+      render: (value: any, item: any) => {
+        const margin = calculateMargin(item);
+        return (
+          <Badge 
+            variant={margin >= 30 ? "default" : "outline"}
+            className={
+              margin >= 30 ? 'bg-green-100 text-green-700 border-green-200' :
+              margin >= 15 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+              'bg-red-100 text-red-700 border-red-200'
+            }
+          >
+            {margin.toFixed(1)}%
+          </Badge>
+        );
+      }
+    },
   ];
 
   // Calculate stats
@@ -1330,17 +1302,9 @@ export default function EnhancedInventoryPage() {
           onClearFilters={handleClearFilters}
         />
 
-        {/* Enhanced Inventory Table */}
+        {/* Enhanced Inventory Table using DataTableWrapper */}
         <section aria-labelledby="inventory-list-heading">
           <div className="flex items-center justify-between mb-6">
-            <h2 id="inventory-list-heading" className="text-2xl font-bold text-slate-900">
-              Inventory Items
-              {filters.search || filters.category !== 'all' || filters.stockStatus !== 'all' || filters.vehicleType !== 'all' ? (
-                <span className="text-sm font-normal text-slate-500 ml-2">
-                  (Filtered: {processedItems.length} of {items.length} items)
-                </span>
-              ) : null}
-            </h2>
             <div className="flex items-center gap-3">
               <Button 
                 variant="outline"
@@ -1361,87 +1325,32 @@ export default function EnhancedInventoryPage() {
             </div>
           </div>
 
-          {/* Table Card */}
-          <Card className="bg-white border-slate-200 shadow-lg transition-all duration-300 hover:shadow-xl">
-            <CardContent className="p-0">
-              {isLoading && items.length === 0 && !fetchError ? (
-                <div className="flex justify-center items-center h-64">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : processedItems.length === 0 ? (
-                <EnhancedEmptyState 
-                  filters={filters}
-                  onClearFilters={handleClearFilters}
-                  onAddItem={handleOpenAddDialog}
-                />
-              ) : (
-                <DataTableWrapper
-                  title=""
-                  columns={enhancedColumns}
-                  data={processedItems.map(i => ({...i, id: i.item_id}))}
-                  onAddNew={handleOpenAddDialog}
-                  onEdit={handleOpenEditDialog}
-                  onDelete={handleOpenDeleteDialog}
-                  renderCell={(item, columnKey, value) => {
-                    const inventoryItem = item as InventoryItem;
-                    
-                    switch (columnKey) {
-                      case 'sale_price':
-                      case 'cost_price':
-                        return `₱${Number(value).toFixed(2)}`;
-                      
-                      case 'category':
-                        return (
-                          <Badge 
-                            variant="outline" 
-                            className="capitalize bg-slate-100 text-slate-700 border-slate-300"
-                          >
-                            {String(value)}
-                          </Badge>
-                        );
-                      
-                      case 'vehicle_type':
-                        return <VehicleTypeBadge type={inventoryItem.vehicle_type} />;
-                      
-                      case 'stock_quantity':
-                        return <StockLevelIndicator quantity={Number(value)} reorderLevel={inventoryItem.reorder_level} />;
-                      
-                      case 'adjust_stock':
-                        return (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenStockAdjustment(inventoryItem)}
-                            className="flex items-center gap-1"
-                          >
-                            <ArrowUpDown className="h-3 w-3" />
-                            Adjust Stock
-                          </Button>
-                        );
-                      
-                      case 'profit_margin':
-                        const margin = calculateMargin(inventoryItem);
-                        return (
-                          <Badge 
-                            variant={margin >= 30 ? "default" : "outline"}
-                            className={
-                              margin >= 30 ? 'bg-green-100 text-green-700 border-green-200' :
-                              margin >= 15 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-                              'bg-red-100 text-red-700 border-red-200'
-                            }
-                          >
-                            {margin.toFixed(1)}%
-                          </Badge>
-                        );
-                      
-                      default:
-                        return String(value);
-                    }
-                  }}
-                />
-              )}
-            </CardContent>
-          </Card>
+          {/* Using DataTableWrapper instead of custom table card */}
+          {isLoading && items.length === 0 && !fetchError ? (
+            <div className="flex justify-center items-center h-64">
+              {filters.search || filters.category !== 'all' || filters.stockStatus !== 'all' || filters.vehicleType !== 'all' ? (
+                <span className="text-sm font-normal text-slate-500 ml-2">
+                  (Filtered: {processedItems.length} of {items.length} items)
+                </span>
+              ) : null}
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : processedItems.length === 0 ? (
+            <EnhancedEmptyState 
+              filters={filters}
+              onClearFilters={handleClearFilters}
+              onAddItem={handleOpenAddDialog}
+            />
+          ) : (
+            <DataTableWrapper
+              title="Inventory Items"
+              columns={enhancedColumns}
+              data={processedItems.map(i => ({...i, id: i.item_id}))}
+              onAddNew={handleOpenAddDialog}
+              onEdit={handleOpenEditDialog}
+              onDelete={handleOpenDeleteDialog}
+            />
+          )}
         </section>
 
         {/* Enhanced Add/Edit Item Dialog */}
@@ -1494,7 +1403,7 @@ export default function EnhancedInventoryPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="car">Car</SelectItem>
-                    <SelectItem value="motor">Motor</SelectItem>
+                    <SelectItem value="motor">Motorcycle</SelectItem>
                     <SelectItem value="truck">Truck</SelectItem>
                   </SelectContent>
                 </Select>
