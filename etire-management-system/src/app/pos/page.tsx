@@ -38,11 +38,21 @@ import {
   Filter,
   RefreshCw,
   Clock,
-  Receipt
+  Receipt,
+  User,
+  CheckCircle,
+  ArrowLeft
 } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import type { InventoryItem } from '../inventory/page';
-
 
 // ============================================
 // INTERFACES & TYPES
@@ -50,6 +60,8 @@ import type { InventoryItem } from '../inventory/page';
 interface Customer {
     customer_id: string;
     name: string;
+    phone?: string;
+    email?: string;
 }
 
 interface CartItem extends InventoryItem {
@@ -72,11 +84,12 @@ export interface Sale {
 
 const ANONYMOUS_CUSTOMER_ID = "anonymous_customer";
 
-// Design system from inventory page
+// Design system from dashboard
 const buttonStyles = {
-  primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl",
-  secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95",
-  glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg"
+  primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins",
+  secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 font-poppins",
+  glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins",
+  back: "flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-slate-300 hover:border-slate-400 font-poppins"
 };
 
 const microAnimations = {
@@ -85,6 +98,7 @@ const microAnimations = {
   fadeIn: "animate-in fade-in duration-500",
   iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
 };
+
 // ============================================
 // DATATABLE WRAPPER COMPONENT
 // ============================================
@@ -269,15 +283,177 @@ function DataTableWrapper({
 }
 
 // ============================================
+// CUSTOMER SEARCH COMPONENT
+// ============================================
+const CustomerSearch = ({ 
+  customers, 
+  selectedCustomerId, 
+  onCustomerSelect 
+}: { 
+  customers: Customer[]; 
+  selectedCustomerId: string; 
+  onCustomerSelect: (customerId: string) => void;
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+
+  const filteredCustomers = useMemo(() => {
+    return customers.filter(customer =>
+      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [customers, searchTerm]);
+
+  const selectedCustomer = customers.find(c => c.customer_id === selectedCustomerId);
+
+  return (
+    <div className="relative">
+      <Button
+        variant="outline"
+        className="w-full justify-start border-slate-300 hover:border-indigo-400 transition-all duration-300 bg-white/80 font-poppins"
+        onClick={() => setIsOpen(true)}
+      >
+        <User className="h-4 w-4 mr-2" />
+        {selectedCustomerId === ANONYMOUS_CUSTOMER_ID ? 'Walk-in Customer' : selectedCustomer?.name || 'Select Customer'}
+      </Button>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="sm:max-w-md bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
+              Select Customer
+            </DialogTitle>
+            <DialogDescription className="text-slate-600 font-poppins">
+              Search and select a customer for this sale
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+              <Input
+                placeholder="Search customers by name, phone, or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
+              />
+            </div>
+
+            <div className="max-h-60 overflow-y-auto space-y-2">
+              <Button
+                variant={selectedCustomerId === ANONYMOUS_CUSTOMER_ID ? "default" : "outline"}
+                className="w-full justify-start border-slate-300 hover:border-indigo-400 transition-all duration-300 bg-white/80 font-poppins"
+                onClick={() => {
+                  onCustomerSelect(ANONYMOUS_CUSTOMER_ID);
+                  setIsOpen(false);
+                  setSearchTerm('');
+                }}
+              >
+                <User className="h-4 w-4 mr-2" />
+                Walk-in Customer
+              </Button>
+
+              {filteredCustomers.map(customer => (
+                <Button
+                  key={customer.customer_id}
+                  variant={selectedCustomerId === customer.customer_id ? "default" : "outline"}
+                  className="w-full justify-start border-slate-300 hover:border-indigo-400 transition-all duration-300 bg-white/80 font-poppins"
+                  onClick={() => {
+                    onCustomerSelect(customer.customer_id);
+                    setIsOpen(false);
+                    setSearchTerm('');
+                  }}
+                >
+                  <div className="text-left">
+                    <div className="font-medium text-slate-800">{customer.name}</div>
+                    {(customer.phone || customer.email) && (
+                      <div className="text-xs text-slate-500 mt-1">
+                        {customer.phone && `📞 ${customer.phone}`}
+                        {customer.phone && customer.email && ' • '}
+                        {customer.email && `✉️ ${customer.email}`}
+                      </div>
+                    )}
+                  </div>
+                </Button>
+              ))}
+
+              {filteredCustomers.length === 0 && searchTerm && (
+                <div className="text-center py-4 text-slate-500">
+                  No customers found matching "{searchTerm}"
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              onClick={() => setIsOpen(false)}
+              className={buttonStyles.back}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+// ============================================
+// SUCCESS ANIMATION COMPONENT
+// ============================================
+const SuccessAnimation = ({ isVisible }: { isVisible: boolean }) => {
+  if (!isVisible) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300">
+        <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500">
+          <CheckCircle className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
+        </div>
+        
+        <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins">
+          Sale Completed!
+        </h3>
+        
+        <p className="text-slate-600 mb-6 font-poppins">
+          The transaction has been processed successfully. Receipt is ready for download.
+        </p>
+        
+        <div className="flex gap-3 justify-center">
+          <Button className={buttonStyles.primary}>
+            <Receipt className="h-4 w-4 mr-2" />
+            Download Receipt
+          </Button>
+          <Button className={buttonStyles.back}>
+            <ShoppingCart className="h-4 w-4 mr-2" />
+            New Sale
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// PRICE FORMATTING UTILITY
+// ============================================
+const formatPrice = (price: number): string => {
+  return new Intl.NumberFormat('en-PH', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(price);
+};
+
+// ============================================
 // MAIN POS PAGE COMPONENT
 // ============================================
 export default function POSPage() {
     const { toast } = useToast();
     const { user: authUser } = useAuth();
-        useEffect(() => {
-  console.log("🧩 Auth user in POS:", authUser);
-}, [authUser]);
-
+    
     // State for POS
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
@@ -292,6 +468,9 @@ export default function POSPage() {
     // State for Sales History
     const [sales, setSales] = useState<Sale[]>([]);
     const [showSalesHistory, setShowSalesHistory] = useState(false);
+    
+    // State for Success Animation
+    const [showSuccess, setShowSuccess] = useState(false);
     
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -327,7 +506,7 @@ export default function POSPage() {
         try {
             const [inventoryRes, customersRes, salesRes] = await Promise.all([
                 supabase.from('inventory_item').select('*').gt('stock_quantity', 0),
-                supabase.from('customer').select('customer_id, name'),
+                supabase.from('customer').select('customer_id, name, phone, email'),
                 supabase
                     .from('sale')
                     .select(`
@@ -359,6 +538,7 @@ export default function POSPage() {
     useEffect(() => {
         fetchInitialData();
     }, [fetchInitialData]);
+
     // Filter inventory based on selections
     const filteredInventory = useMemo(() => {
         return inventory.filter(item => {
@@ -413,62 +593,56 @@ export default function POSPage() {
     const subtotal = cart.reduce((acc, item) => acc + item.sale_price * item.quantity, 0);
     const total = subtotal;
 
-  // 🧾 NEW handleProcessSale (replaces handleCheckout)
-const handleProcessSale = async () => {
-  if (cart.length === 0) {
-    toast({ 
-      title: "Empty Cart", 
-      description: "Please add items before processing a sale.", 
-      variant: "destructive" 
-    });
-    return;
-  }
+    const handleProcessSale = async () => {
+      if (cart.length === 0) {
+        toast({ 
+          title: "Empty Cart", 
+          description: "Please add items before processing a sale.", 
+          variant: "destructive" 
+        });
+        return;
+      }
 
-  setIsSubmitting(true);
+      setIsSubmitting(true);
 
-  try {
-    const response = await fetch("/api/sales", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        customerId: selectedCustomerId === ANONYMOUS_CUSTOMER_ID ? null : selectedCustomerId,
-        cartItems: cart,
-        paymentMethod: "cash",
-        userId: authUser?.user_id,
-        branchId: "main_branch",
-      }),
-    });
+      try {
+        const response = await fetch("/api/sales", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customerId: selectedCustomerId === ANONYMOUS_CUSTOMER_ID ? null : selectedCustomerId,
+            cartItems: cart,
+            paymentMethod: "cash",
+            userId: authUser?.user_id,
+            branchId: "main_branch",
+          }),
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (!response.ok) throw new Error(data.error || "Failed to process sale");
+        if (!response.ok) throw new Error(data.error || "Failed to process sale");
 
-    toast({
-      title: "Sale Complete ✅",
-      description: "Receipt is ready for download.",
-    });
+        // Show success animation
+        setShowSuccess(true);
+        
+        // Clear cart and refresh after delay
+        setTimeout(() => {
+          setCart([]);
+          setSelectedCustomerId(ANONYMOUS_CUSTOMER_ID);
+          setShowSuccess(false);
+          fetchInitialData();
+        }, 3000);
 
-    // 🧾 Automatically open receipt PDF if available
-    if (data.receipt?.pdfUrl) {
-      window.open(data.receipt.pdfUrl, "_blank");
-    }
-
-    // Clear cart and refresh
-    setCart([]);
-    setSelectedCustomerId(ANONYMOUS_CUSTOMER_ID);
-    fetchInitialData();
-  } catch (err: any) {
-    toast({
-      title: "Checkout Failed ❌",
-      description: err.message,
-      variant: "destructive",
-    });
-  } finally {
-    setIsSubmitting(false);
-  }
-};
-
-
+      } catch (err: any) {
+        toast({
+          title: "Checkout Failed ❌",
+          description: err.message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
 
     const clearFilters = () => {
         setSelectedVehicleType('all');
@@ -545,7 +719,7 @@ const handleProcessSale = async () => {
         sortable: true,
         render: (value: any) => (
           <span className="font-semibold text-green-600">
-            ₱{(Number(value) || 0).toFixed(2)}
+            ₱{formatPrice(Number(value) || 0)}
           </span>
         )
       },
@@ -602,7 +776,7 @@ const handleProcessSale = async () => {
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
-      {/* Background Sections */}
+      {/* Background Sections - MATCHING DASHBOARD SPACING */}
       <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
         <div 
           className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
@@ -612,84 +786,85 @@ const handleProcessSale = async () => {
             backgroundPosition: "center 30%"
           }}
         ></div>
-        <div className="absolute top-0 left-0 w-32 h-32 bg-purple-300/20 rounded-br-full"></div>
+        
+        <div className="absolute top-0 left-0 w-32 h-32 bg-green-300/20 rounded-br-full"></div>
         <div className="absolute top-0 right-0 w-32 h-32 bg-teal-300/20 rounded-bl-full"></div>
+        <div className="absolute bottom-10 left-20 w-16 h-16 bg-white/20 rounded-2xl rotate-45"></div>
+        <div className="absolute bottom-16 right-24 w-12 h-12 bg-white/15 rounded-full"></div>
       </div>
 
-      <div className="absolute top-64 left-0 w-full h-full bg-indigo-50/10">
-        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-indigo-100/15 to-indigo-50/10"></div>
+      <div className="absolute top-64 left-0 w-full h-full bg-blue-50/10">
+        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-blue-100/15 to-blue-50/10"></div>
       </div>
 
       <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-        {/* Header Section */}
-        <div className={`mb-8 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
-          <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-6 flex items-center justify-between shadow-xl relative overflow-hidden">
+        
+        {/* Header Section - MATCHING DASHBOARD STYLING */}
+        <div className={`mb-12 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+          <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
             
             <div className="relative z-10 flex-1">
-              <h1 className="text-3xl font-bold text-white mb-2 drop-shadow-2xl font-poppins tracking-tight">
+              <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
                 Point of Sale (POS)
               </h1>
               <div className="flex items-center gap-6 text-white/90">
-                <p className="flex items-center gap-3 drop-shadow-md text-lg font-medium">
-                  <ShoppingCart className="h-5 w-5 opacity-90" />
+                <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium font-poppins">
+                  <ShoppingCart className="h-6 w-6 opacity-90" />
                   Quick and easy sales transactions
                 </p>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 text-lg">
                   {lastUpdated && (
-                    <div className="flex items-center gap-2 text-white/90 bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm text-sm">
-                      <Clock className="w-4 h-4" />
+                    <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
+                      <Clock className="w-5 h-5" />
                       Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                     </div>
                   )}
-                  <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-3 py-1 rounded-full backdrop-blur-sm text-sm">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse-glow"></div>
                     Live data
                   </div>
                 </div>
               </div>
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <Button 
                 onClick={() => setShowSalesHistory(!showSalesHistory)}
-                className={buttonStyles.glass + " active:scale-95 text-sm"}
+                className={buttonStyles.glass + " active:scale-95 font-poppins"}
               >
-                <Receipt className="h-4 w-4 mr-2" />
+                <Receipt className="h-5 w-5 mr-2" />
                 {showSalesHistory ? 'Show POS' : 'Sales History'}
               </Button>
               <Button 
                 onClick={fetchInitialData}
                 disabled={isLoading}
-                className={buttonStyles.glass + " active:scale-95 text-sm"}
+                className={buttonStyles.glass + " active:scale-95 font-poppins"}
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-5 w-5 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
             </div>
           </div>
         </div>
 
+        {/* Success Animation */}
+        <SuccessAnimation isVisible={showSuccess} />
+
         {/* Toggle between POS and Sales History */}
         {!showSalesHistory ? (
           // POS Interface
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Product Selection - Left Side */}
             <div className="lg:col-span-2">
-              <Card className="bg-white border-slate-200 shadow-lg transition-all duration-300 hover:shadow-xl">
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Available Products</span>
-                    <div className="flex items-center gap-2">
-                      <Filter className="h-4 w-4" />
-                      <span className="text-sm font-normal">Quick Filters</span>
-                    </div>
-                  </CardTitle>
+              <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
+                <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-purple-50/50 border-b border-slate-200/50">
+                  <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Available Products</CardTitle>
                   
                   <div className="space-y-4 mt-4">
                     {/* Vehicle Type Selection */}
                     <div>
-                      <Label className="text-slate-700 text-sm font-medium mb-3 block">Vehicle Type</Label>
+                      <Label className="text-slate-700 text-sm font-medium mb-3 block font-poppins">Vehicle Type</Label>
                       <div className="grid grid-cols-4 gap-2 w-full">
                         {vehicleTypes.map((vehicle) => {
                           const Icon = vehicle.icon;
@@ -698,7 +873,7 @@ const handleProcessSale = async () => {
                             <Button
                               key={vehicle.value}
                               variant={isSelected ? "default" : "outline"}
-                              className={`flex items-center justify-center gap-2 transition-all duration-300 w-full ${
+                              className={`flex items-center justify-center gap-2 transition-all duration-300 w-full font-poppins ${
                                 isSelected 
                                   ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transform scale-105' 
                                   : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-300 hover:border-indigo-400 hover:scale-105'
@@ -715,7 +890,7 @@ const handleProcessSale = async () => {
 
                     {/* Category Selection */}
                     <div>
-                      <Label className="text-slate-700 text-sm font-medium mb-3 block">Category</Label>
+                      <Label className="text-slate-700 text-sm font-medium mb-3 block font-poppins">Category</Label>
                       <div className="grid grid-cols-4 gap-2 w-full">
                         {categories.map((category) => {
                           const isSelected = selectedCategory === category.value;
@@ -723,7 +898,7 @@ const handleProcessSale = async () => {
                             <Button
                               key={category.value}
                               variant={isSelected ? "secondary" : "outline"}
-                              className={`transition-all duration-300 w-full ${
+                              className={`transition-all duration-300 w-full font-poppins ${
                                 isSelected 
                                   ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transform scale-105' 
                                   : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-300 hover:border-indigo-400 hover:scale-105'
@@ -742,7 +917,7 @@ const handleProcessSale = async () => {
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                       <Input 
                         placeholder="Search products by name or category..." 
-                        className="pl-10 border-slate-300 focus:border-indigo-400 transition-all duration-300"
+                        className="pl-10 border-slate-300 focus:border-indigo-400 transition-all duration-300 font-poppins"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                       />
@@ -760,17 +935,17 @@ const handleProcessSale = async () => {
                   {/* Active Filters Display */}
                   <div className="flex flex-wrap gap-2 mt-3">
                     {selectedVehicleType !== 'all' && (
-                      <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                      <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 font-poppins">
                         Vehicle: {vehicleTypes.find(v => v.value === selectedVehicleType)?.label}
                       </Badge>
                     )}
                     {selectedCategory !== 'all' && (
-                      <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">
+                      <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200 font-poppins">
                         Category: {categories.find(c => c.value === selectedCategory)?.label}
                       </Badge>
                     )}
                     {searchTerm && (
-                      <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200">
+                      <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200 font-poppins">
                         Search: {searchTerm}
                       </Badge>
                     )}
@@ -787,7 +962,7 @@ const handleProcessSale = async () => {
                       {filteredInventory.map(item => (
                         <Card 
                           key={item.item_id} 
-                          className={`border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group ${microAnimations.cardHover}`}
+                          className={`border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group ${microAnimations.cardHover} font-poppins`}
                           onClick={() => addToCart(item)}
                         >
                           <CardContent className="p-4 flex flex-col gap-3">
@@ -815,7 +990,7 @@ const handleProcessSale = async () => {
                             </div>
                             <div className="flex justify-between items-center">
                               <div>
-                                <p className="text-lg font-bold text-green-600">₱{item.sale_price.toFixed(2)}</p>
+                                <p className="text-lg font-bold text-green-600">₱{formatPrice(item.sale_price)}</p>
                                 <p className={`text-xs ${
                                   item.stock_quantity === 0 ? 'text-red-500' :
                                   item.stock_quantity <= 2 ? 'text-red-500' :
@@ -826,7 +1001,7 @@ const handleProcessSale = async () => {
                               </div>
                               <Button 
                                 size="sm" 
-                                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300"
+                                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 font-poppins"
                                 disabled={item.stock_quantity <= 0}
                               >
                                 <Plus className="mr-1 h-4 w-4" /> 
@@ -839,11 +1014,11 @@ const handleProcessSale = async () => {
                       {filteredInventory.length === 0 && (
                         <div className="col-span-full text-center py-12">
                           <Package className="h-16 w-16 text-slate-300 mx-auto mb-4" />
-                          <p className="text-slate-500 text-lg">No products found</p>
-                          <p className="text-slate-400 text-sm">Try adjusting your filters or search term</p>
+                          <p className="text-slate-500 text-lg font-poppins">No products found</p>
+                          <p className="text-slate-400 text-sm font-poppins">Try adjusting your filters or search term</p>
                           <Button 
                             variant="outline" 
-                            className="mt-4"
+                            className="mt-4 font-poppins"
                             onClick={clearFilters}
                           >
                             Clear All Filters
@@ -858,51 +1033,45 @@ const handleProcessSale = async () => {
 
             {/* Cart & Checkout - Right Side */}
             <div className="lg:col-span-1">
-              <Card className="bg-white border-slate-200 shadow-lg transition-all duration-300 hover:shadow-xl sticky top-8">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <ShoppingCart className="mr-2 h-5 w-5" /> 
+              <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0 sticky top-8">
+                <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-green-50/50 border-b border-slate-200/50">
+                  <CardTitle className="flex items-center text-2xl font-bold text-slate-900 font-poppins">
+                    <ShoppingCart className="mr-3 h-6 w-6" /> 
                     Shopping Cart
                     {cart.length > 0 && (
-                      <Badge variant="outline" className="ml-2 bg-indigo-100 text-indigo-700 border-indigo-200">
+                      <Badge variant="outline" className="ml-3 bg-indigo-100 text-indigo-700 border-indigo-200 font-poppins">
                         {cart.length} items
                       </Badge>
                     )}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="p-6 space-y-6">
                   {/* Customer Selection */}
-                  <div className="space-y-2">
-                    <Label htmlFor="customer-select" className="text-slate-700 font-medium">Customer</Label>
-                    <Select onValueChange={setSelectedCustomerId} value={selectedCustomerId}>
-                      <SelectTrigger id="customer-select" className="border-slate-300 focus:border-indigo-400">
-                        <SelectValue placeholder="Select a customer" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={ANONYMOUS_CUSTOMER_ID}>Walk-in Customer</SelectItem>
-                        {customers.map(c => (
-                          <SelectItem key={c.customer_id} value={c.customer_id}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-3">
+                    <Label htmlFor="customer-select" className="text-slate-700 font-medium font-poppins">Customer</Label>
+                    <CustomerSearch 
+                      customers={customers}
+                      selectedCustomerId={selectedCustomerId}
+                      onCustomerSelect={setSelectedCustomerId}
+                    />
                   </div>
 
                   {/* Cart Items */}
-                  <div className="space-y-3">
-                    <Label className="text-slate-700 font-medium">Order Items</Label>
+                  <div className="space-y-4">
+                    <Label className="text-slate-700 font-medium font-poppins">Order Items</Label>
                     <div className="max-h-64 overflow-y-auto space-y-3 pr-2">
                       {cart.length === 0 ? (
                         <div className="text-center py-8">
                           <ShoppingCart className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                          <p className="text-slate-500">Your cart is empty</p>
-                          <p className="text-slate-400 text-sm">Add products to get started</p>
+                          <p className="text-slate-500 font-poppins">Your cart is empty</p>
+                          <p className="text-slate-400 text-sm font-poppins">Add products to get started</p>
                         </div>
                       ) : (
                         cart.map(item => (
                           <div key={item.item_id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-slate-800 truncate">{item.name}</p>
-                              <p className="text-xs text-slate-500">₱{item.sale_price.toFixed(2)} each</p>
+                              <p className="text-sm font-medium text-slate-800 truncate font-poppins">{item.name}</p>
+                              <p className="text-xs text-slate-500 font-poppins">₱{formatPrice(item.sale_price)} each</p>
                             </div>
                             <div className="flex items-center gap-2">
                               <Button
@@ -913,7 +1082,7 @@ const handleProcessSale = async () => {
                               >
                                 -
                               </Button>
-                              <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
+                              <span className="text-sm font-medium w-8 text-center font-poppins">{item.quantity}</span>
                               <Button
                                 variant="outline"
                                 size="icon"
@@ -940,21 +1109,21 @@ const handleProcessSale = async () => {
 
                   {/* Order Summary */}
                   {cart.length > 0 && (
-                    <div className="border-t pt-4 space-y-2">
-                      <div className="flex justify-between text-sm">
+                    <div className="border-t pt-4 space-y-3">
+                      <div className="flex justify-between text-sm font-poppins">
                         <span className="text-slate-600">Subtotal</span>
-                        <span className="font-medium">₱{subtotal.toFixed(2)}</span>
+                        <span className="font-medium">₱{formatPrice(subtotal)}</span>
                       </div>
-                      <div className="flex justify-between font-bold text-lg">
+                      <div className="flex justify-between font-bold text-lg font-poppins">
                         <span className="text-slate-800">Total Amount</span>
-                        <span className="text-green-600">₱{total.toFixed(2)}</span>
+                        <span className="text-green-600">₱{formatPrice(total)}</span>
                       </div>
                     </div>
                   )}
                 </CardContent>
-                <CardFooter className="flex flex-col gap-3">
+                <CardFooter className="flex flex-col gap-3 p-6 bg-slate-50/50 border-t border-slate-200/50">
                   <Button 
-                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300" 
+                    className={`w-full ${buttonStyles.primary}`}
                     onClick={handleProcessSale} 
                     disabled={cart.length === 0 || isSubmitting}
                   >
@@ -967,7 +1136,7 @@ const handleProcessSale = async () => {
                   </Button>
                   <Button 
                     variant="outline" 
-                    className="w-full border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-600" 
+                    className="w-full border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-600 font-poppins" 
                     onClick={() => setCart([])} 
                     disabled={cart.length === 0}
                   >
@@ -982,60 +1151,60 @@ const handleProcessSale = async () => {
           // Sales History View
           <div className="space-y-6">
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="border-l-4 border-l-green-500">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="border-l-4 border-l-green-500 bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-xl rounded-2xl overflow-hidden border-0">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2">
+                  <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2 font-poppins">
                     <DollarSign className="h-4 w-4" />
                     Today's Revenue
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-green-600">₱{todayRevenue.toFixed(2)}</div>
-                  <p className="text-xs text-slate-500 mt-1">{todaySales.length} transactions today</p>
+                  <div className="text-2xl font-bold text-green-600 font-poppins">₱{formatPrice(todayRevenue)}</div>
+                  <p className="text-xs text-slate-500 mt-1 font-poppins">{todaySales.length} transactions today</p>
                 </CardContent>
               </Card>
 
-              <Card className="border-l-4 border-l-indigo-500">
+              <Card className="border-l-4 border-l-indigo-500 bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-xl rounded-2xl overflow-hidden border-0">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2">
+                  <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2 font-poppins">
                     <TrendingUp className="h-4 w-4" />
                     Total Sales
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-indigo-600">₱{totalSalesAmount.toFixed(2)}</div>
-                  <p className="text-xs text-slate-500 mt-1">{sales.length} total transactions</p>
+                  <div className="text-2xl font-bold text-indigo-600 font-poppins">₱{formatPrice(totalSalesAmount)}</div>
+                  <p className="text-xs text-slate-500 mt-1 font-poppins">{sales.length} total transactions</p>
                 </CardContent>
               </Card>
 
-              <Card className="border-l-4 border-l-purple-500">
+              <Card className="border-l-4 border-l-purple-500 bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-xl rounded-2xl overflow-hidden border-0">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2">
+                  <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2 font-poppins">
                     <ShoppingCart className="h-4 w-4" />
                     Average Order
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-purple-600">
-                    ₱{sales.length > 0 ? (totalSalesAmount / sales.length).toFixed(2) : '0.00'}
+                  <div className="text-2xl font-bold text-purple-600 font-poppins">
+                    ₱{sales.length > 0 ? formatPrice(totalSalesAmount / sales.length) : '0.00'}
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">Per transaction</p>
+                  <p className="text-xs text-slate-500 mt-1 font-poppins">Per transaction</p>
                 </CardContent>
               </Card>
             </div>
 
             {/* Sales Table */}
-            <Card>
-              <CardHeader>
+            <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
+              <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-blue-50/50 border-b border-slate-200/50">
                 <div className="flex items-center justify-between">
-                  <CardTitle>Sales History</CardTitle>
-                  <Badge variant="outline" className="bg-indigo-50 text-indigo-700">
+                  <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Sales History</CardTitle>
+                  <Badge variant="outline" className="bg-indigo-50 text-indigo-700 font-poppins">
                     {sales.length} total sales
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-6">
                 <DataTableWrapper
                   data={sales}
                   columns={salesColumns}
@@ -1062,13 +1231,21 @@ const handleProcessSale = async () => {
           transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
+        @keyframes pulse-glow {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+          }
+          50% {
+            opacity: 0.8;
+            transform: scale(0.95);
+            box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+          }
         }
         
-        .animate-pulse {
-          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        .animate-pulse-glow {
+          animation: pulse-glow 2s infinite ease-in-out;
         }
       `}</style>
     </div>
