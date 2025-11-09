@@ -6,7 +6,7 @@ import { DataTableWrapper } from '@/components/DataTableWrapper';
 import { 
   Archive, Coins, AlertTriangle, PlusCircle, PackageSearch, Loader2, Filter,
   TrendingUp, Clock, RefreshCw, Plus, Search, X, Download, SlidersHorizontal,
-  ArrowUpDown, Eye
+  ArrowUpDown, Eye, Save
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -466,7 +466,7 @@ const StockAlertsBar = ({
   );
 };
 
-// Stock Adjustment Form Component
+// Stock Adjustment Form Component - FIXED: White background and consistent UI
 const StockAdjustmentForm = ({ 
   item, 
   onSave, 
@@ -541,7 +541,7 @@ const StockAdjustmentForm = ({
             value={adjustment}
             onChange={(e) => setAdjustment(e.target.value)}
             placeholder="0"
-            className="text-center border-slate-300 focus:border-indigo-400"
+            className="text-center border-slate-300 focus:border-indigo-400 bg-white"
           />
           <Button
             type="button"
@@ -572,7 +572,7 @@ const StockAdjustmentForm = ({
           Reason for Adjustment
         </Label>
         <Select value={reason} onValueChange={setReason}>
-          <SelectTrigger className="border-slate-300 focus:border-indigo-400">
+          <SelectTrigger className="border-slate-300 focus:border-indigo-400 bg-white">
             <SelectValue placeholder="Select reason..." />
           </SelectTrigger>
           <SelectContent>
@@ -596,7 +596,7 @@ const StockAdjustmentForm = ({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Enter specific reason..."
-            className="border-slate-300 focus:border-indigo-400"
+            className="border-slate-300 focus:border-indigo-400 bg-white"
           />
         </div>
       )}
@@ -606,15 +606,17 @@ const StockAdjustmentForm = ({
           variant="outline"
           onClick={onCancel}
           disabled={isLoading}
+          className="flex items-center gap-2"
         >
+          <X className="h-4 w-4" />
           Cancel
         </Button>
         <Button
           onClick={handleSubmit}
           disabled={isLoading || !adjustment || !reason}
-          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 flex items-center gap-2"
         >
-          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Apply Adjustment
         </Button>
       </div>
@@ -622,7 +624,7 @@ const StockAdjustmentForm = ({
   );
 };
 
-// Enhanced Critical Stock Details Form with Updated Design
+// Enhanced Critical Stock Details Form with Updated Design - FIXED: White background and icons
 const CriticalStockDetails = ({ 
   items, 
   isOpen, 
@@ -641,7 +643,7 @@ const CriticalStockDetails = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-slate-50 to-indigo-50/30 border-0 shadow-2xl">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
             Stock Alert Details
@@ -707,7 +709,7 @@ const CriticalStockDetails = ({
                 Priority Level
               </Label>
               <Select value={priority} onValueChange={setPriority}>
-                <SelectTrigger className="border-slate-300 focus:border-indigo-400 bg-white/80">
+                <SelectTrigger className="border-slate-300 focus:border-indigo-400 bg-white">
                   <SelectValue placeholder="Select priority..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -727,7 +729,7 @@ const CriticalStockDetails = ({
                 value={actionPlan}
                 onChange={(e) => setActionPlan(e.target.value)}
                 placeholder="Describe the plan to address stock issues..."
-                className="min-h-[100px] border-slate-300 focus:border-indigo-400 bg-white/80"
+                className="min-h-[100px] border-slate-300 focus:border-indigo-400 bg-white"
               />
             </div>
 
@@ -740,14 +742,15 @@ const CriticalStockDetails = ({
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Any additional information..."
-                className="min-h-[80px] border-slate-300 focus:border-indigo-400 bg-white/80"
+                className="min-h-[80px] border-slate-300 focus:border-indigo-400 bg-white"
               />
             </div>
           </div>
         </div>
 
         <DialogFooter>
-          <Button onClick={onClose} variant="outline">
+          <Button onClick={onClose} variant="outline" className="flex items-center gap-2">
+            <X className="h-4 w-4" />
             Close
           </Button>
           <Button 
@@ -756,8 +759,9 @@ const CriticalStockDetails = ({
               alert('Action plan saved!');
               onClose();
             }}
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 flex items-center gap-2"
           >
+            <Save className="h-4 w-4" />
             Save Action Plan
           </Button>
         </DialogFooter>
@@ -783,9 +787,9 @@ const ViewMoreDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-slate-900">
+          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
             Complete Inventory List
           </DialogTitle>
           <DialogDescription className="text-slate-600">
@@ -793,8 +797,58 @@ const ViewMoreDialog = ({
           </DialogDescription>
         </DialogHeader>
 
+        <div className="mt-4">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse border border-slate-200">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Product Name</th>
+                  <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Category</th>
+                  <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Vehicle Type</th>
+                  <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Stock</th>
+                  <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Cost (₱)</th>
+                  <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Price (₱)</th>
+                  <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Margin %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => {
+                  const margin = calculateMargin(item);
+                  return (
+                    <tr key={item.item_id} className="hover:bg-slate-50">
+                      <td className="border border-slate-200 p-3">{item.name}</td>
+                      <td className="border border-slate-200 p-3 capitalize">{item.category}</td>
+                      <td className="border border-slate-200 p-3">
+                        <VehicleTypeBadge type={item.vehicle_type} />
+                      </td>
+                      <td className="border border-slate-200 p-3">
+                        <StockLevelIndicator quantity={item.stock_quantity} />
+                      </td>
+                      <td className="border border-slate-200 p-3">₱{item.cost_price.toFixed(2)}</td>
+                      <td className="border border-slate-200 p-3">₱{item.sale_price.toFixed(2)}</td>
+                      <td className="border border-slate-200 p-3">
+                        <Badge 
+                          variant={margin >= 30 ? "default" : "outline"}
+                          className={
+                            margin >= 30 ? 'bg-green-100 text-green-700 border-green-200' :
+                            margin >= 15 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                            'bg-red-100 text-red-700 border-red-200'
+                          }
+                        >
+                          {margin.toFixed(1)}%
+                        </Badge>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <DialogFooter>
-          <Button onClick={onClose} variant="outline">
+          <Button onClick={onClose} variant="outline" className="flex items-center gap-2">
+            <X className="h-4 w-4" />
             Close
           </Button>
         </DialogFooter>
@@ -839,7 +893,6 @@ export default function EnhancedInventoryPage() {
   const [itemCostPrice, setItemCostPrice] = useState('');
   const [itemSalePrice, setItemSalePrice] = useState('');
   const [itemStockQuantity, setItemStockQuantity] = useState('0');
-  const [itemReorderLevel, setItemReorderLevel] = useState('5');
 
   useEffect(() => {
     setMounted(true);
@@ -951,7 +1004,7 @@ export default function EnhancedInventoryPage() {
     return filtered;
   }, [items, filters]);
 
-  // Enhanced columns for DataTableWrapper
+  // Enhanced columns for DataTableWrapper with search functionality
   const enhancedColumns = [
     { 
       key: 'name', 
@@ -997,13 +1050,13 @@ export default function EnhancedInventoryPage() {
       key: 'cost_price', 
       header: 'Cost (₱)',
       sortable: true,
-      render: (value: any) => `₱${Number(value).toFixed(2)}`
+      render: (value: any) => `₱${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     },
     { 
       key: 'sale_price', 
       header: 'Price (₱)',
       sortable: true,
-      render: (value: any) => `₱${Number(value).toFixed(2)}`
+      render: (value: any) => `₱${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     },
     { 
       key: 'profit_margin', 
@@ -1040,7 +1093,6 @@ export default function EnhancedInventoryPage() {
     setItemCostPrice('');
     setItemSalePrice('');
     setItemStockQuantity('0');
-    setItemReorderLevel('5');
   };
 
   const populateForm = (product: InventoryItem) => {
@@ -1050,7 +1102,6 @@ export default function EnhancedInventoryPage() {
     setItemCostPrice(String(product.cost_price));
     setItemSalePrice(String(product.sale_price));
     setItemStockQuantity(String(product.stock_quantity));
-    setItemReorderLevel(String(product.reorder_level || 5));
   };
 
   const handleOpenAddDialog = () => {
@@ -1089,7 +1140,6 @@ export default function EnhancedInventoryPage() {
       cost_price: parseFloat(itemCostPrice),
       sale_price: parseFloat(itemSalePrice),
       stock_quantity: parseInt(itemStockQuantity, 10),
-      reorder_level: parseInt(itemReorderLevel, 10),
     };
 
     setIsLoading(true);
@@ -1353,7 +1403,7 @@ export default function EnhancedInventoryPage() {
           )}
         </section>
 
-        {/* Enhanced Add/Edit Item Dialog */}
+        {/* Enhanced Add/Edit Item Dialog - FIXED: White background and consistent UI */}
         <Dialog open={isAddItemDialogOpen || isEditItemDialogOpen} onOpenChange={(isOpen) => {
             if (isLoading) return;
             if (!isOpen) {
@@ -1362,7 +1412,7 @@ export default function EnhancedInventoryPage() {
               setEditingItem(null);
             }
         }}>
-          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-gradient-to-br from-slate-50 to-indigo-50/30 border-0 shadow-2xl">
+          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
                 {editingItem ? 'Edit Item' : 'Add New Item'}
@@ -1379,13 +1429,13 @@ export default function EnhancedInventoryPage() {
                   value={itemName} 
                   onChange={(e) => setItemName(e.target.value)} 
                   placeholder="Michelin Tire XZ" 
-                  className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                  className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="itemCategory" className="text-slate-700 font-medium">Category</Label>
                 <Select value={itemCategory} onValueChange={(v) => setItemCategory(v as InventoryItem['category'])}>
-                  <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80">
+                  <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white">
                     <SelectValue placeholder="Select category..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -1398,7 +1448,7 @@ export default function EnhancedInventoryPage() {
               <div className="space-y-2">
                 <Label htmlFor="itemVehicleType" className="text-slate-700 font-medium">Vehicle Type</Label>
                 <Select value={itemVehicleType} onValueChange={(v) => setItemVehicleType(v as InventoryItem['vehicle_type'])}>
-                  <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80">
+                  <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white">
                     <SelectValue placeholder="Select vehicle type..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -1416,18 +1466,7 @@ export default function EnhancedInventoryPage() {
                   value={itemStockQuantity} 
                   onChange={(e) => setItemStockQuantity(e.target.value)} 
                   placeholder="10" 
-                  className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="itemReorderLevel" className="text-slate-700 font-medium">Reorder Level</Label>
-                <Input 
-                  id="itemReorderLevel" 
-                  type="number" 
-                  value={itemReorderLevel} 
-                  onChange={(e) => setItemReorderLevel(e.target.value)} 
-                  placeholder="5" 
-                  className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                  className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white"
                 />
               </div>
               <div className="space-y-2">
@@ -1439,7 +1478,7 @@ export default function EnhancedInventoryPage() {
                   value={itemCostPrice} 
                   onChange={(e) => setItemCostPrice(e.target.value)} 
                   placeholder="5000.00" 
-                  className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                  className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white"
                 />
               </div>
               <div className="space-y-2">
@@ -1451,7 +1490,7 @@ export default function EnhancedInventoryPage() {
                   value={itemSalePrice} 
                   onChange={(e) => setItemSalePrice(e.target.value)} 
                   placeholder="7500.00" 
-                  className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white/80"
+                  className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white"
                 />
               </div>
             </div>
@@ -1463,6 +1502,7 @@ export default function EnhancedInventoryPage() {
                   disabled={isLoading}
                   className="flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95"
                 >
+                  <X className="h-4 w-4" />
                   Cancel
                 </Button>
               </DialogClose>
@@ -1470,18 +1510,18 @@ export default function EnhancedInventoryPage() {
                 type="submit" 
                 onClick={handleSubmit} 
                 disabled={isLoading}
-                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl active:scale-95"
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-2"
               >
-                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {editingItem ? 'Save Changes' : 'Save Item'}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* Stock Adjustment Dialog */}
+        {/* Stock Adjustment Dialog - FIXED: White background */}
         <Dialog open={isStockAdjustmentOpen} onOpenChange={setIsStockAdjustmentOpen}>
-          <DialogContent className="sm:max-md bg-gradient-to-br from-slate-50 to-indigo-50/30 border-0 shadow-2xl">
+          <DialogContent className="sm:max-md bg-white border border-slate-200 shadow-2xl">
             <DialogHeader>
               <DialogTitle className="text-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
                 Adjust Stock - {adjustingItem?.name}
@@ -1500,22 +1540,23 @@ export default function EnhancedInventoryPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Critical Stock Details Dialog */}
+        {/* Critical Stock Details Dialog - FIXED: White background */}
         <CriticalStockDetails
           items={items}
           isOpen={isCriticalDetailsOpen}
           onClose={() => setIsCriticalDetailsOpen(false)}
         />
 
-        {/* View More Dialog */}
+        {/* View More Dialog - FIXED: White background */}
         <ViewMoreDialog
           items={processedItems}
           isOpen={isViewMoreOpen}
           onClose={() => setIsViewMoreOpen(false)}
         />
 
+        {/* Delete Confirmation Dialog - FIXED: White background */}
         <AlertDialog open={isDeleteConfirmationOpen} onOpenChange={setIsDeleteConfirmationOpen}>
-          <AlertDialogContent className="bg-gradient-to-br from-slate-50 to-indigo-50/30 border-0 shadow-2xl">
+          <AlertDialogContent className="bg-white border border-slate-200 shadow-2xl">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-slate-900">Confirm Deletion</AlertDialogTitle>
               <AlertDialogDescription className="text-slate-600">
@@ -1524,14 +1565,16 @@ export default function EnhancedInventoryPage() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel className="flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95">
+                <X className="h-4 w-4" />
                 Cancel
               </AlertDialogCancel>
               <AlertDialogAction 
                 onClick={handleDeleteItem} 
                 disabled={isLoading} 
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-red-600 active:scale-95"
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-red-600 active:scale-95 flex items-center gap-2"
               >
-                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Delete'}
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
+                Delete
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
