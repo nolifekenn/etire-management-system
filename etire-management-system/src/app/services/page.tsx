@@ -87,24 +87,47 @@ interface VehicleType {
     name: string;
 }
 
+// ✅ UPDATED: ServiceJob interface with calculated fields
 interface ServiceJob {
     job_id: string;
-    user_id: string;        // Employee who performed the service
-    customer_id?: string;   // ✅ Add this - Customer who owns the vehicle
+    user_id: string;
+    customer_id?: string;
     job_description: string;
     job_date: string;
     status: 'pending' | 'in-progress' | 'completed' | 'cancelled';
     service_fee: number;
     remarks: string | null;
     vehicle_type_id: string | null;
-    user?: { name: string } | null;  // Employee name
-    vehicle_type?: VehicleType | null;
+    
+    // ✅ JOINED DATA
+    user?: { 
+        user_id: string;
+        name: string;
+    } | null;
+    customer?: {
+        customer_id: string;
+        name: string;
+        phone?: string;
+    } | null;
+    vehicle_type?: {
+        vehicle_type_id: string;
+        name: string;
+    } | null;
+    
+    // ✅ CALCULATED FIELDS
+    days_ago?: number;        // Days since service
+    is_recent?: boolean;      // Within last 7 days
 }
 
-// ✅ FIXED: Use customer_id instead of user_id
+// ✅ UPDATED: Customer interface with service stats
 interface Customer {
-    customer_id: string;  // ✅ Changed from user_id
+    customer_id: string;
     name: string;
+    phone?: string;
+    email?: string;
+    // ✅ ADD: Calculated fields
+    service_count?: number;      // Total services
+    last_service_date?: string;  // Most recent service
 }
 
 const ANONYMOUS_CUSTOMER_ID = "anonymous_customer";
@@ -462,65 +485,63 @@ export default function EnhancedServiceManagementPage() {
         setMounted(true);
     }, []);
 
-    // ===== SUPABASE DIRECT API CALLS =====
-    const fetchJobs = useCallback(async () => {
-        if (!supabase) return;
-        setIsLoading(true);
-        
-        try {
-            const { data, error } = await supabase
-                .from('service_job')
-                .select('*, user:user_id(name), vehicle_type:vehicle_type_id(vehicle_type_id, name)')
-                .order('job_date', { ascending: false });
-            
-            if (error) {
-                setFetchError(error.message);
-                setServiceJobs([]);
-                toast({ title: 'Error', description: error.message, variant: 'destructive' });
-            } else {
-                setServiceJobs(data as any);
-                setFetchError(null);
-            }
-        } catch (error: any) {
-            console.error('Service jobs fetch error:', error);
-            setFetchError(error.message);
-            setServiceJobs([]);
-            toast({ title: 'Error', description: error.message, variant: 'destructive' });
-        }
-        
-        setIsLoading(false);
-        setLastUpdated(new Date());
-    }, [toast]);
+  // ✅ OPTIMIZED: Replace fetchJobs (around line 473)
+  const fetchJobs = useCallback(async () => {
+      if (!supabase) return;
+      setIsLoading(true);
+      
+      try {
+          // 🔥 Single optimized RPC call with all joins and calculations!
+          const { data, error } = await supabase
+              .rpc('get_service_jobs_complete');
+          
+          if (error) {
+              setFetchError(error.message);
+              setServiceJobs([]);
+              toast({ title: 'Error', description: error.message, variant: 'destructive' });
+          } else {
+              setServiceJobs((data || []) as ServiceJob[]);
+              setFetchError(null);
+          }
+      } catch (error: any) {
+          console.error('Service jobs fetch error:', error);
+          setFetchError(error.message);
+          setServiceJobs([]);
+          toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      }
+      
+      setIsLoading(false);
+      setLastUpdated(new Date());
+  }, [toast]);
 
-    // ✅ FIXED: Fetch from customer table instead of user table
-    const fetchCustomers = useCallback(async () => {
-        if (!supabase) return;
-        setIsDataLoading(true);
-        
-        try {
-            const { data, error } = await supabase
-                .from('customer')  // ✅ Changed from 'user' to 'customer'
-                .select('customer_id, name, phone')  // ✅ Changed user_id to customer_id
-                .order('name');
-            
-            if (error) throw error;
-            
-            setCustomers([
-                { customer_id: ANONYMOUS_CUSTOMER_ID, name: 'Walk-in Customer' },  // ✅ Changed field name
-                ...(data || [])
-            ]);
-        } catch (error: any) {
-            console.error('Customer fetch error:', error);
-            setFetchError(`Failed to load customers: ${error.message}`);
-            toast({ 
-                title: 'Error', 
-                description: `Failed to load customers: ${error.message}`, 
-                variant: 'destructive'
-            });
-        }
-        
-        setIsDataLoading(false);
-    }, [toast]);
+  // ✅ OPTIMIZED: Replace fetchCustomers (around line 493)
+  const fetchCustomers = useCallback(async () => {
+      if (!supabase) return;
+      setIsDataLoading(true);
+      
+      try {
+          // 🔥 Optimized RPC call with service counts!
+          const { data, error } = await supabase
+              .rpc('get_customers_for_service');
+          
+          if (error) throw error;
+          
+          setCustomers([
+              { customer_id: ANONYMOUS_CUSTOMER_ID, name: 'Walk-in Customer' },
+              ...(data || [])
+          ]);
+      } catch (error: any) {
+          console.error('Customer fetch error:', error);
+          setFetchError(`Failed to load customers: ${error.message}`);
+          toast({ 
+              title: 'Error', 
+              description: `Failed to load customers: ${error.message}`, 
+              variant: 'destructive'
+          });
+      }
+      
+      setIsDataLoading(false);
+  }, [toast]);
 
     const fetchVehicleTypes = useCallback(async () => {
         if (!supabase) return;
