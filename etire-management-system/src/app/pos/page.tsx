@@ -41,7 +41,11 @@ import {
   Receipt,
   User,
   CheckCircle,
-  ArrowLeft
+  ArrowLeft,
+  Download,
+  Circle,
+  Wrench,
+  Settings
 } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import {
@@ -98,6 +102,35 @@ const microAnimations = {
   fadeIn: "animate-in fade-in duration-500",
   iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
 };
+
+// ============================================
+// CUSTOM TIRE ICON COMPONENT
+// ============================================
+const TireIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
+  <svg 
+    className={className} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2"
+  >
+    {/* Outer tire circle */}
+    <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2"/>
+    {/* Inner rim circle */}
+    <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5"/>
+    {/* Tire tread patterns */}
+    <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="1" strokeDasharray="2 2"/>
+    {/* Spoke lines */}
+    <line x1="12" y1="4" x2="12" y2="8" stroke="currentColor" strokeWidth="1"/>
+    <line x1="12" y1="16" x2="12" y2="20" stroke="currentColor" strokeWidth="1"/>
+    <line x1="4" y1="12" x2="8" y2="12" stroke="currentColor" strokeWidth="1"/>
+    <line x1="16" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="1"/>
+    <line x1="6" y1="6" x2="8.5" y2="8.5" stroke="currentColor" strokeWidth="1"/>
+    <line x1="15.5" y1="15.5" x2="18" y2="18" stroke="currentColor" strokeWidth="1"/>
+    <line x1="6" y1="18" x2="8.5" y2="15.5" stroke="currentColor" strokeWidth="1"/>
+    <line x1="15.5" y1="8.5" x2="18" y2="6" stroke="currentColor" strokeWidth="1"/>
+  </svg>
+);
 
 // ============================================
 // DATATABLE WRAPPER COMPONENT
@@ -402,9 +435,17 @@ const CustomerSearch = ({
 };
 
 // ============================================
-// SUCCESS ANIMATION COMPONENT
+// SUCCESS ANIMATION COMPONENT (MODIFIED)
 // ============================================
-const SuccessAnimation = ({ isVisible }: { isVisible: boolean }) => {
+const SuccessAnimation = ({ 
+  isVisible, 
+  saleId, 
+  onConfirm
+}: { 
+  isVisible: boolean;
+  saleId: string | null;
+  onConfirm: () => void;
+}) => {
   if (!isVisible) return null;
 
   return (
@@ -419,17 +460,16 @@ const SuccessAnimation = ({ isVisible }: { isVisible: boolean }) => {
         </h3>
         
         <p className="text-slate-600 mb-6 font-poppins">
-          The transaction has been processed successfully. Receipt is ready for download.
+          The transaction has been processed successfully.
         </p>
         
         <div className="flex gap-3 justify-center">
-          <Button className={buttonStyles.primary}>
-            <Receipt className="h-4 w-4 mr-2" />
-            Download Receipt
-          </Button>
-          <Button className={buttonStyles.back}>
-            <ShoppingCart className="h-4 w-4 mr-2" />
-            New Sale
+          <Button 
+            className={buttonStyles.primary}
+            onClick={onConfirm}
+          >
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Confirm
           </Button>
         </div>
       </div>
@@ -445,6 +485,22 @@ const formatPrice = (price: number): string => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(price);
+};
+
+// ============================================
+// CATEGORY ICON COMPONENT (MODIFIED WITH NEW TIRE ICON)
+// ============================================
+const CategoryIcon = ({ category, className = "h-4 w-4" }: { category: string; className?: string }) => {
+  switch (category.toLowerCase()) {
+    case 'tire':
+      return <TireIcon className={className} />;
+    case 'tool':
+      return <Wrench className={className} />;
+    case 'accessory':
+      return <Settings className={className} />;
+    default:
+      return <Package className={className} />;
+  }
 };
 
 // ============================================
@@ -471,6 +527,7 @@ export default function POSPage() {
     
     // State for Success Animation
     const [showSuccess, setShowSuccess] = useState(false);
+    const [lastSaleId, setLastSaleId] = useState<string | null>(null);
     
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -622,14 +679,16 @@ export default function POSPage() {
 
         if (!response.ok) throw new Error(data.error || "Failed to process sale");
 
+        // Store the sale ID for receipt download
+        setLastSaleId(data.sale_id);
+        
         // Show success animation
         setShowSuccess(true);
         
-        // Clear cart and refresh after delay
+        // Clear cart after delay
         setTimeout(() => {
           setCart([]);
           setSelectedCustomerId(ANONYMOUS_CUSTOMER_ID);
-          setShowSuccess(false);
           fetchInitialData();
         }, 3000);
 
@@ -644,6 +703,43 @@ export default function POSPage() {
       }
     };
 
+    const handleDownloadReceipt = async (saleId: string) => {
+      try {
+        const response = await fetch(`/api/receipts/${saleId}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to download receipt');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `receipt-${saleId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        toast({
+          title: "Receipt Downloaded",
+          description: "Receipt has been downloaded successfully.",
+        });
+      } catch (error: any) {
+        toast({
+          title: "Download Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    };
+
+    const handleConfirmSuccess = () => {
+      setShowSuccess(false);
+      setLastSaleId(null);
+    };
+
     const clearFilters = () => {
         setSelectedVehicleType('all');
         setSelectedCategory('all');
@@ -651,7 +747,7 @@ export default function POSPage() {
     };
 
     // ============================================
-    // SALES TABLE COLUMNS
+    // SALES TABLE COLUMNS (WITHOUT UNDO BUTTON)
     // ============================================
     const salesColumns: Column[] = [
       {
@@ -744,13 +840,22 @@ export default function POSPage() {
         key: 'actions',
         label: 'Actions',
         render: (_: any, row: any) => (
-          <Button variant="ghost" size="sm" onClick={(e) => {
-            e.stopPropagation();
-            alert(`View details for ${row.sale_id}`);
-          }}>
-            <Eye className="h-4 w-4 mr-1" />
-            View
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={(e) => {
+              e.stopPropagation();
+              alert(`View details for ${row.sale_id}`);
+            }}>
+              <Eye className="h-4 w-4 mr-1" />
+              View
+            </Button>
+            <Button variant="ghost" size="sm" onClick={(e) => {
+              e.stopPropagation();
+              handleDownloadReceipt(row.sale_id);
+            }}>
+              <Download className="h-4 w-4 mr-1" />
+              Receipt
+            </Button>
+          </div>
         )
       }
     ];
@@ -849,7 +954,11 @@ export default function POSPage() {
         </div>
 
         {/* Success Animation */}
-        <SuccessAnimation isVisible={showSuccess} />
+        <SuccessAnimation 
+          isVisible={showSuccess} 
+          saleId={lastSaleId}
+          onConfirm={handleConfirmSuccess}
+        />
 
         {/* Toggle between POS and Sales History */}
         {!showSalesHistory ? (
@@ -898,13 +1007,14 @@ export default function POSPage() {
                             <Button
                               key={category.value}
                               variant={isSelected ? "secondary" : "outline"}
-                              className={`transition-all duration-300 w-full font-poppins ${
+                              className={`flex items-center justify-center gap-2 transition-all duration-300 w-full font-poppins ${
                                 isSelected 
                                   ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transform scale-105' 
                                   : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-300 hover:border-indigo-400 hover:scale-105'
                               }`}
                               onClick={() => setSelectedCategory(category.value)}
                             >
+                              <CategoryIcon category={category.value} />
                               {category.label}
                             </Button>
                           );
@@ -968,11 +1078,15 @@ export default function POSPage() {
                           <CardContent className="p-4 flex flex-col gap-3">
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
-                                <p className="font-semibold text-slate-800 group-hover:text-indigo-600 transition-colors truncate">
-                                  {item.name}
-                                </p>
+                                <div className="flex items-center gap-2 mb-2">
+                                  <CategoryIcon category={item.category} className="h-4 w-4 text-indigo-600" />
+                                  <p className="font-semibold text-slate-800 group-hover:text-indigo-600 transition-colors truncate">
+                                    {item.name}
+                                  </p>
+                                </div>
                                 <div className="flex gap-2 mt-2">
-                                  <Badge variant="outline" className="text-xs capitalize bg-slate-100 text-slate-700 border-slate-300">
+                                  <Badge variant="outline" className="text-xs capitalize bg-slate-100 text-slate-700 border-slate-300 flex items-center gap-1">
+                                    <CategoryIcon category={item.category} className="h-3 w-3" />
                                     {item.category}
                                   </Badge>
                                   <Badge 
@@ -1045,6 +1159,7 @@ export default function POSPage() {
                     )}
                   </CardTitle>
                 </CardHeader>
+
                 <CardContent className="p-6 space-y-6">
                   {/* Customer Selection */}
                   <div className="space-y-3">
@@ -1070,7 +1185,10 @@ export default function POSPage() {
                         cart.map(item => (
                           <div key={item.item_id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-slate-800 truncate font-poppins">{item.name}</p>
+                              <div className="flex items-center gap-2 mb-1">
+                                <CategoryIcon category={item.category} className="h-3 w-3 text-indigo-600" />
+                                <p className="text-sm font-medium text-slate-800 truncate font-poppins">{item.name}</p>
+                              </div>
                               <p className="text-xs text-slate-500 font-poppins">₱{formatPrice(item.sale_price)} each</p>
                             </div>
                             <div className="flex items-center gap-2">
@@ -1121,6 +1239,7 @@ export default function POSPage() {
                     </div>
                   )}
                 </CardContent>
+
                 <CardFooter className="flex flex-col gap-3 p-6 bg-slate-50/50 border-t border-slate-200/50">
                   <Button 
                     className={`w-full ${buttonStyles.primary}`}
