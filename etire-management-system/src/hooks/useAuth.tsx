@@ -5,9 +5,10 @@ import { supabase } from "@/lib/supabaseClient";
 
 interface ExtendedUser {
   user_id: string;
-  name: string;
-  username: string;
-  role: number;
+  email?: string;
+  username?: string;
+  name?: string;
+  role?: number;
 }
 
 interface AuthContextType {
@@ -33,48 +34,50 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const storedUser = localStorage.getItem("etire_user");
     if (storedUser) setUser(JSON.parse(storedUser));
   }, []);
-
   // 🟣 Login directly from public.user (no Supabase Auth)
   const login = async (username: string, password: string): Promise<boolean> => {
     setIsLoading(true);
+
+    const emailForAuth = `${username}@queenr.local`;
+
     try {
       console.log("🔐 Attempting local DB login for:", username);
 
-      const { data, error } = await supabase
-        .from("user")
-        .select("user_id, name, username, password, role")
-        .eq("username", username)
-        .single();
+      const client = supabase;
+      if (!client || !client.auth) {
+        console.error("Supabase client is not initialized");
+        return false;
+      }
+
+      const { data, error } = await client.auth.signInWithPassword({
+        email: emailForAuth,
+        password: password,
+      });
 
       if (error) {
-        console.error("❌ Login DB error:", error.message);
+        console.error("Login error:", error.message);
         return false;
       }
 
-      if (!data) {
-        console.warn("⚠️ No user found for:", username);
-        return false;
+      if (data?.user) {
+        const displayUsername = data.user.user_metadata?.username || data.user.email?.split('@')[0];
+
+        const loggedInUser: ExtendedUser = {
+          user_id: data.user.id,
+          name: data.user.user_metadata?.name || displayUsername,
+          username: displayUsername,
+          role: data.user.user_metadata?.role || 0,
+        };
+
+        setUser(loggedInUser);
+        // Update local storage logic here if you wish to keep it
+        // localStorage.setItem("etire_user", JSON.stringify(loggedInUser));
+        return true;
       }
 
-      if (data.password !== password) {
-        console.warn("⚠️ Incorrect password for user:", username);
-        return false;
-      }
-
-      const loggedInUser: ExtendedUser = {
-        user_id: data.user_id,
-        name: data.name,
-        username: data.username,
-        role: data.role,
-      };
-
-      console.log(`✅ Login successful for ${data.username}, Role: ${data.role}`);
-
-      setUser(loggedInUser);
-      localStorage.setItem("etire_user", JSON.stringify(loggedInUser));
-      return true;
+      return false;
     } catch (err) {
-      console.error("Login error:", err);
+      console.error("Unexpected Login Error:", err);
       return false;
     } finally {
       setIsLoading(false);
