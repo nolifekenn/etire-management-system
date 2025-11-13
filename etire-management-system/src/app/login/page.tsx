@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
+// import { supabase } from '@/lib/supabaseClient'; // <--- Removed, not needed here anymore
 import { useToast } from '@/hooks/use-toast';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,9 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, UserPlus, LogIn, Eye, EyeOff, ArrowLeft, Car, Lock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert'; // Removed unused AlertTitle
 import { useFormFieldPersistence } from '@/hooks/useFormPersistence';
 import { CustomCheckbox } from '@/components/ui/custom-checkbox';
+import { registerAction } from '@/lib/action'; // <--- NEW IMPORT
 
 // Tire Loading Animation Component
 const TireLoadingAnimation = ({ isLoading }: { isLoading: boolean }) => {
@@ -283,22 +284,16 @@ export default function LoginPage() {
         setFormLoading(true);
 
         try {
-            const res = await fetch("/api/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    action: "register",
-                    firstName,
-                    lastName,
-                    username: registerUsername,
-                    password: registerPassword,
-                }),
+            // 🟢 REPLACED: OLD FETCH WITH NEW SERVER ACTION
+            const result = await registerAction({
+                firstName,
+                lastName,
+                username: registerUsername,
+                password: registerPassword,
             });
 
-            const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error || "Registration failed");
+            if (!result.success) {
+                throw new Error(result.message || "Registration failed");
             }
 
             toast({ title: "Success", description: "Registration successful! Please log in." });

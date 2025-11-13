@@ -1,14 +1,14 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { loginAction } from "@/lib/action"; // 🟢 Import the server action we created
 
+// Match this interface to the data your 'user' table returns
 interface ExtendedUser {
   user_id: string;
-  email?: string;
-  username?: string;
-  name?: string;
-  role?: number;
+  name: string; // Ensure this matches your DB column (e.g. 'name' or 'first_name')
+  username: string;
+  role: number;
 }
 
 interface AuthContextType {
@@ -27,57 +27,49 @@ const AuthContext = createContext<AuthContextType>({
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<ExtendedUser | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // 🟢 Try loading stored user from localStorage
+  // 🟢 Try loading stored user from localStorage on mount
   useEffect(() => {
     const storedUser = localStorage.getItem("etire_user");
-    if (storedUser) setUser(JSON.parse(storedUser));
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Failed to parse stored user", e);
+        localStorage.removeItem("etire_user");
+      }
+    }
+    setIsLoading(false);
   }, []);
-  // 🟣 Login directly from public.user (no Supabase Auth)
+
+  // 🟣 Login using the Server Action (Safe "Username Only" login)
   const login = async (username: string, password: string): Promise<boolean> => {
     setIsLoading(true);
 
-    const emailForAuth = `${username}@queenr.local`;
-
     try {
-      console.log("🔐 Attempting local DB login for:", username);
+      console.log("🔐 Attempting login via Server Action for:", username);
 
-      const client = supabase;
-      if (!client || !client.auth) {
-        console.error("Supabase client is not initialized");
-        return false;
-      }
+      // 1. Call the Server Action instead of Supabase Auth directly
+      const result = await loginAction(username, password);
 
-      const { data, error } = await client.auth.signInWithPassword({
-        email: emailForAuth,
-        password: password,
-      });
-
-      if (error) {
-        console.error("Login error:", error.message);
-        return false;
-      }
-
-      if (data?.user) {
-        const displayUsername = data.user.user_metadata?.username || data.user.email?.split('@')[0];
-
-        const loggedInUser: ExtendedUser = {
-          user_id: data.user.id,
-          name: data.user.user_metadata?.name || displayUsername,
-          username: displayUsername,
-          role: data.user.user_metadata?.role || 0,
-        };
-
-        setUser(loggedInUser);
-        // Update local storage logic here if you wish to keep it
-        // localStorage.setItem("etire_user", JSON.stringify(loggedInUser));
+      if (result.success && result.user) {
+        console.log("✅ Login successful");
+        
+        // 2. Save user to state
+        setUser(result.user as ExtendedUser);
+        
+        // 3. Persist to localStorage so they stay logged in on refresh
+        localStorage.setItem("etire_user", JSON.stringify(result.user));
         return true;
       }
-
+      
+      // Handle failure
+      console.error("❌ Login failed:", result.message);
       return false;
+
     } catch (err) {
-      console.error("Unexpected Login Error:", err);
+      console.error("❌ Unexpected Login Error:", err);
       return false;
     } finally {
       setIsLoading(false);
