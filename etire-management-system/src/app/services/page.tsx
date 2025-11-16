@@ -87,24 +87,64 @@ interface VehicleType {
     name: string;
 }
 
+// Common service descriptions for tire and vulcanizing shop
+const COMMON_SERVICES = [
+  "Tire Rotation and Balancing",
+  "Tire Replacement",
+  "Tire Patch/Repair",
+  "Tire Vulcanizing",
+  "Wheel Alignment",
+  "Brake Pad Replacement",
+  "Oil Change",
+  "Engine Tune-up",
+  "Battery Replacement",
+  "Suspension Repair",
+  "Exhaust System Repair",
+  "General Check-up/Maintenance",
+  "Other (Please specify below)"
+];
+
+// ✅ UPDATED: ServiceJob interface with calculated fields
 interface ServiceJob {
     job_id: string;
-    user_id: string;        // Employee who performed the service
-    customer_id?: string;   // ✅ Add this - Customer who owns the vehicle
+    user_id: string;
+    customer_id?: string;
     job_description: string;
     job_date: string;
     status: 'pending' | 'in-progress' | 'completed' | 'cancelled';
     service_fee: number;
     remarks: string | null;
     vehicle_type_id: string | null;
-    user?: { name: string } | null;  // Employee name
-    vehicle_type?: VehicleType | null;
+    
+    // ✅ JOINED DATA
+    user?: { 
+        user_id: string;
+        name: string;
+    } | null;
+    customer?: {
+        customer_id: string;
+        name: string;
+        phone?: string;
+    } | null;
+    vehicle_type?: {
+        vehicle_type_id: string;
+        name: string;
+    } | null;
+    
+    // ✅ CALCULATED FIELDS
+    days_ago?: number;        // Days since service
+    is_recent?: boolean;      // Within last 7 days
 }
 
-// ✅ FIXED: Use customer_id instead of user_id
+// ✅ UPDATED: Customer interface with service stats
 interface Customer {
-    customer_id: string;  // ✅ Changed from user_id
+    customer_id: string;
     name: string;
+    phone?: string;
+    email?: string;
+    // ✅ ADD: Calculated fields
+    service_count?: number;      // Total services
+    last_service_date?: string;  // Most recent service
 }
 
 const ANONYMOUS_CUSTOMER_ID = "anonymous_customer";
@@ -187,7 +227,127 @@ const SearchInput = ({
   );
 };
 
-// Stats Overview Component - Updated colors to match purchasing.tsx
+// Quick Status Update Component
+const StatusUpdateForm = ({ 
+  job, 
+  isOpen, 
+  onClose, 
+  onStatusUpdate 
+}: { 
+  job: ServiceJob | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onStatusUpdate: (jobId: string, status: ServiceJob['status']) => Promise<void>;
+}) => {
+  const [selectedStatus, setSelectedStatus] = useState<ServiceJob['status']>(job?.status || 'pending');
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  useEffect(() => {
+    if (job) {
+      setSelectedStatus(job.status);
+    }
+  }, [job]);
+
+  const handleStatusUpdate = async () => {
+    if (!job) return;
+    
+    setIsUpdating(true);
+    try {
+      await onStatusUpdate(job.job_id, selectedStatus);
+      onClose();
+    } catch (error) {
+      console.error('Status update error:', error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
+            Update Job Status
+          </DialogTitle>
+          <DialogDescription className="text-slate-600 font-poppins">
+            Quick update for: <strong>{job?.job_description}</strong>
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label className="text-slate-700 font-medium font-poppins">Current Status</Label>
+            <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg">
+              {job && (
+                <>
+                  {(() => {
+                    const StatusIcon = StatusIcons[job.status];
+                    return <StatusIcon className={`h-4 w-4 ${statusColors[job.status].split(' ')[1]}`} />;
+                  })()}
+                  <span className="capitalize font-poppins">{job.status.replace('-', ' ')}</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-slate-700 font-medium font-poppins">Update Status To</Label>
+            <Select value={selectedStatus} onValueChange={(value: ServiceJob['status']) => setSelectedStatus(value)}>
+              <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
+                <SelectValue placeholder="Select status..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending" className="font-poppins">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-yellow-600" />
+                    Pending
+                  </div>
+                </SelectItem>
+                <SelectItem value="in-progress" className="font-poppins">
+                  <div className="flex items-center gap-2">
+                    <Wrench className="h-4 w-4 text-blue-600" />
+                    In Progress
+                  </div>
+                </SelectItem>
+                <SelectItem value="completed" className="font-poppins">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    Completed
+                  </div>
+                </SelectItem>
+                <SelectItem value="cancelled" className="font-poppins">
+                  <div className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4 text-red-600" />
+                    Cancelled
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button type="button" variant="outline" className={buttonStyles.back}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button 
+            onClick={handleStatusUpdate} 
+            disabled={isUpdating || selectedStatus === job?.status}
+            className={buttonStyles.primary}
+          >
+            {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Update Status
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// Stats Overview Component - Updated with proper number formatting
 const ServiceStats = ({ serviceJobs }: { serviceJobs: ServiceJob[] }) => {
   const totalJobs = serviceJobs.length;
   const pendingJobs = serviceJobs.filter(job => job.status === 'pending').length;
@@ -202,7 +362,7 @@ const ServiceStats = ({ serviceJobs }: { serviceJobs: ServiceJob[] }) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-purple-100 text-sm font-medium font-poppins">Total Jobs</p>
-            <p className="text-3xl font-bold mt-2 font-poppins">{totalJobs}</p>
+            <p className="text-3xl font-bold mt-2 font-poppins">{totalJobs.toLocaleString()}</p>
           </div>
           <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
             <Package className="h-6 w-6" />
@@ -219,7 +379,7 @@ const ServiceStats = ({ serviceJobs }: { serviceJobs: ServiceJob[] }) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-blue-100 text-sm font-medium font-poppins">Pending Jobs</p>
-            <p className="text-3xl font-bold mt-2 font-poppins">{pendingJobs}</p>
+            <p className="text-3xl font-bold mt-2 font-poppins">{pendingJobs.toLocaleString()}</p>
           </div>
           <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
             <Clock className="h-6 w-6" />
@@ -236,7 +396,7 @@ const ServiceStats = ({ serviceJobs }: { serviceJobs: ServiceJob[] }) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-teal-100 text-sm font-medium font-poppins">In Progress</p>
-            <p className="text-3xl font-bold mt-2 font-poppins">{inProgressJobs}</p>
+            <p className="text-3xl font-bold mt-2 font-poppins">{inProgressJobs.toLocaleString()}</p>
           </div>
           <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
             <Wrench className="h-6 w-6" />
@@ -253,7 +413,7 @@ const ServiceStats = ({ serviceJobs }: { serviceJobs: ServiceJob[] }) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-purple-100 text-sm font-medium font-poppins">Total Revenue</p>
-            <p className="text-3xl font-bold mt-2 font-poppins">₱{(totalRevenue / 1000).toFixed(0)}K</p>
+            <p className="text-3xl font-bold mt-2 font-poppins">₱{totalRevenue.toLocaleString()}</p>
           </div>
           <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
             <DollarSign className="h-6 w-6" />
@@ -261,7 +421,7 @@ const ServiceStats = ({ serviceJobs }: { serviceJobs: ServiceJob[] }) => {
         </div>
         <div className="flex items-center gap-1 mt-4 text-purple-100 text-sm font-poppins">
           <TrendingUp className="h-4 w-4" />
-          <span>This month</span>
+          <span>All time</span>
         </div>
       </div>
     </div>
@@ -442,8 +602,10 @@ export default function EnhancedServiceManagementPage() {
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+    const [isStatusUpdateOpen, setIsStatusUpdateOpen] = useState(false);
     const [editingJob, setEditingJob] = useState<ServiceJob | null>(null);
     const [deletingJob, setDeletingJob] = useState<ServiceJob | null>(null);
+    const [statusUpdateJob, setStatusUpdateJob] = useState<ServiceJob | null>(null);
 
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
@@ -453,6 +615,8 @@ export default function EnhancedServiceManagementPage() {
     // Form state
     const [customerId, setCustomerId] = useState(ANONYMOUS_CUSTOMER_ID);
     const [jobDescription, setJobDescription] = useState('');
+    const [customJobDescription, setCustomJobDescription] = useState('');
+    const [selectedServiceType, setSelectedServiceType] = useState('');
     const [remarks, setRemarks] = useState('');
     const [jobStatus, setJobStatus] = useState<'pending' | 'in-progress' | 'completed' | 'cancelled'>('pending');
     const [serviceFee, setServiceFee] = useState('0');
@@ -462,23 +626,31 @@ export default function EnhancedServiceManagementPage() {
         setMounted(true);
     }, []);
 
-    // ===== SUPABASE DIRECT API CALLS =====
+    // Handle service type selection
+    useEffect(() => {
+        if (selectedServiceType === 'Other (Please specify below)') {
+            setJobDescription('');
+        } else if (selectedServiceType) {
+            setJobDescription(selectedServiceType);
+        }
+    }, [selectedServiceType]);
+
+    // ✅ OPTIMIZED: Replace fetchJobs (around line 473)
     const fetchJobs = useCallback(async () => {
         if (!supabase) return;
         setIsLoading(true);
         
         try {
+            // 🔥 Single optimized RPC call with all joins and calculations!
             const { data, error } = await supabase
-                .from('service_job')
-                .select('*, user:user_id(name), vehicle_type:vehicle_type_id(vehicle_type_id, name)')
-                .order('job_date', { ascending: false });
+                .rpc('get_service_jobs_complete');
             
             if (error) {
                 setFetchError(error.message);
                 setServiceJobs([]);
                 toast({ title: 'Error', description: error.message, variant: 'destructive' });
             } else {
-                setServiceJobs(data as any);
+                setServiceJobs((data || []) as ServiceJob[]);
                 setFetchError(null);
             }
         } catch (error: any) {
@@ -492,21 +664,20 @@ export default function EnhancedServiceManagementPage() {
         setLastUpdated(new Date());
     }, [toast]);
 
-    // ✅ FIXED: Fetch from customer table instead of user table
+    // ✅ OPTIMIZED: Replace fetchCustomers (around line 493)
     const fetchCustomers = useCallback(async () => {
         if (!supabase) return;
         setIsDataLoading(true);
         
         try {
+            // 🔥 Optimized RPC call with service counts!
             const { data, error } = await supabase
-                .from('customer')  // ✅ Changed from 'user' to 'customer'
-                .select('customer_id, name, phone')  // ✅ Changed user_id to customer_id
-                .order('name');
+                .rpc('get_customers_for_service');
             
             if (error) throw error;
             
             setCustomers([
-                { customer_id: ANONYMOUS_CUSTOMER_ID, name: 'Walk-in Customer' },  // ✅ Changed field name
+                { customer_id: ANONYMOUS_CUSTOMER_ID, name: 'Walk-in Customer' },
                 ...(data || [])
             ]);
         } catch (error: any) {
@@ -571,6 +742,8 @@ export default function EnhancedServiceManagementPage() {
     const resetForm = () => {
         setCustomerId(ANONYMOUS_CUSTOMER_ID);
         setJobDescription('');
+        setCustomJobDescription('');
+        setSelectedServiceType('');
         setRemarks('');
         setJobStatus('pending');
         setServiceFee('0');
@@ -587,6 +760,7 @@ export default function EnhancedServiceManagementPage() {
         setEditingJob(job);
         setCustomerId(job.user_id || ANONYMOUS_CUSTOMER_ID);
         setJobDescription(job.job_description);
+        setSelectedServiceType(job.job_description);
         setRemarks(job.remarks || '');
         setJobStatus(job.status);
         setServiceFee(String(job.service_fee));
@@ -597,6 +771,36 @@ export default function EnhancedServiceManagementPage() {
     const handleOpenDeleteDialog = (job: ServiceJob) => {
         setDeletingJob(job);
         setIsDeleteConfirmationOpen(true);
+    };
+
+    const handleOpenStatusUpdate = (job: ServiceJob) => {
+        setStatusUpdateJob(job);
+        setIsStatusUpdateOpen(true);
+    };
+
+    const handleStatusUpdate = async (jobId: string, status: ServiceJob['status']) => {
+        if (!supabase) return;
+        
+        setIsLoading(true);
+        
+        try {
+            const { error } = await supabase
+                .from('service_job')
+                .update({ status })
+                .eq('job_id', jobId);
+
+            if (error) {
+                toast({ title: 'Status Update Error', description: error.message, variant: 'destructive' });
+            } else {
+                toast({ title: 'Success', description: 'Service job status updated successfully.' });
+                setIsStatusUpdateOpen(false);
+                fetchJobs();
+            }
+        } catch (error: any) {
+            toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        }
+        
+        setIsLoading(false);
     };
 
     const handleRefresh = () => {
@@ -659,7 +863,12 @@ export default function EnhancedServiceManagementPage() {
     const handleSubmit = async () => {
         if (!supabase || !authUser) return;
         
-        if (!jobDescription) {
+        // Determine final job description
+        const finalJobDescription = selectedServiceType === 'Other (Please specify below)' 
+            ? customJobDescription 
+            : jobDescription;
+
+        if (!finalJobDescription) {
             toast({ title: 'Validation Error', description: 'Job description is required.', variant: 'destructive'});
             return;
         }
@@ -673,7 +882,7 @@ export default function EnhancedServiceManagementPage() {
             const jobData = {
                 user_id: authUser.user_id,  // ✅ This is the EMPLOYEE who created the job
                 customer_id: customerId === ANONYMOUS_CUSTOMER_ID ? null : customerId,  // ✅ Add customer_id field
-                job_description: jobDescription,
+                job_description: finalJobDescription,
                 status: jobStatus,
                 service_fee: parseFloat(serviceFee) || 0,
                 remarks: `Customer: ${customerName}${remarks ? '\n\nRemarks: ' + remarks : ''}`,
@@ -852,13 +1061,7 @@ USING (true);`}
                                     {filteredJobs.length} of {serviceJobs.length} job{filteredJobs.length !== 1 ? 's' : ''} shown
                                 </CardDescription>
                             </div>
-                            <Button 
-                                onClick={handleOpenAddDialog}
-                                className={buttonStyles.primary}
-                            >
-                                <PlusCircle className="h-5 w-5 mr-2" />
-                                New Service Job
-                            </Button>
+                            {/* REMOVED: Duplicate "New Service Job" button */}
                         </div>
 
                         {/* Filter Bar */}
@@ -961,7 +1164,11 @@ USING (true);`}
                                             const VehicleIcon = getVehicleIcon(job.vehicle_type?.name || 'car');
                                             const StatusIcon = StatusIcons[job.status];
                                             return (
-                                                <div key={job.job_id} className="grid grid-cols-12 gap-4 px-6 py-6 hover:bg-slate-50/50 transition-colors duration-200 group">
+                                                <div 
+                                                    key={job.job_id} 
+                                                    className="grid grid-cols-12 gap-4 px-6 py-6 hover:bg-slate-50/50 transition-colors duration-200 group cursor-pointer"
+                                                    onClick={() => handleOpenStatusUpdate(job)}
+                                                >
                                                     {/* Job Details */}
                                                     <div className="col-span-4">
                                                         <div className="flex items-start gap-3">
@@ -1009,9 +1216,9 @@ USING (true);`}
                                                         </p>
                                                     </div>
 
-                                                    {/* Status */}
+                                                    {/* Status - Now clickable for quick updates */}
                                                     <div className="col-span-1">
-                                                        <Badge className={`capitalize ${statusColors[job.status]} transition-colors duration-200 font-poppins`}>
+                                                        <Badge className={`capitalize ${statusColors[job.status]} transition-colors duration-200 font-poppins cursor-pointer hover:scale-105`}>
                                                             <StatusIcon className="h-3 w-3 mr-1" />
                                                             {job.status.replace('-', ' ')}
                                                         </Badge>
@@ -1022,7 +1229,10 @@ USING (true);`}
                                                         <Button 
                                                             variant="outline" 
                                                             size="sm"
-                                                            onClick={() => handleOpenEditDialog(job)}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleOpenEditDialog(job);
+                                                            }}
                                                             className="h-8 px-2 border-slate-300 hover:border-indigo-400 hover:text-indigo-600"
                                                         >
                                                             <Edit className="h-3 w-3" />
@@ -1030,7 +1240,10 @@ USING (true);`}
                                                         <Button 
                                                             variant="outline" 
                                                             size="sm"
-                                                            onClick={() => handleOpenDeleteDialog(job)}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleOpenDeleteDialog(job);
+                                                            }}
                                                             className="h-8 px-2 border-slate-300 hover:border-red-400 hover:text-red-600"
                                                         >
                                                             <Trash2 className="h-3 w-3" />
@@ -1046,7 +1259,7 @@ USING (true);`}
                     </CardContent>
                 </Card>
 
-                {/* Enhanced Add/Edit Dialog - Updated to match purchasing.tsx style */}
+                {/* Enhanced Add/Edit Dialog - Updated with service type selection */}
                 <Dialog open={isAddDialogOpen || isEditDialogOpen} onOpenChange={(isOpen) => {
                     if (!isOpen) { 
                         setIsAddDialogOpen(false); 
@@ -1122,16 +1335,38 @@ USING (true);`}
                                     />
                                 </div>
                             </div>
+                            
+                            {/* NEW: Service Type Selection */}
                             <div className="space-y-2">
-                                <Label htmlFor="job-description" className="text-slate-700 font-medium font-poppins">Job Description *</Label>
-                                <Textarea 
-                                    id="job-description"
-                                    value={jobDescription} 
-                                    onChange={e => setJobDescription(e.target.value)} 
-                                    placeholder="e.g., Tire rotation and balancing"
-                                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
-                                />
+                                <Label htmlFor="service-type" className="text-slate-700 font-medium font-poppins">Service Type *</Label>
+                                <Select value={selectedServiceType} onValueChange={setSelectedServiceType}>
+                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
+                                        <SelectValue placeholder="Select a service type..."/>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {COMMON_SERVICES.map(service => (
+                                            <SelectItem key={service} value={service} className="font-poppins">
+                                                {service}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
+
+                            {/* Show custom input when "Other" is selected */}
+                            {selectedServiceType === 'Other (Please specify below)' && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="custom-job-description" className="text-slate-700 font-medium font-poppins">Custom Service Description *</Label>
+                                    <Textarea 
+                                        id="custom-job-description"
+                                        value={customJobDescription} 
+                                        onChange={e => setCustomJobDescription(e.target.value)} 
+                                        placeholder="Describe the custom service..."
+                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
+                                    />
+                                </div>
+                            )}
+
                             <div className="space-y-2">
                                 <Label htmlFor="remarks" className="text-slate-700 font-medium font-poppins">Remarks</Label>
                                 <Textarea 
@@ -1182,6 +1417,14 @@ USING (true);`}
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
+
+                {/* Status Update Dialog */}
+                <StatusUpdateForm 
+                    job={statusUpdateJob}
+                    isOpen={isStatusUpdateOpen}
+                    onClose={() => setIsStatusUpdateOpen(false)}
+                    onStatusUpdate={handleStatusUpdate}
+                />
 
                 {/* Calendar View */}
                 <CalendarView 

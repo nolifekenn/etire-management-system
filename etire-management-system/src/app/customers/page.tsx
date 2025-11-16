@@ -29,9 +29,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/hooks/use-toast";
 import { 
-  Loader2, PlusCircle, AlertTriangle, Users, Car, History, Wrench, 
-  RefreshCw, Clock, Edit, Trash2, Search, Filter, X, MapPin, Phone, Mail,
-  Bike, Truck, Bus, CarTaxiFront, ArrowLeft
+  Loader2, PlusCircle, AlertTriangle, Users, Car, History, 
+  RefreshCw, Clock, Edit, Trash2, Search, X, ArrowLeft, Download,
+  Eye, TrendingUp, CheckCircle, UserPlus, Calendar, Wrench
 } from 'lucide-react';
 import { DataTableWrapper } from '@/components/DataTableWrapper';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +40,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Customer, Vehicle, TireHistory, InventoryItem, User } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
+// ===== DESIGN SYSTEM =====
 const buttonStyles = {
   primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins",
   secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 font-poppins",
@@ -47,13 +48,20 @@ const buttonStyles = {
   back: "flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-slate-300 hover:border-slate-400 font-poppins"
 };
 
+const microAnimations = {
+  cardHover: "transition-all duration-350 ease-spring hover:translate-y-[-6px] hover:shadow-2xl",
+  buttonHover: "transition-all duration-200 hover:scale-105 active:scale-95",
+  fadeIn: "animate-in fade-in duration-500",
+  iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
+};
+
 // Vehicle Type Icons Mapping
 const VehicleIcons = {
   car: Car,
-  motorcycle: Bike,
-  truck: Truck,
-  bus: Bus,
-  suv: CarTaxiFront,
+  motorcycle: Car,
+  truck: Car,
+  bus: Car,
+  suv: Car,
   default: Car
 };
 
@@ -148,7 +156,7 @@ const SearchInput = ({
     // Set new timeout for debounced update
     timeoutRef.current = setTimeout(() => {
       onChange(newValue);
-    }, 150); // Reduced debounce time for better responsiveness
+    }, 150);
   };
 
   const handleClear = () => {
@@ -181,6 +189,179 @@ const SearchInput = ({
   );
 };
 
+// Modern Widget Components
+const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[], vehicles: any[], tireHistory: any[] }) => {
+    const totalCustomers = customers.length;
+    const totalVehicles = vehicles.length;
+    const recentServices = tireHistory.filter(history => 
+      new Date(history.service_date).getMonth() === new Date().getMonth()
+    ).length;
+    const vehiclesWithRecentService = [...new Set(tireHistory
+      .filter(history => new Date(history.service_date).getMonth() === new Date().getMonth())
+      .map(history => history.vehicle_id)
+    )].length;
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className={`bg-gradient-to-br from-purple-500 via-purple-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-purple-100 text-sm font-medium font-poppins">Total Customers</p>
+              <p className="text-3xl font-bold mt-2 font-poppins">{totalCustomers}</p>
+            </div>
+            <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+              <Users className="h-6 w-6" />
+            </div>
+          </div>
+          <div className="flex items-center gap-1 mt-4 text-purple-100 text-sm font-poppins">
+            <TrendingUp className="h-4 w-4" />
+            <span>Active customers</span>
+          </div>
+        </div>
+
+        <div className={`bg-gradient-to-br from-blue-500 via-blue-600 to-sky-700 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-blue-100 text-sm font-medium font-poppins">Total Vehicles</p>
+              <p className="text-3xl font-bold mt-2 font-poppins">{totalVehicles}</p>
+            </div>
+            <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+              <Car className="h-6 w-6" />
+            </div>
+          </div>
+          <div className="flex items-center gap-1 mt-4 text-blue-100 text-sm font-poppins">
+            <Car className="h-4 w-4" />
+            <span>Registered vehicles</span>
+          </div>
+        </div>
+
+        <div className={`bg-gradient-to-br from-teal-400 via-cyan-500 to-green-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-teal-100 text-sm font-medium font-poppins">Recent Services</p>
+              <p className="text-3xl font-bold mt-2 font-poppins">{recentServices}</p>
+            </div>
+            <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+              <CheckCircle className="h-6 w-6" />
+            </div>
+          </div>
+          <div className="flex items-center gap-1 mt-4 text-teal-100 text-sm font-poppins">
+            <Calendar className="h-4 w-4" />
+            <span>This month</span>
+          </div>
+        </div>
+
+        <div className={`bg-gradient-to-br from-purple-500 via-blue-500 to-cyan-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-purple-100 text-sm font-medium font-poppins">Vehicles Serviced</p>
+              <p className="text-3xl font-bold mt-2 font-poppins">{vehiclesWithRecentService}</p>
+            </div>
+            <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+              <Wrench className="h-6 w-6" />
+            </div>
+          </div>
+          <div className="flex items-center gap-1 mt-4 text-purple-100 text-sm font-poppins">
+            <TrendingUp className="h-4 w-4" />
+            <span>This month</span>
+          </div>
+        </div>
+      </div>
+    );
+};
+
+const QuickActions = ({ onAddCustomer, onAddVehicle, onAddHistory, onExportData }: { 
+  onAddCustomer: () => void, 
+  onAddVehicle: () => void, 
+  onAddHistory: () => void,
+  onExportData: () => void 
+}) => {
+  const actions = [
+    {
+      label: "New Customer",
+      description: "Add a new customer",
+      icon: UserPlus,
+      onClick: onAddCustomer,
+      color: "from-purple-500 to-indigo-600"
+    },
+    {
+      label: "Add Vehicle",
+      description: "Register new vehicle",
+      icon: Car,
+      onClick: onAddVehicle,
+      color: "from-blue-500 to-sky-600"
+    },
+    {
+      label: "Service Record",
+      description: "Add tire service",
+      icon: History,
+      onClick: onAddHistory,
+      color: "from-teal-500 to-green-600"
+    },
+    {
+      label: "Export Data",
+      description: "Export to Excel",
+      icon: Download,
+      onClick: onExportData,
+      color: "from-orange-500 to-red-600"
+    }
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {actions.map((action, index) => (
+        <button
+          key={action.label}
+          onClick={action.onClick}
+          className={`bg-gradient-to-r ${action.color} rounded-xl p-4 text-white text-left shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 group font-poppins`}
+          style={{ animationDelay: `${index * 100}ms` }}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-lg">{action.label}</p>
+              <p className="text-white/80 text-sm mt-1">{action.description}</p>
+            </div>
+            <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm group-hover:scale-110 transition-transform duration-300">
+              <action.icon className="h-5 w-5" />
+            </div>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+};
+
+const EnhancedTabs = ({ value, onValueChange, children }: any) => {
+  return (
+    <Tabs value={value} onValueChange={onValueChange} className="w-full font-poppins">
+      <TabsList className="grid w-full grid-cols-3 p-1 bg-slate-100 rounded-2xl">
+        <TabsTrigger 
+          value="customers" 
+          className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins"
+        >
+          <Users className="h-4 w-4 mr-2" />
+          Customers
+        </TabsTrigger>
+        <TabsTrigger 
+          value="vehicles" 
+          className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins"
+        >
+          <Car className="h-4 w-4 mr-2" />
+          Vehicles
+        </TabsTrigger>
+        <TabsTrigger 
+          value="history" 
+          className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins"
+        >
+          <History className="h-4 w-4 mr-2" />
+          Tire History
+        </TabsTrigger>
+      </TabsList>
+      {children}
+    </Tabs>
+  );
+};
+
 export default function EnhancedCustomersPage() {
     const { toast } = useToast();
     const { user: authUser } = useAuth();
@@ -188,25 +369,23 @@ export default function EnhancedCustomersPage() {
     const [mounted, setMounted] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
     
-    // Customers state
+    // Data states
     const [customers, setCustomers] = useState<Customer[]>([]);
-    const [isCustomerLoading, setIsCustomerLoading] = useState(true);
-    const [customerError, setCustomerError] = useState<string | null>(null);
-    
-    // Vehicles state
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-    const [isVehicleLoading, setIsVehicleLoading] = useState(true);
-    const [vehicleError, setVehicleError] = useState<string | null>(null);
-    const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
-    
-    // Tire History state
     const [tireHistory, setTireHistory] = useState<TireHistory[]>([]);
-    const [isHistoryLoading, setIsHistoryLoading] = useState(true);
-    const [historyError, setHistoryError] = useState<string | null>(null);
-    
-    // Supporting data
+    const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [users, setUsers] = useState<User[]>([]);
+    
+    // Loading states
+    const [isCustomerLoading, setIsCustomerLoading] = useState(true);
+    const [isVehicleLoading, setIsVehicleLoading] = useState(true);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+    
+    // Error states
+    const [customerError, setCustomerError] = useState<string | null>(null);
+    const [vehicleError, setVehicleError] = useState<string | null>(null);
+    const [historyError, setHistoryError] = useState<string | null>(null);
     
     // Dialog states
     const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
@@ -214,27 +393,27 @@ export default function EnhancedCustomersPage() {
     const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     
+    // Editing states
     const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
     const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
     const [editingHistory, setEditingHistory] = useState<TireHistory | null>(null);
     const [deletingItem, setDeletingItem] = useState<any>(null);
 
-    // Separate search terms for each tab to prevent unnecessary re-renders
-    const [customerSearchTerm, setCustomerSearchTerm] = useState('');
-    const [vehicleSearchTerm, setVehicleSearchTerm] = useState('');
-    const [historySearchTerm, setHistorySearchTerm] = useState('');
+    // Separate search terms for each tab
+    const [customerSearch, setCustomerSearch] = useState('');
+    const [vehicleSearch, setVehicleSearch] = useState('');
+    const [historySearch, setHistorySearch] = useState('');
     
+    // Filters
     const [customerFilter, setCustomerFilter] = useState('all');
     const [vehicleTypeFilter, setVehicleTypeFilter] = useState('all');
     const [serviceTypeFilter, setServiceTypeFilter] = useState('all');
 
-    // Customer form state
+    // Form states
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
     const [customerEmail, setCustomerEmail] = useState('');
     const [customerAddress, setCustomerAddress] = useState('');
-
-    // Vehicle form state
     const [selectedCustomer, setSelectedCustomer] = useState('');
     const [plateNumber, setPlateNumber] = useState('');
     const [make, setMake] = useState('');
@@ -242,8 +421,6 @@ export default function EnhancedCustomersPage() {
     const [year, setYear] = useState('');
     const [color, setColor] = useState('');
     const [selectedVehicleType, setSelectedVehicleType] = useState('');
-
-    // History form state
     const [selectedVehicle, setSelectedVehicle] = useState('');
     const [selectedItem, setSelectedItem] = useState('');
     const [serviceType, setServiceType] = useState<'repair' | 'replacement' | 'rotation' | 'balancing'>('repair');
@@ -253,48 +430,63 @@ export default function EnhancedCustomersPage() {
 
     useEffect(() => {
         setMounted(true);
+        fetchData();
     }, []);
 
-// ✅ UPDATE: fetchCustomers function
-const fetchCustomers = useCallback(async () => {
-    if (!supabase) return;
-    setIsCustomerLoading(true);
-    
-    const { data, error } = await supabase
-        .rpc('get_customers_with_vehicles');
+    const handleTabChange = (tab: string) => {
+        setActiveTab(tab);
+        // Reset all searches when switching tabs
+        setCustomerSearch('');
+        setVehicleSearch('');
+        setHistorySearch('');
+    };
 
-    if (error) {
-        setCustomerError(`Could not fetch customers: ${error.message}`);
-        setCustomers([]);
-    } else {
-        // ✅ FIX: Parse JSON response
-        setCustomers((data || []) as Customer[]);
-        setCustomerError(null);
-    }
-    setIsCustomerLoading(false);
-    setLastUpdated(new Date());
-}, []);
+    const fetchData = async () => {
+        await Promise.all([
+            fetchCustomers(),
+            fetchVehicles(),
+            fetchTireHistory(),
+            fetchSupportingData(),
+            fetchVehicleTypes()
+        ]);
+    };
 
- // ✅ UPDATE: fetchVehicles function
-const fetchVehicles = useCallback(async () => {
-    if (!supabase) return;
-    setIsVehicleLoading(true);
-    
-    const { data, error } = await supabase
-        .rpc('get_vehicles_complete');
+    const fetchCustomers = async () => {
+        if (!supabase) return;
+        setIsCustomerLoading(true);
+        
+        const { data, error } = await supabase
+            .rpc('get_customers_with_vehicles');
 
-    if (error) {
-        setVehicleError(`Could not fetch vehicles: ${error.message}`);
-        setVehicles([]);
-    } else {
-        // ✅ FIX: Parse JSON response
-        setVehicles((data || []) as Vehicle[]);
-        setVehicleError(null);
-    }
-    setIsVehicleLoading(false);
-}, []);
+        if (error) {
+            setCustomerError(`Could not fetch customers: ${error.message}`);
+            setCustomers([]);
+        } else {
+            setCustomers((data || []) as Customer[]);
+            setCustomerError(null);
+        }
+        setIsCustomerLoading(false);
+        setLastUpdated(new Date());
+    };
 
-    const fetchVehicleTypes = useCallback(async () => {
+    const fetchVehicles = async () => {
+        if (!supabase) return;
+        setIsVehicleLoading(true);
+        
+        const { data, error } = await supabase
+            .rpc('get_vehicles_complete');
+
+        if (error) {
+            setVehicleError(`Could not fetch vehicles: ${error.message}`);
+            setVehicles([]);
+        } else {
+            setVehicles((data || []) as Vehicle[]);
+            setVehicleError(null);
+        }
+        setIsVehicleLoading(false);
+    };
+
+    const fetchVehicleTypes = async () => {
         if (!supabase) return;
         const { data, error } = await supabase
             .from('vehicle_type')
@@ -302,28 +494,26 @@ const fetchVehicles = useCallback(async () => {
             .order('name');
 
         if (data) setVehicleTypes(data as VehicleType[]);
-    }, []);
+    };
 
-// ✅ UPDATE: fetchTireHistory function
-const fetchTireHistory = useCallback(async () => {
-    if (!supabase) return;
-    setIsHistoryLoading(true);
-    
-    const { data, error } = await supabase
-        .rpc('get_tire_history_complete');
+    const fetchTireHistory = async () => {
+        if (!supabase) return;
+        setIsHistoryLoading(true);
+        
+        const { data, error } = await supabase
+            .rpc('get_tire_history_complete');
 
-    if (error) {
-        setHistoryError(`Could not fetch tire history: ${error.message}`);
-        setTireHistory([]);
-    } else {
-        // ✅ FIX: Parse JSON response
-        setTireHistory((data || []) as TireHistory[]);
-        setHistoryError(null);
-    }
-    setIsHistoryLoading(false);
-}, []);
+        if (error) {
+            setHistoryError(`Could not fetch tire history: ${error.message}`);
+            setTireHistory([]);
+        } else {
+            setTireHistory((data || []) as TireHistory[]);
+            setHistoryError(null);
+        }
+        setIsHistoryLoading(false);
+    };
 
-    const fetchSupportingData = useCallback(async () => {
+    const fetchSupportingData = async () => {
         if (!supabase) return;
         
         const [inventoryRes, usersRes] = await Promise.all([
@@ -333,33 +523,30 @@ const fetchTireHistory = useCallback(async () => {
 
         if (inventoryRes.data) setInventory(inventoryRes.data as InventoryItem[]);
         if (usersRes.data) setUsers(usersRes.data as User[]);
-    }, []);
+    };
 
-    useEffect(() => {
-        fetchCustomers();
-        fetchVehicles();
-        fetchTireHistory();
-        fetchSupportingData();
-        fetchVehicleTypes();
-    }, [fetchCustomers, fetchVehicles, fetchTireHistory, fetchSupportingData, fetchVehicleTypes]);
-
-    // Optimized filter functions with useMemo
+    // Filter functions with useMemo
     const filteredCustomers = useMemo(() => {
         return customers.filter(customer => {
-            const matchesSearch = customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
-                                customer.phone?.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
-                                customer.email?.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
-                                customer.address?.toLowerCase().includes(customerSearchTerm.toLowerCase());
-            return matchesSearch;
+            if (!customerSearch) return true;
+            const searchLower = customerSearch.toLowerCase();
+            return (
+                customer.name.toLowerCase().includes(searchLower) ||
+                customer.phone?.toLowerCase().includes(searchLower) ||
+                customer.email?.toLowerCase().includes(searchLower) ||
+                customer.address?.toLowerCase().includes(searchLower)
+            );
         });
-    }, [customers, customerSearchTerm]);
+    }, [customers, customerSearch]);
 
     const filteredVehicles = useMemo(() => {
         return vehicles.filter(vehicle => {
-            const matchesSearch = vehicle.plate_number.toLowerCase().includes(vehicleSearchTerm.toLowerCase()) ||
-                                vehicle.make?.toLowerCase().includes(vehicleSearchTerm.toLowerCase()) ||
-                                vehicle.model?.toLowerCase().includes(vehicleSearchTerm.toLowerCase()) ||
-                                vehicle.customer?.name.toLowerCase().includes(vehicleSearchTerm.toLowerCase());
+            const searchLower = vehicleSearch.toLowerCase();
+            const matchesSearch = !vehicleSearch || 
+                vehicle.plate_number.toLowerCase().includes(searchLower) ||
+                vehicle.make?.toLowerCase().includes(searchLower) ||
+                vehicle.model?.toLowerCase().includes(searchLower) ||
+                vehicle.customer?.name.toLowerCase().includes(searchLower);
 
             const matchesType = vehicleTypeFilter === 'all' || 
                                vehicle.vehicle_type_id === vehicleTypeFilter;
@@ -369,27 +556,35 @@ const fetchTireHistory = useCallback(async () => {
 
             return matchesSearch && matchesType && matchesCustomer;
         });
-    }, [vehicles, vehicleSearchTerm, vehicleTypeFilter, customerFilter]);
+    }, [vehicles, vehicleSearch, vehicleTypeFilter, customerFilter]);
 
     const filteredHistory = useMemo(() => {
         return tireHistory.filter(history => {
-            const matchesSearch = history.vehicle?.plate_number.toLowerCase().includes(historySearchTerm.toLowerCase()) ||
-                                history.inventory_item?.name.toLowerCase().includes(historySearchTerm.toLowerCase()) ||
-                                history.vehicle?.customer?.name?.toLowerCase().includes(historySearchTerm.toLowerCase());
+            const searchLower = historySearch.toLowerCase();
+            const matchesSearch = !historySearch || 
+                history.vehicle?.plate_number.toLowerCase().includes(searchLower) ||
+                history.inventory_item?.name.toLowerCase().includes(searchLower) ||
+                history.vehicle?.customer?.name?.toLowerCase().includes(searchLower);
 
             const matchesService = serviceTypeFilter === 'all' || 
                                  history.service_type === serviceTypeFilter;
 
             return matchesSearch && matchesService;
         });
-    }, [tireHistory, historySearchTerm, serviceTypeFilter]);
+    }, [tireHistory, historySearch, serviceTypeFilter]);
 
-    const clearFilters = () => {
-        setCustomerSearchTerm('');
-        setVehicleSearchTerm('');
-        setHistorySearchTerm('');
+    const clearCustomerFilters = () => {
+        setCustomerSearch('');
+    };
+
+    const clearVehicleFilters = () => {
+        setVehicleSearch('');
         setCustomerFilter('all');
         setVehicleTypeFilter('all');
+    };
+
+    const clearHistoryFilters = () => {
+        setHistorySearch('');
         setServiceTypeFilter('all');
     };
 
@@ -475,11 +670,95 @@ const fetchTireHistory = useCallback(async () => {
     };
 
     const handleRefresh = () => {
-        fetchCustomers();
-        fetchVehicles();
-        fetchTireHistory();
-        fetchSupportingData();
-        fetchVehicleTypes();
+        fetchData();
+    };
+
+    // Export Data Functionality
+    const handleExportData = () => {
+        let dataToExport: any[] = [];
+        let filename = '';
+        let headers: string[] = [];
+
+        if (activeTab === 'customers') {
+            dataToExport = filteredCustomers;
+            filename = 'customers_export.csv';
+            headers = ['Customer Name', 'Phone', 'Email', 'Address', 'Vehicles Count'];
+        } else if (activeTab === 'vehicles') {
+            dataToExport = filteredVehicles;
+            filename = 'vehicles_export.csv';
+            headers = ['Plate Number', 'Customer', 'Vehicle Type', 'Make', 'Model', 'Year', 'Color'];
+        } else {
+            dataToExport = filteredHistory;
+            filename = 'tire_history_export.csv';
+            headers = ['Vehicle', 'Tire/Item', 'Service Type', 'Date', 'Mileage', 'Service By'];
+        }
+
+        if (dataToExport.length === 0) {
+            toast({
+                title: "No Data to Export",
+                description: "There is no data available for export.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        // Convert data to CSV format
+        const csvContent = convertToCSV(dataToExport, headers, activeTab);
+        
+        // Create and download the file
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        toast({
+            title: "Export Successful",
+            description: `${dataToExport.length} ${activeTab} exported to ${filename}`,
+        });
+    };
+
+    const convertToCSV = (data: any[], headers: string[], type: string) => {
+        const headerRow = headers.join(',') + '\n';
+        
+        const dataRows = data.map(item => {
+            if (type === 'customers') {
+                return [
+                    `"${item.name || ''}"`,
+                    `"${item.phone || ''}"`,
+                    `"${item.email || ''}"`,
+                    `"${item.address || ''}"`,
+                    `"${item.vehicle_count || 0}"`
+                ].join(',');
+            } else if (type === 'vehicles') {
+                return [
+                    `"${item.plate_number || ''}"`,
+                    `"${item.customer?.name || ''}"`,
+                    `"${item.vehicle_type?.name || ''}"`,
+                    `"${item.make || ''}"`,
+                    `"${item.model || ''}"`,
+                    `"${item.year || ''}"`,
+                    `"${item.color || ''}"`
+                ].join(',');
+            } else {
+                return [
+                    `"${item.vehicle?.plate_number || ''}"`,
+                    `"${item.inventory_item?.name || ''}"`,
+                    `"${item.service_type || ''}"`,
+                    `"${item.service_date ? new Date(item.service_date).toLocaleDateString() : ''}"`,
+                    `"${item.mileage || ''}"`,
+                    `"${item.user?.name || ''}"`
+                ].join(',');
+            }
+        }).join('\n');
+
+        return headerRow + dataRows;
     };
 
     const handleSubmitCustomer = async () => {
@@ -641,10 +920,9 @@ const fetchTireHistory = useCallback(async () => {
         }
     };
 
-    // Custom cell renderers for DataTableWrapper
+    // Custom cell renderers
     const renderCustomerCell = (item: any, columnKey: string, value: any) => {
         if (columnKey === 'vehicle_count') {
-            // ✅ FIX: Use the vehicle_count from SQL function
             return item.vehicle_count || 0;
         }
         if (columnKey === 'phone' && !value) {
@@ -674,19 +952,10 @@ const fetchTireHistory = useCallback(async () => {
                 </Badge>
             );
         }
-        if (columnKey === 'year' && !value) {
+        if (!value) {
             return <span className="text-slate-400">-</span>;
         }
-        if (columnKey === 'make' && !value) {
-            return <span className="text-slate-400">-</span>;
-        }
-        if (columnKey === 'model' && !value) {
-            return <span className="text-slate-400">-</span>;
-        }
-        if (columnKey === 'color' && !value) {
-            return <span className="text-slate-400">-</span>;
-        }
-        return String(value || '');
+        return String(value);
     };
 
     const renderHistoryCell = (item: any, columnKey: string, value: any) => {
@@ -715,103 +984,83 @@ const fetchTireHistory = useCallback(async () => {
         return String(value || '');
     };
 
-    const EnhancedTabs = ({ value, onValueChange, children }: any) => {
-        return (
-            <Tabs value={value} onValueChange={onValueChange} className="w-full font-poppins">
-                <TabsList className="grid w-full grid-cols-3 p-1 bg-slate-100 rounded-2xl">
-                    <TabsTrigger 
-                        value="customers" 
-                        className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins"
-                    >
-                        <Users className="h-4 w-4 mr-2" />
-                        Customers
-                    </TabsTrigger>
-                    <TabsTrigger 
-                        value="vehicles" 
-                        className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins"
-                    >
-                        <Car className="h-4 w-4 mr-2" />
-                        Vehicles
-                    </TabsTrigger>
-                    <TabsTrigger 
-                        value="history" 
-                        className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins"
-                    >
-                        <History className="h-4 w-4 mr-2" />
-                        Tire History
-                    </TabsTrigger>
-                </TabsList>
-                {children}
-            </Tabs>
-        );
-    };
-
     return (
         <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
             
             {/* Background Sections */}
-<div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
-    <div 
-        className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
-        style={{ 
-            backgroundImage: "url('/images/image2.jpg')",
-            backgroundSize: "cover",
-            backgroundPosition: "center 30%"
-        }}
-    ></div>
-    <div className="absolute top-0 left-0 w-32 h-32 bg-purple-300/20 rounded-br-full"></div>
-    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-300/20 rounded-bl-full"></div>
-</div>
+            <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
+                <div 
+                    className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
+                    style={{ 
+                        backgroundImage: "url('/images/image2.jpg')",
+                        backgroundSize: "cover",
+                        backgroundPosition: "center 30%"
+                    }}
+                ></div>
+                <div className="absolute top-0 left-0 w-32 h-32 bg-purple-300/20 rounded-br-full"></div>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-300/20 rounded-bl-full"></div>
+            </div>
 
-<div className="absolute top-64 left-0 w-full h-full bg-indigo-50/10">
-    <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-indigo-100/15 to-indigo-50/10"></div>
-</div>
+            <div className="absolute top-64 left-0 w-full h-full bg-indigo-50/10">
+                <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-indigo-100/15 to-indigo-50/10"></div>
+            </div>
 
-<div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-    
-    {/* Header Section - Updated to match Service Management */}
-    <div className={`mb-8 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
-        <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
-            
-            <div className="relative z-10 flex-1">
-                <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
-                    Customer & Vehicle Management
-                </h1>
-                <div className="flex items-center gap-6 text-white/90">
-                    <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium font-poppins">
-                        <Users className="h-6 w-6 opacity-90" />
-                        Manage customers, vehicles, and tire service history
-                    </p>
-                    <div className="flex items-center gap-4 text-lg">
-                        {lastUpdated && (
-                            <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
-                                <Clock className="w-5 h-5" />
-                                Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+            <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
+                
+                {/* Header Section */}
+                <div className={`mb-8 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+                    <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
+                        
+                        <div className="relative z-10 flex-1">
+                            <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
+                                Customer & Vehicle Management
+                            </h1>
+                            <div className="flex items-center gap-6 text-white/90">
+                                <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium font-poppins">
+                                    <Users className="h-6 w-6 opacity-90" />
+                                    Manage customers, vehicles, and tire service history
+                                </p>
+                                <div className="flex items-center gap-4 text-lg">
+                                    {lastUpdated && (
+                                        <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
+                                            <Clock className="w-5 h-5" />
+                                            Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                        </div>
+                                    )}
+                                    <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
+                                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                        Live data
+                                    </div>
+                                </div>
                             </div>
-                        )}
-                        <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                            Live data
                         </div>
+                        
+                        <Button 
+                            onClick={handleRefresh}
+                            disabled={isCustomerLoading || isVehicleLoading || isHistoryLoading}
+                            className={buttonStyles.glass + " active:scale-95 font-poppins"}
+                        >
+                            <RefreshCw className={`h-6 w-6 mr-3 ${isCustomerLoading || isVehicleLoading || isHistoryLoading ? 'animate-spin' : ''}`} />
+                            Refresh Data
+                        </Button>
                     </div>
                 </div>
-            </div>
-            
-            <Button 
-                onClick={handleRefresh}
-                disabled={isCustomerLoading || isVehicleLoading || isHistoryLoading}
-                className={buttonStyles.glass + " active:scale-95 font-poppins"}
-            >
-                <RefreshCw className={`h-6 w-6 mr-3 ${isCustomerLoading || isVehicleLoading || isHistoryLoading ? 'animate-spin' : ''}`} />
-                Refresh Data
-            </Button>
-        </div>
-    </div>
 
-    <div className="mt-12"></div>
+                <div className="mt-12"></div>
+                
+                {/* Stats Overview */}
+                <StatsOverview customers={customers} vehicles={vehicles} tireHistory={tireHistory} />
 
-    <EnhancedTabs value={activeTab} onValueChange={setActiveTab}>
+                {/* Quick Actions */}
+                <QuickActions 
+                    onAddCustomer={handleOpenCustomerDialog} 
+                    onAddVehicle={handleOpenVehicleDialog}
+                    onAddHistory={handleOpenHistoryDialog}
+                    onExportData={handleExportData}
+                />
+
+                <EnhancedTabs value={activeTab} onValueChange={handleTabChange}>
                     {/* Customers Tab */}
                     <TabsContent value="customers" className="space-y-6">
                         <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
@@ -831,11 +1080,19 @@ const fetchTireHistory = useCallback(async () => {
                                         <Label htmlFor="search-customers" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Search Customers</Label>
                                         <SearchInput 
                                             id="search-customers"
-                                            value={customerSearchTerm}
-                                            onChange={setCustomerSearchTerm}
+                                            value={customerSearch}
+                                            onChange={setCustomerSearch}
                                             placeholder="Search by name, phone, email, or address..."
                                         />
                                     </div>
+                                    {customerSearch && (
+                                        <div className="flex items-end">
+                                            <Button onClick={clearCustomerFilters} variant="outline" className="h-10 border-slate-300 text-slate-600 hover:text-slate-700 font-poppins">
+                                                <X className="h-4 w-4 mr-2" />
+                                                Clear
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
                             </CardHeader>
                             
@@ -848,24 +1105,21 @@ const fetchTireHistory = useCallback(async () => {
                                     </Alert>
                                 )}
 
-                                {(isCustomerLoading && customers.length === 0) ? (
+                                {isCustomerLoading ? (
                                     <div className="flex justify-center items-center h-64">
                                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                     </div>
                                 ) : (
                                     <DataTableWrapper
-                                        title="Customers"
+                                        title=""
                                         columns={customerColumns}
-                                        data={filteredCustomers.map(customer => ({ 
-                                            ...customer, 
-                                            id: customer.customer_id 
-                                        }))}
+                                        data={filteredCustomers.map(customer => ({ ...customer, id: customer.customer_id }))}
                                         onEdit={handleEditCustomer}
                                         onDelete={(item) => handleDeleteItem(item, 'customer')}
                                         renderCell={renderCustomerCell}
-                                        searchTerm={customerSearchTerm}
-                                        onSearchChange={setCustomerSearchTerm}
                                         onAddNew={handleOpenCustomerDialog}
+                                        searchTerm={customerSearch}
+                                        onSearchChange={setCustomerSearch}
                                     />
                                 )}
                             </CardContent>
@@ -891,8 +1145,8 @@ const fetchTireHistory = useCallback(async () => {
                                         <Label htmlFor="search-vehicles" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Search Vehicles</Label>
                                         <SearchInput 
                                             id="search-vehicles"
-                                            value={vehicleSearchTerm}
-                                            onChange={setVehicleSearchTerm}
+                                            value={vehicleSearch}
+                                            onChange={setVehicleSearch}
                                             placeholder="Search by plate, make, model, or customer..."
                                         />
                                     </div>
@@ -904,7 +1158,7 @@ const fetchTireHistory = useCallback(async () => {
                                                 <SelectValue placeholder="All customers" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="all">All Customers</SelectItem>
+                                                <SelectItem value="all" className="font-poppins">All Customers</SelectItem>
                                                 {customers.map(customer => (
                                                     <SelectItem key={customer.customer_id} value={customer.customer_id} className="font-poppins">
                                                         {customer.name}
@@ -921,27 +1175,19 @@ const fetchTireHistory = useCallback(async () => {
                                                 <SelectValue placeholder="All types" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="all">All Types</SelectItem>
+                                                <SelectItem value="all" className="font-poppins">All Types</SelectItem>
                                                 {vehicleTypes.map(type => (
                                                     <SelectItem key={type.vehicle_type_id} value={type.vehicle_type_id} className="font-poppins">
-                                                        {type.name.charAt(0).toUpperCase() + type.name.slice(1)}
+                                                        {type.name}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
                                     </div>
 
-                                    {(vehicleSearchTerm || customerFilter !== 'all' || vehicleTypeFilter !== 'all') && (
+                                    {(vehicleSearch || customerFilter !== 'all' || vehicleTypeFilter !== 'all') && (
                                         <div className="flex items-end">
-                                            <Button 
-                                                onClick={() => {
-                                                    setVehicleSearchTerm('');
-                                                    setCustomerFilter('all');
-                                                    setVehicleTypeFilter('all');
-                                                }}
-                                                variant="outline" 
-                                                className="h-10 border-slate-300 text-slate-600 hover:text-slate-700 font-poppins"
-                                            >
+                                            <Button onClick={clearVehicleFilters} variant="outline" className="h-10 border-slate-300 text-slate-600 hover:text-slate-700 font-poppins">
                                                 <X className="h-4 w-4 mr-2" />
                                                 Clear
                                             </Button>
@@ -959,31 +1205,28 @@ const fetchTireHistory = useCallback(async () => {
                                     </Alert>
                                 )}
 
-                                {(isVehicleLoading && vehicles.length === 0) ? (
+                                {isVehicleLoading ? (
                                     <div className="flex justify-center items-center h-64">
                                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                     </div>
                                 ) : (
                                     <DataTableWrapper
-                                        title="Vehicles"
+                                        title=""
                                         columns={vehicleColumns}
-                                        data={filteredVehicles.map(vehicle => ({ 
-                                            ...vehicle, 
-                                            id: vehicle.vehicle_id 
-                                        }))}
+                                        data={filteredVehicles.map(vehicle => ({ ...vehicle, id: vehicle.vehicle_id }))}
                                         onAddNew={handleOpenVehicleDialog}
                                         onEdit={handleEditVehicle}
                                         onDelete={(item) => handleDeleteItem(item, 'vehicle')}
                                         renderCell={renderVehicleCell}
-                                        searchTerm={vehicleSearchTerm}
-                                        onSearchChange={setVehicleSearchTerm}
+                                        searchTerm={vehicleSearch}
+                                        onSearchChange={setVehicleSearch}
                                     />
                                 )}
                             </CardContent>
                         </Card>
                     </TabsContent>
 
-                    {/* Tire History Tab */}
+                    {/* History Tab */}
                     <TabsContent value="history" className="space-y-6">
                         <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
                             <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-green-50/50 border-b border-slate-200/50">
@@ -1002,8 +1245,8 @@ const fetchTireHistory = useCallback(async () => {
                                         <Label htmlFor="search-history" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Search History</Label>
                                         <SearchInput 
                                             id="search-history"
-                                            value={historySearchTerm}
-                                            onChange={setHistorySearchTerm}
+                                            value={historySearch}
+                                            onChange={setHistorySearch}
                                             placeholder="Search by plate number, item, or customer..."
                                         />
                                     </div>
@@ -1015,25 +1258,18 @@ const fetchTireHistory = useCallback(async () => {
                                                 <SelectValue placeholder="All services" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="all">All Services</SelectItem>
-                                                <SelectItem value="repair">Repair</SelectItem>
-                                                <SelectItem value="replacement">Replacement</SelectItem>
-                                                <SelectItem value="rotation">Rotation</SelectItem>
-                                                <SelectItem value="balancing">Balancing</SelectItem>
+                                                <SelectItem value="all" className="font-poppins">All Services</SelectItem>
+                                                <SelectItem value="repair" className="font-poppins">Repair</SelectItem>
+                                                <SelectItem value="replacement" className="font-poppins">Replacement</SelectItem>
+                                                <SelectItem value="rotation" className="font-poppins">Rotation</SelectItem>
+                                                <SelectItem value="balancing" className="font-poppins">Balancing</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
 
-                                    {(historySearchTerm || serviceTypeFilter !== 'all') && (
+                                    {(historySearch || serviceTypeFilter !== 'all') && (
                                         <div className="flex items-end">
-                                            <Button 
-                                                onClick={() => {
-                                                    setHistorySearchTerm('');
-                                                    setServiceTypeFilter('all');
-                                                }}
-                                                variant="outline" 
-                                                className="h-10 border-slate-300 text-slate-600 hover:text-slate-700 font-poppins"
-                                            >
+                                            <Button onClick={clearHistoryFilters} variant="outline" className="h-10 border-slate-300 text-slate-600 hover:text-slate-700 font-poppins">
                                                 <X className="h-4 w-4 mr-2" />
                                                 Clear
                                             </Button>
@@ -1051,24 +1287,21 @@ const fetchTireHistory = useCallback(async () => {
                                     </Alert>
                                 )}
 
-                                {(isHistoryLoading && tireHistory.length === 0) ? (
+                                {isHistoryLoading ? (
                                     <div className="flex justify-center items-center h-64">
                                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                     </div>
                                 ) : (
                                     <DataTableWrapper
-                                        title="Tire History"
+                                        title=""
                                         columns={historyColumns}
-                                        data={filteredHistory.map(history => ({ 
-                                            ...history, 
-                                            id: history.history_id 
-                                        }))}
+                                        data={filteredHistory.map(history => ({ ...history, id: history.history_id }))}
                                         onAddNew={handleOpenHistoryDialog}
                                         onEdit={handleEditHistory}
                                         onDelete={(item) => handleDeleteItem(item, 'history')}
                                         renderCell={renderHistoryCell}
-                                        searchTerm={historySearchTerm}
-                                        onSearchChange={setHistorySearchTerm}
+                                        searchTerm={historySearch}
+                                        onSearchChange={setHistorySearch}
                                     />
                                 )}
                             </CardContent>
@@ -1408,6 +1641,19 @@ const fetchTireHistory = useCallback(async () => {
                 
                 .font-poppins {
                     font-family: 'Poppins', sans-serif;
+                }
+
+                .ease-spring {
+                    transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+                }
+
+                @keyframes pulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                }
+                
+                .animate-pulse {
+                    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
                 }
 
                 /* Custom date input styling */

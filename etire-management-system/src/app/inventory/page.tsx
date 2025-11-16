@@ -39,18 +39,39 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 // Update the InventoryItem interface
-export interface InventoryItem {
-  item_id: string;
-  name: string;
-  category: 'tire' | 'tool' | 'accessory';
-  vehicle_type: 'car' | 'motor' | 'truck';  
-  stock_quantity: number;
-  cost_price: number;
-  sale_price: number;
-  created_at?: string;
-  updated_at?: string;
-  reorder_level?: number;
-}
+  // ✅ UPDATED: InventoryItem interface with calculated fields (around line 51)
+  export interface InventoryItem {
+    item_id: string;
+    name: string;
+    category: 'tire' | 'tool' | 'accessory';
+    vehicle_type: 'car' | 'motor' | 'truck';  
+    stock_quantity: number;
+    cost_price: number;
+    sale_price: number;
+    reorder_level?: number;
+    created_at?: string;
+    updated_at?: string;
+    
+    // ✅ ADD: Calculated fields from RPC function
+    profit_margin?: number;          // Calculated: ((sale_price - cost_price) / cost_price) * 100
+    total_value?: number;            // Calculated: stock_quantity * cost_price
+    potential_profit?: number;       // Calculated: stock_quantity * (sale_price - cost_price)
+    stock_status?: 'in_stock' | 'low_stock' | 'critical' | 'out_of_stock';
+    days_since_update?: number;      // Days since last update
+    
+    // ✅ ADD: Joined data
+    supplier?: {
+      supplier_id: string;
+      name: string;
+      contact_person?: string;
+      phone?: string;
+    };
+    branch?: {
+      branch_id: string;
+      name: string;
+      address?: string;
+    };
+  }
 
 // ===== ENHANCED FILTERING SYSTEM =====
 interface FilterState {
@@ -898,27 +919,36 @@ export default function EnhancedInventoryPage() {
     setMounted(true);
   }, []);
 
+  // ✅ OPTIMIZED: Replace fetchProducts function (around line 765)
   const fetchProducts = useCallback(async () => {
     if (!supabase) {
       setFetchError("Supabase client is not available. Please check your environment variables.");
       setIsLoading(false);
       return;
     }
+    
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('inventory_item')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching inventory:', error.message);
-      setFetchError(`Could not fetch inventory: ${error.message}`);
+    
+    try {
+      // 🔥 Single optimized RPC call with all calculations and joins!
+      const { data, error } = await supabase
+        .rpc('get_inventory_complete');
+  
+      if (error) {
+        console.error('Error fetching inventory:', error.message);
+        setFetchError(`Could not fetch inventory: ${error.message}`);
+        setItems([]);
+      } else {
+        setItems((data || []) as InventoryItem[]);
+        setFetchError(null);
+        setLastUpdated(new Date());
+      }
+    } catch (error: any) {
+      console.error('Network error:', error);
+      setFetchError('Network error while fetching inventory');
       setItems([]);
-    } else {
-      setItems(data as InventoryItem[]);
-      setFetchError(null);
-      setLastUpdated(new Date());
     }
+    
     setIsLoading(false);
   }, []);
 
