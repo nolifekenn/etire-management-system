@@ -79,8 +79,8 @@ interface Customer {
 
 interface CartItem extends InventoryItem {
   quantity: number;
+  installationFee?: number;
 }
-
 export interface Sale {
   sale_id: string;
   sale_date: string;
@@ -541,6 +541,9 @@ export default function POSPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  const [installationModal, setInstallationModal] = useState<{ open: boolean, item: CartItem | null }>({ open: false, item: null });
+  const [installationFee, setInstallationFee] = useState<number>(0);
+
   // Vehicle type configuration
   const vehicleTypes = [
     { value: 'all', label: 'All Vehicles', icon: Package, color: 'bg-slate-500' },
@@ -617,25 +620,47 @@ export default function POSPage() {
   }, [inventory, searchTerm, selectedVehicleType, selectedCategory]);
 
   const addToCart = (item: InventoryItem) => {
+    let itemWasAdded = false;
+    let itemInCart: CartItem | undefined;
+
     setCart(prevCart => {
       const existingItem = prevCart.find(cartItem => cartItem.item_id === item.item_id);
       if (existingItem) {
         if (existingItem.quantity < item.stock_quantity) {
+          itemInCart = { ...existingItem, quantity: existingItem.quantity + 1 };
           return prevCart.map(cartItem =>
-            cartItem.item_id === item.item_id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem
+            cartItem.item_id === item.item_id ? itemInCart : cartItem
           );
         } else {
-          toast({ title: 'Stock Limit', description: `Cannot add more of ${item.name}. Stock limit reached.`, variant: 'destructive' });
+          toast({ title: 'Stock Limit', description: 'Cannot add more of ${item.name}. Stock limit reached.', variant: 'destructive' });
           return prevCart;
         }
       }
       if (item.stock_quantity > 0) {
-        return [...prevCart, { ...item, quantity: 1 }];
+        itemWasAdded = true;
+        itemInCart = { ...item, quantity: 1, installationFee: 0 }; // Default fee
+        return [...prevCart, itemInCart];
       } else {
-        toast({ title: 'Out of Stock', description: `${item.name} is out of stock.`, variant: 'destructive' });
+        toast({ title: 'Out of stock', description: '${item.name} is out of stock.', variant: 'destructive' });
         return prevCart;
       }
     });
+
+    //If item is accessory this function will pop up
+    if (itemInCart && item.category === 'accessory' && item.name.toLowerCase() !== 'installation service') {
+      const serviceItemTemplate = inventory.find(i => i.name.toLowerCase() === 'installation service');
+      if (serviceItemTemplate) {
+        setInstallationModal({ open: true, item: itemInCart });
+        setInstallationFee(0);
+      } else {
+        toast({
+          title: "Setup Incomplete",
+          description: "Accessory added. To add installation fees, please create an item named 'Installation Service' in your inventory.",
+          variant: 'default',
+          duration: 7000,
+        });
+      }
+    }
   };
 
   const updateQuantity = (itemId: string, newQuantity: number) => {
@@ -655,7 +680,7 @@ export default function POSPage() {
     setCart(cart.filter(item => item.item_id !== itemId));
   };
 
-  const subtotal = cart.reduce((acc, item) => acc + item.sale_price * item.quantity, 0);
+  const subtotal = cart.reduce((acc, item) => acc + (item.sale_price * item.quantity) + (item.installationFee || 0), 0)
   const total = subtotal;
 
   const handleProcessSale = async () => {
@@ -778,37 +803,105 @@ export default function POSPage() {
     }
   };
 
-  const handleDownloadReceipt = async (saleId: string) => {
-    try {
-      const response = await fetch(`/api/receipts/${saleId}`);
+  const handleConfirmInstallation = () => {
+    if (!installationModal.itme) return;
 
-      if (!response.ok) {
-        throw new Error('Failed to download receipt');
-      }
+    //Find the item in the cart and updates its free installation
+    setCart(prevCart =>
+      prevCart.map(cartItem =>
+        cartItem.item_id === installationModal.item?.item_id
+          ? { ...cartItem, installationFee: installationFee }
+          : cartItem
+      )
+    );
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = `receipt-${saleId}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+    toast({
+      title: 'Success',
+      description: 'Installation fee of ₱${formatPrice(installationFee)} added.',
+    });
 
-      toast({
-        title: "Receipt Downloaded",
-        description: "Receipt has been downloaded successfully.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Download Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
+    //Close Modal
+    setInstallationModal({ open: false, item: null });
+    setInstallationFee(0);
   };
+
+  const handleDownloadReceipt = async (saleId: string) => {
+      if (!supabase || !authUser) {
+        toast({ title: 'Error', description: 'Client not ready or user not logged in.', variant: 'destructive' });
+        return;
+      }
+      
+      setIsSubmitting(true); // Use the existing loading state
+      
+      try {
+        // Step 1: Fetch all data for this specific sale in one go
+        const { data: saleData, error: saleError } = await supabase
+          .from('sale')
+          .select(`
+            *,
+            customer (*),
+            user (*),
+            sale_item (
+              *,
+              inventory_item (name)
+            )
+          `)
+          .eq('sale_id', saleId)
+          .single();
+
+        if (saleError) throw new Error(`Sale data fetch error: ${saleError.message}`);
+        if (!saleData) throw new Error('Sale not found.');
+
+        // Step 2: Define your Business Info
+        const businessInfo: BusinessInfo = {
+          storeName: 'Queen.R Tire Supply & Vulcanizing Shop',
+          address: '68, Sipocot, Camarines Sur',
+          phone: 'To be given',
+          taxInfo: 'To be given',
+          footerMessage: 'Thank You!',
+        };
+
+        // Step 3: Map sale items to ReceiptItem[]
+        const receiptItems: ReceiptItem[] = saleData.sale_item.map((item: any) => ({
+          name: item.inventory_item?.name || 'Unknown Item', // Get name from joined inventory_item
+          quantity: item.quantity,
+          price: item.price_at_sale,
+        }));
+
+        // Step 4: Get customer (if one exists for this sale)
+        const receiptCustomer: ReceiptCustomer | undefined = saleData.customer
+          ? { name: saleData.customer.name, phone: saleData.customer.phone }
+          : undefined;
+
+        // Step 5: Assemble the final data packet
+        const receiptData: ReceiptData = {
+          sale: saleData,
+          items: receiptItems,
+          cashier: saleData.user as User, // Cashier who made the sale
+          customer: receiptCustomer,
+          businessInfo: businessInfo,
+          // branch: undefined, // Add branch data if you have it
+        };
+
+        // Step 6: Generate the HTML and Print
+        const html = generateHtmlReceipt(receiptData);
+        printReceipt(html);
+
+        toast({
+          title: "Receipt Ready",
+          description: "Opening print dialog for receipt.",
+        });
+
+      } catch (error: any) {
+        toast({
+          title: "Download Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
 
   const handleConfirmSuccess = () => {
     setShowSuccess(false);
@@ -923,11 +1016,13 @@ export default function POSPage() {
             <Eye className="h-4 w-4 mr-1" />
             View
           </Button>
-          <Button variant="ghost" size="sm" onClick={(e) => {
+          <Button variant="ghost" size="sm" onClick={ async (e) => {
             e.stopPropagation();
             handleDownloadReceipt(row.sale_id);
-          }}>
-            <Download className="h-4 w-4 mr-1" />
+          }} 
+          disabled={isSubmitting}
+          >
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4 mr-1"/>}
             Receipt
           </Button>
         </div>
@@ -1035,6 +1130,44 @@ export default function POSPage() {
           onConfirm={handleConfirmSuccess}
         />
 
+        <Dialog open={installationModal.open} onOpenChange={(isOpen) => setInstallationModal({ open: isOpen, item: null })}>
+          <DialogContent className="sm:max-w-md bg-white font-poppins">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-slate-800">
+                Installation Fee
+              </DialogTitle>
+              <DialogDescription className="text-slate-600">
+                Add an installation fee for <span className="font-medium text-indigo-600">{installationModal.item?.name}</span>?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <Label htmlFor="installation-fee" className="font-medium">Fee Amount (₱)</Label>
+              <Input
+                id="installation-fee"
+                type="number"
+                value={installationFee}
+                onChange={(e) => setInstallationFee(Number(e.target.value) || 0)}
+                placeholder="0.00"
+                className="text-lg"
+              />
+            </div>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setInstallationModal({ open: false, item: null })}
+              >
+                Skip
+              </Button>
+              <Button
+                className={buttonStyles.primary}
+                onClick={handleConfirmInstallation}
+              >
+                Confirm Fee
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Toggle between POS and Sales History */}
         {!showSalesHistory ? (
           // POS Interface
@@ -1058,8 +1191,8 @@ export default function POSPage() {
                               key={vehicle.value}
                               variant={isSelected ? "default" : "outline"}
                               className={`flex items-center justify-center gap-2 transition-all duration-300 w-full font-poppins ${isSelected
-                                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transform scale-105'
-                                  : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-300 hover:border-indigo-400 hover:scale-105'
+                                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transform scale-105'
+                                : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-300 hover:border-indigo-400 hover:scale-105'
                                 }`}
                               onClick={() => setSelectedVehicleType(vehicle.value)}
                             >
@@ -1082,8 +1215,8 @@ export default function POSPage() {
                               key={category.value}
                               variant={isSelected ? "secondary" : "outline"}
                               className={`flex items-center justify-center gap-2 transition-all duration-300 w-full font-poppins ${isSelected
-                                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transform scale-105'
-                                  : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-300 hover:border-indigo-400 hover:scale-105'
+                                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transform scale-105'
+                                : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-300 hover:border-indigo-400 hover:scale-105'
                                 }`}
                               onClick={() => setSelectedCategory(category.value)}
                             >
@@ -1165,8 +1298,8 @@ export default function POSPage() {
                                   <Badge
                                     variant="outline"
                                     className={`text-xs ${item.vehicle_type === 'car' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                                        item.vehicle_type === 'motor' ? 'bg-green-100 text-green-700 border-green-200' :
-                                          'bg-orange-100 text-orange-700 border-orange-200'
+                                      item.vehicle_type === 'motor' ? 'bg-green-100 text-green-700 border-green-200' :
+                                        'bg-orange-100 text-orange-700 border-orange-200'
                                       }`}
                                   >
                                     {item.vehicle_type}
@@ -1178,8 +1311,8 @@ export default function POSPage() {
                               <div>
                                 <p className="text-lg font-bold text-green-600">₱{formatPrice(item.sale_price)}</p>
                                 <p className={`text-xs ${item.stock_quantity === 0 ? 'text-red-500' :
-                                    item.stock_quantity <= 2 ? 'text-red-500' :
-                                      item.stock_quantity <= 5 ? 'text-yellow-500' : 'text-green-500'
+                                  item.stock_quantity <= 2 ? 'text-red-500' :
+                                    item.stock_quantity <= 5 ? 'text-yellow-500' : 'text-green-500'
                                   }`}>
                                   {item.stock_quantity} in stock
                                 </p>
@@ -1260,6 +1393,15 @@ export default function POSPage() {
                                 <CategoryIcon category={item.category} className="h-3 w-3 text-indigo-600" />
                                 <p className="text-sm font-medium text-slate-800 truncate font-poppins">{item.name}</p>
                               </div>
+                              {item.installationFee && item.installationFee > 0 ? (
+                                <p className="text-xs text-slate-500 font-poppins">
+                                  {`₱${formatPrice(item.sale_price)} + ₱${formatPrice(item.installationFee)} install`}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-slate-500 font-poppins">
+                                  {`₱${formatPrice(item.sale_price)} each`}
+                                </p>
+                              )}
                               <p className="text-xs text-slate-500 font-poppins">₱{formatPrice(item.sale_price)} each</p>
                             </div>
                             <div className="flex items-center gap-2">
