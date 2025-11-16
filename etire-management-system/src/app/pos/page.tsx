@@ -17,10 +17,10 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  ChevronsLeft, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
   ChevronsRight,
   Search,
   Eye,
@@ -57,33 +57,42 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import type { InventoryItem } from '../inventory/page';
+import {
+  generateHtmlReceipt,
+  printReceipt,
+  type BusinessInfo,
+  type ReceiptItem,
+  type ReceiptData,
+  type ReceiptCustomer,
+} from '@/lib/receiptGenerator';
+import type { Sale, User } from '@/lib/types';
 
 // ============================================
 // INTERFACES & TYPES
 // ============================================
 interface Customer {
-    customer_id: string;
-    name: string;
-    phone?: string;
-    email?: string;
+  customer_id: string;
+  name: string;
+  phone?: string;
+  email?: string;
 }
 
 interface CartItem extends InventoryItem {
-    quantity: number;
+  quantity: number;
 }
 
 export interface Sale {
-    sale_id: string;
-    sale_date: string;
-    customer_id: string;
-    payment_method: string;
-    discount_amount: number;
-    tax_amount: number;
-    customer?: { name: string };
-    sale_item?: Array<{
-        quantity: number;
-        price_at_sale: number;
-    }>;
+  sale_id: string;
+  sale_date: string;
+  customer_id: string;
+  payment_method: string;
+  discount_amount: number;
+  tax_amount: number;
+  customer?: { name: string };
+  sale_item?: Array<{
+    quantity: number;
+    price_at_sale: number;
+  }>;
 }
 
 const ANONYMOUS_CUSTOMER_ID = "anonymous_customer";
@@ -107,28 +116,28 @@ const microAnimations = {
 // CUSTOM TIRE ICON COMPONENT
 // ============================================
 const TireIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
-  <svg 
-    className={className} 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
     strokeWidth="2"
   >
     {/* Outer tire circle */}
-    <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2"/>
+    <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" />
     {/* Inner rim circle */}
-    <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5"/>
+    <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5" />
     {/* Tire tread patterns */}
-    <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="1" strokeDasharray="2 2"/>
+    <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="1" strokeDasharray="2 2" />
     {/* Spoke lines */}
-    <line x1="12" y1="4" x2="12" y2="8" stroke="currentColor" strokeWidth="1"/>
-    <line x1="12" y1="16" x2="12" y2="20" stroke="currentColor" strokeWidth="1"/>
-    <line x1="4" y1="12" x2="8" y2="12" stroke="currentColor" strokeWidth="1"/>
-    <line x1="16" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="1"/>
-    <line x1="6" y1="6" x2="8.5" y2="8.5" stroke="currentColor" strokeWidth="1"/>
-    <line x1="15.5" y1="15.5" x2="18" y2="18" stroke="currentColor" strokeWidth="1"/>
-    <line x1="6" y1="18" x2="8.5" y2="15.5" stroke="currentColor" strokeWidth="1"/>
-    <line x1="15.5" y1="8.5" x2="18" y2="6" stroke="currentColor" strokeWidth="1"/>
+    <line x1="12" y1="4" x2="12" y2="8" stroke="currentColor" strokeWidth="1" />
+    <line x1="12" y1="16" x2="12" y2="20" stroke="currentColor" strokeWidth="1" />
+    <line x1="4" y1="12" x2="8" y2="12" stroke="currentColor" strokeWidth="1" />
+    <line x1="16" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="1" />
+    <line x1="6" y1="6" x2="8.5" y2="8.5" stroke="currentColor" strokeWidth="1" />
+    <line x1="15.5" y1="15.5" x2="18" y2="18" stroke="currentColor" strokeWidth="1" />
+    <line x1="6" y1="18" x2="8.5" y2="15.5" stroke="currentColor" strokeWidth="1" />
+    <line x1="15.5" y1="8.5" x2="18" y2="6" stroke="currentColor" strokeWidth="1" />
   </svg>
 );
 
@@ -150,12 +159,12 @@ interface DataTableProps {
   onRowClick?: (row: any) => void;
 }
 
-function DataTableWrapper({ 
-  data, 
-  columns, 
-  searchKeys = [], 
+function DataTableWrapper({
+  data,
+  columns,
+  searchKeys = [],
   rowsPerPageOptions = [5, 10, 25, 50],
-  onRowClick 
+  onRowClick
 }: DataTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -243,11 +252,10 @@ function DataTableWrapper({
             <thead className="bg-slate-50 border-b">
               <tr>
                 {columns.map((column) => (
-                  <th 
+                  <th
                     key={column.key}
-                    className={`px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider ${
-                      column.sortable ? 'cursor-pointer hover:bg-slate-100 select-none' : ''
-                    }`}
+                    className={`px-6 py-3 text-left text-xs font-medium text-slate-700 uppercase tracking-wider ${column.sortable ? 'cursor-pointer hover:bg-slate-100 select-none' : ''
+                      }`}
                     onClick={() => column.sortable && handleSort(column.key)}
                   >
                     <div className="flex items-center gap-2">
@@ -271,7 +279,7 @@ function DataTableWrapper({
                 </tr>
               ) : (
                 paginatedData.map((row, index) => (
-                  <tr 
+                  <tr
                     key={index}
                     className={`${onRowClick ? 'cursor-pointer hover:bg-slate-50 transition-colors' : ''}`}
                     onClick={() => onRowClick?.(row)}
@@ -318,13 +326,13 @@ function DataTableWrapper({
 // ============================================
 // CUSTOMER SEARCH COMPONENT
 // ============================================
-const CustomerSearch = ({ 
-  customers, 
-  selectedCustomerId, 
-  onCustomerSelect 
-}: { 
-  customers: Customer[]; 
-  selectedCustomerId: string; 
+const CustomerSearch = ({
+  customers,
+  selectedCustomerId,
+  onCustomerSelect
+}: {
+  customers: Customer[];
+  selectedCustomerId: string;
   onCustomerSelect: (customerId: string) => void;
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -361,7 +369,7 @@ const CustomerSearch = ({
               Search and select a customer for this sale
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
@@ -420,7 +428,7 @@ const CustomerSearch = ({
           </div>
 
           <DialogFooter>
-            <Button 
+            <Button
               onClick={() => setIsOpen(false)}
               className={buttonStyles.back}
             >
@@ -437,11 +445,11 @@ const CustomerSearch = ({
 // ============================================
 // SUCCESS ANIMATION COMPONENT (MODIFIED)
 // ============================================
-const SuccessAnimation = ({ 
-  isVisible, 
-  saleId, 
+const SuccessAnimation = ({
+  isVisible,
+  saleId,
   onConfirm
-}: { 
+}: {
   isVisible: boolean;
   saleId: string | null;
   onConfirm: () => void;
@@ -454,17 +462,17 @@ const SuccessAnimation = ({
         <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500">
           <CheckCircle className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
         </div>
-        
+
         <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins">
           Sale Completed!
         </h3>
-        
+
         <p className="text-slate-600 mb-6 font-poppins">
           The transaction has been processed successfully.
         </p>
-        
+
         <div className="flex gap-3 justify-center">
-          <Button 
+          <Button
             className={buttonStyles.primary}
             onClick={onConfirm}
           >
@@ -507,391 +515,458 @@ const CategoryIcon = ({ category, className = "h-4 w-4" }: { category: string; c
 // MAIN POS PAGE COMPONENT
 // ============================================
 export default function POSPage() {
-    const { toast } = useToast();
-    const { user: authUser } = useAuth();
-    
-    // State for POS
-    const [inventory, setInventory] = useState<InventoryItem[]>([]);
-    const [customers, setCustomers] = useState<Customer[]>([]);
-    const [cart, setCart] = useState<CartItem[]>([]);
-    const [selectedCustomerId, setSelectedCustomerId] = useState<string>(ANONYMOUS_CUSTOMER_ID);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [selectedVehicleType, setSelectedVehicleType] = useState<string>('all');
-    const [selectedCategory, setSelectedCategory] = useState<string>('all');
-    const [mounted, setMounted] = useState(false);
-    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-    
-    // State for Sales History
-    const [sales, setSales] = useState<Sale[]>([]);
-    const [showSalesHistory, setShowSalesHistory] = useState(false);
-    
-    // State for Success Animation
-    const [showSuccess, setShowSuccess] = useState(false);
-    const [lastSaleId, setLastSaleId] = useState<string | null>(null);
-    
-    const [isLoading, setIsLoading] = useState(true);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [fetchError, setFetchError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const { user: authUser } = useAuth();
 
-    // Vehicle type configuration
-    const vehicleTypes = [
-        { value: 'all', label: 'All Vehicles', icon: Package, color: 'bg-slate-500' },
-        { value: 'car', label: 'Car', icon: Car, color: 'bg-blue-500' },
-        { value: 'motor', label: 'Motorcycle', icon: Bike, color: 'bg-green-500' },
-        { value: 'truck', label: 'Truck', icon: Truck, color: 'bg-orange-500' }
-    ];
+  // State for POS
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(ANONYMOUS_CUSTOMER_ID);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedVehicleType, setSelectedVehicleType] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [mounted, setMounted] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-    const categories = [
-        { value: 'all', label: 'All Categories' },
-        { value: 'tire', label: 'Tires' },
-        { value: 'tool', label: 'Tools' },
-        { value: 'accessory', label: 'Accessories' }
-    ];
+  // State for Sales History
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [showSalesHistory, setShowSalesHistory] = useState(false);
 
-    useEffect(() => {
-        setMounted(true);
-    }, []);
+  // State for Success Animation
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [lastSaleId, setLastSaleId] = useState<string | null>(null);
 
-    const fetchInitialData = useCallback(async () => {
-        if (!supabase) {
-            setFetchError("Supabase client not available. Please check your .env.local file.");
-            setIsLoading(false);
-            return;
-        }
-        setIsLoading(true);
-        setFetchError(null);
-        try {
-            const [inventoryRes, customersRes, salesRes] = await Promise.all([
-                supabase.from('inventory_item').select('*').gt('stock_quantity', 0),
-                supabase.from('customer').select('customer_id, name, phone, email'),
-                supabase
-                    .from('sale')
-                    .select(`
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Vehicle type configuration
+  const vehicleTypes = [
+    { value: 'all', label: 'All Vehicles', icon: Package, color: 'bg-slate-500' },
+    { value: 'car', label: 'Car', icon: Car, color: 'bg-blue-500' },
+    { value: 'motor', label: 'Motorcycle', icon: Bike, color: 'bg-green-500' },
+    { value: 'truck', label: 'Truck', icon: Truck, color: 'bg-orange-500' }
+  ];
+
+  const categories = [
+    { value: 'all', label: 'All Categories' },
+    { value: 'tire', label: 'Tires' },
+    { value: 'tool', label: 'Tools' },
+    { value: 'accessory', label: 'Accessories' }
+  ];
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const fetchInitialData = useCallback(async () => {
+    if (!supabase) {
+      setFetchError("Supabase client not available. Please check your .env.local file.");
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    setFetchError(null);
+    try {
+      const [inventoryRes, customersRes, salesRes] = await Promise.all([
+        supabase.from('inventory_item').select('*').gt('stock_quantity', 0),
+        supabase.from('customer').select('customer_id, name, phone, email'),
+        supabase
+          .from('sale')
+          .select(`
                         *,
                         customer (name),
                         sale_item (quantity, price_at_sale)
                     `)
-                    .order('sale_date', { ascending: false })
-                    .limit(50)
-            ]);
+          .order('sale_date', { ascending: false })
+          .limit(50)
+      ]);
 
-            if (inventoryRes.error) throw inventoryRes.error;
-            if (customersRes.error) throw customersRes.error;
-            if (salesRes.error) throw salesRes.error;
+      if (inventoryRes.error) throw inventoryRes.error;
+      if (customersRes.error) throw customersRes.error;
+      if (salesRes.error) throw salesRes.error;
 
-            setInventory(inventoryRes.data);
-            setCustomers(customersRes.data);
-            setSales(salesRes.data);
-            setLastUpdated(new Date());
-        } catch (error: any) {
-            let errorMessage = `Failed to load data: ${error.message}.`;
-            setFetchError(errorMessage);
-            toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
-        } finally {
-            setIsLoading(false);
-        }
-    }, [toast]);
-
-    useEffect(() => {
-        fetchInitialData();
-    }, [fetchInitialData]);
-
-    // Filter inventory based on selections
-    const filteredInventory = useMemo(() => {
-        return inventory.filter(item => {
-            const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                item.category.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesVehicle = selectedVehicleType === 'all' || item.vehicle_type === selectedVehicleType;
-            const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
-            
-            return matchesSearch && matchesVehicle && matchesCategory;
-        });
-    }, [inventory, searchTerm, selectedVehicleType, selectedCategory]);
-
-    const addToCart = (item: InventoryItem) => {
-        setCart(prevCart => {
-            const existingItem = prevCart.find(cartItem => cartItem.item_id === item.item_id);
-            if (existingItem) {
-                if (existingItem.quantity < item.stock_quantity) {
-                    return prevCart.map(cartItem =>
-                        cartItem.item_id === item.item_id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem
-                    );
-                } else {
-                    toast({ title: 'Stock Limit', description: `Cannot add more of ${item.name}. Stock limit reached.`, variant: 'destructive'});
-                    return prevCart;
-                }
-            }
-            if (item.stock_quantity > 0) {
-              return [...prevCart, { ...item, quantity: 1 }];
-            } else {
-              toast({ title: 'Out of Stock', description: `${item.name} is out of stock.`, variant: 'destructive'});
-              return prevCart;
-            }
-        });
-    };
-
-    const updateQuantity = (itemId: string, newQuantity: number) => {
-        const item = inventory.find(p => p.item_id === itemId);
-        if (!item) return;
-
-        if (newQuantity > 0 && newQuantity <= item.stock_quantity) {
-            setCart(cart.map(cartItem => cartItem.item_id === itemId ? { ...cartItem, quantity: newQuantity } : cartItem));
-        } else if (newQuantity > item.stock_quantity) {
-            toast({ title: 'Stock Limit', description: `Only ${item.stock_quantity} units of ${item.name} available.`, variant: 'destructive' });
-        } else if (newQuantity <= 0) {
-            removeFromCart(itemId);
-        }
-    };
-    
-    const removeFromCart = (itemId: string) => {
-        setCart(cart.filter(item => item.item_id !== itemId));
-    };
-
-    const subtotal = cart.reduce((acc, item) => acc + item.sale_price * item.quantity, 0);
-    const total = subtotal;
-
-    const handleProcessSale = async () => {
-      if (cart.length === 0) {
-        toast({ 
-          title: "Empty Cart", 
-          description: "Please add items before processing a sale.", 
-          variant: "destructive" 
-        });
-        return;
-      }
-
-      setIsSubmitting(true);
-
-      try {
-        const response = await fetch("/api/sales", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            customerId: selectedCustomerId === ANONYMOUS_CUSTOMER_ID ? null : selectedCustomerId,
-            cartItems: cart,
-            paymentMethod: "cash",
-            userId: authUser?.user_id,
-            branchId: "main_branch",
-          }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) throw new Error(data.error || "Failed to process sale");
-
-        // Store the sale ID for receipt download
-        setLastSaleId(data.sale_id);
-        
-        // Show success animation
-        setShowSuccess(true);
-        
-        // Clear cart after delay
-        setTimeout(() => {
-          setCart([]);
-          setSelectedCustomerId(ANONYMOUS_CUSTOMER_ID);
-          fetchInitialData();
-        }, 3000);
-
-      } catch (err: any) {
-        toast({
-          title: "Checkout Failed ❌",
-          description: err.message,
-          variant: "destructive",
-        });
-      } finally {
-        setIsSubmitting(false);
-      }
-    };
-
-    const handleDownloadReceipt = async (saleId: string) => {
-      try {
-        const response = await fetch(`/api/receipts/${saleId}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to download receipt');
-        }
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = `receipt-${saleId}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-
-        toast({
-          title: "Receipt Downloaded",
-          description: "Receipt has been downloaded successfully.",
-        });
-      } catch (error: any) {
-        toast({
-          title: "Download Failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      }
-    };
-
-    const handleConfirmSuccess = () => {
-      setShowSuccess(false);
-      setLastSaleId(null);
-    };
-
-    const clearFilters = () => {
-        setSelectedVehicleType('all');
-        setSelectedCategory('all');
-        setSearchTerm('');
-    };
-
-    // ============================================
-    // SALES TABLE COLUMNS (WITHOUT UNDO BUTTON)
-    // ============================================
-    const salesColumns: Column[] = [
-      {
-        key: 'sale_id',
-        label: 'Sale ID',
-        sortable: true,
-        render: (value: any) => (
-          <span className="font-mono text-sm font-medium text-indigo-600">{value}</span>
-        )
-      },
-      {
-        key: 'sale_date',
-        label: 'Date & Time',
-        sortable: true,
-        render: (value: any) => {
-          const date = new Date(value);
-          return (
-            <div>
-              <div className="font-medium">{date.toLocaleDateString()}</div>
-              <div className="text-xs text-slate-500">{date.toLocaleTimeString()}</div>
-            </div>
-          );
-        }
-      },
-      {
-        key: 'customer_name',
-        label: 'Customer',
-        sortable: true,
-        render: (value: any) => (
-          <span className={value === 'Walk-in Customer' ? 'text-slate-500 italic' : 'font-medium'}>
-            {value}
-          </span>
-        )
-      },
-      {
-        key: 'items_count',
-        label: 'Items',
-        sortable: true,
-        render: (value: any) => (
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-            {value} items
-          </Badge>
-        )
-      },
-      {
-        key: 'payment_method',
-        label: 'Payment',
-        sortable: true,
-        render: (value: any) => (
-          <Badge 
-            variant="outline" 
-            className={
-              value === 'cash' ? 'bg-green-50 text-green-700 border-green-200' :
-              value === 'card' ? 'bg-purple-50 text-purple-700 border-purple-200' :
-              'bg-blue-50 text-blue-700 border-blue-200'
-            }
-          >
-            {String(value).toUpperCase()}
-          </Badge>
-        )
-      },
-      {
-        key: 'total_amount',
-        label: 'Total Amount',
-        sortable: true,
-        render: (value: any) => (
-          <span className="font-semibold text-green-600">
-            ₱{formatPrice(Number(value) || 0)}
-          </span>
-        )
-      },
-      {
-        key: 'status',
-        label: 'Status',
-        sortable: true,
-        render: (value: any) => (
-          <Badge 
-            variant="outline" 
-            className={
-              value === 'completed' ? 'bg-green-50 text-green-700 border-green-200' :
-              value === 'pending' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
-              'bg-red-50 text-red-700 border-red-200'
-            }
-          >
-            {value}
-          </Badge>
-        )
-      },
-      {
-        key: 'actions',
-        label: 'Actions',
-        render: (_: any, row: any) => (
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={(e) => {
-              e.stopPropagation();
-              alert(`View details for ${row.sale_id}`);
-            }}>
-              <Eye className="h-4 w-4 mr-1" />
-              View
-            </Button>
-            <Button variant="ghost" size="sm" onClick={(e) => {
-              e.stopPropagation();
-              handleDownloadReceipt(row.sale_id);
-            }}>
-              <Download className="h-4 w-4 mr-1" />
-              Receipt
-            </Button>
-          </div>
-        )
-      }
-    ];
-
-    // Calculate summary statistics from the real `sales` state
-    const totalSalesAmount = sales.reduce((sum, s) => sum + (Number((s as any).total_amount) || 0), 0);
-    const todaySales = sales.filter(s => new Date(s.sale_date).toDateString() === new Date().toDateString());
-    const todayRevenue = todaySales.reduce((sum, s) => sum + (Number((s as any).total_amount) || 0), 0);
-
-    if (fetchError) {
-        return (
-            <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
-                <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-                    <PageHeader title="Point of Sale (POS)" description="Create new sales transactions for products." />
-                    <Alert variant="destructive" className="mt-4">
-                        <AlertTitle>Database Error</AlertTitle>
-                        <AlertDescription>{fetchError}</AlertDescription>
-                    </Alert>
-                </div>
-            </div>
-        );
+      setInventory(inventoryRes.data);
+      setCustomers(customersRes.data);
+      setSales(salesRes.data);
+      setLastUpdated(new Date());
+    } catch (error: any) {
+      let errorMessage = `Failed to load data: ${error.message}.`;
+      setFetchError(errorMessage);
+      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
     }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchInitialData();
+  }, [fetchInitialData]);
+
+  // Filter inventory based on selections
+  const filteredInventory = useMemo(() => {
+    return inventory.filter(item => {
+      const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.category.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesVehicle = selectedVehicleType === 'all' || item.vehicle_type === selectedVehicleType;
+      const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
+
+      return matchesSearch && matchesVehicle && matchesCategory;
+    });
+  }, [inventory, searchTerm, selectedVehicleType, selectedCategory]);
+
+  const addToCart = (item: InventoryItem) => {
+    setCart(prevCart => {
+      const existingItem = prevCart.find(cartItem => cartItem.item_id === item.item_id);
+      if (existingItem) {
+        if (existingItem.quantity < item.stock_quantity) {
+          return prevCart.map(cartItem =>
+            cartItem.item_id === item.item_id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem
+          );
+        } else {
+          toast({ title: 'Stock Limit', description: `Cannot add more of ${item.name}. Stock limit reached.`, variant: 'destructive' });
+          return prevCart;
+        }
+      }
+      if (item.stock_quantity > 0) {
+        return [...prevCart, { ...item, quantity: 1 }];
+      } else {
+        toast({ title: 'Out of Stock', description: `${item.name} is out of stock.`, variant: 'destructive' });
+        return prevCart;
+      }
+    });
+  };
+
+  const updateQuantity = (itemId: string, newQuantity: number) => {
+    const item = inventory.find(p => p.item_id === itemId);
+    if (!item) return;
+
+    if (newQuantity > 0 && newQuantity <= item.stock_quantity) {
+      setCart(cart.map(cartItem => cartItem.item_id === itemId ? { ...cartItem, quantity: newQuantity } : cartItem));
+    } else if (newQuantity > item.stock_quantity) {
+      toast({ title: 'Stock Limit', description: `Only ${item.stock_quantity} units of ${item.name} available.`, variant: 'destructive' });
+    } else if (newQuantity <= 0) {
+      removeFromCart(itemId);
+    }
+  };
+
+  const removeFromCart = (itemId: string) => {
+    setCart(cart.filter(item => item.item_id !== itemId));
+  };
+
+  const subtotal = cart.reduce((acc, item) => acc + item.sale_price * item.quantity, 0);
+  const total = subtotal;
+
+  const handleProcessSale = async () => {
+    if (cart.length === 0) {
+      toast({
+        title: "Empty Cart",
+        description: "Please add items before processing a sale.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!authUser) {
+      toast({ title: 'Not Authenticated', description: 'You must be logged in to process a sale.', variant: 'destructive' });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/sales", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: selectedCustomerId === ANONYMOUS_CUSTOMER_ID ? null : selectedCustomerId,
+          cartItems: cart,
+          paymentMethod: "cash", // You can change this if you add a payment selector
+          userId: authUser.user_id,
+          branchId: null, // TODO: Add branch logic if needed
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error || "Failed to process sale");
+
+      // -----------------------------------------------------------
+      // 🟢 NEW RECEIPT GENERATION LOGIC
+      // -----------------------------------------------------------
+      try {
+        // 1. Define your Business Info
+        const businessInfo: BusinessInfo = {
+          storeName: 'Queen.R Tire Supply & Vulcanizing Shop',
+          address: '68, Sipocot, Camarines Sur',
+          phone: 'To be given', // Update when you have it
+          taxInfo: 'To be given', // Update when you have it
+          footerMessage: 'Thank You!',
+        };
+
+        // 2. Map cart to ReceiptItem[]
+        const receiptItems: ReceiptItem[] = cart.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.sale_price,
+        }));
+
+        // 3. Find the selected customer object
+        const selectedCustomerObj = customers.find(c => c.customer_id === selectedCustomerId);
+        const receiptCustomer: ReceiptCustomer | undefined = selectedCustomerObj
+          ? { name: selectedCustomerObj.name, phone: selectedCustomerObj.phone }
+          : undefined;
+
+        // 4. Build a 'Sale' object from state (since the API only returns the ID)
+        const newSaleObject: Sale = {
+          sale_id: data.sale_id,
+          sale_date: new Date().toISOString(),
+          customer_id: selectedCustomerId === ANONYMOUS_CUSTOMER_ID ? undefined : selectedCustomerId,
+          user_id: authUser.user_id,
+          payment_method: 'cash',
+          discount_amount: 0, // You don't calculate this in the cart yet
+          tax_amount: 0, // You don't calculate this in the cart yet
+          total_amount: total, // 'total' is from your component's state (line 698)
+        };
+
+        // 5. Assemble the final data packet
+        const receiptData: ReceiptData = {
+          sale: newSaleObject,
+          items: receiptItems,
+          cashier: authUser as User,
+          customer: receiptCustomer,
+          businessInfo: businessInfo,
+          // branch: undefined, // Add this when you have branch data in state
+        };
+
+        // 6. Generate the HTML
+        const html = generateHtmlReceipt(receiptData);
+
+        // 7. Print it!
+        printReceipt(html);
+
+      } catch (receiptError: any) {
+        console.error('Receipt generation failed:', receiptError);
+        toast({ title: 'Receipt Error', description: `Sale was saved (ID: ${data.sale_id}), but receipt failed to print: ${receiptError.message}`, variant: 'destructive' });
+      }
+      // -----------------------------------------------------------
+      // END OF RECEIPT LOGIC
+      // -----------------------------------------------------------
+
+      // Store the sale ID for receipt download (your existing logic)
+      setLastSaleId(data.sale_id);
+
+      // Show success animation (your existing logic)
+      setShowSuccess(true);
+
+      // Clear cart after delay (your existing logic)
+      setTimeout(() => {
+        setCart([]);
+        setSelectedCustomerId(ANONYMOUS_CUSTOMER_ID);
+        fetchInitialData();
+      }, 3000); // This delay is long, you might want to shorten it or clear cart on "Confirm"
+
+    } catch (err: any) {
+      toast({
+        title: "Checkout Failed ❌",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDownloadReceipt = async (saleId: string) => {
+    try {
+      const response = await fetch(`/api/receipts/${saleId}`);
+
+      if (!response.ok) {
+        throw new Error('Failed to download receipt');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `receipt-${saleId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Receipt Downloaded",
+        description: "Receipt has been downloaded successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Download Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleConfirmSuccess = () => {
+    setShowSuccess(false);
+    setLastSaleId(null);
+  };
+
+  const clearFilters = () => {
+    setSelectedVehicleType('all');
+    setSelectedCategory('all');
+    setSearchTerm('');
+  };
+
+  // ============================================
+  // SALES TABLE COLUMNS (WITHOUT UNDO BUTTON)
+  // ============================================
+  const salesColumns: Column[] = [
+    {
+      key: 'sale_id',
+      label: 'Sale ID',
+      sortable: true,
+      render: (value: any) => (
+        <span className="font-mono text-sm font-medium text-indigo-600">{value}</span>
+      )
+    },
+    {
+      key: 'sale_date',
+      label: 'Date & Time',
+      sortable: true,
+      render: (value: any) => {
+        const date = new Date(value);
+        return (
+          <div>
+            <div className="font-medium">{date.toLocaleDateString()}</div>
+            <div className="text-xs text-slate-500">{date.toLocaleTimeString()}</div>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'customer_name',
+      label: 'Customer',
+      sortable: true,
+      render: (value: any) => (
+        <span className={value === 'Walk-in Customer' ? 'text-slate-500 italic' : 'font-medium'}>
+          {value}
+        </span>
+      )
+    },
+    {
+      key: 'items_count',
+      label: 'Items',
+      sortable: true,
+      render: (value: any) => (
+        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+          {value} items
+        </Badge>
+      )
+    },
+    {
+      key: 'payment_method',
+      label: 'Payment',
+      sortable: true,
+      render: (value: any) => (
+        <Badge
+          variant="outline"
+          className={
+            value === 'cash' ? 'bg-green-50 text-green-700 border-green-200' :
+              value === 'card' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                'bg-blue-50 text-blue-700 border-blue-200'
+          }
+        >
+          {String(value).toUpperCase()}
+        </Badge>
+      )
+    },
+    {
+      key: 'total_amount',
+      label: 'Total Amount',
+      sortable: true,
+      render: (value: any) => (
+        <span className="font-semibold text-green-600">
+          ₱{formatPrice(Number(value) || 0)}
+        </span>
+      )
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortable: true,
+      render: (value: any) => (
+        <Badge
+          variant="outline"
+          className={
+            value === 'completed' ? 'bg-green-50 text-green-700 border-green-200' :
+              value === 'pending' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                'bg-red-50 text-red-700 border-red-200'
+          }
+        >
+          {value}
+        </Badge>
+      )
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (_: any, row: any) => (
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={(e) => {
+            e.stopPropagation();
+            alert(`View details for ${row.sale_id}`);
+          }}>
+            <Eye className="h-4 w-4 mr-1" />
+            View
+          </Button>
+          <Button variant="ghost" size="sm" onClick={(e) => {
+            e.stopPropagation();
+            handleDownloadReceipt(row.sale_id);
+          }}>
+            <Download className="h-4 w-4 mr-1" />
+            Receipt
+          </Button>
+        </div>
+      )
+    }
+  ];
+
+  // Calculate summary statistics from the real `sales` state
+  const totalSalesAmount = sales.reduce((sum, s) => sum + (Number((s as any).total_amount) || 0), 0);
+  const todaySales = sales.filter(s => new Date(s.sale_date).toDateString() === new Date().toDateString());
+  const todayRevenue = todaySales.reduce((sum, s) => sum + (Number((s as any).total_amount) || 0), 0);
+
+  if (fetchError) {
+    return (
+      <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
+        <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
+          <PageHeader title="Point of Sale (POS)" description="Create new sales transactions for products." />
+          <Alert variant="destructive" className="mt-4">
+            <AlertTitle>Database Error</AlertTitle>
+            <AlertDescription>{fetchError}</AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
       {/* Background Sections - MATCHING DASHBOARD SPACING */}
       <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
-        <div 
+        <div
           className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
-          style={{ 
+          style={{
             backgroundImage: "url('/images/image2.jpg')",
             backgroundSize: "cover",
             backgroundPosition: "center 30%"
           }}
         ></div>
-        
+
         <div className="absolute top-0 left-0 w-32 h-32 bg-green-300/20 rounded-br-full"></div>
         <div className="absolute top-0 right-0 w-32 h-32 bg-teal-300/20 rounded-bl-full"></div>
         <div className="absolute bottom-10 left-20 w-16 h-16 bg-white/20 rounded-2xl rotate-45"></div>
@@ -903,12 +978,12 @@ export default function POSPage() {
       </div>
 
       <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-        
+
         {/* Header Section - MATCHING DASHBOARD STYLING */}
         <div className={`mb-12 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
           <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
-            
+
             <div className="relative z-10 flex-1">
               <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
                 Point of Sale (POS)
@@ -932,16 +1007,16 @@ export default function POSPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex gap-3">
-              <Button 
+              <Button
                 onClick={() => setShowSalesHistory(!showSalesHistory)}
                 className={buttonStyles.glass + " active:scale-95 font-poppins"}
               >
                 <Receipt className="h-5 w-5 mr-2" />
                 {showSalesHistory ? 'Show POS' : 'Sales History'}
               </Button>
-              <Button 
+              <Button
                 onClick={fetchInitialData}
                 disabled={isLoading}
                 className={buttonStyles.glass + " active:scale-95 font-poppins"}
@@ -954,8 +1029,8 @@ export default function POSPage() {
         </div>
 
         {/* Success Animation */}
-        <SuccessAnimation 
-          isVisible={showSuccess} 
+        <SuccessAnimation
+          isVisible={showSuccess}
           saleId={lastSaleId}
           onConfirm={handleConfirmSuccess}
         />
@@ -969,7 +1044,7 @@ export default function POSPage() {
               <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
                 <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-purple-50/50 border-b border-slate-200/50">
                   <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Available Products</CardTitle>
-                  
+
                   <div className="space-y-4 mt-4">
                     {/* Vehicle Type Selection */}
                     <div>
@@ -982,11 +1057,10 @@ export default function POSPage() {
                             <Button
                               key={vehicle.value}
                               variant={isSelected ? "default" : "outline"}
-                              className={`flex items-center justify-center gap-2 transition-all duration-300 w-full font-poppins ${
-                                isSelected 
-                                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transform scale-105' 
+                              className={`flex items-center justify-center gap-2 transition-all duration-300 w-full font-poppins ${isSelected
+                                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transform scale-105'
                                   : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-300 hover:border-indigo-400 hover:scale-105'
-                              }`}
+                                }`}
                               onClick={() => setSelectedVehicleType(vehicle.value)}
                             >
                               <Icon className="h-4 w-4" />
@@ -1007,11 +1081,10 @@ export default function POSPage() {
                             <Button
                               key={category.value}
                               variant={isSelected ? "secondary" : "outline"}
-                              className={`flex items-center justify-center gap-2 transition-all duration-300 w-full font-poppins ${
-                                isSelected 
-                                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transform scale-105' 
+                              className={`flex items-center justify-center gap-2 transition-all duration-300 w-full font-poppins ${isSelected
+                                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transform scale-105'
                                   : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-300 hover:border-indigo-400 hover:scale-105'
-                              }`}
+                                }`}
                               onClick={() => setSelectedCategory(category.value)}
                             >
                               <CategoryIcon category={category.value} />
@@ -1025,8 +1098,8 @@ export default function POSPage() {
                     {/* Search Bar */}
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                      <Input 
-                        placeholder="Search products by name or category..." 
+                      <Input
+                        placeholder="Search products by name or category..."
                         className="pl-10 border-slate-300 focus:border-indigo-400 transition-all duration-300 font-poppins"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -1070,8 +1143,8 @@ export default function POSPage() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-6 max-h-[60vh] overflow-y-auto">
                       {filteredInventory.map(item => (
-                        <Card 
-                          key={item.item_id} 
+                        <Card
+                          key={item.item_id}
                           className={`border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group ${microAnimations.cardHover} font-poppins`}
                           onClick={() => addToCart(item)}
                         >
@@ -1089,13 +1162,12 @@ export default function POSPage() {
                                     <CategoryIcon category={item.category} className="h-3 w-3" />
                                     {item.category}
                                   </Badge>
-                                  <Badge 
-                                    variant="outline" 
-                                    className={`text-xs ${
-                                      item.vehicle_type === 'car' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                                      item.vehicle_type === 'motor' ? 'bg-green-100 text-green-700 border-green-200' :
-                                      'bg-orange-100 text-orange-700 border-orange-200'
-                                    }`}
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-xs ${item.vehicle_type === 'car' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                        item.vehicle_type === 'motor' ? 'bg-green-100 text-green-700 border-green-200' :
+                                          'bg-orange-100 text-orange-700 border-orange-200'
+                                      }`}
                                   >
                                     {item.vehicle_type}
                                   </Badge>
@@ -1105,20 +1177,19 @@ export default function POSPage() {
                             <div className="flex justify-between items-center">
                               <div>
                                 <p className="text-lg font-bold text-green-600">₱{formatPrice(item.sale_price)}</p>
-                                <p className={`text-xs ${
-                                  item.stock_quantity === 0 ? 'text-red-500' :
-                                  item.stock_quantity <= 2 ? 'text-red-500' :
-                                  item.stock_quantity <= 5 ? 'text-yellow-500' : 'text-green-500'
-                                }`}>
+                                <p className={`text-xs ${item.stock_quantity === 0 ? 'text-red-500' :
+                                    item.stock_quantity <= 2 ? 'text-red-500' :
+                                      item.stock_quantity <= 5 ? 'text-yellow-500' : 'text-green-500'
+                                  }`}>
                                   {item.stock_quantity} in stock
                                 </p>
                               </div>
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 font-poppins"
                                 disabled={item.stock_quantity <= 0}
                               >
-                                <Plus className="mr-1 h-4 w-4" /> 
+                                <Plus className="mr-1 h-4 w-4" />
                                 Add
                               </Button>
                             </div>
@@ -1130,8 +1201,8 @@ export default function POSPage() {
                           <Package className="h-16 w-16 text-slate-300 mx-auto mb-4" />
                           <p className="text-slate-500 text-lg font-poppins">No products found</p>
                           <p className="text-slate-400 text-sm font-poppins">Try adjusting your filters or search term</p>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             className="mt-4 font-poppins"
                             onClick={clearFilters}
                           >
@@ -1150,7 +1221,7 @@ export default function POSPage() {
               <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0 sticky top-8">
                 <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-green-50/50 border-b border-slate-200/50">
                   <CardTitle className="flex items-center text-2xl font-bold text-slate-900 font-poppins">
-                    <ShoppingCart className="mr-3 h-6 w-6" /> 
+                    <ShoppingCart className="mr-3 h-6 w-6" />
                     Shopping Cart
                     {cart.length > 0 && (
                       <Badge variant="outline" className="ml-3 bg-indigo-100 text-indigo-700 border-indigo-200 font-poppins">
@@ -1164,7 +1235,7 @@ export default function POSPage() {
                   {/* Customer Selection */}
                   <div className="space-y-3">
                     <Label htmlFor="customer-select" className="text-slate-700 font-medium font-poppins">Customer</Label>
-                    <CustomerSearch 
+                    <CustomerSearch
                       customers={customers}
                       selectedCustomerId={selectedCustomerId}
                       onCustomerSelect={setSelectedCustomerId}
@@ -1210,9 +1281,9 @@ export default function POSPage() {
                               >
                                 +
                               </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
                                 onClick={() => removeFromCart(item.item_id)}
                               >
@@ -1241,9 +1312,9 @@ export default function POSPage() {
                 </CardContent>
 
                 <CardFooter className="flex flex-col gap-3 p-6 bg-slate-50/50 border-t border-slate-200/50">
-                  <Button 
+                  <Button
                     className={`w-full ${buttonStyles.primary}`}
-                    onClick={handleProcessSale} 
+                    onClick={handleProcessSale}
                     disabled={cart.length === 0 || isSubmitting}
                   >
                     {isSubmitting ? (
@@ -1253,10 +1324,10 @@ export default function POSPage() {
                     )}
                     Process Sale
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-600 font-poppins" 
-                    onClick={() => setCart([])} 
+                  <Button
+                    variant="outline"
+                    className="w-full border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-600 font-poppins"
+                    onClick={() => setCart([])}
                     disabled={cart.length === 0}
                   >
                     <XCircle className="mr-2 h-4 w-4" />
