@@ -43,9 +43,12 @@ import {
   CheckCircle,
   ArrowLeft,
   Download,
-  Circle,
   Wrench,
-  Settings
+  Settings,
+  Edit,
+  Ban,
+  Lock,
+  X
 } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import {
@@ -81,18 +84,19 @@ interface CartItem extends InventoryItem {
   quantity: number;
   installationFee?: number;
 }
-export interface Sale {
-  sale_id: string;
-  sale_date: string;
-  customer_id: string;
-  payment_method: string;
-  discount_amount: number;
-  tax_amount: number;
+
+interface SaleItem {
+  quantity: number;
+  price_at_sale: number;
+  inventory_item?: {
+    name: string;
+  };
+}
+
+interface EnhancedSale extends Sale {
   customer?: { name: string };
-  sale_item?: Array<{
-    quantity: number;
-    price_at_sale: number;
-  }>;
+  sale_items?: SaleItem[];
+  total_amount?: number;
 }
 
 const ANONYMOUS_CUSTOMER_ID = "anonymous_customer";
@@ -123,13 +127,9 @@ const TireIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
     stroke="currentColor"
     strokeWidth="2"
   >
-    {/* Outer tire circle */}
     <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" />
-    {/* Inner rim circle */}
     <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5" />
-    {/* Tire tread patterns */}
     <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="1" strokeDasharray="2 2" />
-    {/* Spoke lines */}
     <line x1="12" y1="4" x2="12" y2="8" stroke="currentColor" strokeWidth="1" />
     <line x1="12" y1="16" x2="12" y2="20" stroke="currentColor" strokeWidth="1" />
     <line x1="4" y1="12" x2="8" y2="12" stroke="currentColor" strokeWidth="1" />
@@ -171,7 +171,6 @@ function DataTableWrapper({
   const [rowsPerPage, setRowsPerPage] = useState(rowsPerPageOptions[0]);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
-  // Filtering
   const filteredData = useMemo(() => {
     if (!searchTerm) return data;
     return data.filter(row => {
@@ -183,7 +182,6 @@ function DataTableWrapper({
     });
   }, [data, searchTerm, searchKeys]);
 
-  // Sorting
   const sortedData = useMemo(() => {
     if (!sortConfig) return filteredData;
     const sorted = [...filteredData].sort((a, b) => {
@@ -198,7 +196,6 @@ function DataTableWrapper({
     return sorted;
   }, [filteredData, sortConfig]);
 
-  // Pagination
   const totalPages = Math.ceil(sortedData.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
@@ -443,7 +440,7 @@ const CustomerSearch = ({
 };
 
 // ============================================
-// SUCCESS ANIMATION COMPONENT (MODIFIED)
+// SUCCESS ANIMATION COMPONENT
 // ============================================
 const SuccessAnimation = ({
   isVisible,
@@ -496,7 +493,7 @@ const formatPrice = (price: number): string => {
 };
 
 // ============================================
-// CATEGORY ICON COMPONENT (MODIFIED WITH NEW TIRE ICON)
+// CATEGORY ICON COMPONENT
 // ============================================
 const CategoryIcon = ({ category, className = "h-4 w-4" }: { category: string; className?: string }) => {
   switch (category.toLowerCase()) {
@@ -530,12 +527,19 @@ export default function POSPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // State for Sales History
-  const [sales, setSales] = useState<Sale[]>([]);
+  const [sales, setSales] = useState<EnhancedSale[]>([]);
   const [showSalesHistory, setShowSalesHistory] = useState(false);
 
   // State for Success Animation
   const [showSuccess, setShowSuccess] = useState(false);
   const [lastSaleId, setLastSaleId] = useState<string | null>(null);
+
+  // State for Void Management
+  const [showVoidManagement, setShowVoidManagement] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [managerPassword, setManagerPassword] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [editingSale, setEditingSale] = useState<Sale | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -543,6 +547,8 @@ export default function POSPage() {
 
   const [installationModal, setInstallationModal] = useState<{ open: boolean, item: CartItem | null }>({ open: false, item: null });
   const [installationFee, setInstallationFee] = useState<number>(0);
+
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   // Vehicle type configuration
   const vehicleTypes = [
@@ -578,10 +584,14 @@ export default function POSPage() {
         supabase
           .from('sale')
           .select(`
-                        *,
-                        customer (name),
-                        sale_item (quantity, price_at_sale)
-                    `)
+            *,
+            customer (name),
+            sale_item (
+              quantity, 
+              price_at_sale,
+              inventory_item (name)
+            )
+          `)
           .order('sale_date', { ascending: false })
           .limit(50)
       ]);
@@ -620,56 +630,83 @@ export default function POSPage() {
   }, [inventory, searchTerm, selectedVehicleType, selectedCategory]);
 
   const addToCart = (item: InventoryItem) => {
-    let itemWasAdded = false;
-    let itemInCart: CartItem | undefined;
-
     setCart(prevCart => {
       const existingItem = prevCart.find(cartItem => cartItem.item_id === item.item_id);
       if (existingItem) {
         if (existingItem.quantity < item.stock_quantity) {
-          itemInCart = { ...existingItem, quantity: existingItem.quantity + 1 };
+          // Update inventory in real-time
+          setInventory(prevInventory => 
+            prevInventory.map(invItem => 
+              invItem.item_id === item.item_id 
+                ? { ...invItem, stock_quantity: invItem.stock_quantity - 1 }
+                : invItem
+            )
+          );
           return prevCart.map(cartItem =>
-            cartItem.item_id === item.item_id ? itemInCart : cartItem
+            cartItem.item_id === item.item_id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem
           );
         } else {
-          toast({ title: 'Stock Limit', description: 'Cannot add more of ${item.name}. Stock limit reached.', variant: 'destructive' });
+          toast({ title: 'Stock Limit', description: `Cannot add more of ${item.name}. Stock limit reached.`, variant: 'destructive' });
           return prevCart;
         }
       }
       if (item.stock_quantity > 0) {
-        itemWasAdded = true;
-        itemInCart = { ...item, quantity: 1, installationFee: 0 }; // Default fee
-        return [...prevCart, itemInCart];
+        const newCartItem = { ...item, quantity: 1, installationFee: 0 };
+        
+        // Update inventory in real-time for new item
+        setInventory(prevInventory => 
+          prevInventory.map(invItem => 
+            invItem.item_id === item.item_id 
+              ? { ...invItem, stock_quantity: invItem.stock_quantity - 1 }
+              : invItem
+          )
+        );
+        
+        // If item is accessory, show installation modal
+        if (item.category === 'accessory' && item.name.toLowerCase() !== 'installation service') {
+          const serviceItemTemplate = inventory.find(i => i.name.toLowerCase() === 'installation service');
+          if (serviceItemTemplate) {
+            setInstallationModal({ open: true, item: newCartItem });
+            setInstallationFee(0);
+          } else {
+            toast({
+              title: "Setup Incomplete",
+              description: "Accessory added. To add installation fees, please create an item named 'Installation Service' in your inventory.",
+              variant: 'default',
+              duration: 7000,
+            });
+          }
+        }
+        
+        return [...prevCart, newCartItem];
       } else {
-        toast({ title: 'Out of stock', description: '${item.name} is out of stock.', variant: 'destructive' });
+        toast({ title: 'Out of stock', description: `${item.name} is out of stock.`, variant: 'destructive' });
         return prevCart;
       }
     });
-
-    //If item is accessory this function will pop up
-    if (itemInCart && item.category === 'accessory' && item.name.toLowerCase() !== 'installation service') {
-      const serviceItemTemplate = inventory.find(i => i.name.toLowerCase() === 'installation service');
-      if (serviceItemTemplate) {
-        setInstallationModal({ open: true, item: itemInCart });
-        setInstallationFee(0);
-      } else {
-        toast({
-          title: "Setup Incomplete",
-          description: "Accessory added. To add installation fees, please create an item named 'Installation Service' in your inventory.",
-          variant: 'default',
-          duration: 7000,
-        });
-      }
-    }
   };
 
   const updateQuantity = (itemId: string, newQuantity: number) => {
     const item = inventory.find(p => p.item_id === itemId);
     if (!item) return;
 
-    if (newQuantity > 0 && newQuantity <= item.stock_quantity) {
+    const cartItem = cart.find(c => c.item_id === itemId);
+    if (!cartItem) return;
+
+    const quantityDifference = newQuantity - cartItem.quantity;
+
+    if (newQuantity > 0 && newQuantity <= item.stock_quantity + cartItem.quantity) {
+      // Update inventory based on quantity change
+      setInventory(prevInventory => 
+        prevInventory.map(invItem => 
+          invItem.item_id === itemId 
+            ? { ...invItem, stock_quantity: invItem.stock_quantity - quantityDifference }
+            : invItem
+        )
+      );
+      
       setCart(cart.map(cartItem => cartItem.item_id === itemId ? { ...cartItem, quantity: newQuantity } : cartItem));
-    } else if (newQuantity > item.stock_quantity) {
+    } else if (newQuantity > item.stock_quantity + cartItem.quantity) {
       toast({ title: 'Stock Limit', description: `Only ${item.stock_quantity} units of ${item.name} available.`, variant: 'destructive' });
     } else if (newQuantity <= 0) {
       removeFromCart(itemId);
@@ -677,10 +714,21 @@ export default function POSPage() {
   };
 
   const removeFromCart = (itemId: string) => {
+    const cartItem = cart.find(item => item.item_id === itemId);
+    if (cartItem) {
+      // Restore the stock when removing from cart
+      setInventory(prevInventory => 
+        prevInventory.map(invItem => 
+          invItem.item_id === itemId 
+            ? { ...invItem, stock_quantity: invItem.stock_quantity + cartItem.quantity }
+            : invItem
+        )
+      );
+    }
     setCart(cart.filter(item => item.item_id !== itemId));
   };
 
-  const subtotal = cart.reduce((acc, item) => acc + (item.sale_price * item.quantity) + (item.installationFee || 0), 0)
+  const subtotal = cart.reduce((acc, item) => acc + (item.sale_price * item.quantity) + (item.installationFee || 0), 0);
   const total = subtotal;
 
   const handleProcessSale = async () => {
@@ -701,15 +749,32 @@ export default function POSPage() {
     setIsSubmitting(true);
 
     try {
+      // If editing a sale, void the original first
+      if (editingSale) {
+        const { error: deleteItemsError } = await supabase
+          .from('sale_item')
+          .delete()
+          .eq('sale_id', editingSale.sale_id);
+
+        if (deleteItemsError) throw deleteItemsError;
+
+        const { error: deleteSaleError } = await supabase
+          .from('sale')
+          .delete()
+          .eq('sale_id', editingSale.sale_id);
+
+        if (deleteSaleError) throw deleteSaleError;
+      }
+
       const response = await fetch("/api/sales", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerId: selectedCustomerId === ANONYMOUS_CUSTOMER_ID ? null : selectedCustomerId,
           cartItems: cart,
-          paymentMethod: "cash", // You can change this if you add a payment selector
+          paymentMethod: "cash",
           userId: authUser.user_id,
-          branchId: null, // TODO: Add branch logic if needed
+          branchId: null,
         }),
       });
 
@@ -717,80 +782,63 @@ export default function POSPage() {
 
       if (!response.ok) throw new Error(data.error || "Failed to process sale");
 
-      // -----------------------------------------------------------
-      // 🟢 NEW RECEIPT GENERATION LOGIC
-      // -----------------------------------------------------------
+      // Generate receipt
       try {
-        // 1. Define your Business Info
         const businessInfo: BusinessInfo = {
           storeName: 'Queen.R Tire Supply & Vulcanizing Shop',
           address: '68, Sipocot, Camarines Sur',
-          phone: 'To be given', // Update when you have it
-          taxInfo: 'To be given', // Update when you have it
+          phone: 'To be given',
+          taxInfo: 'To be given',
           footerMessage: 'Thank You!',
         };
 
-        // 2. Map cart to ReceiptItem[]
         const receiptItems: ReceiptItem[] = cart.map(item => ({
           name: item.name,
           quantity: item.quantity,
           price: item.sale_price,
         }));
 
-        // 3. Find the selected customer object
         const selectedCustomerObj = customers.find(c => c.customer_id === selectedCustomerId);
         const receiptCustomer: ReceiptCustomer | undefined = selectedCustomerObj
           ? { name: selectedCustomerObj.name, phone: selectedCustomerObj.phone }
           : undefined;
 
-        // 4. Build a 'Sale' object from state (since the API only returns the ID)
         const newSaleObject: Sale = {
           sale_id: data.sale_id,
           sale_date: new Date().toISOString(),
           customer_id: selectedCustomerId === ANONYMOUS_CUSTOMER_ID ? undefined : selectedCustomerId,
           user_id: authUser.user_id,
           payment_method: 'cash',
-          discount_amount: 0, // You don't calculate this in the cart yet
-          tax_amount: 0, // You don't calculate this in the cart yet
-          total_amount: total, // 'total' is from your component's state (line 698)
+          discount_amount: 0,
+          tax_amount: 0,
+          total_amount: total,
         };
 
-        // 5. Assemble the final data packet
         const receiptData: ReceiptData = {
           sale: newSaleObject,
           items: receiptItems,
           cashier: authUser as User,
           customer: receiptCustomer,
           businessInfo: businessInfo,
-          // branch: undefined, // Add this when you have branch data in state
         };
 
-        // 6. Generate the HTML
         const html = generateHtmlReceipt(receiptData);
-
-        // 7. Print it!
         printReceipt(html);
 
       } catch (receiptError: any) {
         console.error('Receipt generation failed:', receiptError);
         toast({ title: 'Receipt Error', description: `Sale was saved (ID: ${data.sale_id}), but receipt failed to print: ${receiptError.message}`, variant: 'destructive' });
       }
-      // -----------------------------------------------------------
-      // END OF RECEIPT LOGIC
-      // -----------------------------------------------------------
 
-      // Store the sale ID for receipt download (your existing logic)
       setLastSaleId(data.sale_id);
-
-      // Show success animation (your existing logic)
       setShowSuccess(true);
 
-      // Clear cart after delay (your existing logic)
       setTimeout(() => {
         setCart([]);
         setSelectedCustomerId(ANONYMOUS_CUSTOMER_ID);
+        setEditingSale(null);
         fetchInitialData();
-      }, 3000); // This delay is long, you might want to shorten it or clear cart on "Confirm"
+      }, 3000);
 
     } catch (err: any) {
       toast({
@@ -804,9 +852,8 @@ export default function POSPage() {
   };
 
   const handleConfirmInstallation = () => {
-    if (!installationModal.itme) return;
+    if (!installationModal.item) return;
 
-    //Find the item in the cart and updates its free installation
     setCart(prevCart =>
       prevCart.map(cartItem =>
         cartItem.item_id === installationModal.item?.item_id
@@ -817,95 +864,261 @@ export default function POSPage() {
 
     toast({
       title: 'Success',
-      description: 'Installation fee of ₱${formatPrice(installationFee)} added.',
+      description: `Installation fee of ₱${formatPrice(installationFee)} added.`,
     });
 
-    //Close Modal
     setInstallationModal({ open: false, item: null });
     setInstallationFee(0);
   };
 
   const handleDownloadReceipt = async (saleId: string) => {
-      if (!supabase || !authUser) {
-        toast({ title: 'Error', description: 'Client not ready or user not logged in.', variant: 'destructive' });
-        return;
-      }
-      
-      setIsSubmitting(true); // Use the existing loading state
-      
-      try {
-        // Step 1: Fetch all data for this specific sale in one go
-        const { data: saleData, error: saleError } = await supabase
-          .from('sale')
-          .select(`
+    if (!supabase || !authUser) {
+      toast({ title: 'Error', description: 'Client not ready or user not logged in.', variant: 'destructive' });
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      const { data: saleData, error: saleError } = await supabase
+        .from('sale')
+        .select(`
+          *,
+          customer (*),
+          user (*),
+          sale_item (
             *,
-            customer (*),
-            user (*),
-            sale_item (
-              *,
-              inventory_item (name)
-            )
-          `)
-          .eq('sale_id', saleId)
-          .single();
+            inventory_item (name)
+          )
+        `)
+        .eq('sale_id', saleId)
+        .single();
 
-        if (saleError) throw new Error(`Sale data fetch error: ${saleError.message}`);
-        if (!saleData) throw new Error('Sale not found.');
+      if (saleError) throw new Error(`Sale data fetch error: ${saleError.message}`);
+      if (!saleData) throw new Error('Sale not found.');
 
-        // Step 2: Define your Business Info
-        const businessInfo: BusinessInfo = {
-          storeName: 'Queen.R Tire Supply & Vulcanizing Shop',
-          address: '68, Sipocot, Camarines Sur',
-          phone: 'To be given',
-          taxInfo: 'To be given',
-          footerMessage: 'Thank You!',
-        };
+      const businessInfo: BusinessInfo = {
+        storeName: 'Queen.R Tire Supply & Vulcanizing Shop',
+        address: '68, Sipocot, Camarines Sur',
+        phone: 'To be given',
+        taxInfo: 'To be given',
+        footerMessage: 'Thank You!',
+      };
 
-        // Step 3: Map sale items to ReceiptItem[]
-        const receiptItems: ReceiptItem[] = saleData.sale_item.map((item: any) => ({
-          name: item.inventory_item?.name || 'Unknown Item', // Get name from joined inventory_item
-          quantity: item.quantity,
-          price: item.price_at_sale,
-        }));
+      const receiptItems: ReceiptItem[] = saleData.sale_item.map((item: any) => ({
+        name: item.inventory_item?.name || 'Unknown Item',
+        quantity: item.quantity,
+        price: item.price_at_sale,
+      }));
 
-        // Step 4: Get customer (if one exists for this sale)
-        const receiptCustomer: ReceiptCustomer | undefined = saleData.customer
-          ? { name: saleData.customer.name, phone: saleData.customer.phone }
-          : undefined;
+      const receiptCustomer: ReceiptCustomer | undefined = saleData.customer
+        ? { name: saleData.customer.name, phone: saleData.customer.phone }
+        : undefined;
 
-        // Step 5: Assemble the final data packet
-        const receiptData: ReceiptData = {
-          sale: saleData,
-          items: receiptItems,
-          cashier: saleData.user as User, // Cashier who made the sale
-          customer: receiptCustomer,
-          businessInfo: businessInfo,
-          // branch: undefined, // Add branch data if you have it
-        };
+      const receiptData: ReceiptData = {
+        sale: saleData,
+        items: receiptItems,
+        cashier: saleData.user as User,
+        customer: receiptCustomer,
+        businessInfo: businessInfo,
+      };
 
-        // Step 6: Generate the HTML and Print
-        const html = generateHtmlReceipt(receiptData);
-        printReceipt(html);
+      const html = generateHtmlReceipt(receiptData);
+      printReceipt(html);
 
-        toast({
-          title: "Receipt Ready",
-          description: "Opening print dialog for receipt.",
-        });
+      toast({
+        title: "Receipt Ready",
+        description: "Opening print dialog for receipt.",
+      });
 
-      } catch (error: any) {
-        toast({
-          title: "Download Failed",
-          description: error.message,
-          variant: "destructive",
-        });
-      } finally {
-        setIsSubmitting(false);
-      }
-    };
+    } catch (error: any) {
+      toast({
+        title: "Download Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleConfirmSuccess = () => {
     setShowSuccess(false);
     setLastSaleId(null);
+  };
+
+  const handleVoidClick = () => {
+    setShowPasswordDialog(true);
+  };
+
+  const handlePasswordSubmit = () => {
+    const BRANCH_MANAGER_PASSWORD = 'admin123';
+    
+    if (managerPassword === BRANCH_MANAGER_PASSWORD) {
+      setIsAuthenticated(true);
+      setShowVoidManagement(true);
+      setShowPasswordDialog(false);
+      setManagerPassword('');
+      setPasswordError(null); // Clear any previous errors
+      toast({
+        title: "Access Granted",
+        description: "You can now manage sales transactions.",
+      });
+    } else {
+      setPasswordError('Invalid password. Please try again.');
+      setManagerPassword(''); // Clear the password field
+      // Keep the toast for additional feedback if desired
+      toast({
+        title: "Access Denied",
+        description: "Incorrect manager password.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEditSale = async (sale: EnhancedSale) => {
+    if (!supabase) return;
+    
+    try {
+      setIsLoading(true);
+      
+      const { data: saleItems, error } = await supabase
+        .from('sale_item')
+        .select(`
+          *,
+          inventory_item (*)
+        `)
+        .eq('sale_id', sale.sale_id);
+
+      if (error) throw error;
+
+      const cartItems: CartItem[] = saleItems.map((item: any) => ({
+        ...item.inventory_item,
+        quantity: item.quantity,
+        installationFee: 0,
+      }));
+
+      setCart(cartItems);
+      setSelectedCustomerId(sale.customer_id || ANONYMOUS_CUSTOMER_ID);
+      setEditingSale(sale);
+      setShowVoidManagement(false);
+      setShowSalesHistory(false);
+      
+      toast({
+        title: "Sale Loaded for Editing",
+        description: `Sale ${sale.sale_id} has been loaded into the cart. Make your changes and process the sale again.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error Loading Sale",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClearCart = () => {
+    // Restore stock for all items in cart
+    setInventory(prevInventory => 
+      prevInventory.map(invItem => {
+        const cartItem = cart.find(c => c.item_id === invItem.item_id);
+        if (cartItem) {
+          return { ...invItem, stock_quantity: invItem.stock_quantity + cartItem.quantity };
+        }
+        return invItem;
+      })
+    );
+    setCart([]);
+  };
+
+  const handleCancelEditSale = () => {
+    // Restore stock for all items in cart when canceling edit
+    setInventory(prevInventory => 
+      prevInventory.map(invItem => {
+        const cartItem = cart.find(c => c.item_id === invItem.item_id);
+        if (cartItem) {
+          return { ...invItem, stock_quantity: invItem.stock_quantity + cartItem.quantity };
+        }
+        return invItem;
+      })
+    );
+    setCart([]);
+    setEditingSale(null);
+    setSelectedCustomerId(ANONYMOUS_CUSTOMER_ID);
+    toast({
+      title: "Edit Cancelled",
+      description: "The sale edit has been cancelled and the cart has been cleared.",
+    });
+  };
+
+  const handleVoidSale = async (saleId: string) => {
+    if (!supabase) return;
+
+    if (!confirm(`Are you sure you want to void sale ${saleId}? This will restore inventory and remove the sale record.`)) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      const { data: saleItems, error: fetchError } = await supabase
+        .from('sale_item')
+        .select('item_id, quantity')
+        .eq('sale_id', saleId);
+
+      if (fetchError) throw fetchError;
+
+      for (const item of saleItems) {
+        const { error: updateError } = await supabase.rpc('increment_stock', {
+          item_id_param: item.item_id,
+          quantity_param: item.quantity
+        });
+
+        if (updateError) {
+          const { data: currentItem } = await supabase
+            .from('inventory_item')
+            .select('stock_quantity')
+            .eq('item_id', item.item_id)
+            .single();
+
+          await supabase
+            .from('inventory_item')
+            .update({ stock_quantity: currentItem.stock_quantity + item.quantity })
+            .eq('item_id', item.item_id);
+        }
+      }
+
+      const { error: deleteItemsError } = await supabase
+        .from('sale_item')
+        .delete()
+        .eq('sale_id', saleId);
+
+      if (deleteItemsError) throw deleteItemsError;
+
+      const { error: deleteSaleError } = await supabase
+        .from('sale')
+        .delete()
+        .eq('sale_id', saleId);
+
+      if (deleteSaleError) throw deleteSaleError;
+
+      toast({
+        title: "Sale Voided",
+        description: `Sale ${saleId} has been voided and inventory has been restored.`,
+      });
+
+      fetchInitialData();
+    } catch (error: any) {
+      toast({
+        title: "Void Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const clearFilters = () => {
@@ -915,7 +1128,7 @@ export default function POSPage() {
   };
 
   // ============================================
-  // SALES TABLE COLUMNS (WITHOUT UNDO BUTTON)
+  // CLEANED SALES TABLE COLUMNS
   // ============================================
   const salesColumns: Column[] = [
     {
@@ -941,24 +1154,56 @@ export default function POSPage() {
       }
     },
     {
-      key: 'customer_name',
+      key: 'customer',
       label: 'Customer',
       sortable: true,
-      render: (value: any) => (
-        <span className={value === 'Walk-in Customer' ? 'text-slate-500 italic' : 'font-medium'}>
-          {value}
+      render: (value: any, row: any) => (
+        <span className={!row.customer ? 'text-slate-500 italic' : 'font-medium'}>
+          {row.customer?.name || 'Walk-in Customer'}
         </span>
       )
     },
     {
-      key: 'items_count',
-      label: 'Items',
+      key: 'products',
+      label: 'Products Sold',
+      sortable: false,
+      render: (_: any, row: any) => {
+        const saleItems = row.sale_item || [];
+        const productNames = saleItems.map((item: SaleItem) => 
+          item.inventory_item?.name || 'Unknown Product'
+        );
+        
+        if (productNames.length === 0) {
+          return <span className="text-slate-500 italic">No products</span>;
+        }
+
+        const displayText = productNames.slice(0, 2).join(', ');
+        const remainingCount = productNames.length - 2;
+        
+        return (
+          <div className="max-w-xs">
+            <span className="font-medium">{displayText}</span>
+            {remainingCount > 0 && (
+              <span className="text-slate-500 text-xs ml-1">
+                +{remainingCount} more
+              </span>
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      key: 'total_items',
+      label: 'Total Items',
       sortable: true,
-      render: (value: any) => (
-        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-          {value} items
-        </Badge>
-      )
+      render: (_: any, row: any) => {
+        const totalQuantity = (row.sale_item || []).reduce((sum: number, item: SaleItem) => sum + item.quantity, 0);
+        return (
+          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+            {totalQuantity} items
+          </Badge>
+        );
+      }
     },
     {
       key: 'payment_method',
@@ -969,8 +1214,8 @@ export default function POSPage() {
           variant="outline"
           className={
             value === 'cash' ? 'bg-green-50 text-green-700 border-green-200' :
-              value === 'card' ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                'bg-blue-50 text-blue-700 border-blue-200'
+            value === 'card' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+            'bg-blue-50 text-blue-700 border-blue-200'
           }
         >
           {String(value).toUpperCase()}
@@ -985,23 +1230,6 @@ export default function POSPage() {
         <span className="font-semibold text-green-600">
           ₱{formatPrice(Number(value) || 0)}
         </span>
-      )
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      sortable: true,
-      render: (value: any) => (
-        <Badge
-          variant="outline"
-          className={
-            value === 'completed' ? 'bg-green-50 text-green-700 border-green-200' :
-              value === 'pending' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
-                'bg-red-50 text-red-700 border-red-200'
-          }
-        >
-          {value}
-        </Badge>
       )
     },
     {
@@ -1030,10 +1258,114 @@ export default function POSPage() {
     }
   ];
 
-  // Calculate summary statistics from the real `sales` state
-  const totalSalesAmount = sales.reduce((sum, s) => sum + (Number((s as any).total_amount) || 0), 0);
+  // ============================================
+  // CLEANED VOID MANAGEMENT TABLE COLUMNS
+  // ============================================
+  const voidManagementColumns: Column[] = [
+    {
+      key: 'sale_id',
+      label: 'Sale ID',
+      sortable: true,
+      render: (value: any) => (
+        <span className="font-mono text-sm font-medium text-indigo-600">{value}</span>
+      )
+    },
+    {
+      key: 'sale_date',
+      label: 'Date & Time',
+      sortable: true,
+      render: (value: any) => {
+        const date = new Date(value);
+        return (
+          <div>
+            <div className="font-medium">{date.toLocaleDateString()}</div>
+            <div className="text-xs text-slate-500">{date.toLocaleTimeString()}</div>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'customer',
+      label: 'Customer',
+      sortable: true,
+      render: (value: any, row: any) => (
+        <span className={!row.customer ? 'text-slate-500 italic' : 'font-medium'}>
+          {row.customer?.name || 'Walk-in Customer'}
+        </span>
+      )
+    },
+    {
+      key: 'products',
+      label: 'Products Sold',
+      sortable: false,
+      render: (_: any, row: any) => {
+        const saleItems = row.sale_item || [];
+        const productNames = saleItems.map((item: SaleItem) => 
+          item.inventory_item?.name || 'Unknown Product'
+        );
+        
+        if (productNames.length === 0) {
+          return <span className="text-slate-500 italic">No products</span>;
+        }
+
+        return (
+          <div className="max-w-xs">
+            <span className="font-medium">{productNames.slice(0, 3).join(', ')}</span>
+            {productNames.length > 3 && (
+              <span className="text-slate-500 text-xs ml-1">
+                +{productNames.length - 3} more
+              </span>
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      key: 'total_amount',
+      label: 'Total Amount',
+      sortable: true,
+      render: (value: any) => (
+        <span className="font-semibold text-green-600">
+          ₱{formatPrice(Number(value) || 0)}
+        </span>
+      )
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (_: any, row: any) => (
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEditSale(row);
+            }}
+          >
+            <Edit className="h-4 w-4 mr-1" />
+            Edit
+          </Button>
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            onClick={(e) => {
+              e.stopPropagation();
+              handleVoidSale(row.sale_id);
+            }}
+          >
+            <Ban className="h-4 w-4 mr-1" />
+            Void
+          </Button>
+        </div>
+      )
+    }
+  ];
+
+  // Calculate summary statistics
+  const totalSalesAmount = sales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
   const todaySales = sales.filter(s => new Date(s.sale_date).toDateString() === new Date().toDateString());
-  const todayRevenue = todaySales.reduce((sum, s) => sum + (Number((s as any).total_amount) || 0), 0);
+  const todayRevenue = todaySales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
 
   if (fetchError) {
     return (
@@ -1051,7 +1383,7 @@ export default function POSPage() {
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
-      {/* Background Sections - MATCHING DASHBOARD SPACING */}
+      {/* Background Sections */}
       <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
         <div
           className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
@@ -1061,20 +1393,11 @@ export default function POSPage() {
             backgroundPosition: "center 30%"
           }}
         ></div>
-
-        <div className="absolute top-0 left-0 w-32 h-32 bg-green-300/20 rounded-br-full"></div>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-teal-300/20 rounded-bl-full"></div>
-        <div className="absolute bottom-10 left-20 w-16 h-16 bg-white/20 rounded-2xl rotate-45"></div>
-        <div className="absolute bottom-16 right-24 w-12 h-12 bg-white/15 rounded-full"></div>
-      </div>
-
-      <div className="absolute top-64 left-0 w-full h-full bg-blue-50/10">
-        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-blue-100/15 to-blue-50/10"></div>
       </div>
 
       <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
 
-        {/* Header Section - MATCHING DASHBOARD STYLING */}
+        {/* Header Section */}
         <div className={`mb-12 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
           <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
@@ -1104,12 +1427,28 @@ export default function POSPage() {
             </div>
 
             <div className="flex gap-3">
+              {editingSale && (
+                <Button
+                  onClick={handleCancelEditSale}
+                  className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins"
+                >
+                  <XCircle className="h-5 w-5 mr-2" />
+                  Cancel Edit
+                </Button>
+              )}
               <Button
                 onClick={() => setShowSalesHistory(!showSalesHistory)}
                 className={buttonStyles.glass + " active:scale-95 font-poppins"}
               >
                 <Receipt className="h-5 w-5 mr-2" />
                 {showSalesHistory ? 'Show POS' : 'Sales History'}
+              </Button>
+              <Button
+                onClick={handleVoidClick}
+                className={buttonStyles.glass + " active:scale-95 font-poppins"}
+              >
+                <Lock className="h-5 w-5 mr-2" />
+                Void Management
               </Button>
               <Button
                 onClick={fetchInitialData}
@@ -1129,6 +1468,119 @@ export default function POSPage() {
           saleId={lastSaleId}
           onConfirm={handleConfirmSuccess}
         />
+
+        {/* Password Dialog for Void Management */}
+        <Dialog open={showPasswordDialog} onOpenChange={(open) => {
+          setShowPasswordDialog(open);
+          setPasswordError(null); // Clear error when dialog closes
+          setManagerPassword(''); // Clear password when dialog closes
+        }}>
+          <DialogContent className="sm:max-w-md bg-white font-poppins">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-slate-800">
+                Manager Authentication Required
+              </DialogTitle>
+              <DialogDescription className="text-slate-600">
+                Please enter the branch manager password to access void management.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <Label htmlFor="manager-password" className="font-medium">Manager Password</Label>
+              <Input
+                id="manager-password"
+                type="password"
+                value={managerPassword}
+                onChange={(e) => {
+                  setManagerPassword(e.target.value);
+                  setPasswordError(null); // Clear error when user starts typing
+                }}
+                placeholder="Enter password"
+                className={`text-lg ${passwordError ? 'border-red-500 focus:border-red-500' : ''}`}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handlePasswordSubmit();
+                  }
+                }}
+              />
+              {passwordError && (
+                <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-md border border-red-200">
+                  <XCircle className="h-4 w-4 flex-shrink-0" />
+                  <span className="font-medium">{passwordError}</span>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowPasswordDialog(false);
+                  setPasswordError(null);
+                  setManagerPassword('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className={buttonStyles.primary}
+                onClick={handlePasswordSubmit}
+              >
+                Authenticate
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Void Management Modal */}
+        {showVoidManagement && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-red-50/50">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900 font-poppins">Void Management</h2>
+                  <p className="text-slate-600 mt-1 font-poppins">
+                    Edit or void sales transactions. Voiding will restore inventory and remove the sale record.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge variant="outline" className="bg-red-50 text-red-700 font-poppins">
+                    Manager Access
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowVoidManagement(false)}
+                    className="h-8 w-8 text-slate-500 hover:text-slate-700"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="flex-1 overflow-auto p-6">
+                <DataTableWrapper
+                  data={sales}
+                  columns={voidManagementColumns}
+                  searchKeys={['sale_id', 'customer.name']}
+                  rowsPerPageOptions={[5, 10, 25, 50]}
+                />
+              </div>
+              
+              <div className="p-4 border-t border-slate-200 bg-slate-50">
+                <div className="flex justify-between items-center">
+                  <p className="text-sm text-slate-600 font-poppins">
+                    {sales.length} sales found
+                  </p>
+                  <Button
+                    onClick={() => setShowVoidManagement(false)}
+                    className={buttonStyles.back}
+                  >
+                    Close Void Management
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <Dialog open={installationModal.open} onOpenChange={(isOpen) => setInstallationModal({ open: isOpen, item: null })}>
           <DialogContent className="sm:max-w-md bg-white font-poppins">
@@ -1168,7 +1620,7 @@ export default function POSPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Toggle between POS and Sales History */}
+        {/* Main Content */}
         {!showSalesHistory ? (
           // POS Interface
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1362,6 +1814,13 @@ export default function POSPage() {
                       </Badge>
                     )}
                   </CardTitle>
+                  {editingSale && (
+                    <div className="mt-2">
+                      <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-200 font-poppins">
+                        Editing Sale: {editingSale.sale_id}
+                      </Badge>
+                    </div>
+                  )}
                 </CardHeader>
 
                 <CardContent className="p-6 space-y-6">
@@ -1402,7 +1861,6 @@ export default function POSPage() {
                                   {`₱${formatPrice(item.sale_price)} each`}
                                 </p>
                               )}
-                              <p className="text-xs text-slate-500 font-poppins">₱{formatPrice(item.sale_price)} each</p>
                             </div>
                             <div className="flex items-center gap-2">
                               <Button
@@ -1464,12 +1922,12 @@ export default function POSPage() {
                     ) : (
                       <ShoppingCart className="mr-2 h-4 w-4" />
                     )}
-                    Process Sale
+                    {editingSale ? 'Update Sale' : 'Process Sale'}
                   </Button>
                   <Button
                     variant="outline"
                     className="w-full border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-600 font-poppins"
-                    onClick={() => setCart([])}
+                    onClick={handleClearCart}
                     disabled={cart.length === 0}
                   >
                     <XCircle className="mr-2 h-4 w-4" />
@@ -1540,7 +1998,7 @@ export default function POSPage() {
                 <DataTableWrapper
                   data={sales}
                   columns={salesColumns}
-                  searchKeys={['sale_id', 'payment_method']}
+                  searchKeys={['sale_id', 'customer.name', 'payment_method']}
                   rowsPerPageOptions={[5, 10, 25, 50]}
                   onRowClick={(row) => {
                     console.log('Clicked row:', row);
