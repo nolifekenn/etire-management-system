@@ -34,8 +34,8 @@ import {
   Loader2, PlusCircle, AlertTriangle, Package, Truck, ShoppingCart, Users, Building2, 
   RefreshCw, Search, X, Download, Eye, ArrowUpDown, Filter, Clock, TrendingUp,
   Calendar, Phone, Mail, MapPin, FileText, CheckCircle, Clock4, TruckIcon, ArrowLeft,
-  CreditCard, DollarSign, Shield, AlertCircle, ChevronRight, Edit, Trash2,
-  History, CalendarDays, FileSearch
+  CreditCard, DollarSign, Shield, AlertCircle, Edit, Trash2,
+  History, CalendarDays, FileSearch, CreditCard as CreditCardIcon, List, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { DataTableWrapper } from '@/components/DataTableWrapper';
 import { Badge } from '@/components/ui/badge';
@@ -65,16 +65,6 @@ const microAnimations = {
 // Simple Delivery Status Badge with smaller font
 const SimpleDeliveryStatus = ({ status }: { status: string }) => {
   const statusConfig = {
-    pending: { 
-      label: 'Pending', 
-      color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      icon: Clock
-    },
-    approved: { 
-      label: 'Approved', 
-      color: 'bg-blue-100 text-blue-800 border-blue-200',
-      icon: CheckCircle
-    },
     ordered: { 
       label: 'Ordered', 
       color: 'bg-purple-100 text-purple-800 border-purple-200',
@@ -92,7 +82,7 @@ const SimpleDeliveryStatus = ({ status }: { status: string }) => {
     }
   };
 
-  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.ordered;
   const IconComponent = config.icon;
 
   return (
@@ -136,7 +126,7 @@ const SimplePaymentStatus = ({ status, method, orderDate }: { status: string; me
   const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
   const methodIcon = methodIcons[method as keyof typeof methodIcons] || '💵';
 
-  // Calculate due date for credit (120 days from order date)
+  // Calculate due date for credit (120 days from order date) and overdue status
   const getDueDateInfo = () => {
     if (method !== 'credit' || !orderDate) return null;
     
@@ -146,21 +136,385 @@ const SimplePaymentStatus = ({ status, method, orderDate }: { status: string; me
     const today = new Date();
     const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     
-    return { dueDate, daysUntilDue };
+    // Only mark as overdue if more than 120 days have passed AND payment is not paid
+    const isOverdue = daysUntilDue < 0 && status !== 'paid';
+    
+    return { dueDate, daysUntilDue, isOverdue };
   };
 
   const dueInfo = getDueDateInfo();
 
+  // Use overdue status if calculated
+  const displayStatus = dueInfo?.isOverdue ? 'overdue' : status;
+
+  const displayConfig = statusConfig[displayStatus as keyof typeof statusConfig] || statusConfig.pending;
+
   return (
     <div className="flex flex-col gap-1">
-      <Badge variant="outline" className={`${config.color} flex items-center gap-1 w-fit text-xs`}>
+      <Badge variant="outline" className={`${displayConfig.color} flex items-center gap-1 w-fit text-xs`}>
         <span>{methodIcon}</span>
-        <span className="capitalize">{config.label}</span>
+        <span className="capitalize">{displayConfig.label}</span>
       </Badge>
       {dueInfo && (
-        <div className="text-xs text-slate-500">
-          Due in {dueInfo.daysUntilDue} days
+        <div className={`text-xs ${dueInfo.isOverdue ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
+          {dueInfo.isOverdue ? `Overdue ${Math.abs(dueInfo.daysUntilDue)} days` : `Due in ${dueInfo.daysUntilDue} days`}
         </div>
+      )}
+    </div>
+  );
+};
+
+// Step by Step Process Component (Only Ordered and Delivered)
+const DeliveryStepper = ({ currentStatus, onStatusChange }: { currentStatus: string; onStatusChange: (status: string) => void }) => {
+  const steps = [
+    { key: 'ordered', label: 'Ordered', icon: Package },
+    { key: 'delivered', label: 'Delivered', icon: Truck }
+  ];
+
+  const currentIndex = steps.findIndex(step => step.key === currentStatus);
+
+  return (
+    <div className="space-y-4">
+      <Label className="text-slate-700 font-medium font-poppins">
+        Delivery Progress
+      </Label>
+      <div className="flex items-center justify-between">
+        {steps.map((step, index) => {
+          const IconComponent = step.icon;
+          const isCompleted = index < currentIndex;
+          const isCurrent = index === currentIndex;
+          const isUpcoming = index > currentIndex;
+
+          return (
+            <div key={step.key} className="flex flex-col items-center flex-1">
+              <div className="flex items-center w-full">
+                {/* Connector line */}
+                {index > 0 && (
+                  <div 
+                    className={`flex-1 h-1 ${
+                      isCompleted ? 'bg-green-500' : 'bg-slate-200'
+                    }`}
+                  />
+                )}
+                
+                {/* Step circle */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Only allow moving forward or staying at current step
+                    if (index <= currentIndex + 1) {
+                      onStatusChange(step.key);
+                    }
+                  }}
+                  disabled={isUpcoming}
+                  className={`relative flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 ${
+                    isCompleted
+                      ? 'bg-green-500 border-green-500 text-white'
+                      : isCurrent
+                      ? 'bg-blue-500 border-blue-500 text-white'
+                      : 'bg-white border-slate-300 text-slate-400'
+                  } ${!isUpcoming ? 'cursor-pointer hover:scale-110' : 'cursor-not-allowed'}`}
+                >
+                  <IconComponent className="h-4 w-4" />
+                </button>
+
+                {/* Connector line */}
+                {index < steps.length - 1 && (
+                  <div 
+                    className={`flex-1 h-1 ${
+                      index < currentIndex ? 'bg-green-500' : 'bg-slate-200'
+                    }`}
+                  />
+                )}
+              </div>
+              
+              {/* Step label */}
+              <div className="mt-2 text-center">
+                <div className={`text-xs font-medium ${
+                  isCompleted || isCurrent ? 'text-slate-800' : 'text-slate-400'
+                }`}>
+                  {step.label}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// Credit Table Component
+const CreditTableDialog = ({ 
+  isOpen, 
+  onClose, 
+  purchaseOrders 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  purchaseOrders: any[];
+}) => {
+  const creditOrders = useMemo(() => {
+    return purchaseOrders.filter(po => 
+      po.payment_method === 'credit' && 
+      (po.payment_status === 'partial' || po.payment_status === 'pending' || po.payment_status === 'overdue')
+    );
+  }, [purchaseOrders]);
+
+  const calculateDueDate = (orderDate: string) => {
+    const order = new Date(orderDate);
+    const dueDate = new Date(order);
+    dueDate.setDate(order.getDate() + 120);
+    return dueDate;
+  };
+
+  const isOverdue = (orderDate: string) => {
+    const dueDate = calculateDueDate(orderDate);
+    const today = new Date();
+    return dueDate < today;
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-4xl bg-white border-0 shadow-2xl mt-10 font-poppins max-h-[85vh] overflow-hidden">
+        <DialogHeader className="pb-4">
+          <DialogTitle className="text-2xl font-bold text-slate-900 font-poppins flex items-center gap-2">
+            <CreditCardIcon className="h-6 w-6" />
+            Credit Management
+          </DialogTitle>
+          <DialogDescription className="text-slate-600 font-poppins">
+            Manage credit purchases and track payment schedules
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="max-h-[60vh] overflow-y-auto">
+          {creditOrders.length === 0 ? (
+            <div className="text-center py-8 text-slate-500">
+              <CreditCardIcon className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+              <p className="text-lg font-medium">No Credit Purchases</p>
+              <p className="text-sm mt-1">All credit purchases are fully paid</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {creditOrders.map(po => {
+                const dueDate = calculateDueDate(po.order_date);
+                const overdue = isOverdue(po.order_date);
+                
+                return (
+                  <div key={po.po_id} className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                    <div className="grid grid-cols-4 gap-4 items-center">
+                      <div>
+                        <div className="font-semibold text-purple-700">{po.po_number}</div>
+                        <div className="text-sm text-slate-600">{po.supplier?.name}</div>
+                      </div>
+                      
+                      <div>
+                        <div className="font-bold text-slate-800">
+                          ₱{Number(po.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <div className="text-sm text-slate-600">
+                          {po.payment_status === 'partial' ? 'Partial Payment' : 'Pending Payment'}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <div className={`font-medium ${overdue ? 'text-red-600' : 'text-slate-700'}`}>
+                          Due: {dueDate.toLocaleDateString('en-US')}
+                        </div>
+                        <div className={`text-sm ${overdue ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
+                          {overdue ? `${Math.ceil((new Date().getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))} days overdue` : 'On track'}
+                        </div>
+                      </div>
+                      
+                      <div className="text-right">
+                        <Badge 
+                          variant="outline" 
+                          className={overdue ? 'bg-red-100 text-red-800 border-red-200' : 'bg-amber-100 text-amber-800 border-amber-200'}
+                        >
+                          {overdue ? 'Overdue' : 'Active'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="pt-4">
+          <DialogClose asChild>
+            <Button type="button" variant="outline" className="flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-slate-300 hover:border-slate-400 font-poppins">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Close
+            </Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// Payment Recording Component for Credit Management
+const PaymentRecording = ({ 
+  po, 
+  onPaymentRecorded 
+}: { 
+  po: any; 
+  onPaymentRecorded: () => void;
+}) => {
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { toast } = useToast();
+
+  const remainingBalance = Number(po.total_amount || 0) - Number(po.paid_amount || 0);
+
+  const handleRecordPayment = async () => {
+    if (!paymentAmount || Number(paymentAmount) <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid payment amount",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (Number(paymentAmount) > remainingBalance) {
+      toast({
+        title: "Amount Exceeds Balance",
+        description: `Payment amount cannot exceed remaining balance of ₱${remainingBalance.toLocaleString()}`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      // Calculate new paid amount and payment status
+      const newPaidAmount = Number(po.paid_amount || 0) + Number(paymentAmount);
+      const newPaymentStatus = newPaidAmount >= Number(po.total_amount) ? 'paid' : 'partial';
+
+      // Update the purchase order in database
+      const { error } = await supabase
+        .from('purchase_order')
+        .update({
+          paid_amount: newPaidAmount,
+          payment_status: newPaymentStatus,
+          last_payment_date: paymentDate
+        })
+        .eq('po_id', po.po_id);
+
+      if (error) throw error;
+
+      // Record payment transaction
+      const { error: paymentError } = await supabase
+        .from('payment_transactions')
+        .insert({
+          po_id: po.po_id,
+          amount: paymentAmount,
+          payment_date: paymentDate,
+          payment_method: 'credit_payment',
+          recorded_at: new Date().toISOString()
+        });
+
+      if (paymentError) throw paymentError;
+
+      toast({
+        title: "Payment Recorded",
+        description: `Payment of ₱${Number(paymentAmount).toLocaleString()} recorded successfully`,
+      });
+
+      setPaymentAmount('');
+      onPaymentRecorded();
+    } catch (error: any) {
+      toast({
+        title: "Payment Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mt-4">
+      <Label className="text-slate-700 font-medium font-poppins flex items-center gap-2 mb-3">
+        <DollarSign className="h-4 w-4" />
+        Record Payment
+      </Label>
+      
+      <div className="grid grid-cols-3 gap-4 mb-3">
+        <div>
+          <Label className="text-slate-600 text-sm">Total Amount</Label>
+          <div className="font-bold text-slate-800">
+            ₱{Number(po.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+        </div>
+        <div>
+          <Label className="text-slate-600 text-sm">Paid Amount</Label>
+          <div className="font-bold text-green-600">
+            ₱{Number(po.paid_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+        </div>
+        <div>
+          <Label className="text-slate-600 text-sm">Remaining Balance</Label>
+          <div className={`font-bold ${remainingBalance > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+            ₱{remainingBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="payment-amount" className="text-slate-700 font-poppins text-sm">
+            Payment Amount
+          </Label>
+          <Input 
+            id="payment-amount"
+            type="number"
+            placeholder="0.00"
+            value={paymentAmount}
+            onChange={(e) => setPaymentAmount(e.target.value)}
+            className="border-slate-300 focus:border-purple-500 bg-white text-sm"
+            min="0"
+            max={remainingBalance}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="payment-date" className="text-slate-700 font-poppins text-sm">
+            Payment Date
+          </Label>
+          <Input 
+            id="payment-date"
+            type="date"
+            value={paymentDate}
+            onChange={(e) => setPaymentDate(e.target.value)}
+            className="border-slate-300 focus:border-purple-500 bg-white text-sm"
+          />
+        </div>
+      </div>
+
+      <Button 
+        onClick={handleRecordPayment}
+        disabled={isProcessing || !paymentAmount || Number(paymentAmount) <= 0}
+        className="mt-3 w-full"
+        size="sm"
+      >
+        {isProcessing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+        Record Payment
+      </Button>
+
+      {remainingBalance === 0 && (
+        <Alert className="bg-green-50 border-green-200 mt-3">
+          <CheckCircle className="h-4 w-4 text-green-600" />
+          <AlertTitle className="text-green-800">Fully Paid</AlertTitle>
+          <AlertDescription className="text-green-700">
+            This purchase order has been fully paid.
+          </AlertDescription>
+        </Alert>
       )}
     </div>
   );
@@ -173,7 +527,8 @@ const EnhancedPOForm = ({
   onFormChange,
   suppliers,
   branches,
-  isEditing
+  isEditing,
+  onPaymentRecorded
 }: {
   editingPO: any;
   formData: any;
@@ -181,6 +536,7 @@ const EnhancedPOForm = ({
   suppliers: any[];
   branches: any[];
   isEditing: boolean;
+  onPaymentRecorded: () => void;
 }) => {
   // Calculate due date for credit terms
   const calculateDueDate = useCallback(() => {
@@ -195,7 +551,7 @@ const EnhancedPOForm = ({
 
   const dueDate = calculateDueDate();
 
-  // ADD THIS: Auto-cancel handler
+  // Auto-cancel handler
   const handleStatusChange = (field: 'deliveryStatus' | 'paymentStatus', value: string) => {
     onFormChange(field, value);
     
@@ -206,6 +562,23 @@ const EnhancedPOForm = ({
       } else if (field === 'paymentStatus') {
         onFormChange('deliveryStatus', 'cancelled');
       }
+    }
+
+    // Auto-set payment status to paid when delivered and payment method is cash
+    if (field === 'deliveryStatus' && value === 'delivered' && formData.paymentMethod === 'cash') {
+      onFormChange('paymentStatus', 'paid');
+    }
+  };
+
+  // Payment method change handler
+  const handlePaymentMethodChange = (value: 'cash' | 'credit') => {
+    onFormChange('paymentMethod', value);
+    
+    // Auto-set payment status based on method
+    if (value === 'credit') {
+      onFormChange('paymentStatus', 'pending');
+    } else if (value === 'cash') {
+      onFormChange('paymentStatus', 'pending');
     }
   };
 
@@ -309,7 +682,7 @@ const EnhancedPOForm = ({
             <Label className="text-slate-700 font-medium font-poppins">Payment Method</Label>
             <Select 
               value={formData.paymentMethod} 
-              onValueChange={(value) => onFormChange('paymentMethod', value)}
+              onValueChange={handlePaymentMethodChange} 
               disabled={isEditing}
             >
               <SelectTrigger className={`border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 ${
@@ -331,96 +704,49 @@ const EnhancedPOForm = ({
 
           {/* Delivery Status - Only in Edit Mode */}
           {isEditing && (
-              <div className="space-y-2">
-                <Label className="text-slate-700 font-medium font-poppins">
-                  Delivery Status
-                </Label>
-                <Select 
-                  value={formData.deliveryStatus} 
-                  onValueChange={(value) => handleStatusChange('deliveryStatus', value)} // CHANGED
-                >
-                  <SelectTrigger className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending" className="font-poppins">⏳ Pending</SelectItem>
-                    <SelectItem value="approved" className="font-poppins">✅ Approved</SelectItem>
-                    <SelectItem value="ordered" className="font-poppins">📦 Ordered</SelectItem>
-                    <SelectItem value="delivered" className="font-poppins">🚚 Delivered</SelectItem>
-                    <SelectItem value="cancelled" className="font-poppins">❌ Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="space-y-2">
+              <DeliveryStepper 
+                currentStatus={formData.deliveryStatus} 
+                onStatusChange={(value) => handleStatusChange('deliveryStatus', value)}
+              />
+            </div>
+          )}
         </div>
       </div>
 
-        {/* UPDATE: Payment Status to use handleStatusChange */}
-          <div className="space-y-2">
-            <Label className="text-slate-700 font-medium font-poppins">Payment Status</Label>
-            <Select 
-              value={formData.paymentStatus} 
-              onValueChange={(value) => handleStatusChange('paymentStatus', value)} // CHANGED
-              disabled={formData.paymentMethod === 'cash' && formData.paymentStatus === 'partial' && !isEditing}
-            >
-              <SelectTrigger className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pending" className="font-poppins">⏳ Pending</SelectItem>
-                <SelectItem 
-                  value="partial" 
-                  className="font-poppins"
-                  disabled={formData.paymentMethod === 'cash' && !isEditing}
-                >
-                  ⚠️ Partial {formData.paymentMethod === 'cash' && !isEditing && '(Credit Only)'}
-                </SelectItem>
-                <SelectItem value="paid" className="font-poppins">✅ Paid</SelectItem>
-                <SelectItem value="overdue" className="font-poppins">🔴 Overdue</SelectItem>
-                <SelectItem value="cancelled" className="font-poppins">❌ Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-        {formData.paymentMethod === 'cash' && formData.paymentStatus === 'partial' && (
-          <p className="text-xs text-amber-600">
-            Partial payments are only available for Credit (120 days) payment method
-          </p>
-        )}
-      </div>
-
-      {/* Partial Payment Details */}
-      {formData.paymentStatus === 'partial' && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <Label className="text-amber-800 font-medium font-poppins flex items-center gap-2 mb-2">
-            <DollarSign className="h-4 w-4" />
-            Partial Payment Details
-          </Label>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="partial-amount" className="text-amber-700 font-poppins text-sm">
-                Amount Paid
-              </Label>
-              <Input 
-                id="partial-amount"
-                type="number"
-                placeholder="0.00"
-                className="border-amber-300 focus:border-amber-500 bg-white text-sm"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="partial-date" className="text-amber-700 font-poppins text-sm">
-                Payment Date
-              </Label>
-              <Input 
-                id="partial-date"
-                type="date"
-                className="border-amber-300 focus:border-amber-500 bg-white text-sm"
-              />
-            </div>
-          </div>
-          <p className="text-xs text-amber-600 mt-2">
-            Remaining balance will be tracked automatically
-          </p>
+      {/* Payment Status */}
+      {isEditing && (
+        <div className="space-y-2">
+          <Label className="text-slate-700 font-medium font-poppins">Payment Status</Label>
+          <Select 
+            value={formData.paymentStatus} 
+            onValueChange={(value) => handleStatusChange('paymentStatus', value)}
+            disabled={formData.paymentMethod === 'cash' && formData.deliveryStatus === 'delivered'}
+          >
+            <SelectTrigger className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins">
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending" className="font-poppins">⏳ Pending</SelectItem>
+              <SelectItem value="paid" className="font-poppins">✅ Paid</SelectItem>
+              <SelectItem value="overdue" className="font-poppins">🔴 Overdue</SelectItem>
+              <SelectItem value="cancelled" className="font-poppins">❌ Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+          {formData.paymentMethod === 'cash' && formData.deliveryStatus === 'delivered' && (
+            <p className="text-xs text-green-600">
+              Payment status automatically set to Paid when delivered for cash payments
+            </p>
+          )}
         </div>
+      )}
+
+      {/* Payment Recording for Credit Orders */}
+      {isEditing && formData.paymentMethod === 'credit' && formData.paymentStatus !== 'paid' && formData.paymentStatus !== 'cancelled' && (
+        <PaymentRecording 
+          po={editingPO} 
+          onPaymentRecorded={onPaymentRecorded}
+        />
       )}
 
       {/* Cancellation Reason */}
@@ -431,8 +757,8 @@ const EnhancedPOForm = ({
           </Label>
           <Textarea 
             id="cancellation-reason"
-            value={formData.cancellationReason || ''} // BIND VALUE
-            onChange={(e) => onFormChange('cancellationReason', e.target.value)} // BIND CHANGE
+            value={formData.cancellationReason || ''}
+            onChange={(e) => onFormChange('cancellationReason', e.target.value)}
             placeholder="Please provide the reason for cancellation..."
             className="border-red-300 focus:border-red-500 bg-white mt-2 text-sm"
             rows={3}
@@ -478,23 +804,27 @@ const EnhancedPOForm = ({
   );
 };
 
-// Enhanced Table Row with Fixed Actions
+
+// Enhanced Table Row with Clickable Rows
 const EnhancedTableRow = ({ 
   item, 
   onEdit, 
-  onDelete 
+  onDelete,
+  onRowClick
 }: { 
   item: any; 
   onEdit: (item: any) => void; 
   onDelete: (item: any) => void;
+  onRowClick: (item: any) => void;
 }) => {
   const [showActions, setShowActions] = useState(false);
 
   return (
     <div 
-      className="grid grid-cols-9 gap-3 px-3 py-2 items-center border-b border-slate-200 hover:bg-slate-50 transition-colors group"
+      className="grid grid-cols-9 gap-3 px-3 py-2 items-center border-b border-slate-200 hover:bg-slate-50 transition-colors group cursor-pointer"
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
+      onClick={() => onRowClick(item)}
     >
       {/* PO Number */}
       <div className="font-semibold text-purple-700 text-sm">
@@ -536,7 +866,7 @@ const EnhancedTableRow = ({
       
       {/* Delivery Status */}
       <div>
-        <SimpleDeliveryStatus status={item.status || 'pending'} />
+        <SimpleDeliveryStatus status={item.status || 'ordered'} />
       </div>
       
       {/* Payment Status */}
@@ -554,14 +884,20 @@ const EnhancedTableRow = ({
           showActions ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
         }`}>
           <button
-            onClick={() => onEdit(item)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(item);
+            }}
             className="p-1.5 text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors border border-transparent hover:border-purple-200"
             title="Edit PO"
           >
             <Edit className="h-3.5 w-3.5" />
           </button>
           <button
-            onClick={() => onDelete(item)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(item);
+            }}
             className="p-1.5 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors border border-transparent hover:border-red-200"
             title="Delete PO"
           >
@@ -573,61 +909,185 @@ const EnhancedTableRow = ({
   );
 };
 
-// Filter Component for Purchase Orders
+// Enhanced Filter Component for Purchase Orders
 const POFilter = ({ 
   statusFilter, 
   onStatusFilterChange,
   searchTerm,
-  onSearchChange 
+  onSearchChange,
+  selectedBranch,
+  onBranchChange,
+  branches,
+  showBranchFilter = true
 }: {
   statusFilter: string;
   onStatusFilterChange: (status: string) => void;
   searchTerm: string;
   onSearchChange: (term: string) => void;
+  selectedBranch?: string;
+  onBranchChange?: (branch: string) => void;
+  branches?: any[];
+  showBranchFilter?: boolean;
 }) => {
   return (
-    <div className="flex flex-col sm:flex-row gap-4 p-4 bg-white/60 rounded-xl border border-slate-200/50">
-      <div className="flex-1">
-        <Label htmlFor="search-pos" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
-          Search Purchase Orders
-        </Label>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input 
-            id="search-pos"
-            placeholder="Search by PO number, supplier, or branch..."
-            value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-10 pr-4 py-2 border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm"
-          />
-          {searchTerm && (
-            <button 
-              onClick={() => onSearchChange('')}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors duration-200"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
+    <div className="space-y-4 p-4 bg-white/60 rounded-xl border border-slate-200/50">
+      {/* Search and Status Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="md:col-span-2">
+          <Label htmlFor="search-pos" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
+            Search Purchase Orders
+          </Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input 
+              id="search-pos"
+              placeholder="Search by PO number, supplier, or branch..."
+              value={searchTerm}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="pl-10 pr-4 py-2 border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm"
+            />
+            {searchTerm && (
+              <button 
+                onClick={() => onSearchChange('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors duration-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
+        
+        <div>
+          <Label htmlFor="status-filter" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
+            Filter by Status
+          </Label>
+          <Select value={statusFilter} onValueChange={onStatusFilterChange}>
+            <SelectTrigger className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm">
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="font-poppins text-sm">All Statuses</SelectItem>
+              <SelectItem value="ordered" className="font-poppins text-sm">📦 Ordered</SelectItem>
+              <SelectItem value="delivered" className="font-poppins text-sm">🚚 Delivered</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
+
+      {/* Branch Filter */}
+      {showBranchFilter && (
+        <div className="pt-2 border-t border-slate-200/50">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <Label htmlFor="branch-filter" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
+                Filter by Branch
+              </Label>
+              <Select value={selectedBranch || 'all'} onValueChange={onBranchChange}>
+                <SelectTrigger className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm">
+                  <SelectValue placeholder="All Branches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="font-poppins text-sm">All Branches</SelectItem>
+                  {branches?.map(branch => (
+                    <SelectItem key={branch.branch_id} value={branch.branch_id} className="font-poppins text-sm">
+                      {branch.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Pagination Component
+const Pagination = ({ 
+  currentPage, 
+  totalPages, 
+  onPageChange,
+  pageSize,
+  onPageSizeChange,
+  totalItems 
+}: { 
+  currentPage: number; 
+  totalPages: number; 
+  onPageChange: (page: number) => void;
+  pageSize: number;
+  onPageSizeChange: (size: number) => void;
+  totalItems: number;
+}) => {
+  const pages = [];
+  const maxVisiblePages = 5;
+  
+  let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+  let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+  
+  if (endPage - startPage + 1 < maxVisiblePages) {
+    startPage = Math.max(1, endPage - maxVisiblePages + 1);
+  }
+
+  for (let i = startPage; i <= endPage; i++) {
+    pages.push(i);
+  }
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+      <div className="text-sm text-slate-600">
+        Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalItems)} of {totalItems} entries
+      </div>
       
-      <div className="sm:w-48">
-        <Label htmlFor="status-filter" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
-          Filter by Status
-        </Label>
-        <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-          <SelectTrigger className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm">
-            <SelectValue placeholder="All Statuses" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all" className="font-poppins text-sm">All Statuses</SelectItem>
-            <SelectItem value="pending" className="font-poppins text-sm">⏳ Pending</SelectItem>
-            <SelectItem value="approved" className="font-poppins text-sm">✅ Approved</SelectItem>
-            <SelectItem value="ordered" className="font-poppins text-sm">📦 Ordered</SelectItem>
-            <SelectItem value="delivered" className="font-poppins text-sm">🚚 Delivered</SelectItem>
-            <SelectItem value="cancelled" className="font-poppins text-sm">❌ Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 text-sm text-slate-600">
+          <span>Rows per page:</span>
+          <Select value={pageSize.toString()} onValueChange={(value) => onPageSizeChange(Number(value))}>
+            <SelectTrigger className="w-20 h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="25">25</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+              <SelectItem value="100">100</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="h-8 w-8 p-0"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          
+          {pages.map(page => (
+            <Button
+              key={page}
+              variant={currentPage === page ? "default" : "outline"}
+              size="sm"
+              onClick={() => onPageChange(page)}
+              className={`h-8 w-8 p-0 text-xs ${currentPage === page ? 'bg-purple-600 text-white' : ''}`}
+            >
+              {page}
+            </Button>
+          ))}
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="h-8 w-8 p-0"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -636,7 +1096,7 @@ const POFilter = ({
 // Modern Widget Components
 const StatsOverview = ({ suppliers, purchaseOrders }: { suppliers: any[], purchaseOrders: any[] }) => {
   const activeSuppliers = suppliers.filter(s => s.is_active).length;
-  const pendingPOs = purchaseOrders.filter(po => po.status === 'pending').length;
+  const orderedPOs = purchaseOrders.filter(po => po.status === 'ordered').length;
   const deliveredThisMonth = purchaseOrders.filter(po => 
     po.status === 'delivered' && 
     new Date(po.order_date).getMonth() === new Date().getMonth()
@@ -664,16 +1124,16 @@ const StatsOverview = ({ suppliers, purchaseOrders }: { suppliers: any[], purcha
       <div className={`bg-gradient-to-br from-blue-500 via-blue-600 to-sky-700 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-blue-100 text-sm font-medium font-poppins">Pending POs</p>
-            <p className="text-3xl font-bold mt-2 font-poppins">{pendingPOs}</p>
+            <p className="text-blue-100 text-sm font-medium font-poppins">Ordered POs</p>
+            <p className="text-3xl font-bold mt-2 font-poppins">{orderedPOs}</p>
           </div>
           <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-            <Clock4 className="h-6 w-6" />
+            <Package className="h-6 w-6" />
           </div>
         </div>
         <div className="flex items-center gap-1 mt-4 text-blue-100 text-sm font-poppins">
           <AlertTriangle className="h-4 w-4" />
-          <span>Awaiting approval</span>
+          <span>Awaiting delivery</span>
         </div>
       </div>
 
@@ -697,7 +1157,7 @@ const StatsOverview = ({ suppliers, purchaseOrders }: { suppliers: any[], purcha
         <div className="flex items-center justify-between">
           <div>
             <p className="text-purple-100 text-sm font-medium font-poppins">Total PO Value</p>
-            <p className="text-3xl font-bold mt-2 font-poppins">₱{(totalPOValue / 1000).toFixed(0)}K</p>
+            <p className="text-3xl font-bold mt-2 font-poppins">₱{totalPOValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
           <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
             <ShoppingCart className="h-6 w-6" />
@@ -712,19 +1172,17 @@ const StatsOverview = ({ suppliers, purchaseOrders }: { suppliers: any[], purcha
   );
 };
 
-// Quick Actions with History Button
+// Quick Actions with Credit Management Button
 const EnhancedQuickActions = ({ 
   onAddSupplier, 
   onAddPO, 
   onExportData,
-  onViewHistory,
-  showHistoryButton = true
+  onViewCreditTable
 }: { 
   onAddSupplier: () => void; 
   onAddPO: () => void; 
   onExportData: () => void;
-  onViewHistory: () => void;
-  showHistoryButton?: boolean;
+  onViewCreditTable: () => void;
 }) => {
   const actions = [
     {
@@ -747,18 +1205,15 @@ const EnhancedQuickActions = ({
       icon: Download,
       onClick: onExportData,
       color: "from-green-500 to-emerald-600"
+    },
+    {
+      label: "Credit Management",
+      description: "View credit table",
+      icon: CreditCardIcon,
+      onClick: onViewCreditTable,
+      color: "from-red-500 to-pink-600"
     }
   ];
-
-  if (showHistoryButton) {
-    actions.push({
-      label: "Transaction History",
-      description: "View all records",
-      icon: History,
-      onClick: onViewHistory,
-      color: "from-orange-500 to-amber-600"
-    });
-  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -784,11 +1239,11 @@ const EnhancedQuickActions = ({
   );
 };
 
-// Enhanced Tabs with Transaction History
+// Enhanced Tabs
 const EnhancedTabs = ({ value, onValueChange, children }: any) => {
   return (
     <Tabs value={value} onValueChange={onValueChange} className="w-full font-poppins">
-      <TabsList className="grid w-full grid-cols-3 p-1 bg-slate-100 rounded-2xl">
+      <TabsList className="grid w-full grid-cols-4 p-1 bg-slate-100 rounded-2xl">
         <TabsTrigger 
           value="suppliers" 
           className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins text-sm"
@@ -809,6 +1264,13 @@ const EnhancedTabs = ({ value, onValueChange, children }: any) => {
         >
           <History className="h-4 w-4 mr-2" />
           History
+        </TabsTrigger>
+        <TabsTrigger 
+          value="credit-management" 
+          className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins text-sm"
+        >
+          <CreditCardIcon className="h-4 w-4 mr-2" />
+          Credit
         </TabsTrigger>
       </TabsList>
       {children}
@@ -861,6 +1323,7 @@ export default function EnhancedPurchasingPage() {
   const [isSupplierDialogOpen, setIsSupplierDialogOpen] = useState(false);
   const [isPODialogOpen, setIsPODialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isCreditTableOpen, setIsCreditTableOpen] = useState(false);
   
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null);
@@ -870,8 +1333,13 @@ export default function EnhancedPurchasingPage() {
   const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
   const [poSearchTerm, setPOSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [branchFilter, setBranchFilter] = useState('all');
 
-  // Enhanced PO Form State
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  // Enhanced PO Form State - Default to 'ordered' status
   const [poFormData, setPOFormData] = useState({
     poNumber: '',
     selectedSupplier: '',
@@ -880,7 +1348,7 @@ export default function EnhancedPurchasingPage() {
     poNotes: '',
     paymentMethod: 'cash' as 'cash' | 'credit',
     paymentStatus: 'pending' as 'pending' | 'paid' | 'partial' | 'overdue' | 'cancelled',
-    deliveryStatus: 'pending' as 'pending' | 'approved' | 'ordered' | 'delivered' | 'cancelled',
+    deliveryStatus: 'ordered' as 'ordered' | 'delivered' | 'cancelled', // Changed from pending to ordered
     cancellationReason: ''
   });
 
@@ -1001,20 +1469,44 @@ export default function EnhancedPurchasingPage() {
         po.branch?.name.toLowerCase().includes(poSearchTerm.toLowerCase());
       
       const matchesStatus = statusFilter === 'all' || po.status === statusFilter;
+      const matchesBranch = branchFilter === 'all' || po.branch_id === branchFilter;
       
       // For purchase orders tab, only show active orders (not delivered or cancelled)
       const isActiveOrder = po.status !== 'delivered' && po.status !== 'cancelled';
       
-      return matchesSearch && matchesStatus && (activeTab === 'purchase-orders' ? isActiveOrder : true);
+      return matchesSearch && matchesStatus && matchesBranch &&
+             (activeTab === 'purchase-orders' ? isActiveOrder : true);
     });
-  }, [purchaseOrders, poSearchTerm, statusFilter, activeTab]);
+  }, [purchaseOrders, poSearchTerm, statusFilter, branchFilter, activeTab]);
 
-  // Transaction History (Delivered and Cancelled orders)
+  // Transaction History (Delivered and Cancelled orders only)
   const transactionHistory = useMemo(() => {
     return purchaseOrders.filter(po => 
       po.status === 'delivered' || po.status === 'cancelled'
     );
   }, [purchaseOrders]);
+
+  // Credit Management (Credit orders with partial or pending payment)
+  const creditOrders = useMemo(() => {
+    return purchaseOrders.filter(po => 
+      po.payment_method === 'credit' && 
+      (po.payment_status === 'partial' || po.payment_status === 'pending' || po.payment_status === 'overdue')
+    );
+  }, [purchaseOrders]);
+
+  // Paginated data
+  const paginatedPurchaseOrders = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredPurchaseOrders.slice(startIndex, endIndex);
+  }, [filteredPurchaseOrders, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(filteredPurchaseOrders.length / pageSize);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [poSearchTerm, statusFilter, branchFilter]);
 
   const handleRefresh = () => {
     fetchSuppliers();
@@ -1033,7 +1525,7 @@ export default function EnhancedPurchasingPage() {
       poNotes: po.notes || '',
       paymentMethod: (po as any).payment_method || 'cash',
       paymentStatus: (po as any).payment_status || 'pending',
-      deliveryStatus: po.status || 'pending',
+      deliveryStatus: po.status || 'ordered', // Changed from pending to ordered
       cancellationReason: (po as any).cancellation_reason || ''
     });
     setIsPODialogOpen(true);
@@ -1043,6 +1535,10 @@ export default function EnhancedPurchasingPage() {
     setDeletingItem({ ...po, type: 'po' });
     setIsDeleteDialogOpen(true);
   }, []);
+
+  const handleRowClick = useCallback((po: PurchaseOrder) => {
+    handleEditPO(po);
+  }, [handleEditPO]);
 
   // Enhanced PO Form Handlers
   const handlePOFormChange = (field: string, value: any) => {
@@ -1058,7 +1554,7 @@ export default function EnhancedPurchasingPage() {
       poNotes: '',
       paymentMethod: 'cash',
       paymentStatus: 'pending',
-      deliveryStatus: 'pending',
+      deliveryStatus: 'ordered', // Changed from pending to ordered
       cancellationReason: ''
     });
     setEditingPO(null);
@@ -1118,6 +1614,10 @@ export default function EnhancedPurchasingPage() {
       dataToExport = transactionHistory;
       filename = 'transaction_history_export.csv';
       headers = ['PO Number', 'Supplier', 'Branch', 'Order Date', 'Completion Date', 'Total Amount', 'Final Status', 'Payment Status', 'Payment Method'];
+    } else if (activeTab === 'credit-management') {
+      dataToExport = creditOrders;
+      filename = 'credit_management_export.csv';
+      headers = ['PO Number', 'Supplier', 'Branch', 'Order Date', 'Due Date', 'Total Amount', 'Payment Status', 'Days Until Due'];
     } else {
       dataToExport = filteredPurchaseOrders;
       filename = 'purchase_orders_export.csv';
@@ -1149,7 +1649,7 @@ export default function EnhancedPurchasingPage() {
 
     toast({
       title: "Export Successful",
-      description: `${dataToExport.length} ${activeTab === 'suppliers' ? 'suppliers' : activeTab === 'transaction-history' ? 'transactions' : 'purchase orders'} exported to ${filename}`,
+      description: `${dataToExport.length} ${activeTab === 'suppliers' ? 'suppliers' : activeTab === 'transaction-history' ? 'transactions' : activeTab === 'credit-management' ? 'credit orders' : 'purchase orders'} exported to ${filename}`,
     });
   };
   
@@ -1165,6 +1665,22 @@ export default function EnhancedPurchasingPage() {
           `"${item.email || ''}"`,
           `"${item.address || ''}"`,
           `"${item.is_active ? 'Active' : 'Inactive'}"`
+        ].join(',');
+      } else if (type === 'credit-management') {
+        const dueDate = new Date(item.order_date);
+        dueDate.setDate(dueDate.getDate() + 120);
+        const today = new Date();
+        const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        
+        return [
+          `"${item.po_number || ''}"`,
+          `"${item.supplier?.name || ''}"`,
+          `"${item.branch?.name || ''}"`,
+          `"${item.order_date ? new Date(item.order_date).toLocaleDateString('en-US') : ''}"`,
+          `"${dueDate.toLocaleDateString('en-US')}"`,
+          `"${Number(item.total_amount || 0).toFixed(2)}"`,
+          `"${item.payment_status || ''}"`,
+          `"${daysUntilDue}"`
         ].join(',');
       } else {
         const formattedDate = item.order_date 
@@ -1270,16 +1786,6 @@ export default function EnhancedPurchasingPage() {
       }
     }
 
-    // Validate partial payment only for credit
-    if (poFormData.paymentStatus === 'partial' && poFormData.paymentMethod === 'cash') {
-      toast({ 
-        title: "Invalid Payment", 
-        description: "Partial payments are only allowed for Credit (120 days) payment method.", 
-        variant: "destructive" 
-      });
-      return;
-    }
-
     // Validate cancellation reason
     if ((poFormData.deliveryStatus === 'cancelled' || poFormData.paymentStatus === 'cancelled') && !poFormData.cancellationReason?.trim()) {
       toast({ 
@@ -1299,12 +1805,12 @@ export default function EnhancedPurchasingPage() {
       user_id: authUser.user_id,
       expected_delivery_date: poFormData.expectedDelivery || null,
       notes: poFormData.poNotes || null,
-      status: editingPO ? poFormData.deliveryStatus : 'pending',
+      status: 'ordered', // Always set to ordered for new POs
       payment_status: poFormData.paymentStatus,
       payment_method: poFormData.paymentMethod,
       cancellation_reason: (poFormData.deliveryStatus === 'cancelled' || poFormData.paymentStatus === 'cancelled') 
         ? poFormData.cancellationReason 
-        : null // ADD THIS
+        : null
     };
 
     try {
@@ -1313,7 +1819,10 @@ export default function EnhancedPurchasingPage() {
       if (editingPO) {
         const { error: updateError } = await supabase
           .from('purchase_order')
-          .update(poData)
+          .update({
+            ...poData,
+            status: poFormData.deliveryStatus // Use form data for edits
+          })
           .eq('po_id', editingPO.po_id);
         error = updateError;
       } else {
@@ -1326,7 +1835,10 @@ export default function EnhancedPurchasingPage() {
       if (error) {
         toast({ title: "Save Error", description: error.message, variant: "destructive" });
       } else {
-        toast({ title: "Success", description: `Purchase order ${editingPO ? 'updated' : 'created'} successfully.` });
+        toast({ 
+          title: "Success", 
+          description: `Purchase order ${editingPO ? 'updated' : 'added'} successfully.` 
+        });
         setIsPODialogOpen(false);
         resetPOForm();
         fetchPurchaseOrders();
@@ -1374,6 +1886,10 @@ export default function EnhancedPurchasingPage() {
     }
   };
 
+  const handlePaymentRecorded = () => {
+    fetchPurchaseOrders(); // Refresh data after payment is recorded
+  };
+
   const renderSupplierCell = (item: any, columnKey: string, value: any) => {
     if (columnKey === 'is_active') {
       return (
@@ -1415,6 +1931,7 @@ export default function EnhancedPurchasingPage() {
             item={po}
             onEdit={handleEditPO}
             onDelete={handleDeletePO}
+            onRowClick={handleRowClick}
           />
         ))}
       </div>
@@ -1434,7 +1951,7 @@ export default function EnhancedPurchasingPage() {
     return (
       <div className="space-y-1">
         {transactionHistory.map((po) => (
-          <div key={po.po_id} className="grid grid-cols-9 gap-3 px-3 py-2 items-center border-b border-slate-200 hover:bg-slate-50 transition-colors text-sm">
+          <div key={po.po_id} className="grid grid-cols-9 gap-3 px-3 py-2 items-center border-b border-slate-200 hover:bg-slate-50 transition-colors text-sm cursor-pointer" onClick={() => handleEditPO(po)}>
             <div className="font-semibold text-purple-700">{po.po_number}</div>
             <div className="truncate">{po.supplier?.name || 'Unknown'}</div>
             <div className="truncate">{po.branch?.name || 'Unknown'}</div>
@@ -1451,7 +1968,7 @@ export default function EnhancedPurchasingPage() {
               ₱{Number(po.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div>
-              <SimpleDeliveryStatus status={po.status || 'pending'} />
+              <SimpleDeliveryStatus status={po.status || 'ordered'} />
             </div>
             <div>
               <SimplePaymentStatus 
@@ -1465,10 +1982,13 @@ export default function EnhancedPurchasingPage() {
                 <button 
                   className="text-slate-600 hover:text-purple-600" 
                   title={po.notes}
-                  onClick={() => toast({
-                    title: "Order Notes",
-                    description: po.notes,
-                  })}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toast({
+                      title: "Order Notes",
+                      description: po.notes,
+                    })
+                  }}
                 >
                   <FileText className="h-4 w-4" />
                 </button>
@@ -1478,6 +1998,65 @@ export default function EnhancedPurchasingPage() {
             </div>
           </div>
         ))}
+      </div>
+    );
+  };
+
+  // Custom table renderer for credit management
+  const renderCreditTable = () => {
+    if (isPOLoading && purchaseOrders.length === 0) {
+      return (
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      );
+    }
+
+    const calculateDueDate = (orderDate: string) => {
+      const order = new Date(orderDate);
+      const dueDate = new Date(order);
+      dueDate.setDate(order.getDate() + 120);
+      return dueDate;
+    };
+
+    const isOverdue = (orderDate: string) => {
+      const dueDate = calculateDueDate(orderDate);
+      const today = new Date();
+      return dueDate < today;
+    };
+
+    return (
+      <div className="space-y-1">
+        {creditOrders.map((po) => {
+          const dueDate = calculateDueDate(po.order_date);
+          const overdue = isOverdue(po.order_date);
+          const daysUntilDue = Math.ceil((dueDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+          
+          return (
+            <div key={po.po_id} className="grid grid-cols-8 gap-3 px-3 py-2 items-center border-b border-slate-200 hover:bg-slate-50 transition-colors text-sm cursor-pointer" onClick={() => handleEditPO(po)}>
+              <div className="font-semibold text-purple-700">{po.po_number}</div>
+              <div className="truncate">{po.supplier?.name || 'Unknown'}</div>
+              <div className="truncate">{po.branch?.name || 'Unknown'}</div>
+              <div>{po.order_date ? new Date(po.order_date).toLocaleDateString('en-US') : 'No date'}</div>
+              <div className={`font-medium ${overdue ? 'text-red-600' : 'text-slate-700'}`}>
+                {dueDate.toLocaleDateString('en-US')}
+              </div>
+              <div className="font-bold text-slate-800">
+                ₱{Number(po.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div>
+                <SimplePaymentStatus 
+                  status={po.payment_status || 'pending'} 
+                  method={po.payment_method || 'cash'}
+                  orderDate={po.order_date}
+                />
+              </div>
+              <div className={`text-center font-medium ${overdue ? 'text-red-600' : daysUntilDue <= 30 ? 'text-amber-600' : 'text-slate-600'}`}>
+                {overdue ? `${Math.abs(daysUntilDue)} days overdue` : `${daysUntilDue} days`}
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -1536,16 +2115,9 @@ export default function EnhancedPurchasingPage() {
             
             <div className="flex items-center gap-3">
               <Button 
-                onClick={() => setActiveTab('transaction-history')}
-                className={buttonStyles.glass + " active:scale-95 font-poppins"}
-              >
-                <History className="h-5 w-5 mr-2" />
-                View History
-              </Button>
-              <Button 
                 onClick={handleRefresh}
                 disabled={isSupplierLoading || isPOLoading}
-                className={buttonStyles.glass + " active:scale-95 font-poppins"}
+                className="flex items-center gap-2 min-h-[44px] bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins active:scale-95"
               >
                 <RefreshCw className={`h-5 w-5 mr-2 ${isSupplierLoading || isPOLoading ? 'animate-spin' : ''}`} />
                 Refresh Data
@@ -1564,7 +2136,7 @@ export default function EnhancedPurchasingPage() {
           onAddSupplier={handleOpenSupplierDialog} 
           onAddPO={handleOpenPODialog}
           onExportData={handleExportData}
-          onViewHistory={() => setActiveTab('transaction-history')}
+          onViewCreditTable={() => setIsCreditTableOpen(true)}
         />
 
         <EnhancedTabs value={activeTab} onValueChange={setActiveTab}>
@@ -1653,10 +2225,6 @@ export default function EnhancedPurchasingPage() {
                       Delivered orders moved to Transaction History
                     </CardDescription>
                   </div>
-                  <Button onClick={handleOpenPODialog} className={buttonStyles.primary}>
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                    New PO
-                  </Button>
                 </div>
 
                 {/* Enhanced Filter Bar */}
@@ -1665,6 +2233,10 @@ export default function EnhancedPurchasingPage() {
                   onStatusFilterChange={setStatusFilter}
                   searchTerm={poSearchTerm}
                   onSearchChange={setPOSearchTerm}
+                  selectedBranch={branchFilter}
+                  onBranchChange={setBranchFilter}
+                  branches={branches}
+                  showBranchFilter={true}
                 />
               </CardHeader>
               
@@ -1691,7 +2263,7 @@ export default function EnhancedPurchasingPage() {
                 </div>
 
                 {/* Enhanced Table with Fixed Actions */}
-                {renderPOTable(filteredPurchaseOrders)}
+                {renderPOTable(paginatedPurchaseOrders)}
 
                 {filteredPurchaseOrders.length === 0 && !isPOLoading && (
                   <div className="text-center py-12 text-slate-500">
@@ -1703,6 +2275,18 @@ export default function EnhancedPurchasingPage() {
                       Create Purchase Order
                     </Button>
                   </div>
+                )}
+
+                {/* Pagination */}
+                {filteredPurchaseOrders.length > 0 && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    pageSize={pageSize}
+                    onPageSizeChange={setPageSize}
+                    totalItems={filteredPurchaseOrders.length}
+                  />
                 )}
               </CardContent>
             </Card>
@@ -1717,7 +2301,7 @@ export default function EnhancedPurchasingPage() {
                     <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Transaction History</CardTitle>
                     <CardDescription className="text-slate-600 font-poppins">
                       {transactionHistory.length} completed transaction{transactionHistory.length !== 1 ? 's' : ''} • 
-                      Includes delivered and cancelled orders
+                      Includes delivered and cancelled orders only
                     </CardDescription>
                   </div>
                   <Button onClick={handleExportData} className={buttonStyles.primary}>
@@ -1732,6 +2316,10 @@ export default function EnhancedPurchasingPage() {
                   onStatusFilterChange={setStatusFilter}
                   searchTerm={poSearchTerm}
                   onSearchChange={setPOSearchTerm}
+                  selectedBranch={branchFilter}
+                  onBranchChange={setBranchFilter}
+                  branches={branches}
+                  showBranchFilter={true}
                 />
               </CardHeader>
               
@@ -1757,6 +2345,58 @@ export default function EnhancedPurchasingPage() {
                     <History className="h-12 w-12 mx-auto mb-4 text-slate-300" />
                     <p className="text-lg font-medium">No transaction history yet</p>
                     <p className="text-sm mt-1">Completed orders will appear here automatically</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Credit Management Tab */}
+          <TabsContent value="credit-management" className="space-y-6">
+            <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
+              <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-red-50/50 border-b border-slate-200/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Credit Management</CardTitle>
+                    <CardDescription className="text-slate-600 font-poppins">
+                      {creditOrders.length} active credit purchase{creditOrders.length !== 1 ? 's' : ''} • 
+                      Track payments and due dates
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={() => setIsCreditTableOpen(true)} variant="outline" className="flex items-center gap-2">
+                      <List className="h-4 w-4" />
+                      View Details
+                    </Button>
+                    <Button onClick={handleExportData} className={buttonStyles.primary}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Export Credit Data
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="p-6">
+                {/* Table Header */}
+                <div className="grid grid-cols-8 gap-3 px-3 py-3 bg-slate-50 rounded-lg border border-slate-200 mb-2 font-semibold text-slate-700 text-sm">
+                  <div>PO Number</div>
+                  <div>Supplier</div>
+                  <div>Branch</div>
+                  <div>Order Date</div>
+                  <div>Due Date</div>
+                  <div>Total Amount</div>
+                  <div>Payment Status</div>
+                  <div className="text-center">Days Until Due</div>
+                </div>
+
+                {/* Credit Table */}
+                {renderCreditTable()}
+
+                {creditOrders.length === 0 && !isPOLoading && (
+                  <div className="text-center py-12 text-slate-500">
+                    <CreditCardIcon className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+                    <p className="text-lg font-medium">No credit purchases</p>
+                    <p className="text-sm mt-1">Credit purchases will appear here automatically</p>
                   </div>
                 )}
               </CardContent>
@@ -1882,6 +2522,7 @@ export default function EnhancedPurchasingPage() {
               suppliers={suppliers}
               branches={branches}
               isEditing={!!editingPO}
+              onPaymentRecorded={handlePaymentRecorded}
             />
 
             <DialogFooter className="pt-4">
@@ -1926,6 +2567,13 @@ export default function EnhancedPurchasingPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Credit Table Dialog */}
+        <CreditTableDialog 
+          isOpen={isCreditTableOpen}
+          onClose={() => setIsCreditTableOpen(false)}
+          purchaseOrders={purchaseOrders}
+        />
       </div>
 
       <style jsx global>{`
