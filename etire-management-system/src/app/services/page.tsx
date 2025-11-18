@@ -29,7 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   Loader2, PlusCircle, AlertTriangle, Wrench, Clock, CheckCircle, XCircle, 
   RefreshCw, Search, Filter, X, Edit, Trash2, Car, Bike, Truck, Users, Calendar,
-  TrendingUp, DollarSign, Package, ArrowUpDown, Download, ArrowLeft, Eye
+  TrendingUp, DollarSign, Package, ArrowUpDown, Download, ArrowLeft, Eye, Plus, Minus
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -131,9 +131,42 @@ interface ServiceJob {
         name: string;
     } | null;
     
+    // ✅ ADD THIS LINE:
+    items?: ServiceJobItem[];
+    
     // ✅ CALCULATED FIELDS
-    days_ago?: number;        // Days since service
-    is_recent?: boolean;      // Within last 7 days
+    days_ago?: number;
+    is_recent?: boolean;
+}
+
+// ✅ ADD: Service Job Item interface
+interface ServiceJobItem {
+  service_job_item_id?: string;
+  job_id?: string;
+  item_id: string;
+  quantity: number;
+  name?: string;
+  category?: string;
+}
+
+// ✅ ADD: Inventory Item interface
+// ✅ UPDATE: Match your actual database columns
+interface InventoryItem {
+  item_id: string;
+  name: string;
+  category: 'tire' | 'tool' | 'accessory';
+  vehicle_type_id: string | null;
+  vehicle_type?: string | null; // Added field from your DB
+  stock_quantity: number; // Changed from 'quantity'
+  cost_price: number; // Changed from 'unit_cost'
+  sale_price: number; // Changed from 'selling_price'
+  reorder_level: number;
+  supplier_id?: string | null;
+  branch_id: string;
+  description?: string | null;
+  sku?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // ✅ UPDATED: Customer interface with service stats
@@ -353,7 +386,10 @@ const ServiceStats = ({ serviceJobs }: { serviceJobs: ServiceJob[] }) => {
   const pendingJobs = serviceJobs.filter(job => job.status === 'pending').length;
   const inProgressJobs = serviceJobs.filter(job => job.status === 'in-progress').length;
   const completedJobs = serviceJobs.filter(job => job.status === 'completed').length;
-  const totalRevenue = serviceJobs.reduce((acc, job) => acc + job.service_fee, 0);
+  // ✅ UPDATED: Only count revenue from completed jobs
+  const totalRevenue = serviceJobs
+    .filter(job => job.status === 'completed')
+    .reduce((acc, job) => acc + job.service_fee, 0);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -591,7 +627,8 @@ export default function EnhancedServiceManagementPage() {
     const [serviceJobs, setServiceJobs] = useState<ServiceJob[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
-    
+    const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]); // ✅ ADD
+
     const [isLoading, setIsLoading] = useState(true);
     const [isDataLoading, setIsDataLoading] = useState(true);
     const [fetchError, setFetchError] = useState<string | null>(null);
@@ -621,7 +658,10 @@ export default function EnhancedServiceManagementPage() {
     const [jobStatus, setJobStatus] = useState<'pending' | 'in-progress' | 'completed' | 'cancelled'>('pending');
     const [serviceFee, setServiceFee] = useState('0');
     const [vehicleTypeId, setVehicleTypeId] = useState('');
-
+    const [selectedItems, setSelectedItems] = useState<ServiceJobItem[]>([]); // ✅ ADD
+    const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false); // ✅ ADD
+    const [detailsJob, setDetailsJob] = useState<ServiceJob | null>(null); // ✅ ADD
+const [originalStatus, setOriginalStatus] = useState<ServiceJob['status'] | null>(null); // ✅ ADD
     useEffect(() => {
         setMounted(true);
     }, []);
@@ -711,27 +751,62 @@ export default function EnhancedServiceManagementPage() {
         }
     }, [toast]);
 
+    const fetchInventoryItems = useCallback(async () => {
+        if (!supabase) {
+            console.log('No supabase client');
+            return;
+        }
+        
+        try {
+            console.log('Fetching inventory items...');
+            
+            const { data, error } = await supabase
+                .from('inventory_item')
+                .select('*')
+                .gt('stock_quantity', 0) // ✅ Changed from 'quantity'
+                .order('name');
+            
+            if (error) {
+                console.error('Inventory fetch error details:', error);
+                throw error;
+            }
+            
+            console.log(`Successfully fetched ${data?.length || 0} inventory items`);
+            setInventoryItems(data as InventoryItem[]);
+        } catch (error: any) {
+            console.error('Inventory fetch error:', error);
+            setInventoryItems([]);
+        }
+    }, [supabase]);
+
     useEffect(() => {
         fetchJobs();
         fetchCustomers();
         fetchVehicleTypes();
-    }, [fetchJobs, fetchCustomers, fetchVehicleTypes]);
+        fetchInventoryItems(); // ✅ ADD THIS LINE
+    }, [fetchJobs, fetchCustomers, fetchVehicleTypes, fetchInventoryItems]);
 
     // Filter jobs
+    // ...existing code...
     const filteredJobs = useMemo(() => {
-        return serviceJobs.filter(job => {
-            const matchesSearch = job.job_description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            job.remarks?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            job.user?.name.toLowerCase().includes(searchTerm.toLowerCase());
-
-            const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
-
-            const matchesVehicleType = vehicleTypeFilter === 'all' || 
-                                     job.vehicle_type_id === vehicleTypeFilter;
-
-            return matchesSearch && matchesStatus && matchesVehicleType;
-        });
+      return serviceJobs.filter(job => {
+        const matchesSearch =
+          job.job_description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (job.remarks || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (job.customer?.name || '').toLowerCase().includes(searchTerm.toLowerCase()); // ✅ safe
+    
+        const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
+        const matchesVehicleType = vehicleTypeFilter === 'all' || job.vehicle_type_id === vehicleTypeFilter;
+    
+        return matchesSearch && matchesStatus && matchesVehicleType;
+      });
     }, [serviceJobs, searchTerm, statusFilter, vehicleTypeFilter]);
+    // ...existing code...
+
+        // ✅ NEW: Check if fields should be locked
+    const isFieldsLocked = useMemo(() => {
+        return jobStatus === 'completed';
+    }, [jobStatus]);
 
     const clearFilters = () => {
         setSearchTerm('');
@@ -748,7 +823,9 @@ export default function EnhancedServiceManagementPage() {
         setJobStatus('pending');
         setServiceFee('0');
         setVehicleTypeId('');
+        setSelectedItems([]);
         setEditingJob(null);
+        setOriginalStatus(null); // ✅ ADD
     };
 
     const handleOpenAddDialog = () => {
@@ -758,13 +835,55 @@ export default function EnhancedServiceManagementPage() {
     
     const handleOpenEditDialog = (job: ServiceJob) => {
         setEditingJob(job);
-        setCustomerId(job.user_id || ANONYMOUS_CUSTOMER_ID);
+        
+        // ✅ FIXED: Properly determine which customer to select
+        let customerToSet = ANONYMOUS_CUSTOMER_ID;
+        
+        // If job has a customer_id, use that
+        if (job.customer_id) {
+            customerToSet = job.customer_id;
+        } 
+        // If no customer_id but has user_id, check if it exists in customers list
+        else if (job.user_id) {
+            const customerExists = customers.find(c => c.customer_id === job.user_id);
+            if (customerExists) {
+                customerToSet = job.user_id;
+            }
+        }
+        
+        setCustomerId(customerToSet);
         setJobDescription(job.job_description);
         setSelectedServiceType(job.job_description);
-        setRemarks(job.remarks || '');
+        
+        // ✅ FIXED: Clean up remarks by removing "Customer:" prefix if it exists
+        let cleanRemarks = job.remarks || '';
+        if (cleanRemarks.startsWith('Customer:')) {
+            const parts = cleanRemarks.split('\n\nRemarks: ');
+            cleanRemarks = parts.length > 1 ? parts[1] : '';
+        }
+        setRemarks(cleanRemarks);
+        setOriginalStatus(job.status); // ✅ ADD THIS LINE
         setJobStatus(job.status);
-        setServiceFee(String(job.service_fee));
         setVehicleTypeId(job.vehicle_type_id || '');
+        setSelectedItems(job.items || []);
+        
+        // ✅ Calculate the original service fee by subtracting items total
+        if (job.items && job.items.length > 0) {
+            const itemsTotal = job.items.reduce((total, item) => {
+                const inventoryItem = inventoryItems.find(i => i.item_id === item.item_id);
+                if (inventoryItem) {
+                    return total + (inventoryItem.sale_price * item.quantity);
+                }
+                return total;
+            }, 0);
+            
+            // Set service fee to the original fee (grand total - items)
+            setServiceFee(String(job.service_fee - itemsTotal));
+        } else {
+            // No items, so service_fee is the actual service fee
+            setServiceFee(String(job.service_fee));
+        }
+        
         setIsEditDialogOpen(true);
     };
 
@@ -778,23 +897,248 @@ export default function EnhancedServiceManagementPage() {
         setIsStatusUpdateOpen(true);
     };
 
+    // ✅ ADD: Function to open details dialog
+    const handleOpenDetails = (job: ServiceJob) => {
+        setDetailsJob(job);
+        setIsDetailsDialogOpen(true);
+    };
+
+    // ✅ UPDATED: Item management functions with price calculation
+    const addNewItemRow = () => {
+        setSelectedItems([...selectedItems, { item_id: '', quantity: 1 }]);
+    };
+
+    const removeItemRow = (index: number) => {
+        setSelectedItems(selectedItems.filter((_, i) => i !== index));
+    };
+
+    const updateItemField = (index: number, field: keyof ServiceJobItem, value: any) => {
+        const updated = [...selectedItems];
+        updated[index] = { ...updated[index], [field]: value };
+        
+        if (field === 'item_id' && value) {
+            const item = inventoryItems.find(i => i.item_id === value);
+            if (item) {
+                updated[index].name = item.name;
+                updated[index].category = item.category;
+                // Store the price in the item for calculation
+                (updated[index] as any).sale_price = item.sale_price;
+            }
+        }
+        
+        setSelectedItems(updated);
+    };
+
+    const incrementQuantity = (index: number) => {
+        const updated = [...selectedItems];
+        updated[index].quantity = (updated[index].quantity || 1) + 1;
+        setSelectedItems(updated);
+    };
+
+    const decrementQuantity = (index: number) => {
+        const updated = [...selectedItems];
+        if (updated[index].quantity > 1) {
+            updated[index].quantity -= 1;
+            setSelectedItems(updated);
+        }
+    };
+
+    // ✅ NEW: Calculate total items cost
+    const calculateItemsTotal = useMemo(() => {
+        return selectedItems.reduce((total, item) => {
+            const inventoryItem = inventoryItems.find(i => i.item_id === item.item_id);
+            if (inventoryItem) {
+                return total + (inventoryItem.sale_price * item.quantity);
+            }
+            return total;
+        }, 0);
+    }, [selectedItems, inventoryItems]);
+
+    // ✅ NEW: Calculate grand total (service fee + items)
+    const calculateGrandTotal = useMemo(() => {
+        const fee = parseFloat(serviceFee) || 0;
+        return fee + calculateItemsTotal;
+    }, [serviceFee, calculateItemsTotal]);
+
+    const filteredInventoryItems = useMemo(() => {
+        if (!vehicleTypeId) {
+            return [];
+        }
+        
+        // Get the selected vehicle type name
+        const selectedVehicleType = vehicleTypes.find(vt => vt.vehicle_type_id === vehicleTypeId);
+        
+        if (!selectedVehicleType) {
+            return [];
+        }
+        
+        console.log('Filtering for vehicle type:', selectedVehicleType.name);
+        
+        // Filter by the vehicle_type STRING column, not vehicle_type_id
+        const filtered = inventoryItems.filter(item => {
+            const matches = item.vehicle_type?.toLowerCase() === selectedVehicleType.name.toLowerCase() 
+                         && item.stock_quantity > 0;
+            return matches;
+        });
+        
+        console.log('Filtered items:', filtered);
+        return filtered;
+    }, [inventoryItems, vehicleTypeId, vehicleTypes]);
+
     const handleStatusUpdate = async (jobId: string, status: ServiceJob['status']) => {
-        if (!supabase) return;
+        if (!supabase || !authUser) return;
         
         setIsLoading(true);
         
         try {
+            // Find the job being updated
+            const job = serviceJobs.find(j => j.job_id === jobId);
+            if (!job) throw new Error('Job not found');
+    
+            // Check if status is changing to "completed"
+            const isBecomingCompleted = status === 'completed' && job.status !== 'completed';
+            const isLeavingCompleted = status !== 'completed' && job.status === 'completed';
+    
+            // Validate stock if becoming completed
+            if (isBecomingCompleted && job.items && job.items.length > 0) {
+                for (const item of job.items) {
+                    const inventoryItem = inventoryItems.find(i => i.item_id === item.item_id);
+                    if (inventoryItem && inventoryItem.stock_quantity < item.quantity) {
+                        toast({ 
+                            title: 'Insufficient Stock', 
+                            description: `Not enough stock for ${inventoryItem.name}. Available: ${inventoryItem.stock_quantity}`,
+                            variant: 'destructive'
+                        });
+                        setIsLoading(false);
+                        return;
+                    }
+                }
+            }
+    
+            // Update status
             const { error } = await supabase
                 .from('service_job')
                 .update({ status })
                 .eq('job_id', jobId);
-
+    
             if (error) {
                 toast({ title: 'Status Update Error', description: error.message, variant: 'destructive' });
             } else {
-                toast({ title: 'Success', description: 'Service job status updated successfully.' });
+                // Deduct stock and create sales if becoming completed
+                if (isBecomingCompleted && job.items && job.items.length > 0) {
+                    // Check if sale already exists
+                    const { data: existingSale } = await supabase
+                        .from('sale')
+                        .select('sale_id')
+                        .eq('service_job_id', jobId)
+                        .single();
+    
+                    let saleId: string;
+    
+                    if (existingSale) {
+                        saleId = existingSale.sale_id;
+                    } else {
+                        // Create main sale record
+                        const firstItem = job.items[0];
+                        const { data: firstItemData } = await supabase
+                            .from('inventory_item')
+                            .select('branch_id')
+                            .eq('item_id', firstItem.item_id)
+                            .single();
+    
+                        if (firstItemData) {
+                            const { data: newSale, error: saleError } = await supabase
+                                .from('sale')
+                                .insert([{
+                                    user_id: authUser.user_id,
+                                    branch_id: firstItemData.branch_id,
+                                    customer_id: job.customer_id || null,
+                                    sale_date: new Date().toISOString(),
+                                    service_job_id: jobId,
+                                    total_amount: job.service_fee,
+                                    payment_method: 'cash'
+                                }])
+                                .select('sale_id')
+                                .single();
+    
+                            if (saleError || !newSale) {
+                                console.error('Sale creation error:', saleError);
+                            } else {
+                                saleId = newSale.sale_id;
+                            }
+                        }
+                    }
+    
+                    // Process each item
+                    for (const item of job.items) {
+                        const { data: currentItem, error: fetchError } = await supabase
+                            .from('inventory_item')
+                            .select('stock_quantity, name, sale_price, branch_id')
+                            .eq('item_id', item.item_id)
+                            .single();
+                        
+                        if (fetchError) continue;
+    
+                        const newStock = currentItem.stock_quantity - item.quantity;
+    
+                        // Deduct stock
+                        await supabase
+                            .from('inventory_item')
+                            .update({ stock_quantity: newStock })
+                            .eq('item_id', item.item_id);
+    
+                        // Create sale_item record
+                        if (saleId!) {
+                            const { error: saleItemError } = await supabase
+                                .from('sale_item')
+                                .insert([{
+                                    sale_id: saleId,
+                                    item_id: item.item_id,
+                                    quantity: item.quantity,
+                                    price_at_sale: currentItem.sale_price,
+                                    installation_fee: 0
+                                }]);
+    
+                            if (saleItemError) {
+                                console.error('Sale item creation error:', saleItemError);
+                            }
+                        }
+                    }
+                }
+    
+                // Restore stock and delete sales if leaving completed
+                if (isLeavingCompleted && job.items && job.items.length > 0) {
+                    for (const item of job.items) {
+                        const { data: currentItem, error: fetchError } = await supabase
+                            .from('inventory_item')
+                            .select('stock_quantity, name')
+                            .eq('item_id', item.item_id)
+                            .single();
+                        
+                        if (fetchError) continue;
+    
+                        const restoredStock = currentItem.stock_quantity + item.quantity;
+    
+                        await supabase
+                            .from('inventory_item')
+                            .update({ stock_quantity: restoredStock })
+                            .eq('item_id', item.item_id);
+                    }
+    
+                    // Delete sale records for this job
+                    await supabase
+                        .from('sale')
+                        .delete()
+                        .eq('service_job_id', jobId);
+                }
+    
+                toast({ 
+                    title: 'Success', 
+                    description: `Status updated to ${status}.${isBecomingCompleted ? ' Stock deducted and sale recorded.' : ''}${isLeavingCompleted ? ' Stock restored and sales removed.' : ''}` 
+                });
                 setIsStatusUpdateOpen(false);
                 fetchJobs();
+                fetchInventoryItems();
             }
         } catch (error: any) {
             toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -848,7 +1192,7 @@ export default function EnhancedServiceManagementPage() {
             return [
                 `"${job.job_id || ''}"`,
                 `"${job.job_description || ''}"`,
-                `"${job.user?.name || 'Walk-in Customer'}"`,
+                `"${job.customer?.name || 'Walk-in Customer'}"`,
                 `"${job.vehicle_type?.name || 'Not specified'}"`,
                 `"${job.status || ''}"`,
                 `"${Number(job.service_fee || 0).toFixed(2)}"`,
@@ -863,60 +1207,219 @@ export default function EnhancedServiceManagementPage() {
     const handleSubmit = async () => {
         if (!supabase || !authUser) return;
         
-        // Determine final job description
         const finalJobDescription = selectedServiceType === 'Other (Please specify below)' 
             ? customJobDescription 
             : jobDescription;
-
+    
         if (!finalJobDescription) {
             toast({ title: 'Validation Error', description: 'Job description is required.', variant: 'destructive'});
             return;
         }
     
+        // ✅ Check if status changed to "completed"
+        const isNowCompleted = jobStatus === 'completed';
+        const wasNotCompleted = editingJob ? originalStatus !== 'completed' : true;
+        const shouldDeductStock = isNowCompleted && wasNotCompleted;
+    
+        // ✅ Validate stock only if becoming completed
+        if (shouldDeductStock && selectedItems.length > 0) {
+            for (const item of selectedItems) {
+                if (!item.item_id || item.quantity <= 0) continue;
+                
+                const inventoryItem = inventoryItems.find(i => i.item_id === item.item_id);
+                if (inventoryItem && inventoryItem.stock_quantity < item.quantity) {
+                    toast({ 
+                        title: 'Insufficient Stock', 
+                        description: `Not enough stock for ${inventoryItem.name}. Available: ${inventoryItem.stock_quantity}`,
+                        variant: 'destructive'
+                    });
+                    return;
+                }
+            }
+        }
+    
         setIsLoading(true);
         
         try {
-            const customerName = customerId === ANONYMOUS_CUSTOMER_ID ? 'Walk-in Customer' : 
-                                customers.find(c => c.customer_id === customerId)?.name || 'Unknown Customer';  // ✅ Changed to customer_id
-            
             const jobData = {
-                user_id: authUser.user_id,  // ✅ This is the EMPLOYEE who created the job
-                customer_id: customerId === ANONYMOUS_CUSTOMER_ID ? null : customerId,  // ✅ Add customer_id field
+                user_id: authUser.user_id,
+                customer_id: customerId === ANONYMOUS_CUSTOMER_ID ? null : customerId,
                 job_description: finalJobDescription,
                 status: jobStatus,
-                service_fee: parseFloat(serviceFee) || 0,
-                remarks: `Customer: ${customerName}${remarks ? '\n\nRemarks: ' + remarks : ''}`,
+                service_fee: calculateGrandTotal,
+                remarks: remarks || null,
                 vehicle_type_id: vehicleTypeId && vehicleTypeId !== '' ? vehicleTypeId : null,
             };
     
-            console.log('Submitting job data:', jobData);
-    
-            let error;
+            let jobId: string;
             
             if (editingJob) {
                 const { error: updateError } = await supabase
                     .from('service_job')
                     .update(jobData)
                     .eq('job_id', editingJob.job_id);
-                error = updateError;
+                
+                if (updateError) throw updateError;
+                jobId = editingJob.job_id;
+                
+                // ✅ Restore stock ONLY if status was "completed" and is changing
+                if (originalStatus === 'completed' && jobStatus !== 'completed') {
+                    if (editingJob.items && editingJob.items.length > 0) {
+                        for (const oldItem of editingJob.items) {
+                            const { data: currentItem, error: fetchError } = await supabase
+                                .from('inventory_item')
+                                .select('stock_quantity, name')
+                                .eq('item_id', oldItem.item_id)
+                                .single();
+                            
+                            if (fetchError) continue;
+    
+                            const restoredStock = currentItem.stock_quantity + oldItem.quantity;
+    
+                            await supabase
+                                .from('inventory_item')
+                                .update({ stock_quantity: restoredStock })
+                                .eq('item_id', oldItem.item_id);
+                        }
+    
+                        // Delete associated sales
+                        await supabase
+                            .from('sale')
+                            .delete()
+                            .eq('service_job_id', jobId);
+                    }
+                }
+                
+                // Delete old items
+                await supabase
+                    .from('service_job_item')
+                    .delete()
+                    .eq('job_id', jobId);
             } else {
-                const { error: insertError } = await supabase
+                const { data: insertData, error: insertError } = await supabase
                     .from('service_job')
-                    .insert([jobData]);
-                error = insertError;
+                    .insert([jobData])
+                    .select()
+                    .single();
+                
+                if (insertError) throw insertError;
+                jobId = insertData.job_id;
             }
     
-            if (error) {
-                toast({ title: 'Save Error', description: error.message, variant: 'destructive' });
-            } else {
-                toast({ title: 'Success', description: `Service job ${editingJob ? 'updated' : 'created'} successfully.` });
-                setIsAddDialogOpen(false);
-                setIsEditDialogOpen(false);
-                resetForm();
-                fetchJobs();
+            // ✅ Insert selected items
+            if (selectedItems.length > 0) {
+                const validItems = selectedItems.filter(item => item.item_id && item.quantity > 0);
+                
+                if (validItems.length > 0) {
+                    const itemsToInsert = validItems.map(item => ({
+                        job_id: jobId,
+                        item_id: item.item_id,
+                        quantity: item.quantity
+                    }));
+                    
+                    const { error: itemsError } = await supabase
+                        .from('service_job_item')
+                        .insert(itemsToInsert)
+                        .select();
+                    
+                    if (itemsError) throw itemsError;
+    
+                    // ✅ Deduct stock and create sales ONLY if status is "completed"
+                    if (shouldDeductStock && authUser) {
+                        // Check if sale already exists
+                        const { data: existingSale } = await supabase
+                            .from('sale')
+                            .select('sale_id')
+                            .eq('service_job_id', jobId)
+                            .single();
+    
+                        let saleId: string;
+    
+                        if (existingSale) {
+                            saleId = existingSale.sale_id;
+                        } else {
+                            // Create main sale record
+                            const firstItem = validItems[0];
+                            const firstInventoryItem = inventoryItems.find(i => i.item_id === firstItem.item_id);
+                            
+                            if (firstInventoryItem) {
+                                const { data: newSale, error: saleError } = await supabase
+                                    .from('sale')
+                                    .insert([{
+                                        user_id: authUser.user_id,
+                                        branch_id: firstInventoryItem.branch_id,
+                                        customer_id: customerId === ANONYMOUS_CUSTOMER_ID ? null : customerId,
+                                        sale_date: new Date().toISOString(),
+                                        service_job_id: jobId,
+                                        total_amount: calculateGrandTotal,
+                                        payment_method: 'cash'
+                                    }])
+                                    .select('sale_id')
+                                    .single();
+    
+                                if (saleError || !newSale) {
+                                    console.error('Sale creation error:', saleError);
+                                } else {
+                                    saleId = newSale.sale_id;
+                                }
+                            }
+                        }
+    
+                        // Process each item
+                        for (const item of validItems) {
+                            const { data: currentItem, error: fetchError } = await supabase
+                                .from('inventory_item')
+                                .select('stock_quantity, name, sale_price, branch_id')
+                                .eq('item_id', item.item_id)
+                                .single();
+                            
+                            if (fetchError) throw fetchError;
+    
+                            const newStock = currentItem.stock_quantity - item.quantity;
+    
+                            if (newStock < 0) {
+                                throw new Error(`Cannot deduct ${item.quantity} from ${currentItem.name}. Only ${currentItem.stock_quantity} available.`);
+                            }
+    
+                            // Deduct stock
+                            const { error: stockError } = await supabase
+                                .from('inventory_item')
+                                .update({ stock_quantity: newStock })
+                                .eq('item_id', item.item_id);
+                            
+                            if (stockError) throw stockError;
+    
+                            // Create sale_item record
+                            if (saleId!) {
+                                const { error: saleItemError } = await supabase
+                                    .from('sale_item')
+                                    .insert([{
+                                        sale_id: saleId,
+                                        item_id: item.item_id,
+                                        quantity: item.quantity,
+                                        price_at_sale: currentItem.sale_price,
+                                        installation_fee: 0
+                                    }]);
+    
+                                if (saleItemError) {
+                                    console.error('Sale item creation error:', saleItemError);
+                                }
+                            }
+                        }
+                    }
+                }
             }
+    
+            toast({ 
+                title: 'Success', 
+                description: `Service job ${editingJob ? 'updated' : 'created'} successfully.${shouldDeductStock ? ' Stock deducted and sale recorded.' : ''}` 
+            });
+            setIsAddDialogOpen(false);
+            setIsEditDialogOpen(false);
+            resetForm();
+            fetchJobs();
+            fetchInventoryItems();
         } catch (error: any) {
-            console.error('Submit error:', error);
             toast({ title: 'Error', description: error.message, variant: 'destructive' });
         }
         
@@ -1140,8 +1643,9 @@ USING (true);`}
                         ) : (
                             <div className="overflow-hidden">
                                 {/* Table Header */}
-                                <div className="grid grid-cols-12 gap-4 px-6 py-4 bg-slate-50/80 border-b border-slate-200/50 text-sm font-semibold text-slate-700 font-poppins">
-                                    <div className="col-span-4">Job Details</div>
+                                <div className="grid grid-cols-12 gap-4 p-4 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold rounded-t-xl font-poppins">
+                                    <div className="col-span-3">Job Details</div>
+                                    <div className="col-span-1">Details</div> {/* ✅ NEW COLUMN */}
                                     <div className="col-span-2">Vehicle Type</div>
                                     <div className="col-span-2">Employee</div>
                                     <div className="col-span-2">Date & Fee</div>
@@ -1170,20 +1674,42 @@ USING (true);`}
                                                     onClick={() => handleOpenStatusUpdate(job)}
                                                 >
                                                     {/* Job Details */}
-                                                    <div className="col-span-4">
+                                                    <div className="col-span-3">
                                                         <div className="flex items-start gap-3">
                                                             <div className="p-2 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg">
                                                                 <Wrench className="h-5 w-5 text-white" />
                                                             </div>
                                                             <div>
                                                                 <p className="font-semibold text-slate-900 text-lg font-poppins">{job.job_description}</p>
+                                                                {/* ✅ Show customer name */}
+                                                                <p className="text-sm text-slate-600 mt-1 font-poppins">
+                                                                    Customer: {job.customer?.name || 'Walk-in Customer'}
+                                                                </p>
+                                                                {/* ✅ Show remarks if they exist */}
                                                                 {job.remarks && (
-                                                                    <p className="text-sm text-slate-600 mt-1 line-clamp-2 font-poppins">
-                                                                        {job.remarks.split('\n')[0]}
+                                                                    <p className="text-sm text-slate-500 mt-1 line-clamp-2 font-poppins">
+                                                                        {job.remarks}
                                                                     </p>
                                                                 )}
                                                             </div>
                                                         </div>
+                                                    </div>
+
+
+                                                    {/* ✅ NEW: Details Column */}
+                                                    <div className="col-span-1">
+                                                      <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();               // ✅ prevent row click
+                                                          handleOpenDetails(job);
+                                                        }}
+                                                        className="text-purple-600 border-purple-300 hover:bg-purple-50 hover:border-purple-500 transition-all font-poppins"
+                                                      >
+                                                        <Eye className="h-4 w-4 mr-1" />
+                                                        View More
+                                                      </Button>
                                                     </div>
 
                                                     {/* Vehicle Type */}
@@ -1276,123 +1802,295 @@ USING (true);`}
                                 {editingJob ? `Update details for job #${editingJob.job_id.substring(0, 8)}` : 'Fill in the details for a new service job.'}
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="customer" className="text-slate-700 font-medium font-poppins">Customer</Label>
-                                <Select value={customerId} onValueChange={setCustomerId}>
-                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
-                                        <SelectValue placeholder="Select customer reference..."/>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={ANONYMOUS_CUSTOMER_ID} className="font-poppins">Walk-in Customer</SelectItem>
-                                        {customers.filter(c => c.customer_id !== ANONYMOUS_CUSTOMER_ID).map(c => (  // ✅ Changed to customer_id
-                                            <SelectItem key={c.customer_id} value={c.customer_id} className="font-poppins">
-                                                {c.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="vehicle-type" className="text-slate-700 font-medium font-poppins">Vehicle Type</Label>
-                                <Select value={vehicleTypeId || undefined} onValueChange={(val) => setVehicleTypeId(val)}>
-                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
-                                        <SelectValue placeholder="Select vehicle type..."/>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {vehicleTypes.map(vt => (
-                                            <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id} className="font-poppins">
-                                                {vt.name.charAt(0).toUpperCase() + vt.name.slice(1)}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
+                        
+                                {/* Show lock warning */}
+                                {isFieldsLocked && (
+                                    <Alert className="bg-amber-50 border-amber-200">
+                                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                        <AlertTitle className="text-amber-800 font-poppins">Fields Locked</AlertTitle>
+                                        <AlertDescription className="text-amber-700 font-poppins">
+                                            This job is marked as completed. Change the status to edit job details.
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+                            
                                 <div className="space-y-2">
-                                    <Label htmlFor="job-status" className="text-slate-700 font-medium font-poppins">Status</Label>
-                                    <Select value={jobStatus} onValueChange={val => setJobStatus(val as any)}>
-                                        <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
-                                            <SelectValue/>
+                                    <Label htmlFor="customer" className="text-slate-700 font-medium font-poppins">Customer</Label>
+                                    <Select 
+                                        value={customerId} 
+                                        onValueChange={setCustomerId}
+                                        disabled={isFieldsLocked}
+                                    >
+                                        <SelectTrigger className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins ${isFieldsLocked ? 'bg-slate-100 cursor-not-allowed' : 'bg-white/80'}`}>
+                                            <SelectValue placeholder="Select customer reference..."/>
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="pending" className="font-poppins">Pending</SelectItem>
-                                            <SelectItem value="in-progress" className="font-poppins">In Progress</SelectItem>
-                                            <SelectItem value="completed" className="font-poppins">Completed</SelectItem>
-                                            <SelectItem value="cancelled" className="font-poppins">Cancelled</SelectItem>
+                                            <SelectItem value={ANONYMOUS_CUSTOMER_ID} className="font-poppins">Walk-in Customer</SelectItem>
+                                            {customers.filter(c => c.customer_id !== ANONYMOUS_CUSTOMER_ID).map(c => (
+                                                <SelectItem key={c.customer_id} value={c.customer_id} className="font-poppins">
+                                                    {c.name}
+                                                </SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="service-fee" className="text-slate-700 font-medium font-poppins">Service Fee (₱)</Label>
-                                    <Input 
-                                        id="service-fee"
-                                        type="number" 
-                                        value={serviceFee} 
-                                        onChange={e => setServiceFee(e.target.value)} 
-                                        placeholder="0.00"
-                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
-                                    />
-                                </div>
-                            </div>
                             
-                            {/* NEW: Service Type Selection */}
-                            <div className="space-y-2">
-                                <Label htmlFor="service-type" className="text-slate-700 font-medium font-poppins">Service Type *</Label>
-                                <Select value={selectedServiceType} onValueChange={setSelectedServiceType}>
-                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
-                                        <SelectValue placeholder="Select a service type..."/>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {COMMON_SERVICES.map(service => (
-                                            <SelectItem key={service} value={service} className="font-poppins">
-                                                {service}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            {/* Show custom input when "Other" is selected */}
-                            {selectedServiceType === 'Other (Please specify below)' && (
                                 <div className="space-y-2">
-                                    <Label htmlFor="custom-job-description" className="text-slate-700 font-medium font-poppins">Custom Service Description *</Label>
-                                    <Textarea 
-                                        id="custom-job-description"
-                                        value={customJobDescription} 
-                                        onChange={e => setCustomJobDescription(e.target.value)} 
-                                        placeholder="Describe the custom service..."
-                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
-                                    />
+                                    <Label htmlFor="vehicle-type" className="text-slate-700 font-medium font-poppins">Vehicle Type</Label>
+                                    <Select 
+                                        value={vehicleTypeId || undefined} 
+                                        onValueChange={(val) => setVehicleTypeId(val)}
+                                        disabled={isFieldsLocked}
+                                    >
+                                        <SelectTrigger className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins ${isFieldsLocked ? 'bg-slate-100 cursor-not-allowed' : 'bg-white/80'}`}>
+                                            <SelectValue placeholder="Select vehicle type..."/>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {vehicleTypes.map(vt => (
+                                                <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id} className="font-poppins">
+                                                    {vt.name.charAt(0).toUpperCase() + vt.name.slice(1)}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
-                            )}
-
-                            <div className="space-y-2">
-                                <Label htmlFor="remarks" className="text-slate-700 font-medium font-poppins">Remarks</Label>
-                                <Textarea 
-                                    id="remarks"
-                                    value={remarks} 
-                                    onChange={e => setRemarks(e.target.value)} 
-                                    placeholder="Customer notes or internal remarks..."
-                                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
-                                />
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <DialogClose asChild>
-                                <Button type="button" variant="outline" className={buttonStyles.back}>
-                                    <ArrowLeft className="h-4 w-4 mr-2" />
-                                    Cancel
-                                </Button>
-                            </DialogClose>
-                            <Button onClick={handleSubmit} disabled={isLoading || isDataLoading} className={buttonStyles.primary}>
-                                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                                {editingJob ? 'Update Job' : 'Create Job'}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-
+                                
+                                {/* Service Type Selection */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="service-type" className="text-slate-700 font-medium font-poppins">Service Type *</Label>
+                                    <Select 
+                                        value={selectedServiceType} 
+                                        onValueChange={setSelectedServiceType}
+                                        disabled={isFieldsLocked}
+                                    >
+                                        <SelectTrigger className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins ${isFieldsLocked ? 'bg-slate-100 cursor-not-allowed' : 'bg-white/80'}`}>
+                                            <SelectValue placeholder="Select a service type..."/>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {COMMON_SERVICES.map(service => (
+                                                <SelectItem key={service} value={service} className="font-poppins">
+                                                    {service}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            
+                                {/* Custom input when "Other" is selected */}
+                                {selectedServiceType === 'Other (Please specify below)' && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="custom-job-description" className="text-slate-700 font-medium font-poppins">Custom Service Description *</Label>
+                                        <Textarea 
+                                            id="custom-job-description"
+                                            value={customJobDescription} 
+                                            onChange={e => setCustomJobDescription(e.target.value)} 
+                                            placeholder="Describe the custom service..."
+                                            disabled={isFieldsLocked}
+                                            className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins ${isFieldsLocked ? 'bg-slate-100 cursor-not-allowed' : 'bg-white/80'}`}
+                                        />
+                                    </div>
+                                )}
+                            
+                                {/* Items from Inventory */}
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-slate-700 font-medium font-poppins">Items Used (Optional)</Label>
+                                        <Button 
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={addNewItemRow}
+                                            disabled={!vehicleTypeId || isFieldsLocked}
+                                            className="text-purple-600 border-purple-300 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <Plus className="h-4 w-4 mr-1" />
+                                            Add Item
+                                        </Button>
+                                    </div>
+                            
+                                    {!vehicleTypeId && !isFieldsLocked && (
+                                        <p className="text-sm text-amber-600 bg-amber-50 p-2 rounded font-poppins">
+                                            Please select a vehicle type first to add items
+                                        </p>
+                                    )}
+                            
+                                    {selectedItems.length > 0 && (
+                                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                                            {/* Column Headers */}
+                                            <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-slate-100 rounded-lg">
+                                                <div className="col-span-4 text-xs font-semibold text-slate-600 font-poppins">Item Name</div>
+                                                <div className="col-span-2 text-xs font-semibold text-slate-600 font-poppins">Type</div>
+                                                <div className="col-span-2 text-xs font-semibold text-slate-600 font-poppins">Price</div>
+                                                <div className="col-span-2 text-xs font-semibold text-slate-600 font-poppins">Quantity</div>
+                                                <div className="col-span-1 text-xs font-semibold text-slate-600 font-poppins">Subtotal</div>
+                                                <div className="col-span-1"></div>
+                                            </div>
+                            
+                                            {selectedItems.map((item, index) => {
+                                                const inventoryItem = inventoryItems.find(i => i.item_id === item.item_id);
+                                                const itemSubtotal = inventoryItem ? inventoryItem.sale_price * item.quantity : 0;
+                                                
+                                                return (
+                                                    <div key={index} className="grid grid-cols-12 gap-2 items-center p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                                        {/* Item Name */}
+                                                        <div className="col-span-4 space-y-1">
+                                                            <Select 
+                                                                value={item.item_id} 
+                                                                onValueChange={(val) => updateItemField(index, 'item_id', val)}
+                                                                disabled={isFieldsLocked}
+                                                            >
+                                                                <SelectTrigger className={`h-9 text-sm border-slate-300 focus:border-purple-500 font-poppins ${isFieldsLocked ? 'bg-slate-100 cursor-not-allowed' : 'bg-white'}`}>
+                                                                    <SelectValue placeholder="Select item..." />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {filteredInventoryItems.length === 0 ? (
+                                                                        <div className="p-2 text-sm text-slate-500 font-poppins">
+                                                                            No items available
+                                                                        </div>
+                                                                    ) : (
+                                                                        filteredInventoryItems.map(invItem => (
+                                                                            <SelectItem key={invItem.item_id} value={invItem.item_id} className="font-poppins">
+                                                                                {invItem.name} ({invItem.stock_quantity} left)
+                                                                            </SelectItem>
+                                                                        ))
+                                                                    )}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                            
+                                                        {/* Type */}
+                                                        <div className="col-span-2">
+                                                            <div className="h-9 px-3 flex items-center text-sm bg-slate-100 text-slate-600 rounded font-poppins border border-slate-200">
+                                                                {item.category ? item.category.charAt(0).toUpperCase() + item.category.slice(1) : '—'}
+                                                            </div>
+                                                        </div>
+                            
+                                                        {/* Price */}
+                                                        <div className="col-span-2">
+                                                            <div className="h-9 px-3 flex items-center text-sm bg-green-50 text-green-700 rounded font-poppins border border-green-200 font-semibold">
+                                                                ₱{inventoryItem?.sale_price.toFixed(2) || '0.00'}
+                                                            </div>
+                                                        </div>
+                            
+                                                        {/* Quantity */}
+                                                        <div className="col-span-2">
+                                                            <div className="flex items-center gap-1">
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => decrementQuantity(index)}
+                                                                    disabled={isFieldsLocked}
+                                                                    className="h-9 w-9 p-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                >
+                                                                    <Minus className="h-3 w-3" />
+                                                                </Button>
+                                                                <Input 
+                                                                    type="number"
+                                                                    value={item.quantity}
+                                                                    onChange={(e) => updateItemField(index, 'quantity', parseInt(e.target.value) || 1)}
+                                                                    min="1"
+                                                                    max={inventoryItem?.stock_quantity || 999}
+                                                                    disabled={isFieldsLocked}
+                                                                    className={`h-9 text-center text-sm font-poppins ${isFieldsLocked ? 'bg-slate-100 cursor-not-allowed' : ''}`}
+                                                                />
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => incrementQuantity(index)}
+                                                                    disabled={isFieldsLocked || (inventoryItem ? item.quantity >= inventoryItem.stock_quantity : false)}
+                                                                    className="h-9 w-9 p-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                >
+                                                                    <Plus className="h-3 w-3" />
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                            
+                                                        {/* Subtotal */}
+                                                        <div className="col-span-1">
+                                                            <div className="text-sm font-bold text-purple-600 font-poppins">
+                                                                ₱{itemSubtotal.toFixed(2)}
+                                                            </div>
+                                                        </div>
+                            
+                                                        {/* Remove button */}
+                                                        <div className="col-span-1 flex justify-end">
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => removeItemRow(index)}
+                                                                disabled={isFieldsLocked}
+                                                                className="h-9 w-9 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            >
+                                                                <X className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                            
+                                            {/* Items Total Summary */}
+                                            {selectedItems.length > 0 && calculateItemsTotal > 0 && (
+                                                <div className="p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-sm font-semibold text-purple-700 font-poppins">Items Total:</span>
+                                                        <span className="text-lg font-bold text-purple-700 font-poppins">₱{calculateItemsTotal.toFixed(2)}</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            
+                                {/* Grand Total Display */}
+                                <div className="space-y-3 p-4 bg-gradient-to-br from-slate-50 to-purple-50 rounded-xl border-2 border-purple-200">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-slate-600 font-poppins">Service Fee:</span>
+                                        <span className="text-lg font-semibold text-slate-700 font-poppins">₱{(parseFloat(serviceFee) || 0).toFixed(2)}</span>
+                                    </div>
+                                    {calculateItemsTotal > 0 && (
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-slate-600 font-poppins">Items Total:</span>
+                                            <span className="text-lg font-semibold text-slate-700 font-poppins">₱{calculateItemsTotal.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    <div className="h-px bg-slate-300"></div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-base font-bold text-slate-800 font-poppins">Grand Total:</span>
+                                        <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
+                                            ₱{calculateGrandTotal.toFixed(2)}
+                                        </span>
+                                    </div>
+                                </div>
+                                 <div className="space-y-2">
+                                                                <Label htmlFor="remarks" className="text-slate-700 font-medium font-poppins">Remarks</Label>
+                                                                <Textarea 
+                                                                    id="remarks"
+                                                                    value={remarks} 
+                                                                    onChange={e => setRemarks(e.target.value)} 
+                                                                    placeholder="Customer notes or internal remarks..."
+                                                                    disabled={isFieldsLocked}
+                                                                    className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins ${isFieldsLocked ? 'bg-slate-100 cursor-not-allowed' : 'bg-white/80'}`}
+                                                                />
+                                                            </div>
+                                                        
+                                                        <DialogFooter>
+                                                            <DialogClose asChild>
+                                                                <Button type="button" variant="outline" className={buttonStyles.back}>
+                                                                    <ArrowLeft className="h-4 w-4 mr-2" />
+                                                                    Cancel
+                                                                </Button>
+                                                            </DialogClose>
+                                                            <Button onClick={handleSubmit} disabled={isLoading || isDataLoading} className={buttonStyles.primary}>
+                                                                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                                                                {editingJob ? 'Update Job' : 'Create Job'}
+                                                            </Button>
+                                                        </DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+            
                 {/* Enhanced Delete Confirmation Dialog */}
                 <AlertDialog open={isDeleteConfirmationOpen} onOpenChange={setIsDeleteConfirmationOpen}>
                     <AlertDialogContent className="bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins">
@@ -1417,6 +2115,149 @@ USING (true);`}
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
+
+                {/* ✅ NEW: Details Dialog */}
+                <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
+                    <DialogContent className="sm:max-w-2xl bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl font-poppins">
+                        <DialogHeader>
+                            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
+                                Service Job Details
+                            </DialogTitle>
+                        </DialogHeader>
+
+                        {detailsJob && (
+                            <div className="space-y-6 py-4">
+                                {/* Job Information */}
+                                <div className="space-y-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                    <h3 className="font-semibold text-lg text-slate-900 font-poppins">Job Information</h3>
+                                    <div className="grid grid-cols-2 gap-3 text-sm">
+                                        <div>
+                                            <span className="text-slate-600 font-poppins">Description:</span>
+                                            <p className="font-semibold text-slate-900 font-poppins">{detailsJob.job_description}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-600 font-poppins">Customer:</span>
+                                            <p className="font-semibold text-slate-900 font-poppins">{detailsJob.customer?.name || 'Walk-in Customer'}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-600 font-poppins">Vehicle Type:</span>
+                                            <p className="font-semibold text-slate-900 font-poppins">
+                                                {detailsJob.vehicle_type?.name ? 
+                                                    detailsJob.vehicle_type.name.charAt(0).toUpperCase() + detailsJob.vehicle_type.name.slice(1) : 
+                                                    'Not specified'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <span className="text-slate-600 font-poppins">Total Fee:</span>
+                                            <p className="font-semibold text-green-600 font-poppins">₱{detailsJob.service_fee.toFixed(2)}</p>
+                                        </div>
+                                    </div>
+                                    {detailsJob.remarks && (
+                                        <div>
+                                            <span className="text-slate-600 font-poppins">Remarks:</span>
+                                            <p className="text-slate-900 font-poppins">{detailsJob.remarks}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* ✅ NEW: Service Fee Section */}
+                                <div className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border-2 border-blue-200">
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <span className="text-sm text-blue-600 font-poppins">Service Fee</span>
+                                            <p className="text-xs text-blue-500 font-poppins mt-1">Labor and service charges</p>
+                                        </div>
+                                        <span className="text-2xl font-bold text-blue-600 font-poppins">
+                                            ₱{(() => {
+                                                const itemsTotal = detailsJob.items?.reduce((total, item) => {
+                                                    const invItem = inventoryItems.find(i => i.item_id === item.item_id);
+                                                    return total + (invItem ? invItem.sale_price * item.quantity : 0);
+                                                }, 0) || 0;
+                                                return (detailsJob.service_fee - itemsTotal).toFixed(2);
+                                            })()}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Items Used */}
+                                <div className="space-y-3">
+                                    <h3 className="font-semibold text-lg text-slate-900 font-poppins">Items Used</h3>
+                                    
+                                    {!detailsJob.items || detailsJob.items.length === 0 ? (
+                                        <div className="p-8 text-center bg-slate-50 rounded-lg border border-slate-200">
+                                            <Package className="h-12 w-12 text-slate-400 mx-auto mb-2" />
+                                            <p className="text-slate-500 font-poppins">No items used in this service job</p>
+                                        </div>
+                                    ) : (
+                                        <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                            {/* Table Header */}
+                                            <div className="grid grid-cols-12 gap-3 p-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold text-sm font-poppins">
+                                                <div className="col-span-6">Item</div>
+                                                <div className="col-span-3 text-right">Price</div>
+                                                <div className="col-span-3 text-right">Quantity</div>
+                                            </div>
+
+                                            {/* Table Rows */}
+                                            <div className="divide-y divide-slate-200">
+                                                {detailsJob.items.map((item, index) => {
+                                                    const inventoryItem = inventoryItems.find(i => i.item_id === item.item_id);
+                                                    return (
+                                                        <div key={index} className="grid grid-cols-12 gap-3 p-3 bg-white hover:bg-slate-50 transition-colors">
+                                                            <div className="col-span-6">
+                                                                <p className="font-semibold text-slate-900 font-poppins">{item.name || 'Unknown Item'}</p>
+                                                                <p className="text-xs text-slate-500 font-poppins capitalize">{item.category || '—'}</p>
+                                                            </div>
+                                                            <div className="col-span-3 text-right">
+                                                                <p className="font-semibold text-green-600 font-poppins">
+                                                                    ₱{inventoryItem?.sale_price.toFixed(2) || '0.00'}
+                                                                </p>
+                                                            </div>
+                                                            <div className="col-span-3 text-right">
+                                                                <p className="font-semibold text-slate-900 font-poppins">
+                                                                    {item.quantity}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            {/* Total Row */}
+                                            <div className="grid grid-cols-12 gap-3 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 border-t-2 border-purple-200">
+                                                <div className="col-span-6">
+                                                    <p className="font-bold text-slate-900 font-poppins">Total</p>
+                                                </div>
+                                                <div className="col-span-3 text-right">
+                                                    <p className="font-bold text-purple-700 font-poppins">
+                                                        ₱{detailsJob.items.reduce((total, item) => {
+                                                            const invItem = inventoryItems.find(i => i.item_id === item.item_id);
+                                                            return total + (invItem ? invItem.sale_price * item.quantity : 0);
+                                                        }, 0).toFixed(2)}
+                                                    </p>
+                                                </div>
+                                                <div className="col-span-3 text-right">
+                                                    <p className="font-bold text-slate-900 font-poppins">
+                                                        {detailsJob.items.reduce((sum, item) => sum + item.quantity, 0)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end pt-4">
+                            <Button 
+                                variant="outline" 
+                                onClick={() => setIsDetailsDialogOpen(false)}
+                                className="font-poppins"
+                            >
+                                Close
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Status Update Dialog */}
                 <StatusUpdateForm 
@@ -1484,6 +2325,6 @@ USING (true);`}
                     transition: all 0.3s ease;
                 }
             `}</style>
-        </div>
+        </div>  
     );
 }
