@@ -33,7 +33,9 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   Loader2, PlusCircle, AlertTriangle, Package, Truck, ShoppingCart, Users, Building2, 
   RefreshCw, Search, X, Download, Eye, ArrowUpDown, Filter, Clock, TrendingUp,
-  Calendar, Phone, Mail, MapPin, FileText, CheckCircle, Clock4, TruckIcon, ArrowLeft
+  Calendar, Phone, Mail, MapPin, FileText, CheckCircle, Clock4, TruckIcon, ArrowLeft,
+  CreditCard, DollarSign, Shield, AlertCircle, ChevronRight, Edit, Trash2,
+  History, CalendarDays, FileSearch
 } from 'lucide-react';
 import { DataTableWrapper } from '@/components/DataTableWrapper';
 import { Badge } from '@/components/ui/badge';
@@ -41,8 +43,9 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
 import { Supplier, PurchaseOrder, Branch, InventoryItem, User } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 
-// ===== DESIGN SYSTEM =====
+// ===== ENHANCED DESIGN SYSTEM =====
 const buttonStyles = {
   primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins",
   secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 font-poppins",
@@ -57,95 +60,549 @@ const microAnimations = {
   iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
 };
 
-// Supplier Management
-const supplierColumns = [
-  { key: 'name', header: 'Supplier Name' },
-  { key: 'contact_person', header: 'Contact Person' },
-  { key: 'phone', header: 'Phone' },
-  { key: 'email', header: 'Email' },
-  { key: 'payment_terms', header: 'Payment Terms'},
-  { 
-    key: 'is_active', 
-    header: 'Status',
-    render: (value: any) => (
-      <Badge 
-        variant={value ? 'default' : 'secondary'} 
-        className={`${value ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'} font-poppins`}
-      >
-        {value ? 'Active' : 'Inactive'}
-      </Badge>
-    )
-  }
-];
+// ===== ENHANCED STATUS COMPONENTS =====
 
-// Purchase Order Management
+// Simple Delivery Status Badge with smaller font
+const SimpleDeliveryStatus = ({ status }: { status: string }) => {
+  const statusConfig = {
+    pending: { 
+      label: 'Pending', 
+      color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      icon: Clock
+    },
+    approved: { 
+      label: 'Approved', 
+      color: 'bg-blue-100 text-blue-800 border-blue-200',
+      icon: CheckCircle
+    },
+    ordered: { 
+      label: 'Ordered', 
+      color: 'bg-purple-100 text-purple-800 border-purple-200',
+      icon: Package
+    },
+    delivered: { 
+      label: 'Delivered', 
+      color: 'bg-green-100 text-green-800 border-green-200',
+      icon: Truck
+    },
+    cancelled: { 
+      label: 'Cancelled', 
+      color: 'bg-red-100 text-red-800 border-red-200',
+      icon: X
+    }
+  };
 
-// Custom Date Input Component with better styling
-const CustomDateInput = ({ value, onChange, id, className = "" }: { value: string; onChange: (value: string) => void; id: string; className?: string }) => {
+  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+  const IconComponent = config.icon;
+
   return (
-    <div className="relative">
-      <Input
-        id={id}
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={`${className} border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins custom-date-input`}
-      />
+    <Badge variant="outline" className={`${config.color} flex items-center gap-1 w-fit text-xs`}>
+      <IconComponent className="h-3 w-3" />
+      <span className="capitalize">{config.label}</span>
+    </Badge>
+  );
+};
+
+// Enhanced Payment Status with Credit Terms
+const SimplePaymentStatus = ({ status, method, orderDate }: { status: string; method: string; orderDate?: string }) => {
+  const statusConfig = {
+    pending: { 
+      label: 'Pending', 
+      color: 'bg-orange-100 text-orange-800 border-orange-200'
+    },
+    paid: { 
+      label: 'Paid', 
+      color: 'bg-emerald-100 text-emerald-800 border-emerald-200'
+    },
+    partial: { 
+      label: 'Partial', 
+      color: 'bg-amber-100 text-amber-800 border-amber-200'
+    },
+    overdue: { 
+      label: 'Overdue', 
+      color: 'bg-red-100 text-red-800 border-red-200'
+    },
+    cancelled: { 
+      label: 'Cancelled', 
+      color: 'bg-gray-100 text-gray-800 border-gray-200'
+    }
+  };
+
+  const methodIcons = {
+    cash: '💵',
+    credit: '📅'
+  };
+
+  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+  const methodIcon = methodIcons[method as keyof typeof methodIcons] || '💵';
+
+  // Calculate due date for credit (120 days from order date)
+  const getDueDateInfo = () => {
+    if (method !== 'credit' || !orderDate) return null;
+    
+    const order = new Date(orderDate);
+    const dueDate = new Date(order);
+    dueDate.setDate(order.getDate() + 120);
+    const today = new Date();
+    const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    return { dueDate, daysUntilDue };
+  };
+
+  const dueInfo = getDueDateInfo();
+
+  return (
+    <div className="flex flex-col gap-1">
+      <Badge variant="outline" className={`${config.color} flex items-center gap-1 w-fit text-xs`}>
+        <span>{methodIcon}</span>
+        <span className="capitalize">{config.label}</span>
+      </Badge>
+      {dueInfo && (
+        <div className="text-xs text-slate-500">
+          Due in {dueInfo.daysUntilDue} days
+        </div>
+      )}
     </div>
   );
 };
 
-// Optimized Search Input Component
-const SearchInput = ({ 
-  value, 
-  onChange, 
-  placeholder, 
-  id 
-}: { 
-  value: string; 
-  onChange: (value: string) => void; 
-  placeholder: string; 
-  id: string;
+// Enhanced Purchase Order Form with Credit Logic
+const EnhancedPOForm = ({ 
+  editingPO, 
+  formData, 
+  onFormChange,
+  suppliers,
+  branches,
+  isEditing
+}: {
+  editingPO: any;
+  formData: any;
+  onFormChange: (field: string, value: any) => void;
+  suppliers: any[];
+  branches: any[];
+  isEditing: boolean;
 }) => {
-  const [localValue, setLocalValue] = useState(value);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  // Calculate due date for credit terms
+  const calculateDueDate = useCallback(() => {
+    if (formData.paymentMethod === 'credit' && formData.expectedDelivery) {
+      const deliveryDate = new Date(formData.expectedDelivery);
+      const dueDate = new Date(deliveryDate);
+      dueDate.setDate(deliveryDate.getDate() + 120);
+      return dueDate.toLocaleDateString('en-US');
+    }
+    return null;
+  }, [formData.paymentMethod, formData.expectedDelivery]);
 
-  useEffect(() => {
-    setLocalValue(value);
-  }, [value]);
-
-  const handleChange = (newValue: string) => {
-    setLocalValue(newValue);
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      onChange(newValue);
-    }, 150);
-  };
-
-  const handleClear = () => {
-    setLocalValue('');
-    onChange('');
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-  };
+  const dueDate = calculateDueDate();
 
   return (
-    <div className="relative">
-      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-      <Input 
-        id={id}
-        placeholder={placeholder} 
-        value={localValue}
-        onChange={(e) => handleChange(e.target.value)}
-        className="pl-10 pr-4 py-2 border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
-      />
-      {localValue && (
-        <button 
-          onClick={handleClear}
-          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors duration-200"
+    <div className="space-y-4 py-2 max-h-[70vh] overflow-y-auto pr-2">
+      <div className="grid grid-cols-2 gap-4">
+        {/* Left Column */}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="po-number" className="text-slate-700 font-medium font-poppins">
+              PO Number *
+            </Label>
+            <div className="relative">
+              <Input 
+                id="po-number" 
+                value={formData.poNumber} 
+                onChange={(e) => onFormChange('poNumber', e.target.value)} 
+                placeholder="PO-0001"
+                readOnly={isEditing}
+                className={`border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 ${
+                  isEditing ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                } font-poppins`}
+              />
+              {!isEditing && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <Badge variant="secondary" className="text-xs font-poppins bg-green-100 text-green-700 border-green-200">
+                    Auto
+                  </Badge>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="supplier" className="text-slate-700 font-medium font-poppins">
+              Supplier *
+            </Label>
+            <Select 
+              value={formData.selectedSupplier} 
+              onValueChange={(value) => onFormChange('selectedSupplier', value)}
+              disabled={isEditing}
+            >
+              <SelectTrigger className={`border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 ${
+                isEditing ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+              } font-poppins`}>
+                <SelectValue placeholder="Select supplier" />
+              </SelectTrigger>
+              <SelectContent>
+                {suppliers.filter(s => s.is_active).map(supplier => (
+                  <SelectItem key={supplier.supplier_id} value={supplier.supplier_id} className="font-poppins">
+                    {supplier.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="expected-delivery" className="text-slate-700 font-medium font-poppins">
+              Expected Delivery
+            </Label>
+            <Input 
+              id="expected-delivery" 
+              type="date"
+              value={formData.expectedDelivery}
+              onChange={(e) => onFormChange('expectedDelivery', e.target.value)}
+              min={new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0]}
+              className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 bg-white font-poppins"
+            />
+          </div>
+        </div>
+
+        {/* Right Column */}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="branch" className="text-slate-700 font-medium font-poppins">
+              Branch *
+            </Label>
+            <Select 
+              value={formData.selectedBranch} 
+              onValueChange={(value) => onFormChange('selectedBranch', value)}
+              disabled={isEditing}
+            >
+              <SelectTrigger className={`border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 ${
+                isEditing ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+              } font-poppins`}>
+                <SelectValue placeholder="Select branch" />
+              </SelectTrigger>
+              <SelectContent>
+                {branches.map(branch => (
+                  <SelectItem key={branch.branch_id} value={branch.branch_id} className="font-poppins">
+                    {branch.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Payment Method */}
+          <div className="space-y-2">
+            <Label className="text-slate-700 font-medium font-poppins">Payment Method</Label>
+            <Select 
+              value={formData.paymentMethod} 
+              onValueChange={(value) => onFormChange('paymentMethod', value)}
+              disabled={isEditing}
+            >
+              <SelectTrigger className={`border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 ${
+                isEditing ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+              } font-poppins`}>
+                <SelectValue placeholder="Select method" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash" className="font-poppins">💵 Cash</SelectItem>
+                <SelectItem value="credit" className="font-poppins">📅 Credit (120 days)</SelectItem>
+              </SelectContent>
+            </Select>
+            {formData.paymentMethod === 'credit' && dueDate && (
+              <p className="text-xs text-slate-500">
+                Payment due: {dueDate}
+              </p>
+            )}
+          </div>
+
+          {/* Delivery Status - Only in Edit Mode */}
+          {isEditing && (
+            <div className="space-y-2">
+              <Label className="text-slate-700 font-medium font-poppins">
+                Delivery Status
+              </Label>
+              <Select 
+                value={formData.deliveryStatus} 
+                onValueChange={(value) => onFormChange('deliveryStatus', value)}
+              >
+                <SelectTrigger className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending" className="font-poppins">⏳ Pending</SelectItem>
+                  <SelectItem value="approved" className="font-poppins">✅ Approved</SelectItem>
+                  <SelectItem value="ordered" className="font-poppins">📦 Ordered</SelectItem>
+                  <SelectItem value="delivered" className="font-poppins">🚚 Delivered</SelectItem>
+                  <SelectItem value="cancelled" className="font-poppins">❌ Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Payment Status with Partial Payment Logic */}
+      <div className="space-y-2">
+        <Label className="text-slate-700 font-medium font-poppins">Payment Status</Label>
+        <Select 
+          value={formData.paymentStatus} 
+          onValueChange={(value) => onFormChange('paymentStatus', value)}
+          disabled={formData.paymentMethod === 'cash' && formData.paymentStatus === 'partial' && !isEditing}
         >
-          <X className="h-4 w-4" />
-        </button>
+          <SelectTrigger className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins">
+            <SelectValue placeholder="Select status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="pending" className="font-poppins">⏳ Pending</SelectItem>
+            <SelectItem 
+              value="partial" 
+              className="font-poppins"
+              disabled={formData.paymentMethod === 'cash' && !isEditing}
+            >
+              ⚠️ Partial {formData.paymentMethod === 'cash' && !isEditing && '(Credit Only)'}
+            </SelectItem>
+            <SelectItem value="paid" className="font-poppins">✅ Paid</SelectItem>
+            <SelectItem value="overdue" className="font-poppins">🔴 Overdue</SelectItem>
+            <SelectItem value="cancelled" className="font-poppins">❌ Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+        {formData.paymentMethod === 'cash' && formData.paymentStatus === 'partial' && (
+          <p className="text-xs text-amber-600">
+            Partial payments are only available for Credit (120 days) payment method
+          </p>
+        )}
+      </div>
+
+      {/* Partial Payment Details */}
+      {formData.paymentStatus === 'partial' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <Label className="text-amber-800 font-medium font-poppins flex items-center gap-2 mb-2">
+            <DollarSign className="h-4 w-4" />
+            Partial Payment Details
+          </Label>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="partial-amount" className="text-amber-700 font-poppins text-sm">
+                Amount Paid
+              </Label>
+              <Input 
+                id="partial-amount"
+                type="number"
+                placeholder="0.00"
+                className="border-amber-300 focus:border-amber-500 bg-white text-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="partial-date" className="text-amber-700 font-poppins text-sm">
+                Payment Date
+              </Label>
+              <Input 
+                id="partial-date"
+                type="date"
+                className="border-amber-300 focus:border-amber-500 bg-white text-sm"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-amber-600 mt-2">
+            Remaining balance will be tracked automatically
+          </p>
+        </div>
       )}
+
+      {/* Cancellation Reason */}
+      {(formData.deliveryStatus === 'cancelled' || formData.paymentStatus === 'cancelled') && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <Label htmlFor="cancellation-reason" className="text-red-800 font-medium font-poppins">
+            Cancellation Reason *
+          </Label>
+          <Textarea 
+            id="cancellation-reason"
+            placeholder="Please provide the reason for cancellation..."
+            className="border-red-300 focus:border-red-500 bg-white mt-2 text-sm"
+            rows={3}
+          />
+        </div>
+      )}
+
+      {/* Notes Section */}
+      <div className="space-y-2">
+        <Label htmlFor="po-notes" className="text-slate-700 font-medium font-poppins">
+          Notes & Instructions
+        </Label>
+        <Textarea 
+          id="po-notes" 
+          value={formData.poNotes} 
+          onChange={(e) => onFormChange('poNotes', e.target.value)} 
+          placeholder="Additional notes, special instructions, or delivery requirements..."
+          className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins min-h-[80px] text-sm"
+        />
+      </div>
+
+      {/* Form Validation */}
+      {(!formData.selectedSupplier || !formData.selectedBranch) && (
+        <Alert className="bg-amber-50 border-amber-200 font-poppins">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-800">Required Fields</AlertTitle>
+          <AlertDescription className="text-amber-700">
+            Please fill in all required fields marked with *
+          </AlertDescription>
+        </Alert>
+      )}
+    </div>
+  );
+};
+
+// Enhanced Table Row with Fixed Actions
+const EnhancedTableRow = ({ 
+  item, 
+  onEdit, 
+  onDelete 
+}: { 
+  item: any; 
+  onEdit: (item: any) => void; 
+  onDelete: (item: any) => void;
+}) => {
+  const [showActions, setShowActions] = useState(false);
+
+  return (
+    <div 
+      className="grid grid-cols-9 gap-3 px-3 py-2 items-center border-b border-slate-200 hover:bg-slate-50 transition-colors group"
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
+    >
+      {/* PO Number */}
+      <div className="font-semibold text-purple-700 text-sm">
+        {item.po_number}
+      </div>
+      
+      {/* Supplier */}
+      <div className="flex items-center gap-2">
+        <Building2 className="h-3 w-3 text-slate-500" />
+        <span className="font-medium text-sm truncate">{item.supplier?.name || 'Unknown'}</span>
+      </div>
+      
+      {/* Branch */}
+      <div className="flex items-center gap-2">
+        <MapPin className="h-3 w-3 text-slate-500" />
+        <span className="text-sm truncate">{item.branch?.name || 'Unknown'}</span>
+      </div>
+      
+      {/* Order Date */}
+      <div className="text-slate-700 text-sm">
+        {item.order_date ? new Date(item.order_date).toLocaleDateString('en-US') : 'No date'}
+      </div>
+      
+      {/* Expected Delivery */}
+      <div>
+        <span className={`font-medium text-sm ${
+          item.expected_delivery_date && new Date(item.expected_delivery_date) < new Date() && item.status !== 'delivered' 
+            ? 'text-red-600' 
+            : 'text-slate-700'
+        }`}>
+          {item.expected_delivery_date ? new Date(item.expected_delivery_date).toLocaleDateString('en-US') : 'Not set'}
+        </span>
+      </div>
+      
+      {/* Total Amount */}
+      <div className="font-bold text-slate-800 text-sm">
+        ₱{Number(item.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      </div>
+      
+      {/* Delivery Status */}
+      <div>
+        <SimpleDeliveryStatus status={item.status || 'pending'} />
+      </div>
+      
+      {/* Payment Status */}
+      <div>
+        <SimplePaymentStatus 
+          status={item.payment_status || 'pending'} 
+          method={item.payment_method || 'cash'}
+          orderDate={item.order_date}
+        />
+      </div>
+      
+      {/* Actions Column */}
+      <div className="flex justify-center">
+        <div className={`flex items-center gap-1 transition-opacity duration-200 ${
+          showActions ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        }`}>
+          <button
+            onClick={() => onEdit(item)}
+            className="p-1.5 text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors border border-transparent hover:border-purple-200"
+            title="Edit PO"
+          >
+            <Edit className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => onDelete(item)}
+            className="p-1.5 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors border border-transparent hover:border-red-200"
+            title="Delete PO"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Filter Component for Purchase Orders
+const POFilter = ({ 
+  statusFilter, 
+  onStatusFilterChange,
+  searchTerm,
+  onSearchChange 
+}: {
+  statusFilter: string;
+  onStatusFilterChange: (status: string) => void;
+  searchTerm: string;
+  onSearchChange: (term: string) => void;
+}) => {
+  return (
+    <div className="flex flex-col sm:flex-row gap-4 p-4 bg-white/60 rounded-xl border border-slate-200/50">
+      <div className="flex-1">
+        <Label htmlFor="search-pos" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
+          Search Purchase Orders
+        </Label>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input 
+            id="search-pos"
+            placeholder="Search by PO number, supplier, or branch..."
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="pl-10 pr-4 py-2 border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm"
+          />
+          {searchTerm && (
+            <button 
+              onClick={() => onSearchChange('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors duration-200"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+      
+      <div className="sm:w-48">
+        <Label htmlFor="status-filter" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
+          Filter by Status
+        </Label>
+        <Select value={statusFilter} onValueChange={onStatusFilterChange}>
+          <SelectTrigger className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm">
+            <SelectValue placeholder="All Statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" className="font-poppins text-sm">All Statuses</SelectItem>
+            <SelectItem value="pending" className="font-poppins text-sm">⏳ Pending</SelectItem>
+            <SelectItem value="approved" className="font-poppins text-sm">✅ Approved</SelectItem>
+            <SelectItem value="ordered" className="font-poppins text-sm">📦 Ordered</SelectItem>
+            <SelectItem value="delivered" className="font-poppins text-sm">🚚 Delivered</SelectItem>
+            <SelectItem value="cancelled" className="font-poppins text-sm">❌ Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 };
@@ -229,7 +686,20 @@ const StatsOverview = ({ suppliers, purchaseOrders }: { suppliers: any[], purcha
   );
 };
 
-const QuickActions = ({ onAddSupplier, onAddPO, onExportData }: { onAddSupplier: () => void, onAddPO: () => void, onExportData: () => void }) => {
+// Quick Actions with History Button
+const EnhancedQuickActions = ({ 
+  onAddSupplier, 
+  onAddPO, 
+  onExportData,
+  onViewHistory,
+  showHistoryButton = true
+}: { 
+  onAddSupplier: () => void; 
+  onAddPO: () => void; 
+  onExportData: () => void;
+  onViewHistory: () => void;
+  showHistoryButton?: boolean;
+}) => {
   const actions = [
     {
       label: "New Supplier",
@@ -254,8 +724,18 @@ const QuickActions = ({ onAddSupplier, onAddPO, onExportData }: { onAddSupplier:
     }
   ];
 
+  if (showHistoryButton) {
+    actions.push({
+      label: "Transaction History",
+      description: "View all records",
+      icon: History,
+      onClick: onViewHistory,
+      color: "from-orange-500 to-amber-600"
+    });
+  }
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
       {actions.map((action, index) => (
         <button
           key={action.label}
@@ -278,23 +758,31 @@ const QuickActions = ({ onAddSupplier, onAddPO, onExportData }: { onAddSupplier:
   );
 };
 
+// Enhanced Tabs with Transaction History
 const EnhancedTabs = ({ value, onValueChange, children }: any) => {
   return (
     <Tabs value={value} onValueChange={onValueChange} className="w-full font-poppins">
-      <TabsList className="grid w-full grid-cols-2 p-1 bg-slate-100 rounded-2xl">
+      <TabsList className="grid w-full grid-cols-3 p-1 bg-slate-100 rounded-2xl">
         <TabsTrigger 
           value="suppliers" 
-          className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins"
+          className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins text-sm"
         >
           <Building2 className="h-4 w-4 mr-2" />
           Suppliers
         </TabsTrigger>
         <TabsTrigger 
           value="purchase-orders" 
-          className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins"
+          className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins text-sm"
         >
           <ShoppingCart className="h-4 w-4 mr-2" />
           Purchase Orders
+        </TabsTrigger>
+        <TabsTrigger 
+          value="transaction-history" 
+          className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins text-sm"
+        >
+          <History className="h-4 w-4 mr-2" />
+          History
         </TabsTrigger>
       </TabsList>
       {children}
@@ -302,24 +790,44 @@ const EnhancedTabs = ({ value, onValueChange, children }: any) => {
   );
 };
 
+// Supplier Management
+const supplierColumns = [
+  { key: 'name', header: 'Supplier Name' },
+  { key: 'contact_person', header: 'Contact Person' },
+  { key: 'phone', header: 'Phone' },
+  { key: 'email', header: 'Email' },
+  { key: 'payment_terms', header: 'Payment Terms'},
+  { 
+    key: 'is_active', 
+    header: 'Status',
+    render: (value: any) => (
+      <Badge 
+        variant={value ? 'default' : 'secondary'} 
+        className={`${value ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'} font-poppins`}
+      >
+        {value ? 'Active' : 'Inactive'}
+      </Badge>
+    )
+  }
+];
+
+// MAIN COMPONENT
 export default function EnhancedPurchasingPage() {
   const { toast } = useToast();
   const { user: authUser } = useAuth();
-  const [activeTab, setActiveTab] = useState('suppliers');
+  const [activeTab, setActiveTab] = useState('purchase-orders');
   const [mounted, setMounted] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
-  // Suppliers state
+  // State management
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isSupplierLoading, setIsSupplierLoading] = useState(true);
   const [supplierError, setSupplierError] = useState<string | null>(null);
   
-  // Purchase Orders state
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [isPOLoading, setIsPOLoading] = useState(true);
   const [poError, setPOError] = useState<string | null>(null);
   
-  // Supporting data
   const [branches, setBranches] = useState<Branch[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -333,9 +841,22 @@ export default function EnhancedPurchasingPage() {
   const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null);
   const [deletingItem, setDeletingItem] = useState<any>(null);
 
-  // Separate search terms for each tab
+  // Search and Filter states
   const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
   const [poSearchTerm, setPOSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  // Enhanced PO Form State
+  const [poFormData, setPOFormData] = useState({
+    poNumber: '',
+    selectedSupplier: '',
+    selectedBranch: '',
+    expectedDelivery: '',
+    poNotes: '',
+    paymentMethod: 'cash' as 'cash' | 'credit',
+    paymentStatus: 'pending' as 'pending' | 'paid' | 'partial' | 'overdue' | 'cancelled',
+    deliveryStatus: 'pending' as 'pending' | 'approved' | 'ordered' | 'delivered' | 'cancelled'
+  });
 
   // Supplier form state
   const [supplierName, setSupplierName] = useState('');
@@ -346,24 +867,15 @@ export default function EnhancedPurchasingPage() {
   const [paymentTerms, setPaymentTerms] = useState('');
   const [supplierActive, setSupplierActive] = useState(true);
 
-  // Purchase Order form state
-  const [poNumber, setPONumber] = useState('');
-  const [selectedSupplier, setSelectedSupplier] = useState('');
-  const [selectedBranch, setSelectedBranch] = useState('');
-  const [expectedDelivery, setExpectedDelivery] = useState('');
-  const [poNotes, setPONotes] = useState('');
-  // Payment fields
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'credit_card'>('cash');
-  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'paid' | 'partial' | 'overdue' | 'cancelled'>('pending');
-  // Status dialog state
-  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
-  const [editingStatusPO, setEditingStatusPO] = useState<any | null>(null);
-
+  // Initialize
   useEffect(() => {
     setMounted(true);
+    fetchSuppliers();
+    fetchPurchaseOrders();
+    fetchSupportingData();
   }, []);
 
-  // ===== SUPABASE DIRECT API CALLS =====
+  // Data fetching functions
   const fetchSuppliers = useCallback(async () => {
     if (!supabase) return;
     setIsSupplierLoading(true);
@@ -412,7 +924,6 @@ export default function EnhancedPurchasingPage() {
     setLastUpdated(new Date());
   }, []);
 
-  // Fetch auto PO number
   const fetchNextPONumber = useCallback(async () => {
     if (!supabase) return '';
     try {
@@ -463,9 +974,22 @@ export default function EnhancedPurchasingPage() {
       const matchesSearch = po.po_number.toLowerCase().includes(poSearchTerm.toLowerCase()) ||
         po.supplier?.name.toLowerCase().includes(poSearchTerm.toLowerCase()) ||
         po.branch?.name.toLowerCase().includes(poSearchTerm.toLowerCase());
-      return matchesSearch;
+      
+      const matchesStatus = statusFilter === 'all' || po.status === statusFilter;
+      
+      // For purchase orders tab, only show active orders (not delivered or cancelled)
+      const isActiveOrder = po.status !== 'delivered' && po.status !== 'cancelled';
+      
+      return matchesSearch && matchesStatus && (activeTab === 'purchase-orders' ? isActiveOrder : true);
     });
-  }, [purchaseOrders, poSearchTerm]);
+  }, [purchaseOrders, poSearchTerm, statusFilter, activeTab]);
+
+  // Transaction History (Delivered and Cancelled orders)
+  const transactionHistory = useMemo(() => {
+    return purchaseOrders.filter(po => 
+      po.status === 'delivered' || po.status === 'cancelled'
+    );
+  }, [purchaseOrders]);
 
   const handleRefresh = () => {
     fetchSuppliers();
@@ -473,11 +997,45 @@ export default function EnhancedPurchasingPage() {
     fetchSupportingData();
   };
 
-  useEffect(() => {
-    fetchSuppliers();
-    fetchPurchaseOrders();
-    fetchSupportingData();
-  }, [fetchSuppliers, fetchPurchaseOrders, fetchSupportingData]);
+  // Define handlers before they are used
+  const handleEditPO = useCallback((po: PurchaseOrder) => {
+    setEditingPO(po);
+    setPOFormData({
+      poNumber: po.po_number,
+      selectedSupplier: po.supplier_id,
+      selectedBranch: po.branch_id,
+      expectedDelivery: po.expected_delivery_date || '',
+      poNotes: po.notes || '',
+      paymentMethod: (po as any).payment_method || 'cash',
+      paymentStatus: (po as any).payment_status || 'pending',
+      deliveryStatus: po.status || 'pending'
+    });
+    setIsPODialogOpen(true);
+  }, []);
+
+  const handleDeletePO = useCallback((po: PurchaseOrder) => {
+    setDeletingItem({ ...po, type: 'po' });
+    setIsDeleteDialogOpen(true);
+  }, []);
+
+  // Enhanced PO Form Handlers
+  const handlePOFormChange = (field: string, value: any) => {
+    setPOFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const resetPOForm = () => {
+    setPOFormData({
+      poNumber: '',
+      selectedSupplier: '',
+      selectedBranch: '',
+      expectedDelivery: '',
+      poNotes: '',
+      paymentMethod: 'cash',
+      paymentStatus: 'pending',
+      deliveryStatus: 'pending'
+    });
+    setEditingPO(null);
+  };
 
   const resetSupplierForm = () => {
     setSupplierName('');
@@ -490,17 +1048,6 @@ export default function EnhancedPurchasingPage() {
     setEditingSupplier(null);
   };
 
-  const resetPOForm = () => {
-    setPONumber('');
-    setSelectedSupplier('');
-    setSelectedBranch('');
-    setExpectedDelivery('');
-    setPONotes('');
-    setPaymentMethod('cash');
-    setPaymentStatus('pending');
-    setEditingPO(null);
-  };
-
   const handleOpenSupplierDialog = () => {
     resetSupplierForm();
     setIsSupplierDialogOpen(true);
@@ -510,111 +1057,10 @@ export default function EnhancedPurchasingPage() {
     resetPOForm();
     const nextPO = await fetchNextPONumber();
     if (nextPO) {
-      setPONumber(nextPO);
+      handlePOFormChange('poNumber', nextPO);
     }
     setIsPODialogOpen(true);
   };
-
-  // Open combined status dialog
-  const handleOpenStatusDialog = useCallback((po: any) => {
-    setEditingStatusPO({
-      ...po,
-      payment_status: po.payment_status || 'pending',
-      payment_method: po.payment_method || 'cash',
-      status: po.status || 'pending',
-    });
-    setIsStatusDialogOpen(true);
-  }, []);
-  
-  const handleUpdateStatuses = async () => {
-    if (!supabase || !editingStatusPO) return;
-    setIsPOLoading(true);
-    try {
-      const { error } = await supabase
-        .from('purchase_order')
-        .update({
-          status: editingStatusPO.status,
-          payment_status: editingStatusPO.payment_status,
-          payment_method: editingStatusPO.payment_method,
-        })
-        .eq('po_id', editingStatusPO.po_id);
-
-      if (error) {
-        toast({ title: 'Update Error', description: error.message, variant: 'destructive' });
-      } else {
-        toast({ title: 'Success', description: 'Statuses updated.' });
-        setIsStatusDialogOpen(false);
-        setEditingStatusPO(null);
-        fetchPurchaseOrders();
-      }
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
-    } finally {
-      setIsPOLoading(false);
-    }
-  };
-
-const poColumns = useMemo(() => [
-    { key: 'po_number', header: 'PO Number', sortable: true },
-    { 
-      key: 'supplier', 
-      header: 'Supplier', 
-      sortable: true,
-      render: (value: any, _item: any) => value?.name || 'Unknown Supplier'
-    },
-    { 
-      key: 'branch', 
-      header: 'Branch', 
-      sortable: true,
-      render: (value: any, _item: any) => value?.name || 'Unknown Branch'
-    },
-    { 
-      key: 'order_date', header: 'Order Date', sortable: true,
-      render: (value: any) => value ? new Date(value).toLocaleDateString('en-US') : 'No date'
-    },
-    { 
-      key: 'expected_delivery_date', header: 'Expected Delivery', sortable: true,
-      render: (value: any) => value ? new Date(value).toLocaleDateString('en-US') : 'Not set'
-    },
-    { 
-      key: 'total_amount', header: 'Total Amount', sortable: true,
-      render: (value: any) => `₱${Number(value || 0).toFixed(2)}`
-    },
-    { 
-      key: 'statuses', header: 'Status', sortable: false,
-      render: (_: any, item: any) => {
-        const delivery = (item.status || 'pending') as string;
-        const pay = (item.payment_status || 'pending') as string;
-
-        const deliveryClasses = {
-          pending: 'bg-yellow-100 text-yellow-700',
-          approved: 'bg-blue-100 text-blue-700',
-          ordered: 'bg-purple-100 text-purple-700',
-          delivered: 'bg-green-100 text-green-700',
-          cancelled: 'bg-red-100 text-red-700',
-        }[delivery] || 'bg-slate-100 text-slate-700';
-
-        const paymentClasses = {
-          pending: 'bg-orange-100 text-orange-700',
-          paid: 'bg-emerald-100 text-emerald-700',
-          partial: 'bg-amber-100 text-amber-700',
-          overdue: 'bg-red-100 text-red-700',
-          cancelled: 'bg-gray-100 text-gray-700',
-        }[pay] || 'bg-slate-100 text-slate-700';
-
-        return (
-          <button
-            onClick={() => handleOpenStatusDialog(item)}
-            className="flex flex-col gap-1.5 items-start hover:bg-slate-50 p-2 rounded-lg transition-colors"
-            title="Click to update delivery and payment status"
-          >
-            <Badge variant="outline" className={`capitalize ${deliveryClasses} text-xs`}>🚚 {delivery}</Badge>
-            <Badge variant="outline" className={`capitalize ${paymentClasses} text-xs`}>💳 {pay}</Badge>
-          </button>
-        );
-      }
-    }
-  ], [handleOpenStatusDialog]);
 
   const handleEditSupplier = (supplier: Supplier) => {
     setEditingSupplier(supplier);
@@ -628,20 +1074,8 @@ const poColumns = useMemo(() => [
     setIsSupplierDialogOpen(true);
   };
 
-  const handleEditPO = (po: PurchaseOrder) => {
-    setEditingPO(po);
-    setPONumber(po.po_number);
-    setSelectedSupplier(po.supplier_id);
-    setSelectedBranch(po.branch_id);
-    setExpectedDelivery(po.expected_delivery_date || '');
-    setPONotes(po.notes || '');
-    setPaymentMethod((po as any).payment_method || 'cash');
-    setPaymentStatus((po as any).payment_status || 'pending');
-    setIsPODialogOpen(true);
-  };
-
-  const handleDeleteItem = (item: any, type: 'supplier' | 'po') => {
-    setDeletingItem({ ...item, type });
+  const handleDeleteSupplier = (supplier: Supplier) => {
+    setDeletingItem({ ...supplier, type: 'supplier' });
     setIsDeleteDialogOpen(true);
   };
 
@@ -655,10 +1089,13 @@ const poColumns = useMemo(() => [
       dataToExport = filteredSuppliers;
       filename = 'suppliers_export.csv';
       headers = ['Supplier Name', 'Contact Person', 'Phone', 'Email', 'Address', 'Payment Terms', 'Status'];
+    } else if (activeTab === 'transaction-history') {
+      dataToExport = transactionHistory;
+      filename = 'transaction_history_export.csv';
+      headers = ['PO Number', 'Supplier', 'Branch', 'Order Date', 'Completion Date', 'Total Amount', 'Final Status', 'Payment Status', 'Payment Method'];
     } else {
       dataToExport = filteredPurchaseOrders;
       filename = 'purchase_orders_export.csv';
-      // Updated to include delivery + payment status and method, and put Expected Delivery before Total
       headers = ['PO Number', 'Supplier', 'Branch', 'Order Date', 'Expected Delivery', 'Total Amount', 'Delivery Status', 'Payment Status', 'Payment Method'];
     }
 
@@ -687,7 +1124,7 @@ const poColumns = useMemo(() => [
 
     toast({
       title: "Export Successful",
-      description: `${dataToExport.length} ${activeTab === 'suppliers' ? 'suppliers' : 'purchase orders'} exported to ${filename}`,
+      description: `${dataToExport.length} ${activeTab === 'suppliers' ? 'suppliers' : activeTab === 'transaction-history' ? 'transactions' : 'purchase orders'} exported to ${filename}`,
     });
   };
   
@@ -714,12 +1151,18 @@ const poColumns = useMemo(() => [
           ? new Date(item.expected_delivery_date).toLocaleDateString('en-US')
           : '';
           
+        const completionDate = item.status === 'delivered' && item.expected_delivery_date
+          ? new Date(item.expected_delivery_date).toLocaleDateString('en-US')
+          : item.status === 'cancelled' 
+          ? new Date(item.updated_at || item.order_date).toLocaleDateString('en-US')
+          : '';
+          
         return [
           `"${item.po_number || ''}"`,
           `"${item.supplier?.name || ''}"`,
           `"${item.branch?.name || ''}"`,
           `"${formattedDate}"`,
-          `"${formattedDeliveryDate}"`,
+          `"${type === 'transaction-history' ? completionDate : formattedDeliveryDate}"`,
           `"${Number(item.total_amount || 0).toFixed(2)}"`,
           `"${item.status || ''}"`,
           `"${item.payment_status || ''}"`,
@@ -783,15 +1226,15 @@ const poColumns = useMemo(() => [
 
   const handleSubmitPO = async () => {
     if (!supabase || !authUser) return;
-    if (!poNumber || !selectedSupplier || !selectedBranch) {
+    if (!poFormData.poNumber || !poFormData.selectedSupplier || !poFormData.selectedBranch) {
       toast({ title: "Validation Error", description: "PO Number, Supplier, and Branch are required.", variant: "destructive" });
       return;
     }
 
     // Validate delivery date must be after today (order date is now)
-    if (expectedDelivery) {
+    if (poFormData.expectedDelivery) {
       const orderDate = new Date();
-      const deliveryDate = new Date(expectedDelivery);
+      const deliveryDate = new Date(poFormData.expectedDelivery);
       orderDate.setHours(0,0,0,0);
       deliveryDate.setHours(0,0,0,0);
       if (deliveryDate <= orderDate) {
@@ -804,18 +1247,28 @@ const poColumns = useMemo(() => [
       }
     }
 
+    // Validate partial payment only for credit
+    if (poFormData.paymentStatus === 'partial' && poFormData.paymentMethod === 'cash') {
+      toast({ 
+        title: "Invalid Payment", 
+        description: "Partial payments are only allowed for Credit (120 days) payment method.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     setIsPOLoading(true);
 
     const poData = {
-      po_number: poNumber,
-      supplier_id: selectedSupplier,
-      branch_id: selectedBranch,
+      po_number: poFormData.poNumber,
+      supplier_id: poFormData.selectedSupplier,
+      branch_id: poFormData.selectedBranch,
       user_id: authUser.user_id,
-      expected_delivery_date: expectedDelivery || null,
-      notes: poNotes || null,
-      status: 'pending',
-      payment_status: paymentStatus,
-      payment_method: paymentMethod,
+      expected_delivery_date: poFormData.expectedDelivery || null,
+      notes: poFormData.poNotes || null,
+      status: editingPO ? poFormData.deliveryStatus : 'pending',
+      payment_status: poFormData.paymentStatus,
+      payment_method: poFormData.paymentMethod,
     };
 
     try {
@@ -911,33 +1364,89 @@ const poColumns = useMemo(() => [
     return String(value || '');
   };
 
-  const renderPOCell = (item: any, columnKey: string, value: any) => {
-    if (columnKey === 'supplier') {
-      return item.supplier?.name || 'Unknown Supplier';
+  // Custom table renderer for purchase orders
+  const renderPOTable = (items: any[], showActions: boolean = true) => {
+    if (isPOLoading && purchaseOrders.length === 0) {
+      return (
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      );
     }
-    if (columnKey === 'branch') {
-      return item.branch?.name || 'Unknown Branch';
+
+    return (
+      <div className="space-y-1">
+        {items.map((po) => (
+          <EnhancedTableRow
+            key={po.po_id}
+            item={po}
+            onEdit={handleEditPO}
+            onDelete={handleDeletePO}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  // Custom table renderer for transaction history
+  const renderHistoryTable = () => {
+    if (isPOLoading && purchaseOrders.length === 0) {
+      return (
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      );
     }
-    if (columnKey === 'order_date') {
-      return value ? new Date(value).toLocaleDateString('en-US') : 'No date';
-    }
-    if (columnKey === 'expected_delivery_date') {
-      return value ? new Date(value).toLocaleDateString('en-US') : 'Not set';
-    }
-    if (columnKey === 'total_amount') {
-      return `₱${Number(value || 0).toFixed(2)}`;
-    }
-    if (columnKey === 'status') {
-      const status = value as string;
-      let color = '';
-      if (status === 'pending') color = 'bg-yellow-100 text-yellow-700 border-yellow-200';
-      if (status === 'approved') color = 'bg-blue-100 text-blue-700 border-blue-200';
-      if (status === 'ordered') color = 'bg-purple-100 text-purple-700 border-purple-200';
-      if (status === 'delivered') color = 'bg-green-100 text-green-700 border-green-200';
-      if (status === 'cancelled') color = 'bg-red-100 text-red-700 border-red-200';
-      return <Badge variant="outline" className={`capitalize ${color} font-poppins`}>{status || 'pending'}</Badge>;
-    }
-    return String(value || '');
+
+    return (
+      <div className="space-y-1">
+        {transactionHistory.map((po) => (
+          <div key={po.po_id} className="grid grid-cols-9 gap-3 px-3 py-2 items-center border-b border-slate-200 hover:bg-slate-50 transition-colors text-sm">
+            <div className="font-semibold text-purple-700">{po.po_number}</div>
+            <div className="truncate">{po.supplier?.name || 'Unknown'}</div>
+            <div className="truncate">{po.branch?.name || 'Unknown'}</div>
+            <div>{po.order_date ? new Date(po.order_date).toLocaleDateString('en-US') : 'No date'}</div>
+            <div>
+              {po.status === 'delivered' && po.expected_delivery_date 
+                ? new Date(po.expected_delivery_date).toLocaleDateString('en-US')
+                : po.status === 'cancelled' 
+                ? new Date().toLocaleDateString('en-US')
+                : 'N/A'
+              }
+            </div>
+            <div className="font-bold text-slate-800">
+              ₱{Number(po.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div>
+              <SimpleDeliveryStatus status={po.status || 'pending'} />
+            </div>
+            <div>
+              <SimplePaymentStatus 
+                status={po.payment_status || 'pending'} 
+                method={po.payment_method || 'cash'}
+                orderDate={po.order_date}
+              />
+            </div>
+            <div className="text-center">
+              {po.notes ? (
+                <button 
+                  className="text-slate-600 hover:text-purple-600" 
+                  title={po.notes}
+                  onClick={() => toast({
+                    title: "Order Notes",
+                    description: po.notes,
+                  })}
+                >
+                  <FileText className="h-4 w-4" />
+                </button>
+              ) : (
+                <span className="text-slate-400">-</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -992,14 +1501,23 @@ const poColumns = useMemo(() => [
               </div>
             </div>
             
-            <Button 
-              onClick={handleRefresh}
-              disabled={isSupplierLoading || isPOLoading}
-              className={buttonStyles.glass + " active:scale-95 font-poppins"}
-            >
-              <RefreshCw className={`h-6 w-6 mr-3 ${isSupplierLoading || isPOLoading ? 'animate-spin' : ''}`} />
-              Refresh Data
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button 
+                onClick={() => setActiveTab('transaction-history')}
+                className={buttonStyles.glass + " active:scale-95 font-poppins"}
+              >
+                <History className="h-5 w-5 mr-2" />
+                View History
+              </Button>
+              <Button 
+                onClick={handleRefresh}
+                disabled={isSupplierLoading || isPOLoading}
+                className={buttonStyles.glass + " active:scale-95 font-poppins"}
+              >
+                <RefreshCw className={`h-5 w-5 mr-2 ${isSupplierLoading || isPOLoading ? 'animate-spin' : ''}`} />
+                Refresh Data
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -1009,13 +1527,15 @@ const poColumns = useMemo(() => [
         <StatsOverview suppliers={suppliers} purchaseOrders={purchaseOrders} />
 
         {/* Quick Actions */}
-        <QuickActions 
+        <EnhancedQuickActions 
           onAddSupplier={handleOpenSupplierDialog} 
           onAddPO={handleOpenPODialog}
           onExportData={handleExportData}
+          onViewHistory={() => setActiveTab('transaction-history')}
         />
 
         <EnhancedTabs value={activeTab} onValueChange={setActiveTab}>
+          {/* Suppliers Tab */}
           <TabsContent value="suppliers" className="space-y-6">
             <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
               <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-purple-50/50 border-b border-slate-200/50">
@@ -1026,18 +1546,34 @@ const poColumns = useMemo(() => [
                       {filteredSuppliers.length} of {suppliers.length} supplier{filteredSuppliers.length !== 1 ? 's' : ''} shown
                     </CardDescription>
                   </div>
+                  <Button onClick={handleOpenSupplierDialog} className={buttonStyles.primary}>
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    New Supplier
+                  </Button>
                 </div>
 
                 {/* Filter Bar */}
                 <div className="flex flex-col sm:flex-row gap-4 mt-6 p-4 bg-white/60 rounded-xl border border-slate-200/50">
                   <div className="flex-1">
                     <Label htmlFor="search-suppliers" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Search Suppliers</Label>
-                    <SearchInput 
-                      id="search-suppliers"
-                      value={supplierSearchTerm}
-                      onChange={setSupplierSearchTerm}
-                      placeholder="Search by name, contact, phone, email, or address..."
-                    />
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <Input 
+                        id="search-suppliers"
+                        placeholder="Search by name, contact, phone, email, or address..."
+                        value={supplierSearchTerm}
+                        onChange={(e) => setSupplierSearchTerm(e.target.value)}
+                        className="pl-10 pr-4 py-2 border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm"
+                      />
+                      {supplierSearchTerm && (
+                        <button 
+                          onClick={() => setSupplierSearchTerm('')}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors duration-200"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardHeader>
@@ -1062,7 +1598,7 @@ const poColumns = useMemo(() => [
                     data={filteredSuppliers.map(supplier => ({ ...supplier, id: supplier.supplier_id }))}
                     onAddNew={handleOpenSupplierDialog}
                     onEdit={handleEditSupplier}
-                    onDelete={(item) => handleDeleteItem(item, 'supplier')}
+                    onDelete={handleDeleteSupplier}
                     renderCell={renderSupplierCell}
                     searchTerm={supplierSearchTerm}
                     onSearchChange={setSupplierSearchTerm}
@@ -1072,30 +1608,31 @@ const poColumns = useMemo(() => [
             </Card>
           </TabsContent>
 
+          {/* Purchase Orders Tab */}
           <TabsContent value="purchase-orders" className="space-y-6">
             <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
               <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-blue-50/50 border-b border-slate-200/50">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Purchase Orders</CardTitle>
+                    <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Active Purchase Orders</CardTitle>
                     <CardDescription className="text-slate-600 font-poppins">
-                      {filteredPurchaseOrders.length} of {purchaseOrders.length} purchase order{filteredPurchaseOrders.length !== 1 ? 's' : ''} shown
+                      {filteredPurchaseOrders.length} active order{filteredPurchaseOrders.length !== 1 ? 's' : ''} • 
+                      Delivered orders moved to Transaction History
                     </CardDescription>
                   </div>
+                  <Button onClick={handleOpenPODialog} className={buttonStyles.primary}>
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    New PO
+                  </Button>
                 </div>
 
-                {/* Filter Bar */}
-                <div className="flex flex-col sm:flex-row gap-4 mt-6 p-4 bg-white/60 rounded-xl border border-slate-200/50">
-                  <div className="flex-1">
-                    <Label htmlFor="search-pos" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Search Purchase Orders</Label>
-                    <SearchInput 
-                      id="search-pos"
-                      value={poSearchTerm}
-                      onChange={setPOSearchTerm}
-                      placeholder="Search by PO number, supplier, or branch..."
-                    />
-                  </div>
-                </div>
+                {/* Enhanced Filter Bar */}
+                <POFilter
+                  statusFilter={statusFilter}
+                  onStatusFilterChange={setStatusFilter}
+                  searchTerm={poSearchTerm}
+                  onSearchChange={setPOSearchTerm}
+                />
               </CardHeader>
               
               <CardContent className="p-6">
@@ -1107,22 +1644,87 @@ const poColumns = useMemo(() => [
                   </Alert>
                 )}
 
-                {(isPOLoading && purchaseOrders.length === 0) ? (
-                  <div className="flex justify-center items-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                {/* Table Header */}
+                <div className="grid grid-cols-9 gap-3 px-3 py-3 bg-slate-50 rounded-lg border border-slate-200 mb-2 font-semibold text-slate-700 text-sm">
+                  <div>PO Number</div>
+                  <div>Supplier</div>
+                  <div>Branch</div>
+                  <div>Order Date</div>
+                  <div>Expected Delivery</div>
+                  <div>Total Amount</div>
+                  <div>Delivery Status</div>
+                  <div>Payment Status</div>
+                  <div className="text-center">Actions</div>
+                </div>
+
+                {/* Enhanced Table with Fixed Actions */}
+                {renderPOTable(filteredPurchaseOrders)}
+
+                {filteredPurchaseOrders.length === 0 && !isPOLoading && (
+                  <div className="text-center py-12 text-slate-500">
+                    <ShoppingCart className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+                    <p className="text-lg font-medium">No active purchase orders found</p>
+                    <p className="text-sm mt-1">Create your first purchase order to get started</p>
+                    <Button onClick={handleOpenPODialog} className="mt-4">
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Create Purchase Order
+                    </Button>
                   </div>
-                ) : (
-                  <DataTableWrapper
-                    title=""
-                    columns={poColumns}
-                    data={filteredPurchaseOrders.map(po => ({ ...po, id: po.po_id }))}
-                    onAddNew={handleOpenPODialog}
-                    onEdit={handleEditPO}
-                    onDelete={(item) => handleDeleteItem(item, 'po')}
-                    renderCell={renderPOCell}
-                    searchTerm={poSearchTerm}
-                    onSearchChange={setPOSearchTerm}
-                  />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Transaction History Tab */}
+          <TabsContent value="transaction-history" className="space-y-6">
+            <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
+              <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-purple-50/50 border-b border-slate-200/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Transaction History</CardTitle>
+                    <CardDescription className="text-slate-600 font-poppins">
+                      {transactionHistory.length} completed transaction{transactionHistory.length !== 1 ? 's' : ''} • 
+                      Includes delivered and cancelled orders
+                    </CardDescription>
+                  </div>
+                  <Button onClick={handleExportData} className={buttonStyles.primary}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export History
+                  </Button>
+                </div>
+
+                {/* History Filter */}
+                <POFilter
+                  statusFilter={statusFilter}
+                  onStatusFilterChange={setStatusFilter}
+                  searchTerm={poSearchTerm}
+                  onSearchChange={setPOSearchTerm}
+                />
+              </CardHeader>
+              
+              <CardContent className="p-6">
+                {/* Table Header */}
+                <div className="grid grid-cols-9 gap-3 px-3 py-3 bg-slate-50 rounded-lg border border-slate-200 mb-2 font-semibold text-slate-700 text-sm">
+                  <div>PO Number</div>
+                  <div>Supplier</div>
+                  <div>Branch</div>
+                  <div>Order Date</div>
+                  <div>Completion Date</div>
+                  <div>Total Amount</div>
+                  <div>Final Status</div>
+                  <div>Payment Status</div>
+                  <div className="text-center">Notes</div>
+                </div>
+
+                {/* History Table */}
+                {renderHistoryTable()}
+
+                {transactionHistory.length === 0 && !isPOLoading && (
+                  <div className="text-center py-12 text-slate-500">
+                    <History className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+                    <p className="text-lg font-medium">No transaction history yet</p>
+                    <p className="text-sm mt-1">Completed orders will appear here automatically</p>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -1136,16 +1738,16 @@ const poColumns = useMemo(() => [
             resetSupplierForm();
           }
         }}>
-          <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
+          <DialogContent className="sm:max-w-lg bg-white border-0 shadow-2xl mt-10 font-poppins max-h-[85vh] overflow-hidden">
+            <DialogHeader className="pb-4">
+              <DialogTitle className="text-2xl font-bold text-slate-900 font-poppins">
                 {editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}
               </DialogTitle>
               <DialogDescription className="text-slate-600 font-poppins">
                 {editingSupplier ? `Update details for ${editingSupplier.name}.` : 'Enter the details for the new supplier.'}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
+            <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-2">
               <div className="space-y-2">
                 <Label htmlFor="supplier-name" className="text-slate-700 font-medium font-poppins">Supplier Name *</Label>
                 <Input 
@@ -1153,7 +1755,7 @@ const poColumns = useMemo(() => [
                   value={supplierName} 
                   onChange={(e) => setSupplierName(e.target.value)} 
                   placeholder="Neugen Tire Sales Inc"
-                  className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
+                  className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                 />
               </div>
               <div className="space-y-2">
@@ -1163,7 +1765,7 @@ const poColumns = useMemo(() => [
                   value={contactPerson} 
                   onChange={(e) => setContactPerson(e.target.value)} 
                   placeholder="John Smith"
-                  className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
+                  className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -1174,7 +1776,7 @@ const poColumns = useMemo(() => [
                     value={supplierPhone} 
                     onChange={(e) => setSupplierPhone(e.target.value)} 
                     placeholder="+1-555-0201"
-                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
+                    className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                   />
                 </div>
                 <div className="space-y-2">
@@ -1185,7 +1787,7 @@ const poColumns = useMemo(() => [
                     value={supplierEmail} 
                     onChange={(e) => setSupplierEmail(e.target.value)} 
                     placeholder="orders@neugen.com"
-                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
+                    className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                   />
                 </div>
               </div>
@@ -1196,7 +1798,7 @@ const poColumns = useMemo(() => [
                   value={supplierAddress} 
                   onChange={(e) => setSupplierAddress(e.target.value)} 
                   placeholder="789 Tire Street, City"
-                  className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
+                  className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                 />
               </div>
               <div className="space-y-2">
@@ -1206,7 +1808,7 @@ const poColumns = useMemo(() => [
                   value={paymentTerms} 
                   onChange={(e) => setPaymentTerms(e.target.value)} 
                   placeholder="Net 30"
-                  className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
+                  className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                 />
               </div>
               <div className="flex items-center space-x-2">
@@ -1218,7 +1820,7 @@ const poColumns = useMemo(() => [
                 <Label htmlFor="supplier-active" className="text-slate-700 font-medium font-poppins">Active Supplier</Label>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="pt-4">
               <DialogClose asChild>
                 <Button type="button" variant="outline" className={buttonStyles.back}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
@@ -1233,151 +1835,44 @@ const poColumns = useMemo(() => [
           </DialogContent>
         </Dialog>
 
-        {/* Enhanced Purchase Order Dialog */}
+        {/* Enhanced Purchase Order Dialog - Better Layout */}
         <Dialog open={isPODialogOpen} onOpenChange={(isOpen) => {
           if (!isOpen) {
             setIsPODialogOpen(false);
             resetPOForm();
           }
         }}>
-          <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
+          <DialogContent className="sm:max-w-4xl bg-white border-0 shadow-2xl mt-10 font-poppins max-h-[85vh] overflow-hidden">
+            <DialogHeader className="pb-4">
+              <DialogTitle className="text-2xl font-bold text-slate-900 font-poppins">
                 {editingPO ? 'Edit Purchase Order' : 'Create Purchase Order'}
               </DialogTitle>
               <DialogDescription className="text-slate-600 font-poppins">
                 {editingPO ? `Update details for PO ${editingPO.po_number}.` : 'Enter the details for the new purchase order.'}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="po-number" className="text-slate-700 font-medium font-poppins">
-                  PO Number *
-                </Label>
-                <div className="relative">
-                  <Input 
-                    id="po-number" 
-                    value={poNumber} 
-                    onChange={(e) => setPONumber(e.target.value)} 
-                    placeholder="PO-0001"
-                    readOnly={!editingPO}
-                    className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 ${
-                      !editingPO ? 'bg-slate-50 cursor-not-allowed' : 'bg-white/80'
-                    } font-poppins`}
-                  />
-                  {!editingPO && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <Badge variant="secondary" className="text-xs font-poppins bg-green-100 text-green-700 border-green-200">
-                        Auto-generated
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-                {!editingPO && (
-                  <p className="text-xs text-slate-500 font-poppins">
-                    PO number is automatically generated
-                  </p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="supplier" className="text-slate-700 font-medium font-poppins">Supplier *</Label>
-                  <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
-                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
-                      <SelectValue placeholder="Select supplier" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suppliers.filter(s => s.is_active).map(supplier => (
-                        <SelectItem key={supplier.supplier_id} value={supplier.supplier_id} className="font-poppins">
-                          {supplier.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="branch" className="text-slate-700 font-medium font-poppins">Branch *</Label>
-                  <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
-                      <SelectValue placeholder="Select branch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {branches.map(branch => (
-                        <SelectItem key={branch.branch_id} value={branch.branch_id} className="font-poppins">
-                          {branch.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+            
+            <EnhancedPOForm
+              editingPO={editingPO}
+              formData={poFormData}
+              onFormChange={handlePOFormChange}
+              suppliers={suppliers}
+              branches={branches}
+              isEditing={!!editingPO}
+            />
 
-              {/* Payment method + status on create/edit */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-slate-700 font-medium font-poppins">Payment Method</Label>
-                  <Select value={paymentMethod} onValueChange={(v: any) => setPaymentMethod(v)}>
-                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 bg-white/80 font-poppins">
-                      <SelectValue placeholder="Select method" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash" className="font-poppins">💵 Cash</SelectItem>
-                      <SelectItem value="credit_card" className="font-poppins">💳 Credit Card</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-slate-700 font-medium font-poppins">Payment Status</Label>
-                  <Select value={paymentStatus} onValueChange={(v: any) => setPaymentStatus(v)}>
-                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 bg-white/80 font-poppins">
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending" className="font-poppins">⏳ Pending</SelectItem>
-                      <SelectItem value="paid" className="font-poppins">✅ Paid</SelectItem>
-                      <SelectItem value="partial" className="font-poppins">⚠️ Partial</SelectItem>
-                      <SelectItem value="overdue" className="font-poppins">🔴 Overdue</SelectItem>
-                      <SelectItem value="cancelled" className="font-poppins">❌ Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="expected-delivery" className="text-slate-700 font-medium font-poppins">
-                  Expected Delivery Date
-                </Label>
-                <Input 
-                  id="expected-delivery" 
-                  type="date"
-                  value={expectedDelivery}
-                  onChange={(e) => setExpectedDelivery(e.target.value)}
-                  min={new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0]}
-                  className="border-slate-300 focus:border-purple-500 bg-white/80 font-poppins"
-                />
-                <p className="text-xs text-slate-500 font-poppins">
-                  Expected date of delivery (must be after today)
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="po-notes" className="text-slate-700 font-medium font-poppins">Notes</Label>
-                <Textarea 
-                  id="po-notes" 
-                  value={poNotes} 
-                  onChange={(e) => setPONotes(e.target.value)} 
-                  placeholder="Additional notes for this purchase order..."
-                  className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
-                />
-              </div>
-            </div>
-            <DialogFooter>
+            <DialogFooter className="pt-4">
               <DialogClose asChild>
                 <Button type="button" variant="outline" className={buttonStyles.back}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Cancel
                 </Button>
               </DialogClose>
-              <Button onClick={handleSubmitPO} disabled={isPOLoading} className={buttonStyles.primary}>
+              <Button 
+                onClick={handleSubmitPO} 
+                disabled={isPOLoading || !poFormData.selectedSupplier || !poFormData.selectedBranch}
+                className={buttonStyles.primary}
+              >
                 {isPOLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editingPO ? 'Save Changes' : 'Create PO'}
               </Button>
@@ -1385,105 +1880,9 @@ const poColumns = useMemo(() => [
           </DialogContent>
         </Dialog>
 
-        {/* Combined Status Dialog */}
-        <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
-          <DialogContent className="sm:max-w-md bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl font-poppins">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
-                Update Status
-              </DialogTitle>
-              <DialogDescription className="text-slate-600 font-poppins">
-                Update delivery and payment status for PO {editingStatusPO?.po_number}
-              </DialogDescription>
-            </DialogHeader>
-            
-            {editingStatusPO && (
-              <div className="space-y-6 py-2">
-                {/* Delivery Status */}
-                <div className="space-y-3">
-                  <Label className="text-slate-700 font-semibold font-poppins flex items-center gap-2">
-                    <TruckIcon className="h-4 w-4" />
-                    Delivery Status
-                  </Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {['pending', 'approved', 'ordered', 'delivered', 'cancelled'].map((status) => {
-                      const isSelected = editingStatusPO.status === status;
-                      return (
-                        <button
-                          key={status}
-                          onClick={() => setEditingStatusPO({ ...editingStatusPO, status })}
-                          className={`p-3 rounded-lg border-2 transition-all capitalize font-medium ${
-                            isSelected ? 'bg-purple-100 border-purple-500 shadow-sm' : 'bg-slate-100 hover:bg-slate-200 border-transparent'
-                          }`}
-                        >
-                          {status}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Payment Status */}
-                <div className="space-y-3">
-                  <Label className="text-slate-700 font-semibold font-poppins">Payment Status</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {['pending', 'paid', 'partial', 'overdue', 'cancelled'].map((status) => {
-                      const isSelected = editingStatusPO.payment_status === status;
-                      return (
-                        <button
-                          key={status}
-                          onClick={() => setEditingStatusPO({ ...editingStatusPO, payment_status: status })}
-                          className={`p-3 rounded-lg border-2 transition-all capitalize font-medium ${
-                            isSelected ? 'bg-indigo-100 border-indigo-500 shadow-sm' : 'bg-slate-100 hover:bg-slate-200 border-transparent'
-                          }`}
-                        >
-                          {status}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Payment Method */}
-                <div className="space-y-3">
-                  <Label className="text-slate-700 font-semibold font-poppins">Payment Method</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {['cash', 'credit_card'].map((method) => {
-                      const isSelected = editingStatusPO.payment_method === method;
-                      return (
-                        <button
-                          key={method}
-                          onClick={() => setEditingStatusPO({ ...editingStatusPO, payment_method: method })}
-                          className={`p-3 rounded-lg border-2 transition-all capitalize font-medium ${
-                            isSelected ? 'bg-teal-100 border-teal-500 shadow-sm' : 'bg-slate-100 hover:bg-slate-200 border-transparent'
-                          }`}
-                        >
-                          {method === 'cash' ? '💵 Cash' : '💳 Credit Card'}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline" className={buttonStyles.back}>
-                  Cancel
-                </Button>
-              </DialogClose>
-              <Button onClick={handleUpdateStatuses} disabled={isPOLoading} className={buttonStyles.primary}>
-                {isPOLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Update Status
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
         {/* Enhanced Delete Confirmation Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent className="bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins">
+          <AlertDialogContent className="bg-white border-0 shadow-2xl mt-20 font-poppins">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-slate-900 font-poppins">Confirm Deletion</AlertDialogTitle>
               <AlertDialogDescription className="text-slate-600 font-poppins">
@@ -1547,6 +1946,25 @@ const poColumns = useMemo(() => [
         /* Smooth transitions for all interactive elements */
         button, input, select, textarea {
           transition: all 0.3s ease;
+        }
+
+        /* Custom scrollbar for dialogs */
+        .overflow-y-auto::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .overflow-y-auto::-webkit-scrollbar-track {
+          background: #f1f5f9;
+          border-radius: 3px;
+        }
+
+        .overflow-y-auto::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 3px;
+        }
+
+        .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8;
         }
       `}</style>
     </div>
