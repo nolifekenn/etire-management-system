@@ -108,8 +108,6 @@ export interface Customer {
     customer_id: string;
     name: string;
     phone?: string;
-    email?: string;
-    address?: string;
     vehicle_count?: number;
     created_at?: string;
     updated_at?: string;
@@ -121,7 +119,6 @@ export interface Vehicle {
   plate_number: string;
   make?: string;
   model?: string;
-  year?: number;
   color?: string;
   created_at?: string;
   updated_at?: string;

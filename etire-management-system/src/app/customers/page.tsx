@@ -87,29 +87,71 @@ interface VehicleType {
 const customerColumns = [
   { key: 'name', header: 'Customer Name' },
   { key: 'phone', header: 'Phone' },
-  { key: 'email', header: 'Email' },
-  { key: 'address', header: 'Address' },
   { key: 'vehicle_count', header: 'Vehicles' },
 ];
 
+
 const vehicleColumns = [
-  { key: 'plate_number', header: 'Plate Number' },
-  { key: 'customer_name', header: 'Customer' },
-  { key: 'vehicle_type', header: 'Type' },
-  { key: 'make', header: 'Make' },
-  { key: 'model', header: 'Model' },
-  { key: 'year', header: 'Year' },
-  { key: 'color', header: 'Color' },
+  { key: 'plate_number', header: 'Plate Number', sortable: true },
+  {
+    key: 'customer',
+    header: 'Customer',
+    sortable: true,
+    render: (value: any) => <span className="capitalize">{value?.name || '—'}</span>,
+  },
+  {
+    key: 'vehicle_type',
+    header: 'Type',
+    sortable: true,
+    render: (value: any) => <span className="capitalize">{value?.name || '—'}</span>,
+  },
+  { key: 'make', header: 'Make', sortable: true },
+  { key: 'model', header: 'Model', sortable: true },
+  { key: 'color', header: 'Color', sortable: true },
 ];
+// ...existing code...
 
 const historyColumns = [
-  { key: 'plate_number', header: 'Vehicle' },
-  { key: 'item_name', header: 'Tire/Item' },
-  { key: 'service_type', header: 'Service Type' },
-  { key: 'service_date', header: 'Date' },
-  { key: 'mileage', header: 'Mileage' },
-  { key: 'created_by_name', header: 'Service By' },
+  {
+    key: 'plate_number',
+    header: 'Vehicle',
+    render: (_value: any, item: any) => item.vehicle?.plate_number || '—',
+  },
+  {
+    key: 'item_name',
+    header: 'Tire/Item',
+    render: (_value: any, item: any) => item.inventory_item?.name || '—',
+  },
+  {
+    key: 'service_type',
+    header: 'Service Type',
+    render: (_value: any, item: any) => {
+      const st = String(item.service_type ?? '').toLowerCase();
+      return (
+        <Badge className={`capitalize ${serviceTypeColors[st as keyof typeof serviceTypeColors] ?? ''} font-poppins`}>
+          {st || '—'}
+        </Badge>
+      );
+    },
+  },
+  {
+    key: 'service_date',
+    header: 'Date',
+    render: (value: any) => (value ? new Date(value).toLocaleDateString('en-US') : '—'),
+  },
+  {
+    key: 'mileage',
+    header: 'Mileage',
+    render: (value: any) => (value ? value : <span className="text-slate-400">-</span>),
+  },
+  {
+    key: 'created_by_name',
+    header: 'Service By',
+    render: (_value: any, item: any) => item.user?.name || '—',
+  },
 ];
+
+// ...existing code...
 
 // Custom Date Input Component with better styling
 const CustomDateInput = ({ value, onChange, id, className = "" }: { value: string; onChange: (value: string) => void; id: string; className?: string }) => {
@@ -412,13 +454,10 @@ export default function EnhancedCustomersPage() {
     // Form states
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
-    const [customerEmail, setCustomerEmail] = useState('');
-    const [customerAddress, setCustomerAddress] = useState('');
     const [selectedCustomer, setSelectedCustomer] = useState('');
     const [plateNumber, setPlateNumber] = useState('');
     const [make, setMake] = useState('');
     const [model, setModel] = useState('');
-    const [year, setYear] = useState('');
     const [color, setColor] = useState('');
     const [selectedVehicleType, setSelectedVehicleType] = useState('');
     const [selectedVehicle, setSelectedVehicle] = useState('');
@@ -525,38 +564,34 @@ export default function EnhancedCustomersPage() {
         if (usersRes.data) setUsers(usersRes.data as User[]);
     };
 
-    // Filter functions with useMemo
     const filteredCustomers = useMemo(() => {
-        return customers.filter(customer => {
-            if (!customerSearch) return true;
-            const searchLower = customerSearch.toLowerCase();
-            return (
-                customer.name.toLowerCase().includes(searchLower) ||
-                customer.phone?.toLowerCase().includes(searchLower) ||
-                customer.email?.toLowerCase().includes(searchLower) ||
-                customer.address?.toLowerCase().includes(searchLower)
-            );
-        });
+      return customers.filter(customer => {
+        if (!customerSearch) return true;
+        const searchLower = customerSearch.toLowerCase();
+        return (
+          customer.name.toLowerCase().includes(searchLower) ||
+          customer.phone?.toLowerCase().includes(searchLower)
+          // removed: email, address
+        );
+      });
     }, [customers, customerSearch]);
 
+    // ...existing code...
+    
     const filteredVehicles = useMemo(() => {
-        return vehicles.filter(vehicle => {
-            const searchLower = vehicleSearch.toLowerCase();
-            const matchesSearch = !vehicleSearch || 
-                vehicle.plate_number.toLowerCase().includes(searchLower) ||
-                vehicle.make?.toLowerCase().includes(searchLower) ||
-                vehicle.model?.toLowerCase().includes(searchLower) ||
-                vehicle.customer?.name.toLowerCase().includes(searchLower);
-
-            const matchesType = vehicleTypeFilter === 'all' || 
-                               vehicle.vehicle_type_id === vehicleTypeFilter;
-
-            const matchesCustomer = customerFilter === 'all' || 
-                                  vehicle.customer_id === customerFilter;
-
-            return matchesSearch && matchesType && matchesCustomer;
-        });
-    }, [vehicles, vehicleSearch, vehicleTypeFilter, customerFilter]);
+        const q = vehicleSearch.trim().toLowerCase();
+        if (!q) return vehicles;
+        return vehicles.filter(v =>
+            v.plate_number?.toLowerCase().includes(q) ||
+            v.customer?.name?.toLowerCase().includes(q) ||
+            v.vehicle_type?.name?.toLowerCase().includes(q) ||
+            v.make?.toLowerCase().includes(q) ||
+            v.model?.toLowerCase().includes(q) ||
+            v.color?.toLowerCase().includes(q)
+        );
+        }, [vehicles, vehicleSearch]);
+        
+        // ...existing code...
 
     const filteredHistory = useMemo(() => {
         return tireHistory.filter(history => {
@@ -591,8 +626,6 @@ export default function EnhancedCustomersPage() {
     const resetCustomerForm = () => {
         setCustomerName('');
         setCustomerPhone('');
-        setCustomerEmail('');
-        setCustomerAddress('');
         setEditingCustomer(null);
     };
 
@@ -601,7 +634,6 @@ export default function EnhancedCustomersPage() {
         setPlateNumber('');
         setMake('');
         setModel('');
-        setYear('');
         setColor('');
         setSelectedVehicleType('');
         setEditingVehicle(null);
@@ -636,8 +668,6 @@ export default function EnhancedCustomersPage() {
         setEditingCustomer(customer);
         setCustomerName(customer.name);
         setCustomerPhone(customer.phone || '');
-        setCustomerEmail(customer.email || '');
-        setCustomerAddress(customer.address || '');
         setIsCustomerDialogOpen(true);
     };
 
@@ -647,7 +677,6 @@ export default function EnhancedCustomersPage() {
         setPlateNumber(vehicle.plate_number);
         setMake(vehicle.make || '');
         setModel(vehicle.model || '');
-        setYear(vehicle.year?.toString() || '');
         setColor(vehicle.color || '');
         setSelectedVehicleType(vehicle.vehicle_type_id || '');
         setIsVehicleDialogOpen(true);
@@ -680,13 +709,13 @@ export default function EnhancedCustomersPage() {
         let headers: string[] = [];
 
         if (activeTab === 'customers') {
-            dataToExport = filteredCustomers;
-            filename = 'customers_export.csv';
-            headers = ['Customer Name', 'Phone', 'Email', 'Address', 'Vehicles Count'];
+        dataToExport = filteredCustomers;
+        filename = 'customers_export.csv';
+        headers = ['Customer Name', 'Phone', 'Vehicles Count']; // removed Email, Address
         } else if (activeTab === 'vehicles') {
-            dataToExport = filteredVehicles;
-            filename = 'vehicles_export.csv';
-            headers = ['Plate Number', 'Customer', 'Vehicle Type', 'Make', 'Model', 'Year', 'Color'];
+        dataToExport = filteredVehicles;
+        filename = 'vehicles_export.csv';
+        headers = ['Plate Number', 'Customer', 'Vehicle Type', 'Make', 'Model', 'Color'];
         } else {
             dataToExport = filteredHistory;
             filename = 'tire_history_export.csv';
@@ -725,40 +754,36 @@ export default function EnhancedCustomersPage() {
     };
 
     const convertToCSV = (data: any[], headers: string[], type: string) => {
-        const headerRow = headers.join(',') + '\n';
-        
-        const dataRows = data.map(item => {
-            if (type === 'customers') {
-                return [
-                    `"${item.name || ''}"`,
-                    `"${item.phone || ''}"`,
-                    `"${item.email || ''}"`,
-                    `"${item.address || ''}"`,
-                    `"${item.vehicle_count || 0}"`
-                ].join(',');
-            } else if (type === 'vehicles') {
-                return [
-                    `"${item.plate_number || ''}"`,
-                    `"${item.customer?.name || ''}"`,
-                    `"${item.vehicle_type?.name || ''}"`,
-                    `"${item.make || ''}"`,
-                    `"${item.model || ''}"`,
-                    `"${item.year || ''}"`,
-                    `"${item.color || ''}"`
-                ].join(',');
-            } else {
-                return [
-                    `"${item.vehicle?.plate_number || ''}"`,
-                    `"${item.inventory_item?.name || ''}"`,
-                    `"${item.service_type || ''}"`,
-                    `"${item.service_date ? new Date(item.service_date).toLocaleDateString() : ''}"`,
-                    `"${item.mileage || ''}"`,
-                    `"${item.user?.name || ''}"`
-                ].join(',');
-            }
-        }).join('\n');
+    const headerRow = headers.join(',') + '\n'; 
+    const dataRows = data.map(item => {
+        if (type === 'customers') {
+        return [
+            `"${item.name || ''}"`,
+            `"${item.phone || ''}"`,
+            `"${item.vehicle_count || 0}"`
+        ].join(',');
+        } else if (type === 'vehicles') {
+        return [
+            `"${item.plate_number || ''}"`,
+            `"${item.customer?.name || ''}"`,
+            `"${item.vehicle_type?.name || ''}"`,
+            `"${item.make || ''}"`,
+            `"${item.model || ''}"`,
+            `"${item.color || ''}"`
+        ].join(',');
+        } else {
+        return [
+            `"${item.vehicle?.plate_number || ''}"`,
+            `"${item.inventory_item?.name || ''}"`,
+            `"${toTitle(item.service_type) || ''}"`,
+            `"${item.service_date ? new Date(item.service_date).toLocaleDateString('en-US') : ''}"`,
+            `"${item.mileage || ''}"`,
+            `"${item.user?.name || ''}"`
+        ].join(',');
+        }
+    }).join('\n');
 
-        return headerRow + dataRows;
+    return headerRow + dataRows;
     };
 
     const handleSubmitCustomer = async () => {
@@ -773,8 +798,6 @@ export default function EnhancedCustomersPage() {
         const customerData = {
             name: customerName,
             phone: customerPhone || null,
-            email: customerEmail || null,
-            address: customerAddress || null,
         };
 
         let error;
@@ -816,7 +839,6 @@ export default function EnhancedCustomersPage() {
             plate_number: plateNumber,
             make: make || null,
             model: model || null,
-            year: year ? parseInt(year) : null,
             color: color || null,
             vehicle_type_id: selectedVehicleType || null,
         };
@@ -959,29 +981,30 @@ export default function EnhancedCustomersPage() {
     };
 
     const renderHistoryCell = (item: any, columnKey: string, value: any) => {
-        if (columnKey === 'plate_number') {
-            return item.vehicle?.plate_number || 'Unknown Vehicle';
-        }
-        if (columnKey === 'item_name') {
-            return item.inventory_item?.name || 'Unknown Item';
-        }
-        if (columnKey === 'service_type') {
-            return (
-                <Badge className={`capitalize ${serviceTypeColors[item.service_type]} font-poppins`}>
-                    {value}
-                </Badge>
-            );
-        }
-        if (columnKey === 'service_date') {
-            return new Date(value).toLocaleDateString();
-        }
-        if (columnKey === 'mileage' && !value) {
-            return <span className="text-slate-400">-</span>;
-        }
-        if (columnKey === 'created_by_name') {
-            return item.user?.name || 'Unknown User';
-        }
-        return String(value || '');
+    if (columnKey === 'plate_number') {
+        return item.vehicle?.plate_number || '—';
+    }
+    if (columnKey === 'item_name') {
+        return item.inventory_item?.name || '—';
+    }
+    if (columnKey === 'service_type') {
+        const st = String(item.service_type ?? '').toLowerCase();
+        return (
+        <Badge className={`capitalize ${serviceTypeColors[st as keyof typeof serviceTypeColors] ?? ''} font-poppins`}>
+            {st || '—'}
+        </Badge>
+        );
+    }
+    if (columnKey === 'service_date') {
+        return value ? new Date(value).toLocaleDateString('en-US') : '—';
+    }
+    if (columnKey === 'mileage' && !value) {
+        return <span className="text-slate-400">-</span>;
+    }
+    if (columnKey === 'created_by_name') {
+        return item.user?.name || '—';
+    }
+    return String(value ?? '');
     };
 
     return (
@@ -1082,7 +1105,7 @@ export default function EnhancedCustomersPage() {
                                             id="search-customers"
                                             value={customerSearch}
                                             onChange={setCustomerSearch}
-                                            placeholder="Search by name, phone, email, or address..."
+                                            placeholder="Search by name or phone..."
                                         />
                                     </div>
                                     {customerSearch && (
@@ -1292,17 +1315,23 @@ export default function EnhancedCustomersPage() {
                                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                     </div>
                                 ) : (
-                                    <DataTableWrapper
-                                        title=""
-                                        columns={historyColumns}
-                                        data={filteredHistory.map(history => ({ ...history, id: history.history_id }))}
-                                        onAddNew={handleOpenHistoryDialog}
-                                        onEdit={handleEditHistory}
-                                        onDelete={(item) => handleDeleteItem(item, 'history')}
-                                        renderCell={renderHistoryCell}
-                                        searchTerm={historySearch}
-                                        onSearchChange={setHistorySearch}
-                                    />
+                                <DataTableWrapper
+                                title=""
+                                columns={historyColumns}
+                                data={filteredHistory.map(h => ({
+                                    ...h,
+                                    id: h.history_id,
+                                    plate_number: h.vehicle?.plate_number ?? '',
+                                    item_name: h.inventory_item?.name ?? '',
+                                    created_by_name: h.user?.name ?? '',
+                                }))}
+                                onAddNew={handleOpenHistoryDialog}
+                                onEdit={handleEditHistory}
+                                onDelete={(item) => handleDeleteItem(item, 'history')}
+                                renderCell={renderHistoryCell}
+                                searchTerm={historySearch}
+                                onSearchChange={setHistorySearch}
+                                />
                                 )}
                             </CardContent>
                         </Card>
@@ -1347,27 +1376,6 @@ export default function EnhancedCustomersPage() {
                                         className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="customer-email" className="text-slate-700 font-medium font-poppins">Email</Label>
-                                    <Input 
-                                        id="customer-email" 
-                                        type="email"
-                                        value={customerEmail} 
-                                        onChange={(e) => setCustomerEmail(e.target.value)} 
-                                        placeholder="john@example.com"
-                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
-                                    />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="customer-address" className="text-slate-700 font-medium font-poppins">Address</Label>
-                                <Textarea 
-                                    id="customer-address" 
-                                    value={customerAddress} 
-                                    onChange={(e) => setCustomerAddress(e.target.value)} 
-                                    placeholder="123 Main Street, City, State"
-                                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
-                                />
                             </div>
                         </div>
                         <DialogFooter>
@@ -1465,17 +1473,6 @@ export default function EnhancedCustomersPage() {
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="year" className="text-slate-700 font-medium font-poppins">Year</Label>
-                                    <Input 
-                                        id="year" 
-                                        type="number"
-                                        value={year} 
-                                        onChange={(e) => setYear(e.target.value)} 
-                                        placeholder="2020"
-                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
-                                    />
-                                </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="color" className="text-slate-700 font-medium font-poppins">Color</Label>
                                     <Input 
