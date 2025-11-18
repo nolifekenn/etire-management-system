@@ -195,6 +195,20 @@ const EnhancedPOForm = ({
 
   const dueDate = calculateDueDate();
 
+  // ADD THIS: Auto-cancel handler
+  const handleStatusChange = (field: 'deliveryStatus' | 'paymentStatus', value: string) => {
+    onFormChange(field, value);
+    
+    // Auto-cancel the other status when one is cancelled
+    if (value === 'cancelled') {
+      if (field === 'deliveryStatus') {
+        onFormChange('paymentStatus', 'cancelled');
+      } else if (field === 'paymentStatus') {
+        onFormChange('deliveryStatus', 'cancelled');
+      }
+    }
+  };
+
   return (
     <div className="space-y-4 py-2 max-h-[70vh] overflow-y-auto pr-2">
       <div className="grid grid-cols-2 gap-4">
@@ -317,55 +331,55 @@ const EnhancedPOForm = ({
 
           {/* Delivery Status - Only in Edit Mode */}
           {isEditing && (
-            <div className="space-y-2">
-              <Label className="text-slate-700 font-medium font-poppins">
-                Delivery Status
-              </Label>
-              <Select 
-                value={formData.deliveryStatus} 
-                onValueChange={(value) => onFormChange('deliveryStatus', value)}
-              >
-                <SelectTrigger className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending" className="font-poppins">⏳ Pending</SelectItem>
-                  <SelectItem value="approved" className="font-poppins">✅ Approved</SelectItem>
-                  <SelectItem value="ordered" className="font-poppins">📦 Ordered</SelectItem>
-                  <SelectItem value="delivered" className="font-poppins">🚚 Delivered</SelectItem>
-                  <SelectItem value="cancelled" className="font-poppins">❌ Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+              <div className="space-y-2">
+                <Label className="text-slate-700 font-medium font-poppins">
+                  Delivery Status
+                </Label>
+                <Select 
+                  value={formData.deliveryStatus} 
+                  onValueChange={(value) => handleStatusChange('deliveryStatus', value)} // CHANGED
+                >
+                  <SelectTrigger className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending" className="font-poppins">⏳ Pending</SelectItem>
+                    <SelectItem value="approved" className="font-poppins">✅ Approved</SelectItem>
+                    <SelectItem value="ordered" className="font-poppins">📦 Ordered</SelectItem>
+                    <SelectItem value="delivered" className="font-poppins">🚚 Delivered</SelectItem>
+                    <SelectItem value="cancelled" className="font-poppins">❌ Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
         </div>
       </div>
 
-      {/* Payment Status with Partial Payment Logic */}
-      <div className="space-y-2">
-        <Label className="text-slate-700 font-medium font-poppins">Payment Status</Label>
-        <Select 
-          value={formData.paymentStatus} 
-          onValueChange={(value) => onFormChange('paymentStatus', value)}
-          disabled={formData.paymentMethod === 'cash' && formData.paymentStatus === 'partial' && !isEditing}
-        >
-          <SelectTrigger className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins">
-            <SelectValue placeholder="Select status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="pending" className="font-poppins">⏳ Pending</SelectItem>
-            <SelectItem 
-              value="partial" 
-              className="font-poppins"
-              disabled={formData.paymentMethod === 'cash' && !isEditing}
+        {/* UPDATE: Payment Status to use handleStatusChange */}
+          <div className="space-y-2">
+            <Label className="text-slate-700 font-medium font-poppins">Payment Status</Label>
+            <Select 
+              value={formData.paymentStatus} 
+              onValueChange={(value) => handleStatusChange('paymentStatus', value)} // CHANGED
+              disabled={formData.paymentMethod === 'cash' && formData.paymentStatus === 'partial' && !isEditing}
             >
-              ⚠️ Partial {formData.paymentMethod === 'cash' && !isEditing && '(Credit Only)'}
-            </SelectItem>
-            <SelectItem value="paid" className="font-poppins">✅ Paid</SelectItem>
-            <SelectItem value="overdue" className="font-poppins">🔴 Overdue</SelectItem>
-            <SelectItem value="cancelled" className="font-poppins">❌ Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
+              <SelectTrigger className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending" className="font-poppins">⏳ Pending</SelectItem>
+                <SelectItem 
+                  value="partial" 
+                  className="font-poppins"
+                  disabled={formData.paymentMethod === 'cash' && !isEditing}
+                >
+                  ⚠️ Partial {formData.paymentMethod === 'cash' && !isEditing && '(Credit Only)'}
+                </SelectItem>
+                <SelectItem value="paid" className="font-poppins">✅ Paid</SelectItem>
+                <SelectItem value="overdue" className="font-poppins">🔴 Overdue</SelectItem>
+                <SelectItem value="cancelled" className="font-poppins">❌ Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
         {formData.paymentMethod === 'cash' && formData.paymentStatus === 'partial' && (
           <p className="text-xs text-amber-600">
             Partial payments are only available for Credit (120 days) payment method
@@ -417,11 +431,23 @@ const EnhancedPOForm = ({
           </Label>
           <Textarea 
             id="cancellation-reason"
+            value={formData.cancellationReason || ''} // BIND VALUE
+            onChange={(e) => onFormChange('cancellationReason', e.target.value)} // BIND CHANGE
             placeholder="Please provide the reason for cancellation..."
             className="border-red-300 focus:border-red-500 bg-white mt-2 text-sm"
             rows={3}
           />
         </div>
+      )}
+
+      {(formData.deliveryStatus === 'cancelled' || formData.paymentStatus === 'cancelled') && (
+        <Alert className="bg-red-50 border-red-200 font-poppins">
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          <AlertTitle className="text-red-800">Order Cancellation</AlertTitle>
+          <AlertDescription className="text-red-700">
+            Both delivery and payment statuses will be set to cancelled.
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Notes Section */}
@@ -796,7 +822,6 @@ const supplierColumns = [
   { key: 'contact_person', header: 'Contact Person' },
   { key: 'phone', header: 'Phone' },
   { key: 'email', header: 'Email' },
-  { key: 'payment_terms', header: 'Payment Terms'},
   { 
     key: 'is_active', 
     header: 'Status',
@@ -855,7 +880,8 @@ export default function EnhancedPurchasingPage() {
     poNotes: '',
     paymentMethod: 'cash' as 'cash' | 'credit',
     paymentStatus: 'pending' as 'pending' | 'paid' | 'partial' | 'overdue' | 'cancelled',
-    deliveryStatus: 'pending' as 'pending' | 'approved' | 'ordered' | 'delivered' | 'cancelled'
+    deliveryStatus: 'pending' as 'pending' | 'approved' | 'ordered' | 'delivered' | 'cancelled',
+    cancellationReason: ''
   });
 
   // Supplier form state
@@ -864,7 +890,6 @@ export default function EnhancedPurchasingPage() {
   const [supplierPhone, setSupplierPhone] = useState('');
   const [supplierEmail, setSupplierEmail] = useState('');
   const [supplierAddress, setSupplierAddress] = useState('');
-  const [paymentTerms, setPaymentTerms] = useState('');
   const [supplierActive, setSupplierActive] = useState(true);
 
   // Initialize
@@ -1008,7 +1033,8 @@ export default function EnhancedPurchasingPage() {
       poNotes: po.notes || '',
       paymentMethod: (po as any).payment_method || 'cash',
       paymentStatus: (po as any).payment_status || 'pending',
-      deliveryStatus: po.status || 'pending'
+      deliveryStatus: po.status || 'pending',
+      cancellationReason: (po as any).cancellation_reason || ''
     });
     setIsPODialogOpen(true);
   }, []);
@@ -1032,7 +1058,8 @@ export default function EnhancedPurchasingPage() {
       poNotes: '',
       paymentMethod: 'cash',
       paymentStatus: 'pending',
-      deliveryStatus: 'pending'
+      deliveryStatus: 'pending',
+      cancellationReason: ''
     });
     setEditingPO(null);
   };
@@ -1043,7 +1070,6 @@ export default function EnhancedPurchasingPage() {
     setSupplierPhone('');
     setSupplierEmail('');
     setSupplierAddress('');
-    setPaymentTerms('');
     setSupplierActive(true);
     setEditingSupplier(null);
   };
@@ -1069,7 +1095,6 @@ export default function EnhancedPurchasingPage() {
     setSupplierPhone(supplier.phone || '');
     setSupplierEmail(supplier.email || '');
     setSupplierAddress(supplier.address || '');
-    setPaymentTerms(supplier.payment_terms || '');
     setSupplierActive(supplier.is_active);
     setIsSupplierDialogOpen(true);
   };
@@ -1088,7 +1113,7 @@ export default function EnhancedPurchasingPage() {
     if (activeTab === 'suppliers') {
       dataToExport = filteredSuppliers;
       filename = 'suppliers_export.csv';
-      headers = ['Supplier Name', 'Contact Person', 'Phone', 'Email', 'Address', 'Payment Terms', 'Status'];
+      headers = ['Supplier Name', 'Contact Person', 'Phone', 'Email', 'Address', 'Status'];
     } else if (activeTab === 'transaction-history') {
       dataToExport = transactionHistory;
       filename = 'transaction_history_export.csv';
@@ -1139,7 +1164,6 @@ export default function EnhancedPurchasingPage() {
           `"${item.phone || ''}"`,
           `"${item.email || ''}"`,
           `"${item.address || ''}"`,
-          `"${item.payment_terms || ''}"`,
           `"${item.is_active ? 'Active' : 'Inactive'}"`
         ].join(',');
       } else {
@@ -1189,7 +1213,6 @@ export default function EnhancedPurchasingPage() {
       phone: supplierPhone || null,
       email: supplierEmail || null,
       address: supplierAddress || null,
-      payment_terms: paymentTerms || null,
       is_active: supplierActive,
     };
 
@@ -1257,6 +1280,16 @@ export default function EnhancedPurchasingPage() {
       return;
     }
 
+    // Validate cancellation reason
+    if ((poFormData.deliveryStatus === 'cancelled' || poFormData.paymentStatus === 'cancelled') && !poFormData.cancellationReason?.trim()) {
+      toast({ 
+        title: "Validation Error", 
+        description: "Cancellation reason is required when cancelling an order.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     setIsPOLoading(true);
 
     const poData = {
@@ -1269,6 +1302,9 @@ export default function EnhancedPurchasingPage() {
       status: editingPO ? poFormData.deliveryStatus : 'pending',
       payment_status: poFormData.paymentStatus,
       payment_method: poFormData.paymentMethod,
+      cancellation_reason: (poFormData.deliveryStatus === 'cancelled' || poFormData.paymentStatus === 'cancelled') 
+        ? poFormData.cancellationReason 
+        : null // ADD THIS
     };
 
     try {
@@ -1357,9 +1393,6 @@ export default function EnhancedPurchasingPage() {
     }
     if (columnKey === 'email' && !value) {
       return <span className="text-slate-400">No email</span>;
-    }
-    if (columnKey === 'payment_terms' && !value) {
-      return <span className="text-slate-400">No terms</span>;
     }
     return String(value || '');
   };
@@ -1798,16 +1831,6 @@ export default function EnhancedPurchasingPage() {
                   value={supplierAddress} 
                   onChange={(e) => setSupplierAddress(e.target.value)} 
                   placeholder="789 Tire Street, City"
-                  className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="payment-terms" className="text-slate-700 font-medium font-poppins">Payment Terms</Label>
-                <Input 
-                  id="payment-terms" 
-                  value={paymentTerms} 
-                  onChange={(e) => setPaymentTerms(e.target.value)} 
-                  placeholder="Net 30"
                   className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                 />
               </div>

@@ -31,7 +31,6 @@ export interface Supplier {
   phone?: string;
   email?: string;
   address?: string;
-  payment_terms?: string;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
@@ -71,6 +70,7 @@ export interface PurchaseOrder {
     user_id: string;
     name: string;
   };
+  cancellation_reason?: string | null; // ✅ Add this
 }
 
 export interface PurchaseOrderItem {
