@@ -630,38 +630,62 @@ export default function POSPage() {
   }, [inventory, searchTerm, selectedVehicleType, selectedCategory]);
 
   // Replace the addToCart function (around line 608)
+  // Replace the addToCart function (around line 632)
+  // Replace the addToCart function (around line 634)
   const addToCart = (item: InventoryItem) => {
-    setCart(prevCart => {
-      const existingItem = prevCart.find(cartItem => cartItem.item_id === item.item_id);
-      if (existingItem) {
-        if (existingItem.quantity < item.stock_quantity) {
-          // Update inventory in real-time
-          setInventory(prevInventory => 
-            prevInventory.map(invItem => 
-              invItem.item_id === item.item_id 
-                ? { ...invItem, stock_quantity: invItem.stock_quantity - 1 }
-                : invItem
-            )
-          );
-          return prevCart.map(cartItem =>
-            cartItem.item_id === item.item_id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem
-          );
-        } else {
-          toast({ title: 'Stock Limit', description: `Cannot add more of ${item.name}. Stock limit reached.`, variant: 'destructive' });
-          return prevCart;
-        }
+    // ✅ Get the CURRENT stock from inventory state (not the passed item)
+    const currentInventoryItem = inventory.find(inv => inv.item_id === item.item_id);
+    const currentStock = currentInventoryItem?.stock_quantity ?? 0;
+    
+    // Check stock before doing anything
+    if (currentStock <= 0) {
+      toast({ 
+        title: 'Out of stock', 
+        description: `${item.name} is out of stock.`, 
+        variant: 'destructive' 
+      });
+      return;
+    }
+  
+    const existingItem = cart.find(cartItem => cartItem.item_id === item.item_id);
+    
+    if (existingItem) {
+      // ✅ Item already in cart - check against CURRENT stock, not cart quantity
+      if (currentStock > 0) {
+        setCart(prevCart =>
+          prevCart.map(cartItem =>
+            cartItem.item_id === item.item_id 
+              ? { ...cartItem, quantity: cartItem.quantity + 1 } 
+              : cartItem
+          )
+        );
+        
+        // Update inventory
+        setInventory(prevInventory => 
+          prevInventory.map(invItem => 
+            invItem.item_id === item.item_id 
+              ? { ...invItem, stock_quantity: invItem.stock_quantity - 1 }
+              : invItem
+          )
+        );
+      } else {
+        toast({ 
+          title: 'Stock Limit', 
+          description: `Cannot add more of ${item.name}. Stock limit reached.`, 
+          variant: 'destructive' 
+        });
       }
+    } else {
+      // New item - add to cart
+      const newCartItem: CartItem = { 
+        ...item, 
+        quantity: 1, 
+        installationFee: 0 
+      };
       
-      // ✅ FIX: Check stock before adding
-      if (item.stock_quantity <= 0) {
-        toast({ title: 'Out of stock', description: `${item.name} is out of stock.`, variant: 'destructive' });
-        return prevCart;
-      }
+      setCart(prevCart => [...prevCart, newCartItem]);
       
-      // ✅ FIX: Create new cart item first (before updating inventory)
-      const newCartItem = { ...item, quantity: 1, installationFee: 0 };
-      
-      // ✅ FIX: Now update inventory ONCE
+      // Update inventory
       setInventory(prevInventory => 
         prevInventory.map(invItem => 
           invItem.item_id === item.item_id 
@@ -670,7 +694,7 @@ export default function POSPage() {
         )
       );
       
-      // If item is accessory, show installation modal
+      // Handle installation modal for accessories
       if (item.category === 'accessory' && item.name.toLowerCase() !== 'installation service') {
         const serviceItemTemplate = inventory.find(i => i.name.toLowerCase() === 'installation service');
         if (serviceItemTemplate) {
@@ -685,9 +709,7 @@ export default function POSPage() {
           });
         }
       }
-      
-      return [...prevCart, newCartItem];
-    });
+    }
   };
 
   const updateQuantity = (itemId: string, newQuantity: number) => {
