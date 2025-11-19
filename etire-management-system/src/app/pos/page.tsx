@@ -617,6 +617,12 @@ export default function POSPage() {
     fetchInitialData();
   }, [fetchInitialData]);
 
+  // Calculate available stock considering items in cart
+  const getAvailableStock = useCallback((item: InventoryItem) => {
+    const cartItem = cart.find(cartItem => cartItem.item_id === item.item_id);
+    return item.stock_quantity - (cartItem ? cartItem.quantity : 0);
+  }, [cart]);
+
   // Filter inventory based on selections
   const filteredInventory = useMemo(() => {
     return inventory.filter(item => {
@@ -633,28 +639,55 @@ export default function POSPage() {
   const addToCart = (item: InventoryItem) => {
     setCart(prevCart => {
       const existingItem = prevCart.find(cartItem => cartItem.item_id === item.item_id);
+      const availableStock = getAvailableStock(item);
+      
       if (existingItem) {
-        if (existingItem.quantity < item.stock_quantity) {
-          // Update inventory in real-time
-          setInventory(prevInventory => 
-            prevInventory.map(invItem => 
-              invItem.item_id === item.item_id 
-                ? { ...invItem, stock_quantity: invItem.stock_quantity - 1 }
-                : invItem
-            )
-          );
+        if (existingItem.quantity < availableStock) {
           return prevCart.map(cartItem =>
             cartItem.item_id === item.item_id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem
           );
         } else {
-          toast({ title: 'Stock Limit', description: `Cannot add more of ${item.name}. Stock limit reached.`, variant: 'destructive' });
+          toast({ 
+            title: 'Stock Limit', 
+            description: `Cannot add more of ${item.name}. Only ${availableStock} available.`, 
+            variant: 'destructive' 
+          });
           return prevCart;
         }
       }
       
+<<<<<<< Updated upstream
       // ✅ FIX: Check stock before adding
       if (item.stock_quantity <= 0) {
         toast({ title: 'Out of stock', description: `${item.name} is out of stock.`, variant: 'destructive' });
+=======
+      if (availableStock > 0) {
+        const newCartItem = { ...item, quantity: 1, installationFee: 0 };
+        
+        // If item is accessory, show installation modal
+        if (item.category === 'accessory' && item.name.toLowerCase() !== 'installation service') {
+          const serviceItemTemplate = inventory.find(i => i.name.toLowerCase() === 'installation service');
+          if (serviceItemTemplate) {
+            setInstallationModal({ open: true, item: newCartItem });
+            setInstallationFee(0);
+          } else {
+            toast({
+              title: "Setup Incomplete",
+              description: "Accessory added. To add installation fees, please create an item named 'Installation Service' in your inventory.",
+              variant: 'default',
+              duration: 7000,
+            });
+          }
+        }
+        
+        return [...prevCart, newCartItem];
+      } else {
+        toast({ 
+          title: 'Out of stock', 
+          description: `${item.name} is out of stock.`, 
+          variant: 'destructive' 
+        });
+>>>>>>> Stashed changes
         return prevCart;
       }
       
@@ -697,38 +730,24 @@ export default function POSPage() {
     const cartItem = cart.find(c => c.item_id === itemId);
     if (!cartItem) return;
 
-    const quantityDifference = newQuantity - cartItem.quantity;
+    const availableStock = getAvailableStock(item) + cartItem.quantity; // Add back the current cart quantity
 
-    if (newQuantity > 0 && newQuantity <= item.stock_quantity + cartItem.quantity) {
-      // Update inventory based on quantity change
-      setInventory(prevInventory => 
-        prevInventory.map(invItem => 
-          invItem.item_id === itemId 
-            ? { ...invItem, stock_quantity: invItem.stock_quantity - quantityDifference }
-            : invItem
-        )
-      );
-      
-      setCart(cart.map(cartItem => cartItem.item_id === itemId ? { ...cartItem, quantity: newQuantity } : cartItem));
-    } else if (newQuantity > item.stock_quantity + cartItem.quantity) {
-      toast({ title: 'Stock Limit', description: `Only ${item.stock_quantity} units of ${item.name} available.`, variant: 'destructive' });
+    if (newQuantity > 0 && newQuantity <= availableStock) {
+      setCart(cart.map(cartItem => 
+        cartItem.item_id === itemId ? { ...cartItem, quantity: newQuantity } : cartItem
+      ));
+    } else if (newQuantity > availableStock) {
+      toast({ 
+        title: 'Stock Limit', 
+        description: `Only ${availableStock} units of ${item.name} available.`, 
+        variant: 'destructive' 
+      });
     } else if (newQuantity <= 0) {
       removeFromCart(itemId);
     }
   };
 
   const removeFromCart = (itemId: string) => {
-    const cartItem = cart.find(item => item.item_id === itemId);
-    if (cartItem) {
-      // Restore the stock when removing from cart
-      setInventory(prevInventory => 
-        prevInventory.map(invItem => 
-          invItem.item_id === itemId 
-            ? { ...invItem, stock_quantity: invItem.stock_quantity + cartItem.quantity }
-            : invItem
-        )
-      );
-    }
     setCart(cart.filter(item => item.item_id !== itemId));
   };
 
@@ -748,6 +767,28 @@ export default function POSPage() {
     if (!authUser) {
       toast({ title: 'Not Authenticated', description: 'You must be logged in to process a sale.', variant: 'destructive' });
       return;
+    }
+
+    // Validate stock availability before processing
+    for (const cartItem of cart) {
+      const inventoryItem = inventory.find(item => item.item_id === cartItem.item_id);
+      if (!inventoryItem) {
+        toast({
+          title: "Item Not Found",
+          description: `Item ${cartItem.name} no longer exists in inventory.`,
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      if (cartItem.quantity > inventoryItem.stock_quantity) {
+        toast({
+          title: "Insufficient Stock",
+          description: `Only ${inventoryItem.stock_quantity} units of ${cartItem.name} available. Please adjust your cart.`,
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -831,7 +872,11 @@ export default function POSPage() {
 
       } catch (receiptError: any) {
         console.error('Receipt generation failed:', receiptError);
-        toast({ title: 'Receipt Error', description: `Sale was saved (ID: ${data.sale_id}), but receipt failed to print: ${receiptError.message}`, variant: 'destructive' });
+        toast({ 
+          title: 'Receipt Error', 
+          description: `Sale was saved (ID: ${data.sale_id}), but receipt failed to print: ${receiptError.message}`, 
+          variant: 'destructive' 
+        });
       }
 
       setLastSaleId(data.sale_id);
@@ -841,7 +886,7 @@ export default function POSPage() {
         setCart([]);
         setSelectedCustomerId(ANONYMOUS_CUSTOMER_ID);
         setEditingSale(null);
-        fetchInitialData();
+        fetchInitialData(); // Refresh inventory from server
       }, 3000);
 
     } catch (err: any) {
@@ -955,8 +1000,11 @@ export default function POSPage() {
     setShowPasswordDialog(true);
   };
 
+<<<<<<< Updated upstream
   // Replace the handlePasswordSubmit function (around line 954)
   // Replace the handlePasswordSubmit function (around line 958)
+=======
+>>>>>>> Stashed changes
   const handlePasswordSubmit = async () => {
     if (!supabase) {
       toast({
@@ -1092,30 +1140,10 @@ export default function POSPage() {
   };
 
   const handleClearCart = () => {
-    // Restore stock for all items in cart
-    setInventory(prevInventory => 
-      prevInventory.map(invItem => {
-        const cartItem = cart.find(c => c.item_id === invItem.item_id);
-        if (cartItem) {
-          return { ...invItem, stock_quantity: invItem.stock_quantity + cartItem.quantity };
-        }
-        return invItem;
-      })
-    );
     setCart([]);
   };
 
   const handleCancelEditSale = () => {
-    // Restore stock for all items in cart when canceling edit
-    setInventory(prevInventory => 
-      prevInventory.map(invItem => {
-        const cartItem = cart.find(c => c.item_id === invItem.item_id);
-        if (cartItem) {
-          return { ...invItem, stock_quantity: invItem.stock_quantity + cartItem.quantity };
-        }
-        return invItem;
-      })
-    );
     setCart([]);
     setEditingSale(null);
     setSelectedCustomerId(ANONYMOUS_CUSTOMER_ID);
@@ -1800,6 +1828,7 @@ export default function POSPage() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-6 max-h-[60vh] overflow-y-auto">
                       {filteredInventory.map(item => {
+<<<<<<< Updated upstream
                         // ✅ Get the current stock from the inventory state (not the filtered item)
                         const currentInventoryItem = inventory.find(inv => inv.item_id === item.item_id);
                         const currentStock = currentInventoryItem?.stock_quantity ?? item.stock_quantity;
@@ -1808,6 +1837,14 @@ export default function POSPage() {
                           <Card
                             key={item.item_id}
                             className={`border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 group ${microAnimations.cardHover} font-poppins`}
+=======
+                        const availableStock = getAvailableStock(item);
+                        return (
+                          <Card
+                            key={item.item_id}
+                            className={`border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group ${microAnimations.cardHover} font-poppins`}
+                            onClick={() => addToCart(item)}
+>>>>>>> Stashed changes
                           >
                             <CardContent className="p-4 flex flex-col gap-3">
                               <div className="flex justify-between items-start">
@@ -1825,11 +1862,18 @@ export default function POSPage() {
                                     </Badge>
                                     <Badge
                                       variant="outline"
+<<<<<<< Updated upstream
                                       className={`text-xs ${
                                         item.vehicle_type === 'car' ? 'bg-blue-100 text-blue-700 border-blue-200' :
                                         item.vehicle_type === 'motor' ? 'bg-green-100 text-green-700 border-green-200' :
                                         'bg-orange-100 text-orange-700 border-orange-200'
                                       }`}
+=======
+                                      className={`text-xs ${item.vehicle_type === 'car' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                        item.vehicle_type === 'motor' ? 'bg-green-100 text-green-700 border-green-200' :
+                                          'bg-orange-100 text-orange-700 border-orange-200'
+                                        }`}
+>>>>>>> Stashed changes
                                     >
                                       {item.vehicle_type}
                                     </Badge>
@@ -1839,23 +1883,35 @@ export default function POSPage() {
                               <div className="flex justify-between items-center">
                                 <div>
                                   <p className="text-lg font-bold text-green-600">₱{formatPrice(item.sale_price)}</p>
+<<<<<<< Updated upstream
                                   <p className={`text-xs ${
                                     currentStock === 0 ? 'text-red-500' :
                                     currentStock <= 2 ? 'text-red-500' :
                                     currentStock <= 5 ? 'text-yellow-500' : 'text-green-500'
                                   }`}>
                                     {currentStock} in stock
+=======
+                                  <p className={`text-xs ${availableStock === 0 ? 'text-red-500' :
+                                    availableStock <= 2 ? 'text-red-500' :
+                                      availableStock <= 5 ? 'text-yellow-500' : 'text-green-500'
+                                    }`}>
+                                    {availableStock} in stock
+>>>>>>> Stashed changes
                                   </p>
                                 </div>
                                 <Button
                                   size="sm"
                                   className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 font-poppins"
+<<<<<<< Updated upstream
                                   disabled={currentStock <= 0}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     e.preventDefault();
                                     addToCart(item);
                                   }}
+=======
+                                  disabled={availableStock <= 0}
+>>>>>>> Stashed changes
                                 >
                                   <Plus className="mr-1 h-4 w-4" />
                                   Add
@@ -1929,53 +1985,56 @@ export default function POSPage() {
                           <p className="text-slate-400 text-sm font-poppins">Add products to get started</p>
                         </div>
                       ) : (
-                        cart.map(item => (
-                          <div key={item.item_id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <CategoryIcon category={item.category} className="h-3 w-3 text-indigo-600" />
-                                <p className="text-sm font-medium text-slate-800 truncate font-poppins">{item.name}</p>
+                        cart.map(item => {
+                          const availableStock = getAvailableStock(item);
+                          return (
+                            <div key={item.item_id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <CategoryIcon category={item.category} className="h-3 w-3 text-indigo-600" />
+                                  <p className="text-sm font-medium text-slate-800 truncate font-poppins">{item.name}</p>
+                                </div>
+                                {item.installationFee && item.installationFee > 0 ? (
+                                  <p className="text-xs text-slate-500 font-poppins">
+                                    {`₱${formatPrice(item.sale_price)} + ₱${formatPrice(item.installationFee)} install`}
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-slate-500 font-poppins">
+                                    {`₱${formatPrice(item.sale_price)} each`}
+                                  </p>
+                                )}
                               </div>
-                              {item.installationFee && item.installationFee > 0 ? (
-                                <p className="text-xs text-slate-500 font-poppins">
-                                  {`₱${formatPrice(item.sale_price)} + ₱${formatPrice(item.installationFee)} install`}
-                                </p>
-                              ) : (
-                                <p className="text-xs text-slate-500 font-poppins">
-                                  {`₱${formatPrice(item.sale_price)} each`}
-                                </p>
-                              )}
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => updateQuantity(item.item_id, item.quantity - 1)}
+                                >
+                                  -
+                                </Button>
+                                <span className="text-sm font-medium w-8 text-center font-poppins">{item.quantity}</span>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => updateQuantity(item.item_id, item.quantity + 1)}
+                                  disabled={item.quantity >= availableStock}
+                                >
+                                  +
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => removeFromCart(item.item_id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => updateQuantity(item.item_id, item.quantity - 1)}
-                              >
-                                -
-                              </Button>
-                              <span className="text-sm font-medium w-8 text-center font-poppins">{item.quantity}</span>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => updateQuantity(item.item_id, item.quantity + 1)}
-                                disabled={item.quantity >= item.stock_quantity}
-                              >
-                                +
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                onClick={() => removeFromCart(item.item_id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>
