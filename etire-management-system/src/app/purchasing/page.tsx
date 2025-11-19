@@ -164,7 +164,7 @@ const SimplePaymentStatus = ({ status, method, orderDate }: { status: string; me
   );
 };
 
-// Step by Step Process Component (Only Ordered and Delivered)
+// Step by Step Process Component (Only Ordered and Delivered) - CLICKABLE VERSION
 const DeliveryStepper = ({ currentStatus, onStatusChange }: { currentStatus: string; onStatusChange: (status: string) => void }) => {
   const steps = [
     { key: 'ordered', label: 'Ordered', icon: Package },
@@ -172,6 +172,11 @@ const DeliveryStepper = ({ currentStatus, onStatusChange }: { currentStatus: str
   ];
 
   const currentIndex = steps.findIndex(step => step.key === currentStatus);
+
+  const handleStepClick = (stepKey: string, stepIndex: number) => {
+    // Allow clicking on any step to change status
+    onStatusChange(stepKey);
+  };
 
   return (
     <div className="space-y-4">
@@ -192,30 +197,31 @@ const DeliveryStepper = ({ currentStatus, onStatusChange }: { currentStatus: str
                 {index > 0 && (
                   <div 
                     className={`flex-1 h-1 ${
-                      isCompleted ? 'bg-green-500' : 'bg-slate-200'
+                      index <= currentIndex ? 'bg-green-500' : 'bg-slate-200'
                     }`}
                   />
                 )}
                 
-                {/* Step circle */}
+                {/* Step circle - NOW CLICKABLE */}
                 <button
                   type="button"
-                  onClick={() => {
-                    // Only allow moving forward or staying at current step
-                    if (index <= currentIndex + 1) {
-                      onStatusChange(step.key);
-                    }
-                  }}
-                  disabled={isUpcoming}
+                  onClick={() => handleStepClick(step.key, index)}
                   className={`relative flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 ${
                     isCompleted
-                      ? 'bg-green-500 border-green-500 text-white'
+                      ? 'bg-green-500 border-green-500 text-white hover:bg-green-600 hover:border-green-600 cursor-pointer'
                       : isCurrent
-                      ? 'bg-blue-500 border-blue-500 text-white'
-                      : 'bg-white border-slate-300 text-slate-400'
-                  } ${!isUpcoming ? 'cursor-pointer hover:scale-110' : 'cursor-not-allowed'}`}
+                      ? 'bg-blue-500 border-blue-500 text-white hover:bg-blue-600 hover:border-blue-600 cursor-pointer'
+                      : 'bg-white border-slate-300 text-slate-400 hover:bg-slate-100 hover:border-slate-400 cursor-pointer'
+                  } transform hover:scale-110 active:scale-95`}
                 >
                   <IconComponent className="h-4 w-4" />
+                  
+                  {/* Show checkmark for completed steps */}
+                  {isCompleted && (
+                    <div className="absolute -top-1 -right-1 bg-green-500 rounded-full w-5 h-5 flex items-center justify-center">
+                      <CheckCircle className="h-3 w-3 text-white" />
+                    </div>
+                  )}
                 </button>
 
                 {/* Connector line */}
@@ -228,17 +234,37 @@ const DeliveryStepper = ({ currentStatus, onStatusChange }: { currentStatus: str
                 )}
               </div>
               
-              {/* Step label */}
-              <div className="mt-2 text-center">
-                <div className={`text-xs font-medium ${
-                  isCompleted || isCurrent ? 'text-slate-800' : 'text-slate-400'
-                }`}>
+              {/* Step label - ALSO CLICKABLE */}
+              <button
+                type="button"
+                onClick={() => handleStepClick(step.key, index)}
+                className={`mt-2 text-center transition-all duration-200 ${
+                  isCompleted || isCurrent 
+                    ? 'text-slate-800 font-medium hover:text-slate-900 cursor-pointer' 
+                    : 'text-slate-400 hover:text-slate-600 cursor-pointer'
+                }`}
+              >
+                <div className="text-xs font-medium">
                   {step.label}
                 </div>
-              </div>
+              </button>
             </div>
           );
         })}
+      </div>
+      
+      {/* Current Status Display */}
+      <div className="text-center mt-2">
+        <Badge 
+          variant="outline" 
+          className={`${
+            currentStatus === 'delivered' 
+              ? 'bg-green-100 text-green-800 border-green-200'
+              : 'bg-blue-100 text-blue-800 border-blue-200'
+          } text-sm font-medium`}
+        >
+          Current Status: {currentStatus === 'delivered' ? 'Delivered' : 'Ordered'}
+        </Badge>
       </div>
     </div>
   );
@@ -551,24 +577,30 @@ const EnhancedPOForm = ({
 
   const dueDate = calculateDueDate();
 
-  // Auto-cancel handler
-  const handleStatusChange = (field: 'deliveryStatus' | 'paymentStatus', value: string) => {
-    onFormChange(field, value);
-    
-    // Auto-cancel the other status when one is cancelled
-    if (value === 'cancelled') {
-      if (field === 'deliveryStatus') {
-        onFormChange('paymentStatus', 'cancelled');
-      } else if (field === 'paymentStatus') {
-        onFormChange('deliveryStatus', 'cancelled');
-      }
+  // Auto-cancel handler - UPDATED FOR CLICKABLE DELIVERY
+const handleStatusChange = (field: 'deliveryStatus' | 'paymentStatus', value: string) => {
+  onFormChange(field, value);
+  
+  // Auto-cancel the other status when one is cancelled
+  if (value === 'cancelled') {
+    if (field === 'deliveryStatus') {
+      onFormChange('paymentStatus', 'cancelled');
+    } else if (field === 'paymentStatus') {
+      onFormChange('deliveryStatus', 'cancelled');
     }
+  }
 
-    // Auto-set payment status to paid when delivered and payment method is cash
-    if (field === 'deliveryStatus' && value === 'delivered' && formData.paymentMethod === 'cash') {
-      onFormChange('paymentStatus', 'paid');
-    }
-  };
+  // Auto-set payment status to paid when delivered and payment method is cash
+  if (field === 'deliveryStatus' && value === 'delivered' && formData.paymentMethod === 'cash') {
+    onFormChange('paymentStatus', 'paid');
+  }
+  
+  // Show success toast when delivery status changes
+  if (field === 'deliveryStatus') {
+    // You can add a toast notification here if needed
+    console.log(`Delivery status changed to: ${value}`);
+  }
+};
 
   // Payment method change handler
   const handlePaymentMethodChange = (value: 'cash' | 'credit') => {
@@ -864,10 +896,19 @@ const EnhancedTableRow = ({
         ₱{Number(item.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </div>
       
-      {/* Delivery Status */}
-      <div>
-        <SimpleDeliveryStatus status={item.status || 'ordered'} />
-      </div>
+      {/* Delivery Status - Updated for better visual feedback */}
+<div>
+  <div 
+    className="cursor-pointer transform hover:scale-105 transition-transform duration-200"
+    onClick={(e) => {
+      e.stopPropagation();
+      // You can add direct status change here if needed, or keep it opening the edit dialog
+      onRowClick(item);
+    }}
+  >
+    <SimpleDeliveryStatus status={item.status || 'ordered'} />
+  </div>
+</div>
       
       {/* Payment Status */}
       <div>
@@ -1525,7 +1566,7 @@ export default function EnhancedPurchasingPage() {
       poNotes: po.notes || '',
       paymentMethod: (po as any).payment_method || 'cash',
       paymentStatus: (po as any).payment_status || 'pending',
-      deliveryStatus: po.status || 'ordered', // Changed from pending to ordered
+      deliveryStatus: po.status || 'ordered', 
       cancellationReason: (po as any).cancellation_reason || ''
     });
     setIsPODialogOpen(true);
@@ -1751,11 +1792,20 @@ export default function EnhancedPurchasingPage() {
       if (error) {
         toast({ title: "Save Error", description: error.message, variant: "destructive" });
       } else {
-        toast({ title: "Success", description: `Supplier ${editingSupplier ? 'updated' : 'created'} successfully.` });
-        setIsSupplierDialogOpen(false);
-        resetSupplierForm();
-        fetchSuppliers();
+        // Add this success message that specifically mentions delivery status
+        toast({ 
+          title: "Success", 
+          description: `Purchase order ${editingPO ? 'updated' : 'added'} successfully. ${
+            editingPO && poFormData.deliveryStatus === 'delivered' 
+              ? 'Delivery status set to Delivered.' 
+              : ''
+          }` 
+        });
+        setIsPODialogOpen(false);
+        resetPOForm();
+        fetchPurchaseOrders();
       }
+      
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
@@ -1805,7 +1855,7 @@ export default function EnhancedPurchasingPage() {
       user_id: authUser.user_id,
       expected_delivery_date: poFormData.expectedDelivery || null,
       notes: poFormData.poNotes || null,
-      status: 'ordered', // Always set to ordered for new POs
+      status: editingPO ? poFormData.deliveryStatus : 'ordered', // Use form data for both new and edited POs
       payment_status: poFormData.paymentStatus,
       payment_method: poFormData.paymentMethod,
       cancellation_reason: (poFormData.deliveryStatus === 'cancelled' || poFormData.paymentStatus === 'cancelled') 
