@@ -629,6 +629,7 @@ export default function POSPage() {
     });
   }, [inventory, searchTerm, selectedVehicleType, selectedCategory]);
 
+  // Replace the addToCart function (around line 608)
   const addToCart = (item: InventoryItem) => {
     setCart(prevCart => {
       const existingItem = prevCart.find(cartItem => cartItem.item_id === item.item_id);
@@ -650,39 +651,42 @@ export default function POSPage() {
           return prevCart;
         }
       }
-      if (item.stock_quantity > 0) {
-        const newCartItem = { ...item, quantity: 1, installationFee: 0 };
-        
-        // Update inventory in real-time for new item
-        setInventory(prevInventory => 
-          prevInventory.map(invItem => 
-            invItem.item_id === item.item_id 
-              ? { ...invItem, stock_quantity: invItem.stock_quantity - 1 }
-              : invItem
-          )
-        );
-        
-        // If item is accessory, show installation modal
-        if (item.category === 'accessory' && item.name.toLowerCase() !== 'installation service') {
-          const serviceItemTemplate = inventory.find(i => i.name.toLowerCase() === 'installation service');
-          if (serviceItemTemplate) {
-            setInstallationModal({ open: true, item: newCartItem });
-            setInstallationFee(0);
-          } else {
-            toast({
-              title: "Setup Incomplete",
-              description: "Accessory added. To add installation fees, please create an item named 'Installation Service' in your inventory.",
-              variant: 'default',
-              duration: 7000,
-            });
-          }
-        }
-        
-        return [...prevCart, newCartItem];
-      } else {
+      
+      // ✅ FIX: Check stock before adding
+      if (item.stock_quantity <= 0) {
         toast({ title: 'Out of stock', description: `${item.name} is out of stock.`, variant: 'destructive' });
         return prevCart;
       }
+      
+      // ✅ FIX: Create new cart item first (before updating inventory)
+      const newCartItem = { ...item, quantity: 1, installationFee: 0 };
+      
+      // ✅ FIX: Now update inventory ONCE
+      setInventory(prevInventory => 
+        prevInventory.map(invItem => 
+          invItem.item_id === item.item_id 
+            ? { ...invItem, stock_quantity: invItem.stock_quantity - 1 }
+            : invItem
+        )
+      );
+      
+      // If item is accessory, show installation modal
+      if (item.category === 'accessory' && item.name.toLowerCase() !== 'installation service') {
+        const serviceItemTemplate = inventory.find(i => i.name.toLowerCase() === 'installation service');
+        if (serviceItemTemplate) {
+          setInstallationModal({ open: true, item: newCartItem });
+          setInstallationFee(0);
+        } else {
+          toast({
+            title: "Setup Incomplete",
+            description: "Accessory added. To add installation fees, please create an item named 'Installation Service' in your inventory.",
+            variant: 'default',
+            duration: 7000,
+          });
+        }
+      }
+      
+      return [...prevCart, newCartItem];
     });
   };
 
@@ -951,26 +955,94 @@ export default function POSPage() {
     setShowPasswordDialog(true);
   };
 
-  const handlePasswordSubmit = () => {
-    const BRANCH_MANAGER_PASSWORD = 'admin123';
-    
-    if (managerPassword === BRANCH_MANAGER_PASSWORD) {
-      setIsAuthenticated(true);
-      setShowVoidManagement(true);
-      setShowPasswordDialog(false);
-      setManagerPassword('');
-      setPasswordError(null); // Clear any previous errors
+  // Replace the handlePasswordSubmit function (around line 954)
+  // Replace the handlePasswordSubmit function (around line 958)
+  const handlePasswordSubmit = async () => {
+    if (!supabase) {
       toast({
-        title: "Access Granted",
-        description: "You can now manage sales transactions.",
+        title: "Error",
+        description: "Database connection not available.",
+        variant: "destructive",
       });
-    } else {
-      setPasswordError('Invalid password. Please try again.');
-      setManagerPassword(''); // Clear the password field
-      // Keep the toast for additional feedback if desired
+      return;
+    }
+  
+    try {
+      // Check if it's the default admin password first
+      const BRANCH_MANAGER_PASSWORD = 'admin123';
+      
+      if (managerPassword === BRANCH_MANAGER_PASSWORD) {
+        setIsAuthenticated(true);
+        setShowVoidManagement(true);
+        setShowPasswordDialog(false);
+        setManagerPassword('');
+        setPasswordError(null);
+        toast({
+          title: "Access Granted",
+          description: "Admin access: You can now manage sales transactions.",
+        });
+        return;
+      }
+  
+      // ✅ NEW: Fetch all users with role_id = 2 (exclude role 0 - Guest)
+      const { data: roleUsers, error } = await supabase
+        .from('user')
+        .select('user_id, name, password, role')
+        .eq('role', 2); // Only role 2 users
+  
+      if (error) {
+        console.error('Error fetching role 2 users:', error);
+        setPasswordError('Failed to verify credentials. Please try again.');
+        toast({
+          title: "Error",
+          description: "Could not verify user credentials.",
+          variant: "destructive",
+        });
+        return;
+      }
+  
+      // Check if no role 2 users exist
+      if (!roleUsers || roleUsers.length === 0) {
+        setPasswordError('No authorized managers found in the system.');
+        setManagerPassword('');
+        toast({
+          title: "Access Denied",
+          description: "No authorized managers found.",
+          variant: "destructive",
+        });
+        return;
+      }
+  
+      // ✅ Check if entered password matches any role 2 user's password
+      const matchedUser = roleUsers.find(user => user.password === managerPassword);
+  
+      if (matchedUser) {
+        // ✅ SUCCESS: User with role 2 authenticated
+        setIsAuthenticated(true);
+        setShowVoidManagement(true);
+        setShowPasswordDialog(false);
+        setManagerPassword('');
+        setPasswordError(null);
+        toast({
+          title: "Access Granted ✓",
+          description: `Welcome, ${matchedUser.name}. You can now manage sales transactions.`,
+        });
+      } else {
+        // ❌ FAILED: Password doesn't match any role 2 user
+        setPasswordError('Invalid manager password. Access denied.');
+        setManagerPassword('');
+        toast({
+          title: "Access Denied",
+          description: "Incorrect password. Only authorized managers can access void management.",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Password verification error:', error);
+      setPasswordError('An unexpected error occurred. Please try again.');
       toast({
-        title: "Access Denied",
-        description: "Incorrect manager password.",
+        title: "Error",
+        description: "Failed to verify credentials.",
         variant: "destructive",
       });
     }
@@ -1727,60 +1799,72 @@ export default function POSPage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-6 max-h-[60vh] overflow-y-auto">
-                      {filteredInventory.map(item => (
-                        <Card
-                          key={item.item_id}
-                          className={`border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group ${microAnimations.cardHover} font-poppins`}
-                          onClick={() => addToCart(item)}
-                        >
-                          <CardContent className="p-4 flex flex-col gap-3">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <CategoryIcon category={item.category} className="h-4 w-4 text-indigo-600" />
-                                  <p className="font-semibold text-slate-800 group-hover:text-indigo-600 transition-colors truncate">
-                                    {item.name}
-                                  </p>
-                                </div>
-                                <div className="flex gap-2 mt-2">
-                                  <Badge variant="outline" className="text-xs capitalize bg-slate-100 text-slate-700 border-slate-300 flex items-center gap-1">
-                                    <CategoryIcon category={item.category} className="h-3 w-3" />
-                                    {item.category}
-                                  </Badge>
-                                  <Badge
-                                    variant="outline"
-                                    className={`text-xs ${item.vehicle_type === 'car' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                                      item.vehicle_type === 'motor' ? 'bg-green-100 text-green-700 border-green-200' :
+                      {filteredInventory.map(item => {
+                        // ✅ Get the current stock from the inventory state (not the filtered item)
+                        const currentInventoryItem = inventory.find(inv => inv.item_id === item.item_id);
+                        const currentStock = currentInventoryItem?.stock_quantity ?? item.stock_quantity;
+                        
+                        return (
+                          <Card
+                            key={item.item_id}
+                            className={`border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 group ${microAnimations.cardHover} font-poppins`}
+                          >
+                            <CardContent className="p-4 flex flex-col gap-3">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <CategoryIcon category={item.category} className="h-4 w-4 text-indigo-600" />
+                                    <p className="font-semibold text-slate-800 group-hover:text-indigo-600 transition-colors truncate">
+                                      {item.name}
+                                    </p>
+                                  </div>
+                                  <div className="flex gap-2 mt-2">
+                                    <Badge variant="outline" className="text-xs capitalize bg-slate-100 text-slate-700 border-slate-300 flex items-center gap-1">
+                                      <CategoryIcon category={item.category} className="h-3 w-3" />
+                                      {item.category}
+                                    </Badge>
+                                    <Badge
+                                      variant="outline"
+                                      className={`text-xs ${
+                                        item.vehicle_type === 'car' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                        item.vehicle_type === 'motor' ? 'bg-green-100 text-green-700 border-green-200' :
                                         'bg-orange-100 text-orange-700 border-orange-200'
                                       }`}
-                                  >
-                                    {item.vehicle_type}
-                                  </Badge>
+                                    >
+                                      {item.vehicle_type}
+                                    </Badge>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <div>
-                                <p className="text-lg font-bold text-green-600">₱{formatPrice(item.sale_price)}</p>
-                                <p className={`text-xs ${item.stock_quantity === 0 ? 'text-red-500' :
-                                  item.stock_quantity <= 2 ? 'text-red-500' :
-                                    item.stock_quantity <= 5 ? 'text-yellow-500' : 'text-green-500'
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <p className="text-lg font-bold text-green-600">₱{formatPrice(item.sale_price)}</p>
+                                  <p className={`text-xs ${
+                                    currentStock === 0 ? 'text-red-500' :
+                                    currentStock <= 2 ? 'text-red-500' :
+                                    currentStock <= 5 ? 'text-yellow-500' : 'text-green-500'
                                   }`}>
-                                  {item.stock_quantity} in stock
-                                </p>
+                                    {currentStock} in stock
+                                  </p>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 font-poppins"
+                                  disabled={currentStock <= 0}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    addToCart(item);
+                                  }}
+                                >
+                                  <Plus className="mr-1 h-4 w-4" />
+                                  Add
+                                </Button>
                               </div>
-                              <Button
-                                size="sm"
-                                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 font-poppins"
-                                disabled={item.stock_quantity <= 0}
-                              >
-                                <Plus className="mr-1 h-4 w-4" />
-                                Add
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
                       {filteredInventory.length === 0 && (
                         <div className="col-span-full text-center py-12">
                           <Package className="h-16 w-16 text-slate-300 mx-auto mb-4" />
