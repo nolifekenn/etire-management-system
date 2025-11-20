@@ -68,14 +68,17 @@ const adminNavItems = [
     { href: '/admin', label: 'Admin', icon: Shield, requiredRole: 2 }
 ]
 
-// Avatar options with different gradient combinations
+// Updated avatar options with face emojis and better gradients
 const avatarOptions = [
-  { id: 1, gradient: 'from-purple-500 to-pink-500', emoji: '👑', name: 'Royal' },
-  { id: 2, gradient: 'from-blue-500 to-cyan-500', emoji: '💎', name: 'Crystal' },
-  { id: 3, gradient: 'from-green-500 to-emerald-500', emoji: '🌟', name: 'Emerald' },
-  { id: 4, gradient: 'from-orange-500 to-red-500', emoji: '🔥', name: 'Flame' },
-  { id: 5, gradient: 'from-indigo-500 to-purple-500', emoji: '🌌', name: 'Twilight' },
-  { id: 6, gradient: 'from-teal-500 to-blue-500', emoji: '🌊', name: 'Ocean' },
+  { id: 1, gradient: 'from-purple-500 to-pink-500', emoji: '😊', name: 'Happy' },
+  { id: 2, gradient: 'from-blue-500 to-cyan-500', emoji: '😎', name: 'Cool' },
+  { id: 3, gradient: 'from-green-500 to-emerald-500', emoji: '🤓', name: 'Smart' },
+  { id: 4, gradient: 'from-orange-500 to-red-500', emoji: '😄', name: 'Joyful' },
+  { id: 5, gradient: 'from-indigo-500 to-purple-500', emoji: '🥳', name: 'Celebrate' },
+  { id: 6, gradient: 'from-teal-500 to-blue-500', emoji: '😌', name: 'Peaceful' },
+  { id: 7, gradient: 'from-rose-500 to-pink-500', emoji: '😍', name: 'Loving' },
+  { id: 8, gradient: 'from-amber-500 to-orange-500', emoji: '🤩', name: 'Excited' },
+  { id: 9, gradient: 'from-lime-500 to-green-500', emoji: '😏', name: 'Confident' },
 ];
 
 // Add interface for user with branch_id
@@ -98,20 +101,16 @@ export function SidebarNav() {
   const [selectedAvatar, setSelectedAvatar] = useState(avatarOptions[0]);
   const [isHovering, setIsHovering] = useState(false);
 
-  // Original color system with purple/blue focus
+  // Enhanced color system with better visual hierarchy
   const colors = {
     primary: {
       gradient: 'bg-gradient-to-r from-purple-500 to-blue-500',
+      lightGradient: 'bg-gradient-to-r from-purple-400 to-blue-400',
       solid: 'bg-purple-600',
       hover: 'hover:bg-purple-700',
       text: 'text-white',
-      border: 'border-purple-600'
-    },
-    secondary: {
-      background: 'bg-transparent',
-      hover: 'hover:bg-gray-100',
-      text: 'text-gray-700',
-      border: 'border-gray-300'
+      border: 'border-purple-600',
+      light: 'bg-purple-50 text-purple-700'
     },
     active: {
       background: 'bg-gradient-to-r from-purple-500 to-blue-500',
@@ -131,28 +130,27 @@ export function SidebarNav() {
     }
   };
 
-  // Icon color categories updated with purple/blue theme
+  // Enhanced icon categories with better contrast
   const iconCategories = {
-    dashboard: { background: 'rgba(168, 85, 247, 0.1)', icon: '#a855f7' },
-    inventory: { background: 'rgba(59, 130, 246, 0.1)', icon: '#3b82f6' },
-    sales: { background: 'rgba(139, 92, 246, 0.1)', icon: '#8b5cf6' },
-    service: { background: 'rgba(16, 185, 129, 0.1)', icon: '#10b981' },
-    analytics: { background: 'rgba(99, 102, 241, 0.1)', icon: '#6366f1' },
-    customers: { background: 'rgba(168, 85, 247, 0.1)', icon: '#a855f7' },
-    branches: { background: 'rgba(59, 130, 246, 0.1)', icon: '#3b82f6' },
-    notifications: { background: 'rgba(139, 92, 246, 0.1)', icon: '#8b5cf6' },
-    admin: { background: 'rgba(99, 102, 241, 0.1)', icon: '#6366f1' }
+    dashboard: { background: 'rgba(168, 85, 247, 0.15)', icon: '#a855f7' },
+    inventory: { background: 'rgba(59, 130, 246, 0.15)', icon: '#3b82f6' },
+    sales: { background: 'rgba(139, 92, 246, 0.15)', icon: '#8b5cf6' },
+    service: { background: 'rgba(16, 185, 129, 0.15)', icon: '#10b981' },
+    analytics: { background: 'rgba(99, 102, 241, 0.15)', icon: '#6366f1' },
+    customers: { background: 'rgba(168, 85, 247, 0.15)', icon: '#a855f7' },
+    branches: { background: 'rgba(59, 130, 246, 0.15)', icon: '#3b82f6' },
+    notifications: { background: 'rgba(139, 92, 246, 0.15)', icon: '#8b5cf6' },
+    admin: { background: 'rgba(99, 102, 241, 0.15)', icon: '#6366f1' }
   };
 
-  // Micro-animations matching dashboard
+  // Enhanced micro-animations
   const microAnimations = {
-    cardHover: "transition-all duration-350 ease-spring hover:translate-y-[-2px]",
+    cardHover: "transition-all duration-300 ease-out hover:translate-y-[-2px] hover:shadow-md",
     buttonHover: "transition-all duration-200 hover:scale-105 active:scale-95",
-    iconHover: "transition-all duration-350 ease-spring group-hover:scale-110",
-    linkHover: "transition-all duration-300 ease-in-out"
+    iconHover: "transition-all duration-300 ease-out group-hover:scale-110",
+    linkHover: "transition-all duration-200 ease-in-out",
+    spring: "transition-all duration-300 cubic-bezier(0.4, 0, 0.2, 1)"
   };
-
-  const springEasing = "cubic-bezier(0.34, 1.56, 0.64, 1)";
 
   // Debug logging
   console.log('SidebarNav - User:', user);
@@ -267,7 +265,7 @@ export function SidebarNav() {
           maxWidth: isCollapsed ? '5rem' : '16rem',
         }}
       >
-        {/* Enhanced Sidebar Header */}
+        {/* Enhanced Sidebar Header with better typography */}
         <SidebarHeader className="p-6 bg-white border-b border-gray-200">
           <div className="flex items-center justify-between gap-3">
             {isCollapsed ? (
@@ -290,8 +288,8 @@ export function SidebarNav() {
                     <LayoutDashboard className="h-6 w-6 text-white" />
                   </div>
                   <div className="flex flex-col text-left">
-                    <h2 className="text-xl font-bold text-gray-800 tracking-tight">eTire Manager</h2>
-                    <p className="text-sm text-gray-600 font-medium">Q.R T&V Shop</p>
+                    <h2 className="text-xl font-bold text-gray-800 tracking-tight font-poppins">eTire Manager</h2>
+                    <p className="text-sm text-gray-600 font-medium font-poppins">Q.R T&V Shop</p>
                   </div>
                 </button>
                 <button
@@ -308,22 +306,22 @@ export function SidebarNav() {
           {/* Enhanced Branch Switcher for Admins */}
           {!isCollapsed && user && user.role === 3 && branches.length > 0 && (
             <div className="mt-6">
-              <label className="text-sm font-semibold text-gray-700 mb-3 block">
+              <label className="text-sm font-semibold text-gray-700 mb-3 block font-poppins">
                 Current Branch
               </label>
               <Select 
                 value={currentBranch?.branch_id || ''} 
                 onValueChange={handleBranchSwitch}
               >
-                <SelectTrigger className="w-full bg-white border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50">
+                <SelectTrigger className="w-full bg-white border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 font-poppins">
                   <SelectValue placeholder="Select branch" />
                 </SelectTrigger>
-                <SelectContent className="bg-white border border-gray-300 rounded-xl shadow-xl">
+                <SelectContent className="bg-white border border-gray-300 rounded-xl shadow-xl font-poppins">
                   {branches.map((branch) => (
                     <SelectItem 
                       key={branch.branch_id} 
                       value={branch.branch_id}
-                      className="focus:bg-purple-50 focus:text-purple-700 rounded-lg"
+                      className="focus:bg-purple-50 focus:text-purple-700 rounded-lg font-poppins"
                     >
                       {branch.name}
                     </SelectItem>
@@ -334,7 +332,7 @@ export function SidebarNav() {
           )}
         </SidebarHeader>
 
-        {/* Enhanced Sidebar Content */}
+        {/* Enhanced Sidebar Content with better spacing */}
         <SidebarContent className="p-3 overflow-y-auto flex-1 bg-white">
           <SidebarMenu>
             {navItems.map((item) => {
@@ -352,7 +350,7 @@ export function SidebarNav() {
                   >
                     <Link
                       href={item.href}
-                      className={`group flex items-center gap-3 px-4 py-3 transition-all duration-300 text-sm rounded-xl
+                      className={`group flex items-center gap-3 px-4 py-3 transition-all duration-200 text-sm rounded-xl font-poppins
                         ${active 
                           ? `${colors.active.background} text-white font-semibold ${colors.active.shadow}` 
                           : 'bg-transparent text-gray-700 hover:bg-gray-100 hover:text-purple-600 border border-transparent'
@@ -362,17 +360,15 @@ export function SidebarNav() {
                         ${isCollapsed ? 'justify-center' : ''}
                       `}
                       title={isCollapsed ? item.label : undefined}
-                      style={{ transitionTimingFunction: springEasing }}
                     >
                       <div 
-                        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
                           active 
                             ? 'bg-white/20' 
                             : 'bg-gray-100 group-hover:bg-gray-200'
                         } ${microAnimations.iconHover}`}
                         style={{ 
                           backgroundColor: active ? 'rgba(255,255,255,0.2)' : iconColor.background,
-                          transitionTimingFunction: springEasing
                         }}
                       >
                         <item.icon 
@@ -383,7 +379,7 @@ export function SidebarNav() {
                         />
                       </div>
                       {!isCollapsed && (
-                        <span className="font-medium tracking-wide">{item.label}</span>
+                        <span className="font-medium tracking-wide font-poppins">{item.label}</span>
                       )}
                     </Link>
                   </SidebarMenuButton>
@@ -401,7 +397,7 @@ export function SidebarNav() {
                 >
                   <Link
                     href="/admin"
-                    className={`group flex items-center gap-3 px-4 py-3 transition-all duration-300 text-sm rounded-xl
+                    className={`group flex items-center gap-3 px-4 py-3 transition-all duration-200 text-sm rounded-xl font-poppins
                       ${pathname === '/admin' 
                         ? `${colors.active.background} text-white font-semibold ${colors.active.shadow}` 
                         : 'bg-transparent text-gray-700 hover:bg-gray-100 hover:text-purple-600 border border-transparent'
@@ -411,17 +407,15 @@ export function SidebarNav() {
                       ${isCollapsed ? 'justify-center' : ''}
                     `}
                     title={isCollapsed ? "Admin" : undefined}
-                    style={{ transitionTimingFunction: springEasing }}
                   >
                     <div 
-                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
                         pathname === '/admin' 
                           ? 'bg-white/20' 
                           : 'bg-gray-100 group-hover:bg-gray-200'
                       } ${microAnimations.iconHover}`}
                       style={{ 
                         backgroundColor: pathname === '/admin' ? 'rgba(255,255,255,0.2)' : iconCategories.admin.background,
-                        transitionTimingFunction: springEasing
                       }}
                     >
                       <Shield 
@@ -432,7 +426,7 @@ export function SidebarNav() {
                       />
                     </div>
                     {!isCollapsed && (
-                      <span className="font-medium tracking-wide">Admin</span>
+                      <span className="font-medium tracking-wide font-poppins">Admin</span>
                     )}
                   </Link>
                 </SidebarMenuButton>
@@ -441,101 +435,105 @@ export function SidebarNav() {
           </SidebarMenu>
         </SidebarContent>
 
-        {/* Enhanced Sidebar Footer */}
+        {/* Enhanced Sidebar Footer with improved user profile */}
         <SidebarSeparator className="border-gray-200" />
         <SidebarFooter className="p-4 flex flex-col gap-2 bg-white border-t border-gray-200">
           {!isCollapsed ? (
             <>
-              {/* Enhanced User Profile */}
+              {/* Enhanced User Profile with better typography */}
               <div 
-                className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100 transition-all duration-300 group"
+                className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100 transition-all duration-200 group"
                 onClick={() => setIsAvatarDialogOpen(true)}
               >
                 <div className="relative">
                   <Avatar className="h-12 w-12 ring-2 ring-white shadow-sm bg-white flex-shrink-0">
                     <AvatarImage src="" alt="User Avatar" />
-                    <AvatarFallback className={`bg-gradient-to-r ${selectedAvatar.gradient} text-white font-semibold`}>
+                    <AvatarFallback className={`bg-gradient-to-r ${selectedAvatar.gradient} text-white font-semibold font-poppins`}>
                       {selectedAvatar.emoji}
                     </AvatarFallback>
                   </Avatar>
                   <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <Camera className="h-4 w-4 text-gray-600" />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-black/20 rounded-full">
+                    <Camera className="h-4 w-4 text-white" />
                   </div>
                 </div>
                 <div className="flex flex-col flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-800 truncate">{user?.name ?? 'Loading...'}</p>
-                  <p className="text-xs text-gray-600 truncate">{user?.username ?? ''}</p>
-                  <p className="text-xs text-purple-600 font-medium mt-1">
+                  <p className="text-sm font-semibold text-gray-800 truncate font-poppins">{user?.name ?? 'Loading...'}</p>
+                  <p className="text-xs text-gray-600 truncate font-poppins">{user?.username ?? ''}</p>
+                  <p className="text-xs text-purple-600 font-medium mt-1 font-poppins">
                     {user?.role === 3 ? 'Administrator' : user?.role === 2 ? 'Manager' : 'Staff'}
                   </p>
                 </div>
               </div>
 
-              {/* Enhanced Footer Buttons */}
+              {/* Enhanced Footer Buttons with consistent styling */}
               <Button 
                 asChild 
                 variant="ghost" 
-                className={`w-full justify-start hover:bg-gray-100 hover:text-purple-600 text-gray-700 rounded-xl py-3 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 ${
+                className={`w-full justify-start hover:bg-gray-100 hover:text-purple-600 text-gray-700 rounded-xl py-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 font-poppins ${
                   pathname === '/settings' ? 'bg-purple-50 text-purple-700' : ''
                 }`}
               >
                 <Link href="/settings" className="group flex items-center gap-2 w-full">
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-all duration-300">
+                  <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-all duration-200">
                     <Settings className="w-4 h-4 text-gray-600 group-hover:text-purple-600 transition-colors" />
                   </div>
-                  <span className="font-medium">Settings</span>
+                  <span className="font-medium font-poppins">Settings</span>
                 </Link>
               </Button>
               <Button 
                 asChild 
                 variant="ghost" 
-                className={`w-full justify-start hover:bg-gray-100 hover:text-purple-600 text-gray-700 rounded-xl py-3 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 ${
+                className={`w-full justify-start hover:bg-gray-100 hover:text-purple-600 text-gray-700 rounded-xl py-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 font-poppins ${
                   pathname === '/support' ? 'bg-purple-50 text-purple-700' : ''
                 }`}
               >
                 <Link href="/support" className="group flex items-center gap-2 w-full">
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-all duration-300">
+                  <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-all duration-200">
                     <LifeBuoy className="w-4 h-4 text-gray-600 group-hover:text-purple-600 transition-colors" />
                   </div>
-                  <span className="font-medium">Support</span>
+                  <span className="font-medium font-poppins">Support</span>
                 </Link>
               </Button>
               <Button 
                 variant="ghost" 
-                className="w-full justify-start hover:bg-red-50 hover:text-red-600 text-gray-700 rounded-xl py-3 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50" 
+                className="w-full justify-start hover:bg-red-50 hover:text-red-600 text-gray-700 rounded-xl py-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 font-poppins" 
                 onClick={() => setIsLogoutDialogOpen(true)}
               >
-                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-red-100 transition-all duration-300 mr-2">
+                <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-red-100 transition-all duration-200 mr-2">
                   <LogOut className="w-4 h-4 text-gray-600 group-hover:text-red-600 transition-colors" />
                 </div>
-                <span className="font-medium">Logout</span>
+                <span className="font-medium font-poppins">Logout</span>
               </Button>
             </>
           ) : (
             <>
-              {/* Collapsed Footer */}
+              {/* Collapsed Footer with better tooltips */}
               <div 
                 className="flex justify-center w-full mb-2 cursor-pointer group"
                 onClick={() => setIsAvatarDialogOpen(true)}
+                title="Change Avatar"
               >
-                <Avatar className="h-12 w-12 ring-2 ring-white shadow-sm bg-gradient-to-r from-purple-500 to-blue-500 group-hover:scale-110 transition-transform duration-300">
-                  <AvatarImage src="" alt="User Avatar" />
-                  <AvatarFallback className={`bg-gradient-to-r ${selectedAvatar.gradient} text-white font-semibold`}>
-                    {selectedAvatar.emoji}
-                  </AvatarFallback>
-                </Avatar>
+                <div className="relative">
+                  <Avatar className="h-12 w-12 ring-2 ring-white shadow-sm bg-gradient-to-r from-purple-500 to-blue-500 group-hover:scale-110 transition-transform duration-200">
+                    <AvatarImage src="" alt="User Avatar" />
+                    <AvatarFallback className={`bg-gradient-to-r ${selectedAvatar.gradient} text-white font-semibold font-poppins`}>
+                      {selectedAvatar.emoji}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
+                </div>
               </div>
               <Button 
                 asChild 
                 variant="ghost" 
-                className={`w-full justify-center hover:bg-gray-100 rounded-xl p-3 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 ${
+                className={`w-full justify-center hover:bg-gray-100 rounded-xl p-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 ${
                   pathname === '/settings' ? 'bg-purple-50' : ''
                 }`} 
                 title="Settings"
               >
                 <Link href="/settings" className="group flex items-center justify-center w-full text-gray-700 hover:text-purple-600">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-all duration-300">
+                  <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-all duration-200">
                     <Settings className="w-5 h-5 text-gray-600 group-hover:text-purple-600 transition-colors" />
                   </div>
                 </Link>
@@ -543,24 +541,24 @@ export function SidebarNav() {
               <Button 
                 asChild 
                 variant="ghost" 
-                className={`w-full justify-center hover:bg-gray-100 rounded-xl p-3 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 ${
+                className={`w-full justify-center hover:bg-gray-100 rounded-xl p-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 ${
                   pathname === '/support' ? 'bg-purple-50' : ''
                 }`} 
                 title="Support"
               >
                 <Link href="/support" className="group flex items-center justify-center w-full text-gray-700 hover:text-purple-600">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-all duration-300">
+                  <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-all duration-200">
                     <LifeBuoy className="w-5 h-5 text-gray-600 group-hover:text-purple-600 transition-colors" />
                   </div>
                 </Link>
               </Button>
               <Button 
                 variant="ghost" 
-                className="w-full justify-center hover:bg-red-50 rounded-xl p-3 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50" 
+                className="w-full justify-center hover:bg-red-50 rounded-xl p-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50" 
                 onClick={() => setIsLogoutDialogOpen(true)} 
                 title="Logout"
               >
-                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-red-100 transition-all duration-300">
+                <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-red-100 transition-all duration-200">
                   <LogOut className="w-5 h-5 text-gray-600 group-hover:text-red-600 transition-colors" />
                 </div>
               </Button>
@@ -569,32 +567,32 @@ export function SidebarNav() {
         </SidebarFooter>
       </div>
 
-      {/* Avatar Selection Dialog */}
+      {/* Enhanced Avatar Selection Dialog with better typography */}
       <Dialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
-        <DialogContent className="sm:max-w-md bg-white border border-gray-300 text-gray-900">
+        <DialogContent className="sm:max-w-md bg-white border border-gray-300 text-gray-900 font-poppins">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-gray-900">Choose Your Avatar</DialogTitle>
-            <DialogDescription className="text-gray-600">
+            <DialogTitle className="text-xl font-bold text-gray-900 font-poppins">Choose Your Avatar</DialogTitle>
+            <DialogDescription className="text-gray-600 font-poppins">
               Select an avatar style that represents you
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-3 gap-4 py-4">
+          <div className="grid grid-cols-3 gap-3 py-4">
             {avatarOptions.map((avatar) => (
               <button
                 key={avatar.id}
                 onClick={() => handleAvatarSelect(avatar)}
-                className={`flex flex-col items-center p-4 rounded-2xl border-2 transition-all duration-300 ${
+                className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all duration-200 font-poppins ${
                   selectedAvatar.id === avatar.id
-                    ? 'border-purple-500 bg-purple-50 scale-105'
+                    ? 'border-purple-500 bg-purple-50 scale-105 shadow-md'
                     : 'border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400'
                 } ${microAnimations.buttonHover}`}
               >
-                <div className={`w-16 h-16 rounded-full bg-gradient-to-r ${avatar.gradient} flex items-center justify-center text-2xl mb-2 shadow-lg`}>
+                <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${avatar.gradient} flex items-center justify-center text-xl mb-2 shadow-lg`}>
                   {avatar.emoji}
                 </div>
-                <span className="text-sm font-medium text-gray-700">{avatar.name}</span>
+                <span className="text-xs font-medium text-gray-700 font-poppins">{avatar.name}</span>
                 {selectedAvatar.id === avatar.id && (
-                  <Check className="w-5 h-5 text-green-500 absolute top-2 right-2" />
+                  <Check className="w-4 h-4 text-green-500 absolute top-2 right-2" />
                 )}
               </button>
             ))}
@@ -602,7 +600,7 @@ export function SidebarNav() {
           <DialogFooter>
             <Button
               onClick={() => setIsAvatarDialogOpen(false)}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 font-poppins"
             >
               Close
             </Button>
@@ -610,36 +608,36 @@ export function SidebarNav() {
         </DialogContent>
       </Dialog>
 
-      {/* Logout Confirmation Dialog */}
+      {/* Enhanced Logout Confirmation Dialog */}
       <Dialog open={isLogoutDialogOpen} onOpenChange={setIsLogoutDialogOpen}>
-        <DialogContent className="sm:max-w-md bg-white border border-gray-300 text-gray-900">
+        <DialogContent className="sm:max-w-md bg-white border border-gray-300 text-gray-900 font-poppins">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-gray-900">Confirm Logout</DialogTitle>
-            <DialogDescription className="text-gray-600">
+            <DialogTitle className="text-xl font-bold text-gray-900 font-poppins">Confirm Logout</DialogTitle>
+            <DialogDescription className="text-gray-600 font-poppins">
               Are you sure you want to logout from your account?
             </DialogDescription>
           </DialogHeader>
-          <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-200">
+          <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
             <Avatar className="h-12 w-12 ring-2 ring-white bg-gradient-to-r from-purple-500 to-blue-500">
-              <AvatarFallback className={`bg-gradient-to-r ${selectedAvatar.gradient} text-white font-bold`}>
+              <AvatarFallback className={`bg-gradient-to-r ${selectedAvatar.gradient} text-white font-bold font-poppins`}>
                 {selectedAvatar.emoji}
               </AvatarFallback>
             </Avatar>
             <div>
-              <p className="font-semibold text-gray-900">{user?.name}</p>
-              <p className="text-sm text-gray-600">{user?.username}</p>
+              <p className="font-semibold text-gray-900 font-poppins">{user?.name}</p>
+              <p className="text-sm text-gray-600 font-poppins">{user?.username}</p>
             </div>
           </div>
           <DialogFooter className="gap-2">
             <Button
               onClick={() => setIsLogoutDialogOpen(false)}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 font-poppins"
             >
               Cancel
             </Button>
             <Button
               onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white border border-red-500"
+              className="bg-red-500 hover:bg-red-600 text-white border border-red-500 font-poppins"
             >
               <LogOut className="w-4 h-4 mr-2" />
               Logout
@@ -656,7 +654,7 @@ export function SidebarNav() {
         }
 
         .ease-spring {
-          transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+          transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         @keyframes float {
