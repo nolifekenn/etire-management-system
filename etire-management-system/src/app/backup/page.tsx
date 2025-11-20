@@ -8,98 +8,133 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertTriangle, Download, Upload, Database, Cloud, CheckCircle, Clock } from 'lucide-react';
+import { Loader2, AlertTriangle, Download, Upload, Database, Cloud, CheckCircle, Clock, FileJson, FileSpreadsheet } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+
+// 🟢 1. DEFINE THE STRICT ORDER FOR DATA INTEGRITY
+// Parent tables must come before Child tables to avoid Foreign Key errors.
+// Put this at the top of page.tsx, outside the function
+const TABLE_DEPENDENCY_ORDER = [
+    'vehicle_type', 'user', 'branch', 'supplier', 'inventory_item',
+    'customer', 'vehicle', 'sale', 'sale_item', 'service_job',
+    'purchase_order', 'purchase_order_item', 'tire_history',
+    'delivery', 'delivery_item', 'system_setting', 'audit_log'
+];
 
 export default function BackupPage() {
     const { toast } = useToast();
     const { user: authUser } = useAuth();
     const [isLoading, setIsLoading] = useState(false);
-    const [backupProgress, setBackupProgress] = useState(0);
+    const [progress, setProgress] = useState(0);
+    const [statusMessage, setStatusMessage] = useState("");
     const [lastBackup, setLastBackup] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchLastBackup = useCallback(async () => {
-        if (!supabase) return;
-        // In a real implementation, you would fetch the last backup timestamp from a settings table
-        // For now, we'll simulate it
-        setLastBackup(new Date().toISOString());
+    // Load last backup time from local storage (simulation)
+    useEffect(() => {
+        const storedDate = localStorage.getItem('etire_last_backup');
+        if (storedDate) setLastBackup(storedDate);
     }, []);
 
-    useEffect(() => {
-        fetchLastBackup();
-    }, [fetchLastBackup]);
+    // 🟢 HELPER: Convert JSON Array to CSV String
+    const convertToCSV = (data: any[]) => {
+        if (!data || !data.length) return "";
+        const headers = Object.keys(data[0]).join(",");
+        const rows = data.map(row =>
+            Object.values(row).map(value => {
+                // Handle strings with commas, nulls, and objects
+                if (value === null) return "";
+                if (typeof value === 'object') return JSON.stringify(value).replace(/"/g, '""');
+                const str = String(value);
+                return str.includes(",") ? `"${str}"` : str;
+            }).join(",")
+        ).join("\n");
+        return `${headers}\n${rows}`;
+    };
 
-    const exportData = async (format: 'csv' | 'json') => {
+    const exportData = async (format: 'json' | 'csv') => {
         if (!supabase || !authUser) return;
-        
+
         setIsLoading(true);
         setError(null);
-        setBackupProgress(0);
+        setProgress(0);
+        setStatusMessage("Starting export...");
 
         try {
-            // Simulate progress
-            const progressInterval = setInterval(() => {
-                setBackupProgress(prev => {
-                    if (prev >= 90) {
-                        clearInterval(progressInterval);
-                        return 90;
-                    }
-                    return prev + 10;
-                });
-            }, 200);
+            const exportData: any = {
+                meta: {
+                    version: "1.0",
+                    exported_at: new Date().toISOString(),
+                    exported_by: authUser.name
+                },
+                tables: {}
+            };
 
-            // Export all tables
-            const tables = ['user', 'branch', 'supplier', 'customer', 'vehicle', 'inventory_item', 'sale', 'service_job', 'purchase_order'];
-            const exportData: any = {};
+            let csvContent = "";
+            const totalTables = TABLE_DEPENDENCY_ORDER.length;
 
-            for (const table of tables) {
-                const { data, error } = await supabase.from(table).select('*');
+            // Fetch data table by table
+            for (let i = 0; i < totalTables; i++) {
+                const tableName = TABLE_DEPENDENCY_ORDER[i];
+                setStatusMessage(`Exporting ${tableName}...`);
+
+                const { data, error } = await supabase.from(tableName).select('*');
+
                 if (error) {
-                    console.error(`Error exporting ${table}:`, error);
-                } else {
-                    exportData[table] = data;
+                    console.warn(`Skipping ${tableName}: ${error.message}`);
+                } else if (data) {
+                    exportData.tables[tableName] = data;
+
+                    // Build CSV string if needed
+                    if (format === 'csv' && data.length > 0) {
+                        csvContent += `\n\n--- TABLE: ${tableName.toUpperCase()} ---\n`;
+                        csvContent += convertToCSV(data);
+                    }
                 }
+
+                // Update progress bar
+                setProgress(Math.round(((i + 1) / totalTables) * 100));
             }
 
-            clearInterval(progressInterval);
-            setBackupProgress(100);
+            // Finalize and Download
+            let blob: Blob;
+            let filename: string;
 
-            // Create and download file
-            const dataStr = format === 'json' 
-                ? JSON.stringify(exportData, null, 2)
-                : Object.entries(exportData).map(([table, data]) => 
-                    `Table: ${table}\n${JSON.stringify(data, null, 2)}\n\n`
-                  ).join('');
+            if (format === 'json') {
+                const jsonStr = JSON.stringify(exportData, null, 2);
+                blob = new Blob([jsonStr], { type: 'application/json' });
+                filename = `etire_backup_${new Date().toISOString().split('T')[0]}.json`;
+            } else {
+                blob = new Blob([csvContent], { type: 'text/csv' });
+                filename = `etire_export_${new Date().toISOString().split('T')[0]}.csv`;
+            }
 
-            const blob = new Blob([dataStr], { 
-                type: format === 'json' ? 'application/json' : 'text/csv' 
-            });
-            
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `etire_backup_${new Date().toISOString().split('T')[0]}.${format}`;
+            link.download = filename;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
 
-            toast({ 
-                title: "Export Successful", 
-                description: `Data exported as ${format.toUpperCase()} file.` 
+            // Update "Last Backup" state
+            const now = new Date().toISOString();
+            setLastBackup(now);
+            localStorage.setItem('etire_last_backup', now);
+
+            toast({
+                title: "Export Successful",
+                description: `${format.toUpperCase()} file downloaded.`
             });
 
         } catch (err: any) {
             setError(`Export failed: ${err.message}`);
-            toast({ 
-                title: "Export Failed", 
-                description: err.message, 
-                variant: "destructive" 
-            });
+            toast({ title: "Export Failed", description: err.message, variant: "destructive" });
         } finally {
             setIsLoading(false);
-            setBackupProgress(0);
+            setProgress(0);
+            setStatusMessage("");
         }
     };
 
@@ -107,104 +142,163 @@ export default function BackupPage() {
         const file = event.target.files?.[0];
         if (!file || !supabase || !authUser) return;
 
+        // Reset input so the same file can be selected again if needed
+        event.target.value = '';
+
+        if (!window.confirm("WARNING: Importing data will overwrite existing records with matching IDs. This action cannot be undone. Are you sure?")) {
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
-        setBackupProgress(0);
+        setProgress(0);
+        setStatusMessage("Reading file...");
 
         try {
             const text = await file.text();
-            const data = JSON.parse(text);
+            const importData = JSON.parse(text);
 
-            // Simulate progress
-            const progressInterval = setInterval(() => {
-                setBackupProgress(prev => {
-                    if (prev >= 90) {
-                        clearInterval(progressInterval);
-                        return 90;
-                    }
-                    return prev + 10;
-                    });
-            }, 200);
-
-            // Import data to tables
-            for (const [tableName, tableData] of Object.entries(data)) {
-                if (Array.isArray(tableData) && tableData.length > 0) {
-                    const { error } = await supabase.from(tableName).upsert(tableData);
-                    if (error) {
-                        console.error(`Error importing ${tableName}:`, error);
-                    }
-                }
+            // Validation: Check if it's a valid backup file
+            if (!importData.tables || !importData.meta) {
+                throw new Error("Invalid backup file format. Missing 'tables' or 'meta' data.");
             }
 
-            clearInterval(progressInterval);
-            setBackupProgress(100);
+            const totalTables = TABLE_DEPENDENCY_ORDER.length;
 
-            toast({ 
-                title: "Import Successful", 
-                description: "Data imported successfully." 
+            // 🟢 STRICT IMPORT LOOP
+            // We iterate through our hardcoded ORDER, looking for data in the JSON.
+            // We do NOT iterate through the JSON keys, because JSON order is not guaranteed.
+            for (let i = 0; i < totalTables; i++) {
+                const tableName = TABLE_DEPENDENCY_ORDER[i];
+                const tableRows = importData.tables[tableName];
+
+                if (tableRows && Array.isArray(tableRows) && tableRows.length > 0) {
+                    setStatusMessage(`Restoring ${tableName} (${tableRows.length} records)...`);
+
+                    // We use upsert (insert or update)
+                    // Note: If you have huge datasets (10k+ rows), you should batch this.
+                    const { error } = await supabase.from(tableName).upsert(tableRows);
+
+                    if (error) {
+                        // We throw immediately on error to prevent partial corrupted state
+                        // or broken foreign keys further down the chain.
+                        throw new Error(`Failed to import ${tableName}: ${error.message}`);
+                    }
+                }
+
+                setProgress(Math.round(((i + 1) / totalTables) * 100));
+            }
+
+            setStatusMessage("Finalizing...");
+            setProgress(100);
+
+            toast({
+                title: "Restore Complete",
+                description: "Database has been successfully updated from backup."
             });
 
         } catch (err: any) {
+            console.error(err);
             setError(`Import failed: ${err.message}`);
-            toast({ 
-                title: "Import Failed", 
-                description: err.message, 
-                variant: "destructive" 
-            });
+            toast({ title: "Import Failed", description: err.message, variant: "destructive" });
         } finally {
             setIsLoading(false);
-            setBackupProgress(0);
+            setTimeout(() => {
+                setProgress(0);
+                setStatusMessage("");
+            }, 1000);
         }
     };
 
+    // 🟢 NEW: Cloud Sync using Supabase Storage
+    // 🟢 REPLACE YOUR EXISTING syncData FUNCTION WITH THIS
     const syncData = async () => {
         if (!supabase || !authUser) return;
-        
+
         setIsLoading(true);
         setError(null);
-        setBackupProgress(0);
+        setProgress(5);
+        setStatusMessage("Preparing cloud sync...");
 
         try {
-            // Simulate sync progress
-            const progressInterval = setInterval(() => {
-                setBackupProgress(prev => {
-                    if (prev >= 90) {
-                        clearInterval(progressInterval);
-                        return 90;
-                    }
-                    return prev + 15;
+            // 1. Generate the JSON Data (Real Data Snapshot)
+            const exportData: any = {
+                meta: {
+                    version: "1.0",
+                    synced_at: new Date().toISOString(),
+                    synced_by: authUser.name,
+                    type: "cloud_sync"
+                },
+                tables: {}
+            };
+
+            const totalTables = TABLE_DEPENDENCY_ORDER.length;
+
+            // Loop through tables and fetch real data
+            for (let i = 0; i < totalTables; i++) {
+                const tableName = TABLE_DEPENDENCY_ORDER[i];
+                const { data, error } = await supabase.from(tableName).select('*');
+
+                if (error) {
+                    console.warn(`Sync warning for ${tableName}:`, error.message);
+                } else if (data) {
+                    exportData.tables[tableName] = data;
+                }
+
+                // Update progress (10% to 70%)
+                setProgress(10 + Math.round(((i + 1) / totalTables) * 60));
+            }
+
+            setStatusMessage("Uploading to Cloud Storage...");
+
+            // 2. Create the File Object for Upload
+            const jsonStr = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            // Create a unique filename with timestamp: backup_2025-11-20_10-30-00.json
+            const fileName = `backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+            const file = new File([blob], fileName, { type: 'application/json' });
+
+            // 3. Upload to Supabase Storage
+            // NOTE: Ensure your bucket is named 'backups' in Supabase Dashboard
+            const { data, error: uploadError } = await supabase
+                .storage
+                .from('backups')
+                .upload(fileName, file, {
+                    cacheControl: '3600',
+                    upsert: false
                 });
-            }, 300);
 
-            // In a real implementation, this would sync with external systems
-            // For now, we'll just simulate the process
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            if (uploadError) throw uploadError;
 
-            clearInterval(progressInterval);
-            setBackupProgress(100);
+            setProgress(100);
+            setStatusMessage("Sync Complete");
 
-            toast({ 
-                title: "Sync Successful", 
-                description: "Data synchronized successfully." 
+            toast({
+                title: "Cloud Sync Successful",
+                description: `Database backed up to cloud as ${fileName}.`
             });
 
         } catch (err: any) {
+            console.error(err);
             setError(`Sync failed: ${err.message}`);
-            toast({ 
-                title: "Sync Failed", 
-                description: err.message, 
-                variant: "destructive" 
+            toast({
+                title: "Sync Failed",
+                description: "Could not upload to cloud storage. Check your network or storage permissions.",
+                variant: "destructive"
             });
         } finally {
             setIsLoading(false);
-            setBackupProgress(0);
+            setTimeout(() => {
+                setProgress(0);
+                setStatusMessage("");
+            }, 2000);
         }
     };
 
     return (
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-            <PageHeader 
-                title="Data Sync & Backup" 
+        <div className="container mx-auto p-4 sm:p-6 lg:p-8 font-poppins">
+            <PageHeader
+                title="Data Sync & Backup"
                 description="Manage data backup, restore, and synchronization."
             />
 
@@ -218,57 +312,57 @@ export default function BackupPage() {
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {/* Export Data */}
-                <Card>
+                <Card className="shadow-md border-slate-200">
                     <CardHeader>
-                        <CardTitle className="flex items-center">
-                            <Download className="mr-2 h-5 w-5 text-primary" />
-                            Export Data
+                        <CardTitle className="flex items-center text-slate-800">
+                            <Download className="mr-2 h-5 w-5 text-indigo-600" />
+                            Backup Data
                         </CardTitle>
                         <CardDescription>
-                            Download your data in various formats for backup purposes.
+                            Download a full snapshot of your database.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Button 
-                                className="w-full" 
+                        <div className="grid grid-cols-2 gap-3">
+                            <Button
+                                className="w-full bg-indigo-600 hover:bg-indigo-700"
                                 onClick={() => exportData('json')}
                                 disabled={isLoading}
                             >
-                                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Export as JSON
+                                <FileJson className="mr-2 h-4 w-4" />
+                                JSON Backup
                             </Button>
-                            <Button 
-                                variant="outline" 
-                                className="w-full" 
+                            <Button
+                                variant="outline"
+                                className="w-full"
                                 onClick={() => exportData('csv')}
                                 disabled={isLoading}
                             >
-                                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Export as CSV
+                                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                                CSV Report
                             </Button>
                         </div>
-                        {isLoading && (
-                            <div className="space-y-2">
-                                <div className="flex justify-between text-sm">
-                                    <span>Exporting data...</span>
-                                    <span>{backupProgress}%</span>
+                        {isLoading && statusMessage.includes("Exporting") && (
+                            <div className="space-y-2 animate-in fade-in">
+                                <div className="flex justify-between text-xs text-slate-600">
+                                    <span>{statusMessage}</span>
+                                    <span>{progress}%</span>
                                 </div>
-                                <Progress value={backupProgress} className="w-full" />
+                                <Progress value={progress} className="w-full h-2" />
                             </div>
                         )}
                     </CardContent>
                 </Card>
 
                 {/* Import Data */}
-                <Card>
+                <Card className="shadow-md border-slate-200">
                     <CardHeader>
-                        <CardTitle className="flex items-center">
-                            <Upload className="mr-2 h-5 w-5 text-primary" />
-                            Import Data
+                        <CardTitle className="flex items-center text-slate-800">
+                            <Upload className="mr-2 h-5 w-5 text-orange-600" />
+                            Restore Data
                         </CardTitle>
                         <CardDescription>
-                            Restore data from a previously exported backup file.
+                            Restore from a .json backup file.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -281,58 +375,59 @@ export default function BackupPage() {
                                 id="import-file"
                                 disabled={isLoading}
                             />
-                            <Button 
+                            <Button
                                 asChild
-                                className="w-full"
+                                variant="outline"
+                                className="w-full border-dashed border-2 hover:bg-orange-50 hover:border-orange-200"
                                 disabled={isLoading}
                             >
-                                <label htmlFor="import-file">
-                                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Choose File to Import
+                                <label htmlFor="import-file" className="cursor-pointer">
+                                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
+                                    Select Backup File
                                 </label>
                             </Button>
                         </div>
-                        {isLoading && (
-                            <div className="space-y-2">
-                                <div className="flex justify-between text-sm">
-                                    <span>Importing data...</span>
-                                    <span>{backupProgress}%</span>
+                        {isLoading && (statusMessage.includes("Restoring") || statusMessage.includes("Reading")) && (
+                            <div className="space-y-2 animate-in fade-in">
+                                <div className="flex justify-between text-xs text-slate-600">
+                                    <span>{statusMessage}</span>
+                                    <span>{progress}%</span>
                                 </div>
-                                <Progress value={backupProgress} className="w-full" />
+                                <Progress value={progress} className="w-full h-2" />
                             </div>
                         )}
                     </CardContent>
                 </Card>
 
                 {/* Sync Data */}
-                <Card>
+                <Card className="shadow-md border-slate-200">
                     <CardHeader>
-                        <CardTitle className="flex items-center">
-                            <Cloud className="mr-2 h-5 w-5 text-primary" />
-                            Sync Data
+                        <CardTitle className="flex items-center text-slate-800">
+                            <Cloud className="mr-2 h-5 w-5 text-blue-500" />
+                            Cloud Sync
                         </CardTitle>
                         <CardDescription>
-                            Synchronize data with external systems and cloud storage.
+                            Sync with external storage.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
-                            <Button 
-                                className="w-full" 
+                            <Button
+                                className="w-full"
+                                variant="secondary"
                                 onClick={syncData}
                                 disabled={isLoading}
                             >
-                                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Sync Now
+                                {isLoading && statusMessage.includes("Sync") ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sync Now"}
                             </Button>
                         </div>
-                        {isLoading && (
-                            <div className="space-y-2">
-                                <div className="flex justify-between text-sm">
-                                    <span>Syncing data...</span>
-                                    <span>{backupProgress}%</span>
+                        {isLoading && statusMessage.includes("Sync") && (
+                            <div className="space-y-2 animate-in fade-in">
+                                <div className="flex justify-between text-xs text-slate-600">
+                                    <span>{statusMessage}</span>
+                                    <span>{progress}%</span>
                                 </div>
-                                <Progress value={backupProgress} className="w-full" />
+                                <Progress value={progress} className="w-full h-2" />
                             </div>
                         )}
                     </CardContent>
@@ -340,96 +435,36 @@ export default function BackupPage() {
             </div>
 
             {/* Backup Status */}
-            <Card className="mt-6">
+            <Card className="mt-6 shadow-md border-slate-200">
                 <CardHeader>
-                    <CardTitle className="flex items-center">
-                        <Database className="mr-2 h-5 w-5 text-primary" />
-                        Backup Status
+                    <CardTitle className="flex items-center text-slate-800">
+                        <Database className="mr-2 h-5 w-5 text-slate-600" />
+                        System Status
                     </CardTitle>
-                    <CardDescription>
-                        Information about your data backup and sync status.
-                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        <div className="flex items-center space-x-2">
-                            <CheckCircle className="h-4 w-4 text-green-500" />
+                        <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg">
+                            <Clock className="h-5 w-5 text-indigo-500" />
                             <div>
-                                <p className="text-sm font-medium">Last Backup</p>
-                                <p className="text-xs text-muted-foreground">
-                                    {lastBackup ? new Date(lastBackup).toLocaleDateString() : 'Never'}
+                                <p className="text-sm font-medium text-slate-800">Last Backup</p>
+                                <p className="text-xs text-slate-500">
+                                    {lastBackup ? new Date(lastBackup).toLocaleString() : 'Never'}
                                 </p>
                             </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                            <CheckCircle className="h-4 w-4 text-green-500" />
+                        <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg">
+                            <CheckCircle className="h-5 w-5 text-green-500" />
                             <div>
-                                <p className="text-sm font-medium">Database Status</p>
-                                <p className="text-xs text-muted-foreground">Connected</p>
+                                <p className="text-sm font-medium text-slate-800">Database Connection</p>
+                                <p className="text-xs text-slate-500">Active</p>
                             </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                            <Clock className="h-4 w-4 text-yellow-500" />
+                        <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-lg">
+                            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse ml-1 mr-2"></div>
                             <div>
-                                <p className="text-sm font-medium">Auto Backup</p>
-                                <p className="text-xs text-muted-foreground">Daily at 2:00 AM</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                            <div>
-                                <p className="text-sm font-medium">Cloud Sync</p>
-                                <p className="text-xs text-muted-foreground">Enabled</p>
-                            </div>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Backup Recommendations */}
-            <Card className="mt-6">
-                <CardHeader>
-                    <CardTitle>Backup Recommendations</CardTitle>
-                    <CardDescription>
-                        Best practices for data backup and recovery.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        <div className="flex items-start space-x-3">
-                            <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                            <div>
-                                <h4 className="font-medium">Regular Backups</h4>
-                                <p className="text-sm text-muted-foreground">
-                                    Export your data regularly (daily or weekly) to ensure you don't lose important information.
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex items-start space-x-3">
-                            <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                            <div>
-                                <h4 className="font-medium">Multiple Formats</h4>
-                                <p className="text-sm text-muted-foreground">
-                                    Keep backups in both JSON and CSV formats for maximum compatibility.
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex items-start space-x-3">
-                            <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                            <div>
-                                <h4 className="font-medium">Secure Storage</h4>
-                                <p className="text-sm text-muted-foreground">
-                                    Store backup files in secure locations, such as encrypted cloud storage or external drives.
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex items-start space-x-3">
-                            <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                            <div>
-                                <h4 className="font-medium">Test Restores</h4>
-                                <p className="text-sm text-muted-foreground">
-                                    Periodically test your backup files by importing them to ensure they work correctly.
-                                </p>
+                                <p className="text-sm font-medium text-slate-800">System Status</p>
+                                <p className="text-xs text-slate-500">Operational</p>
                             </div>
                         </div>
                     </div>
