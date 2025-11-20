@@ -427,7 +427,7 @@ const CustomerSearch = ({
           <DialogFooter>
             <Button
               onClick={() => setIsOpen(false)}
-              className={buttonStyles.back}
+              className="flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-slate-300 hover:border-slate-400 font-poppins"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Close
@@ -470,7 +470,7 @@ const SuccessAnimation = ({
 
         <div className="flex gap-3 justify-center">
           <Button
-            className={buttonStyles.primary}
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins"
             onClick={onConfirm}
           >
             <CheckCircle className="h-4 w-4 mr-2" />
@@ -507,6 +507,81 @@ const CategoryIcon = ({ category, className = "h-4 w-4" }: { category: string; c
       return <Package className={className} />;
   }
 };
+
+// UPDATED: Fixed vehicle type visuals to use purple/blue color scheme but keep the original structure
+const vehicleTypeVisuals = {
+  all: {
+    label: 'All Vehicles',
+    icon: Package,
+    buttonActive: 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg border-transparent',
+    buttonInactive: 'bg-white text-slate-700 hover:text-slate-900 border-slate-200 hover:border-slate-400 hover:bg-slate-50',
+    badge: 'bg-slate-100 text-slate-700 border-slate-200'
+  },
+  car: {
+    label: 'Car',
+    icon: Car,
+    buttonActive: 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg border-transparent',
+    buttonInactive: 'bg-white text-slate-700 hover:text-purple-700 border-slate-200 hover:border-purple-300 hover:bg-purple-50/70',
+    badge: 'bg-purple-50 text-purple-700 border-purple-200'
+  },
+  motor: {
+    label: 'Motorcycle',
+    icon: Bike,
+    buttonActive: 'bg-gradient-to-r from-violet-500 to-cyan-500 text-white shadow-lg border-transparent',
+    buttonInactive: 'bg-white text-slate-700 hover:text-violet-700 border-slate-200 hover:border-violet-300 hover:bg-violet-50/70',
+    badge: 'bg-violet-50 text-violet-700 border-violet-200'
+  },
+  truck: {
+    label: 'Truck',
+    icon: Truck,
+    buttonActive: 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg border-transparent',
+    buttonInactive: 'bg-white text-slate-700 hover:text-pink-700 border-slate-200 hover:border-pink-300 hover:bg-pink-50/70',
+    badge: 'bg-pink-50 text-pink-700 border-pink-200'
+  }
+} as const;
+
+const vehicleTypes = Object.entries(vehicleTypeVisuals).map(([value, config]) => ({
+  value,
+  label: config.label,
+  icon: config.icon
+}));
+
+// UPDATED: Fixed category visuals to use purple/blue color scheme but keep the original structure
+const categoryVisuals = {
+  all: {
+    label: 'All Categories',
+    buttonActive: 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg border-transparent',
+    buttonInactive: 'bg-white text-slate-700 hover:text-slate-900 border-slate-200 hover:border-slate-400 hover:bg-slate-50',
+    badge: 'bg-slate-100 text-slate-700 border-slate-200',
+    dot: 'bg-slate-400'
+  },
+  tire: {
+    label: 'Tires',
+    buttonActive: 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg border-transparent',
+    buttonInactive: 'bg-white text-slate-700 hover:text-purple-700 border-slate-200 hover:border-purple-300 hover:bg-purple-50/70',
+    badge: 'bg-purple-50 text-purple-700 border-purple-100',
+    dot: 'bg-purple-500'
+  },
+  tool: {
+    label: 'Tools',
+    buttonActive: 'bg-gradient-to-r from-violet-500 to-cyan-500 text-white shadow-lg border-transparent',
+    buttonInactive: 'bg-white text-slate-700 hover:text-violet-700 border-slate-200 hover:border-violet-300 hover:bg-violet-50/70',
+    badge: 'bg-violet-50 text-violet-700 border-violet-100',
+    dot: 'bg-violet-500'
+  },
+  accessory: {
+    label: 'Accessories',
+    buttonActive: 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg border-transparent',
+    buttonInactive: 'bg-white text-slate-700 hover:text-pink-700 border-slate-200 hover:border-pink-300 hover:bg-pink-50/70',
+    badge: 'bg-pink-50 text-pink-700 border-pink-100',
+    dot: 'bg-pink-500'
+  }
+} as const;
+
+const categories = Object.entries(categoryVisuals).map(([value, config]) => ({
+  value,
+  label: config.label
+}));
 
 // ============================================
 // MAIN POS PAGE COMPONENT
@@ -549,21 +624,6 @@ export default function POSPage() {
   const [installationFee, setInstallationFee] = useState<number>(0);
 
   const [passwordError, setPasswordError] = useState<string | null>(null);
-
-  // Vehicle type configuration
-  const vehicleTypes = [
-    { value: 'all', label: 'All Vehicles', icon: Package, color: 'bg-slate-500' },
-    { value: 'car', label: 'Car', icon: Car, color: 'bg-blue-500' },
-    { value: 'motor', label: 'Motorcycle', icon: Bike, color: 'bg-green-500' },
-    { value: 'truck', label: 'Truck', icon: Truck, color: 'bg-orange-500' }
-  ];
-
-  const categories = [
-    { value: 'all', label: 'All Categories' },
-    { value: 'tire', label: 'Tires' },
-    { value: 'tool', label: 'Tools' },
-    { value: 'accessory', label: 'Accessories' }
-  ];
 
   useEffect(() => {
     setMounted(true);
@@ -629,9 +689,6 @@ export default function POSPage() {
     });
   }, [inventory, searchTerm, selectedVehicleType, selectedCategory]);
 
-  // Replace the addToCart function (around line 608)
-  // Replace the addToCart function (around line 632)
-  // Replace the addToCart function (around line 634)
   const addToCart = (item: InventoryItem) => {
     // ✅ Get the CURRENT stock from inventory state (not the passed item)
     const currentInventoryItem = inventory.find(inv => inv.item_id === item.item_id);
@@ -977,8 +1034,6 @@ export default function POSPage() {
     setShowPasswordDialog(true);
   };
 
-  // Replace the handlePasswordSubmit function (around line 954)
-  // Replace the handlePasswordSubmit function (around line 958)
   const handlePasswordSubmit = async () => {
     if (!supabase) {
       toast({
@@ -1460,7 +1515,6 @@ export default function POSPage() {
   const totalSalesAmount = sales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
   const todaySales = sales.filter(s => new Date(s.sale_date).toDateString() === new Date().toDateString());
   const todayRevenue = todaySales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
-
   if (fetchError) {
     return (
       <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
@@ -1491,7 +1545,7 @@ export default function POSPage() {
 
       <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
 
-        {/* Header Section */}
+        {/* Header Section - RESTORED original glassmorphism effect */}
         <div className={`mb-12 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
           <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
@@ -1532,14 +1586,14 @@ export default function POSPage() {
               )}
               <Button
                 onClick={() => setShowSalesHistory(!showSalesHistory)}
-                className={buttonStyles.glass + " active:scale-95 font-poppins"}
+                className="bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins active:scale-95"
               >
                 <Receipt className="h-5 w-5 mr-2" />
                 {showSalesHistory ? 'Show POS' : 'Sales History'}
               </Button>
               <Button
                 onClick={handleVoidClick}
-                className={buttonStyles.glass + " active:scale-95 font-poppins"}
+                className="bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins active:scale-95"
               >
                 <Lock className="h-5 w-5 mr-2" />
                 Void Management
@@ -1547,7 +1601,7 @@ export default function POSPage() {
               <Button
                 onClick={fetchInitialData}
                 disabled={isLoading}
-                className={buttonStyles.glass + " active:scale-95 font-poppins"}
+                className="bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins active:scale-95"
               >
                 <RefreshCw className={`h-5 w-5 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
                 Refresh
@@ -1615,7 +1669,7 @@ export default function POSPage() {
                 Cancel
               </Button>
               <Button
-                className={buttonStyles.primary}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins"
                 onClick={handlePasswordSubmit}
               >
                 Authenticate
@@ -1666,7 +1720,7 @@ export default function POSPage() {
                   </p>
                   <Button
                     onClick={() => setShowVoidManagement(false)}
-                    className={buttonStyles.back}
+                    className="flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-slate-300 hover:border-slate-400 font-poppins"
                   >
                     Close Void Management
                   </Button>
@@ -1705,7 +1759,7 @@ export default function POSPage() {
                 Skip
               </Button>
               <Button
-                className={buttonStyles.primary}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins"
                 onClick={handleConfirmInstallation}
               >
                 Confirm Fee
@@ -1720,7 +1774,7 @@ export default function POSPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Product Selection - Left Side */}
             <div className="lg:col-span-2">
-              <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
+              <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0 min-h-[720px] flex flex-col">
                 <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-purple-50/50 border-b border-slate-200/50">
                   <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Available Products</CardTitle>
 
@@ -1732,18 +1786,20 @@ export default function POSPage() {
                         {vehicleTypes.map((vehicle) => {
                           const Icon = vehicle.icon;
                           const isSelected = selectedVehicleType === vehicle.value;
+                          const visual = vehicleTypeVisuals[vehicle.value as keyof typeof vehicleTypeVisuals];
                           return (
                             <Button
                               key={vehicle.value}
-                              variant={isSelected ? "default" : "outline"}
-                              className={`flex items-center justify-center gap-2 transition-all duration-300 w-full font-poppins ${isSelected
-                                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transform scale-105'
-                                : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-300 hover:border-indigo-400 hover:scale-105'
-                                }`}
+                              variant="outline"
+                              className={`group relative overflow-hidden rounded-2xl border text-sm font-semibold transition-all duration-300 w-full font-poppins ${isSelected ? visual.buttonActive : visual.buttonInactive}`}
                               onClick={() => setSelectedVehicleType(vehicle.value)}
                             >
-                              <Icon className="h-4 w-4" />
-                              {vehicle.label}
+                              <span className="relative z-10 flex items-center gap-2">
+                                <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700 group-hover:text-current'}`}>
+                                  <Icon className="h-4 w-4" />
+                                </span>
+                                {vehicle.label}
+                              </span>
                             </Button>
                           );
                         })}
@@ -1756,18 +1812,20 @@ export default function POSPage() {
                       <div className="grid grid-cols-4 gap-2 w-full">
                         {categories.map((category) => {
                           const isSelected = selectedCategory === category.value;
+                          const visual = categoryVisuals[category.value as keyof typeof categoryVisuals];
                           return (
                             <Button
                               key={category.value}
-                              variant={isSelected ? "secondary" : "outline"}
-                              className={`flex items-center justify-center gap-2 transition-all duration-300 w-full font-poppins ${isSelected
-                                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transform scale-105'
-                                : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-300 hover:border-indigo-400 hover:scale-105'
-                                }`}
+                              variant="outline"
+                              className={`group relative overflow-hidden rounded-2xl border text-sm font-semibold transition-all duration-300 w-full font-poppins ${isSelected ? visual.buttonActive : visual.buttonInactive}`}
                               onClick={() => setSelectedCategory(category.value)}
                             >
-                              <CategoryIcon category={category.value} />
-                              {category.label}
+                              <span className="relative z-10 flex items-center gap-2">
+                                <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700 group-hover:text-current'}`}>
+                                  <CategoryIcon category={category.value} className={`h-4 w-4 ${isSelected ? 'text-white' : 'text-slate-600'}`} />
+                                </span>
+                                {category.label}
+                              </span>
                             </Button>
                           );
                         })}
@@ -1797,30 +1855,30 @@ export default function POSPage() {
                   {/* Active Filters Display */}
                   <div className="flex flex-wrap gap-2 mt-3">
                     {selectedVehicleType !== 'all' && (
-                      <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 font-poppins">
+                      <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 font-poppins capitalize">
                         Vehicle: {vehicleTypes.find(v => v.value === selectedVehicleType)?.label}
                       </Badge>
                     )}
                     {selectedCategory !== 'all' && (
-                      <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200 font-poppins">
+                      <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200 font-poppins capitalize">
                         Category: {categories.find(c => c.value === selectedCategory)?.label}
                       </Badge>
                     )}
                     {searchTerm && (
-                      <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200 font-poppins">
+                      <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200 font-poppins capitalize">
                         Search: {searchTerm}
                       </Badge>
                     )}
                   </div>
                 </CardHeader>
 
-                <CardContent className="p-0">
+                <CardContent className="p-0 flex-1 flex flex-col">
                   {isLoading ? (
                     <div className="flex justify-center items-center h-48">
                       <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-6 max-h-[60vh] overflow-y-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-6 overflow-y-auto flex-1">
                       {filteredInventory.map(item => {
                         // ✅ Get the current stock from the inventory state (not the filtered item)
                         const currentInventoryItem = inventory.find(inv => inv.item_id === item.item_id);
@@ -1829,9 +1887,12 @@ export default function POSPage() {
                         return (
                           <Card
                             key={item.item_id}
-                            className={`border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 group ${microAnimations.cardHover} font-poppins`}
+                            className={`relative overflow-hidden border border-slate-100/70 bg-white/90 shadow-sm hover:shadow-2xl transition-all duration-300 group rounded-2xl transition-all duration-350 ease-spring hover:translate-y-[-6px] hover:shadow-2xl font-poppins`}
                           >
-                            <CardContent className="p-4 flex flex-col gap-3">
+                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+                              <div className="absolute -inset-8 bg-gradient-to-r from-indigo-500/10 via-transparent to-purple-500/20 blur-2xl animate-card-glow"></div>
+                            </div>
+                            <CardContent className="p-4 flex flex-col gap-3 relative z-10">
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-2">
@@ -1840,23 +1901,32 @@ export default function POSPage() {
                                       {item.name}
                                     </p>
                                   </div>
-                                  <div className="flex gap-2 mt-2">
-                                    <Badge variant="outline" className="text-xs capitalize bg-slate-100 text-slate-700 border-slate-300 flex items-center gap-1">
-                                      <CategoryIcon category={item.category} className="h-3 w-3" />
-                                      {item.category}
-                                    </Badge>
-                                    <Badge
-                                      variant="outline"
-                                      className={`text-xs ${
-                                        item.vehicle_type === 'car' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                                        item.vehicle_type === 'motor' ? 'bg-green-100 text-green-700 border-green-200' :
-                                        'bg-orange-100 text-orange-700 border-orange-200'
-                                      }`}
-                                    >
-                                      {item.vehicle_type}
-                                    </Badge>
+                                  {/* FIXED: Changed badges to use capitalize and flex-wrap for long text */}
+                                  <div className="flex flex-wrap gap-2 mt-2">
+                                    {(() => {
+                                      const visual = categoryVisuals[item.category as keyof typeof categoryVisuals] || categoryVisuals.all;
+                                      return (
+                                        <Badge variant="outline" className={`text-[11px] capitalize tracking-wide flex items-center gap-1 ${visual.badge}`}>
+                                          <span className={`h-2 w-2 rounded-full ${visual.dot}`}></span>
+                                          {visual.label}
+                                        </Badge>
+                                      );
+                                    })()}
+                                    {(() => {
+                                      const visual = vehicleTypeVisuals[item.vehicle_type as keyof typeof vehicleTypeVisuals] || vehicleTypeVisuals.all;
+                                      const VehicleIcon = visual.icon;
+                                      return (
+                                        <Badge variant="outline" className={`text-[11px] font-medium capitalize flex items-center gap-1 ${visual.badge}`}>
+                                          <VehicleIcon className="h-3 w-3" />
+                                          {visual.label}
+                                        </Badge>
+                                      );
+                                    })()}
                                   </div>
                                 </div>
+                                <Badge variant="outline" className="text-[10px] uppercase tracking-[0.3em] bg-white/80 text-slate-500 border-slate-200">
+                                  SKU
+                                </Badge>
                               </div>
                               <div className="flex justify-between items-center">
                                 <div>
@@ -1909,117 +1979,167 @@ export default function POSPage() {
 
             {/* Cart & Checkout - Right Side */}
             <div className="lg:col-span-1">
-              <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0 sticky top-8">
-                <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-green-50/50 border-b border-slate-200/50">
-                  <CardTitle className="flex items-center text-2xl font-bold text-slate-900 font-poppins">
-                    <ShoppingCart className="mr-3 h-6 w-6" />
-                    Shopping Cart
-                    {cart.length > 0 && (
-                      <Badge variant="outline" className="ml-3 bg-indigo-100 text-indigo-700 border-indigo-200 font-poppins">
-                        {cart.length} items
-                      </Badge>
+              <Card className="bg-white/95 backdrop-blur-sm border-slate-200/80 shadow-[0_30px_50px_-28px_rgba(79,70,229,0.7)] rounded-3xl overflow-hidden border-0 sticky top-8 min-h-[720px] flex flex-col">
+                <CardHeader className="pb-5 bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-500 text-white border-b border-white/10 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.25),_transparent_60%)]"></div>
+                  <div className="relative z-10">
+                    <CardTitle className="flex items-center text-2xl font-bold text-white font-poppins">
+                      <ShoppingCart className="mr-3 h-6 w-6" />
+                      Shopping Cart
+                      {cart.length > 0 && (
+                        <Badge variant="outline" className="ml-3 bg-white/15 text-white border-white/30 font-poppins">
+                          {cart.length} item{cart.length === 1 ? '' : 's'}
+                        </Badge>
+                      )}
+                    </CardTitle>
+                    <p className="text-sm text-white/70 mt-2">
+                      Manage quantities, add services, and finalize totals in one glance.
+                    </p>
+                    {editingSale && (
+                      <div className="mt-2">
+                        <Badge variant="outline" className="bg-amber-500/20 text-amber-100 border-amber-200/40 font-poppins">
+                          Editing Sale: {editingSale.sale_id}
+                        </Badge>
+                      </div>
                     )}
-                  </CardTitle>
-                  {editingSale && (
-                    <div className="mt-2">
-                      <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-200 font-poppins">
-                        Editing Sale: {editingSale.sale_id}
-                      </Badge>
-                    </div>
-                  )}
+                  </div>
                 </CardHeader>
 
-                <CardContent className="p-6 space-y-6">
+                <CardContent className="p-6 space-y-6 flex-1 flex flex-col">
                   {/* Customer Selection */}
                   <div className="space-y-3">
-                    <Label htmlFor="customer-select" className="text-slate-700 font-medium font-poppins">Customer</Label>
-                    <CustomerSearch
-                      customers={customers}
-                      selectedCustomerId={selectedCustomerId}
-                      onCustomerSelect={setSelectedCustomerId}
-                    />
+                    <Label htmlFor="customer-select" className="text-slate-600 text-sm font-semibold uppercase tracking-[0.2em] font-poppins">
+                      Customer
+                    </Label>
+                    <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4">
+                      <CustomerSearch
+                        customers={customers}
+                        selectedCustomerId={selectedCustomerId}
+                        onCustomerSelect={setSelectedCustomerId}
+                      />
+                    </div>
                   </div>
 
                   {/* Cart Items */}
-                  <div className="space-y-4">
-                    <Label className="text-slate-700 font-medium font-poppins">Order Items</Label>
-                    <div className="max-h-64 overflow-y-auto space-y-3 pr-2">
+                  <div className="space-y-4 flex-1 flex flex-col">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-slate-700 font-semibold font-poppins text-base">Order Items</Label>
+                      {cart.length > 0 && (
+                        <span className="text-xs uppercase tracking-[0.3em] text-slate-400">
+                          {cart.length} line{cart.length === 1 ? '' : 's'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="max-h-72 overflow-y-auto space-y-3 pr-1 flex-1">
                       {cart.length === 0 ? (
                         <div className="text-center py-8">
                           <ShoppingCart className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                          <p className="text-slate-500 font-poppins">Your cart is empty</p>
-                          <p className="text-slate-400 text-sm font-poppins">Add products to get started</p>
+                          <p className="text-slate-500 font-poppins font-medium">Your cart is empty</p>
+                          <p className="text-slate-400 text-sm font-poppins">Add products to see them glow here</p>
                         </div>
                       ) : (
-                        cart.map(item => (
-                          <div key={item.item_id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <CategoryIcon category={item.category} className="h-3 w-3 text-indigo-600" />
-                                <p className="text-sm font-medium text-slate-800 truncate font-poppins">{item.name}</p>
+                        cart.map(item => {
+                          const visual = vehicleTypeVisuals[item.vehicle_type as keyof typeof vehicleTypeVisuals] || vehicleTypeVisuals.all;
+                          const VehicleIcon = visual.icon;
+                          const categoryVisual = categoryVisuals[item.category as keyof typeof categoryVisuals] || categoryVisuals.all;
+                          const currentInventoryItem = inventory.find(inv => inv.item_id === item.item_id);
+                          const liveStock = currentInventoryItem?.stock_quantity ?? 0;
+                          const lineTotal = (item.sale_price * item.quantity) + (item.installationFee || 0);
+                          return (
+                            <div key={item.item_id} className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm hover:border-indigo-200 hover:shadow-lg transition-all duration-300">
+                              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+                                <div className="absolute -inset-8 bg-gradient-to-r from-indigo-500/5 via-purple-500/10 to-emerald-500/5 blur-2xl"></div>
                               </div>
-                              {item.installationFee && item.installationFee > 0 ? (
-                                <p className="text-xs text-slate-500 font-poppins">
-                                  {`₱${formatPrice(item.sale_price)} + ₱${formatPrice(item.installationFee)} install`}
-                                </p>
-                              ) : (
-                                <p className="text-xs text-slate-500 font-poppins">
-                                  {`₱${formatPrice(item.sale_price)} each`}
-                                </p>
-                              )}
+                              <div className="relative z-10 space-y-3">
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="min-w-0 flex-1 space-y-1">
+                                    {/* FIXED: Changed badges to use capitalize and flex-wrap for long text */}
+                                    <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                                      <Badge variant="outline" className={`capitalize tracking-wide flex items-center gap-1 ${categoryVisual.badge}`}>
+                                        <span className={`h-2 w-2 rounded-full ${categoryVisual.dot}`}></span>
+                                        {categoryVisual.label}
+                                      </Badge>
+                                      <Badge variant="outline" className={`flex items-center gap-1 font-medium capitalize ${visual.badge}`}>
+                                        <VehicleIcon className="h-3 w-3" />
+                                        {visual.label}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-base font-semibold text-slate-900 truncate font-poppins">
+                                      {item.name}
+                                    </p>
+                                    <p className="text-xs text-slate-500 font-poppins">
+                                      ₱{formatPrice(item.sale_price)} each{item.installationFee ? ` · ₱${formatPrice(item.installationFee)} install` : ''}
+                                    </p>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-[10px] uppercase tracking-[0.3em] text-slate-400 block">Line total</span>
+                                    <p className="text-lg font-bold text-slate-900">₱{formatPrice(lineTotal)}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-xs text-slate-500 font-medium">
+                                    {liveStock > 0 ? `${liveStock} in stock` : 'Out of stock soon'}
+                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      className="h-8 w-8 rounded-xl border-slate-200 bg-white/80 text-slate-700 hover:border-indigo-400 hover:text-indigo-600 transition-all duration-200"
+                                      onClick={() => updateQuantity(item.item_id, item.quantity - 1)}
+                                    >
+                                      -
+                                    </Button>
+                                    <span className="text-sm font-semibold w-8 text-center font-poppins">{item.quantity}</span>
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      className="h-8 w-8 rounded-xl border-slate-200 bg-white/80 text-slate-700 hover:border-indigo-400 hover:text-indigo-600 transition-all duration-200 disabled:opacity-40"
+                                      onClick={() => updateQuantity(item.item_id, item.quantity + 1)}
+                                      disabled={item.quantity >= item.stock_quantity}
+                                    >
+                                      +
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50"
+                                      onClick={() => removeFromCart(item.item_id)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => updateQuantity(item.item_id, item.quantity - 1)}
-                              >
-                                -
-                              </Button>
-                              <span className="text-sm font-medium w-8 text-center font-poppins">{item.quantity}</span>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => updateQuantity(item.item_id, item.quantity + 1)}
-                                disabled={item.quantity >= item.stock_quantity}
-                              >
-                                +
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                onClick={() => removeFromCart(item.item_id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>
 
                   {/* Order Summary */}
                   {cart.length > 0 && (
-                    <div className="border-t pt-4 space-y-3">
+                    <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 space-y-4">
                       <div className="flex justify-between text-sm font-poppins">
-                        <span className="text-slate-600">Subtotal</span>
-                        <span className="font-medium">₱{formatPrice(subtotal)}</span>
+                        <span className="text-slate-500">Subtotal</span>
+                        <span className="font-medium text-slate-800">₱{formatPrice(subtotal)}</span>
                       </div>
-                      <div className="flex justify-between font-bold text-lg font-poppins">
-                        <span className="text-slate-800">Total Amount</span>
-                        <span className="text-green-600">₱{formatPrice(total)}</span>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Total</p>
+                          <p className="text-2xl font-bold text-slate-900 font-poppins">₱{formatPrice(total)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-400">Taxes handled at receipt</p>
+                        </div>
                       </div>
                     </div>
                   )}
                 </CardContent>
 
-                <CardFooter className="flex flex-col gap-3 p-6 bg-slate-50/50 border-t border-slate-200/50">
+                <CardFooter className="flex flex-col gap-3 p-6 bg-slate-50/80 border-t border-slate-200/60">
                   <Button
-                    className={`w-full ${buttonStyles.primary}`}
+                    className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins shadow-lg shadow-purple-500/30 w-full"
                     onClick={handleProcessSale}
                     disabled={cart.length === 0 || isSubmitting}
                   >
@@ -2032,7 +2152,7 @@ export default function POSPage() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="w-full border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-600 font-poppins"
+                    className="w-full border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-600 font-poppins rounded-2xl"
                     onClick={handleClearCart}
                     disabled={cart.length === 0}
                   >
@@ -2142,6 +2262,25 @@ export default function POSPage() {
         
         .animate-pulse-glow {
           animation: pulse-glow 2s infinite ease-in-out;
+        }
+
+        @keyframes card-glow {
+          0% {
+            opacity: 0.3;
+            transform: scale(0.95);
+          }
+          50% {
+            opacity: 0.7;
+            transform: scale(1.05);
+          }
+          100% {
+            opacity: 0.3;
+            transform: scale(0.95);
+          }
+        }
+
+        .animate-card-glow {
+          animation: card-glow 6s ease-in-out infinite;
         }
       `}</style>
     </div>
