@@ -117,18 +117,6 @@ const microAnimations = {
   iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
 };
 
-const springEasing = "cubic-bezier(0.34, 1.56, 0.64, 1)";
-
-const iconCategories = {
-  financial: { background: 'rgba(16, 185, 129, 0.1)', icon: '#10b981' },
-  inventory: { background: 'rgba(6, 182, 212, 0.1)', icon: '#06b6d4' },
-  analytics: { background: 'rgba(99, 102, 241, 0.1)', icon: '#6366f1' },
-  service: { background: 'rgba(139, 92, 246, 0.1)', icon: '#8b5cf6' },
-  customers: { background: 'rgba(59, 130, 246, 0.1)', icon: '#3b82f6' },
-  warning: { background: 'rgba(245, 158, 11, 0.1)', icon: '#f59e0b' },
-  error: { background: 'rgba(239, 68, 68, 0.1)', icon: '#ef4444' }
-};
-
 // Stock Level Indicator Component
 const StockLevelIndicator = ({ quantity, reorderLevel = 5 }: { quantity: number; reorderLevel?: number }) => {
   const getStockLevel = (qty: number) => {
@@ -191,6 +179,107 @@ const VehicleTypeBadge = ({ type }: { type: 'car' | 'motor' | 'truck' }) => {
   );
 };
 
+// Success Confirmation Component
+const SuccessConfirmation = ({ 
+  item, 
+  isOpen, 
+  onClose,
+  onAddAnother
+}: { 
+  item?: InventoryItem | null; 
+  isOpen: boolean; 
+  onClose: () => void;
+  onAddAnother: () => void;
+}) => {
+  // Guard against undefined/null item (prevents errors like accessing item.name)
+  if (!item) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w bg-white border border-green-200 shadow-2xl">
+        <div className="flex flex-col items-center text-center p-6">
+          {/* Success Icon */}
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+            <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          </div>
+          
+          {/* Success Message */}
+          <DialogTitle className="text-xl font-bold text-green-800 mb-2">
+            Item Added Successfully!
+          </DialogTitle>
+          
+          <DialogDescription className="text-slate-600 mb-6">
+            Your new inventory item has been added to the system.
+          </DialogDescription>
+
+          {/* Item Details */}
+          <div className="w-full flex justify-center mb-6">
+            <div className="w-full sm:max-w-md bg-green-50 rounded-lg p-4 border border-green-200">
+              <div className="text-left space-y-5">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-slate-700">Product Name:</span>
+                  <span className="text-sm font-semibold text-slate-900">{item.name}</span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-slate-700">Category:</span>
+                  <Badge variant="outline" className="capitalize bg-slate-100 text-slate-700 border-slate-300">
+                    {item.category}
+                  </Badge>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-slate-700">Vehicle Type:</span>
+                  <VehicleTypeBadge type={item.vehicle_type} />
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-slate-700">Stock Quantity:</span>
+                  <span className="text-sm font-semibold text-slate-900">{item.stock_quantity}</span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-slate-700">Cost Price:</span>
+                  <span className="text-sm font-semibold text-slate-900">₱{item.cost_price.toFixed(2)}</span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-slate-700">Sale Price:</span>
+                  <span className="text-sm font-semibold text-slate-900">₱{item.sale_price.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 w-full">
+            <Button
+              onClick={onClose}
+              className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white border-0"
+            >
+              Continue Managing Inventory
+            </Button>
+            <Button
+              onClick={() => {
+                onClose();
+                onAddAnother();
+              }}
+              variant="outline"
+              className="flex-1 border-slate-300"
+            >
+              Add Another Item
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 // Filter Component
 const AdvancedFilters = ({ 
   filters, 
@@ -201,8 +290,6 @@ const AdvancedFilters = ({
   onFiltersChange: (filters: FilterState) => void;
   onClearFilters: () => void;
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
   // Helper function to check if a specific filter is active
   const isFilterActive = (category: string, value: string) => {
     if (category === 'stockStatus') {
@@ -250,26 +337,16 @@ const AdvancedFilters = ({
     return count;
   };
 
-  // Categorized filter groups
+  // Compact filter groups
   const filterCategories = [
-    {
-      title: "Stock Status",
-      icon: AlertTriangle,
-      category: 'stockStatus' as const,
-      filters: [
-        { label: "Low Stock", value: "lowStock", icon: AlertTriangle, description: "3-5 units left" },
-        { label: "Critical Stock", value: "critical", icon: AlertTriangle, description: "1-2 units left" },
-        { label: "Out of Stock", value: "outOfStock", icon: PackageSearch, description: "0 units" }
-      ]
-    },
     {
       title: "Product Categories",
       icon: PackageSearch,
       category: 'category' as const,
       filters: [
-        { label: "Tires", value: "tire", icon: PackageSearch, description: "All tires" },
-        { label: "Tools", value: "tool", icon: PackageSearch, description: "All tools" },
-        { label: "Accessories", value: "accessory", icon: PackageSearch, description: "All accessories" }
+        { label: "Tires", value: "tire", icon: PackageSearch },
+        { label: "Tools", value: "tool", icon: PackageSearch },
+        { label: "Accessories", value: "accessory", icon: PackageSearch }
       ]
     },
     {
@@ -277,98 +354,129 @@ const AdvancedFilters = ({
       icon: PackageSearch,
       category: 'vehicleType' as const,
       filters: [
-        { label: "Car Items", value: "car", icon: PackageSearch, description: "For cars" },
-        { label: "Motorcycle Items", value: "motor", icon: PackageSearch, description: "For motorcycles" },
-        { label: "Truck Items", value: "truck", icon: PackageSearch, description: "For trucks" }
+        { label: "Car", value: "car", icon: PackageSearch },
+        { label: "Motorcycle", value: "motor", icon: PackageSearch },
+        { label: "Truck", value: "truck", icon: PackageSearch }
+      ]
+    },
+    {
+      title: "Stock Status",
+      icon: AlertTriangle,
+      category: 'stockStatus' as const,
+      filters: [
+        { label: "Low Stock", value: "lowStock", icon: AlertTriangle },
+        { label: "Critical", value: "critical", icon: AlertTriangle },
+        { label: "Out of Stock", value: "outOfStock", icon: PackageSearch }
       ]
     }
   ];
 
   return (
-    <div className="bg-white rounded-2xl p-6 mb-6 border border-slate-200 shadow-sm">
-      {/* Quick Filter Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center gap-4 mb-6">
-        {/* Search Box */}
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4 transition-all duration-300" />
-          <Input
-            placeholder="Search products by name..."
-            value={filters.search}
-            onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
-            className="pl-10 border-slate-300 focus:border-indigo-400 transition-all duration-300"
-          />
-          {filters.search && (
-            <button
-              onClick={() => onFiltersChange({ ...filters, search: '' })}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-all duration-300"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
+    <div className="bg-white p-6 border border-slate-100 shadow-sm">
+      {/* Search and Sort Bar */}
+      <div className="flex flex-col lg:flex-row lg:items-end gap-4 mb-6">
+        {/* Search Box with Label */}
+        <div className="flex-1">
+          <Label className="text-sm font-medium text-slate-700 mb-2 block">Search Items</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4 transition-all duration-300" />
+            <Input
+              placeholder="Search products by name..."
+              value={filters.search}
+              onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
+              className="pl-10 border-slate-300 focus:border-indigo-400 transition-all duration-300"
+            />
+            {filters.search && (
+              <button
+                onClick={() => onFiltersChange({ ...filters, search: '' })}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-all duration-300"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Expand/Collapse Filters */}
-        <Button
-          variant="outline"
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-2 transition-all duration-300"
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          {isExpanded ? 'Hide Filters' : 'Show Filters'}
-          {hasActiveFilters && (
-            <Badge variant="secondary" className="ml-1 bg-indigo-100 text-indigo-700">
-              {getActiveFilterCount()}
-            </Badge>
-          )}
-        </Button>
+        {/* Sort By Dropdown */}
+        <div className="w-full lg:w-48">
+          <Label className="text-sm font-medium text-slate-700 mb-2 block">Sort By</Label>
+          <Select
+            value={filters.sortBy}
+            onValueChange={(value) => onFiltersChange({ ...filters, sortBy: value as any })}
+          >
+            <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300">
+              <SelectValue placeholder="Sort by..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">Name (A-Z)</SelectItem>
+              <SelectItem value="stock">Stock Level</SelectItem>
+              <SelectItem value="price">Price</SelectItem>
+              <SelectItem value="vehicleType">Vehicle Type</SelectItem>
+              <SelectItem value="updated">Last Updated</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Sort Order Dropdown */}
+        <div className="w-full lg:w-40">
+          <Label className="text-sm font-medium text-slate-700 mb-2 block">Order</Label>
+          <Select
+            value={filters.sortOrder}
+            onValueChange={(value) => onFiltersChange({ ...filters, sortOrder: value as any })}
+          >
+            <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300">
+              <SelectValue placeholder="Order" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="asc">Ascending</SelectItem>
+              <SelectItem value="desc">Descending</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
         {/* Clear Filters - Only show when filters are active */}
         {hasActiveFilters && (
-          <Button
-            variant="outline"
-            onClick={onClearFilters}
-            className="flex items-center gap-2 transition-all duration-300"
-          >
-            <X className="h-4 w-4" />
-            Clear All Filters
-          </Button>
+          <div className="flex items-end">
+            <Button
+              variant="outline"
+              onClick={onClearFilters}
+              className="flex items-center gap-2 transition-all duration-300"
+            >
+              <X className="h-4 w-4" />
+              Clear All Filters
+            </Button>
+          </div>
         )}
       </div>
 
-      {/* Categorized Filter Groups */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-4">
-        {filterCategories.map((categoryGroup, categoryIndex) => {
+      {/* Compact Filter Groups - Elegant Design */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        {filterCategories.map((categoryGroup) => {
           const CategoryIcon = categoryGroup.icon;
           const hasActiveFilterInCategory = filters[categoryGroup.category] !== 'all';
           
           return (
             <div 
               key={categoryGroup.title}
-              className={`flex flex-col ${
-                categoryIndex < filterCategories.length - 1 
-                  ? 'lg:border-r lg:border-slate-200 lg:pr-6' 
-                  : ''
-              }`}
+              className="bg-slate-50/80 rounded-lg border border-slate-200 p-4"
             >
-              {/* Category Header */}
-              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100">
-                <div className={`p-1.5 rounded-lg ${
-                  hasActiveFilterInCategory ? 'bg-green-100' : 'bg-indigo-100'
+              {/* Compact Category Header */}
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`p-1.5 rounded-md ${
+                  hasActiveFilterInCategory ? 'bg-indigo-100' : 'bg-slate-200'
                 }`}>
                   <CategoryIcon className={`h-3.5 w-3.5 ${
-                    hasActiveFilterInCategory ? 'text-green-600' : 'text-indigo-600'
+                    hasActiveFilterInCategory ? 'text-indigo-600' : 'text-slate-600'
                   }`} />
                 </div>
                 <h3 className="text-sm font-semibold text-slate-700">{categoryGroup.title}</h3>
                 {hasActiveFilterInCategory && (
-                  <Badge variant="secondary" className="ml-auto bg-green-100 text-green-700 text-xs">
-                    Active
-                  </Badge>
+                  <div className="w-2 h-2 bg-indigo-500 rounded-full ml-1"></div>
                 )}
               </div>
 
-              {/* Filter Items */}
-              <div className="space-y-2">
+              {/* Compact Filter Buttons */}
+              <div className="flex flex-col gap-2">
                 {categoryGroup.filters.map((filter) => {
                   const FilterIcon = filter.icon;
                   const isActive = isFilterActive(categoryGroup.category, filter.value);
@@ -376,30 +484,20 @@ const AdvancedFilters = ({
                   return (
                     <button
                       key={filter.value}
-                      className={`cursor-pointer transition-all w-full text-left p-3 rounded-lg border text-sm font-medium ${
+                      className={`cursor-pointer transition-all w-full text-left p-2.5 text-sm font-medium border rounded-md flex items-center justify-between ${
                         isActive 
-                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-transparent shadow-md transform scale-[1.02]' 
-                          : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-200 hover:border-indigo-300 hover:scale-[1.02]'
+                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-transparent shadow-sm' 
+                          : 'bg-white text-slate-700 border-slate-300 hover:border-indigo-300 hover:bg-slate-50'
                       }`}
                       onClick={() => handleFilterToggle(categoryGroup.category, filter.value)}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <FilterIcon className="h-3.5 w-3.5" />
-                          <span className="font-medium">{filter.label}</span>
-                        </div>
-                        {isActive && (
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs opacity-80">Active</span>
-                            <div className="w-2 h-2 bg-white rounded-full ml-1"></div>
-                          </div>
-                        )}
+                      <div className="flex items-center gap-2">
+                        <FilterIcon className="h-3.5 w-3.5" />
+                        <span>{filter.label}</span>
                       </div>
-                      <div className={`text-xs mt-1 ${
-                        isActive ? 'text-white/80' : 'text-slate-500'
-                      }`}>
-                        {filter.description}
-                      </div>
+                      {isActive && (
+                        <div className="w-2 h-2 bg-white rounded-sm"></div>
+                      )}
                     </button>
                   );
                 })}
@@ -476,106 +574,6 @@ const AdvancedFilters = ({
           </div>
         </div>
       )}
-
-      {/* Advanced Filters (Collapsible) */}
-      {isExpanded && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 pt-6 border-t border-slate-200">
-          {/* Category Filter */}
-          <div>
-            <Label className="text-sm font-medium text-slate-700 mb-2 block">Category</Label>
-            <Select
-              value={filters.category}
-              onValueChange={(value) => onFiltersChange({ ...filters, category: value as any })}
-            >
-              <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300">
-                <SelectValue placeholder="All categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="tire">Tires</SelectItem>
-                <SelectItem value="tool">Tools</SelectItem>
-                <SelectItem value="accessory">Accessories</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Vehicle Type Filter */}
-          <div>
-            <Label className="text-sm font-medium text-slate-700 mb-2 block">Vehicle Type</Label>
-            <Select
-              value={filters.vehicleType}
-              onValueChange={(value) => onFiltersChange({ ...filters, vehicleType: value as any })}
-            >
-              <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300">
-                <SelectValue placeholder="All vehicle types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Vehicle Types</SelectItem>
-                <SelectItem value="car">Car</SelectItem>
-                <SelectItem value="motor">Motorcycle</SelectItem>
-                <SelectItem value="truck">Truck</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Stock Status Filter */}
-          <div>
-            <Label className="text-sm font-medium text-slate-700 mb-2 block">Stock Status</Label>
-            <Select
-              value={filters.stockStatus}
-              onValueChange={(value) => onFiltersChange({ ...filters, stockStatus: value as any })}
-            >
-              <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300">
-                <SelectValue placeholder="All stock" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Stock</SelectItem>
-                <SelectItem value="inStock">In Stock (6+)</SelectItem>
-                <SelectItem value="lowStock">Low Stock (3-5)</SelectItem>
-                <SelectItem value="critical">Critical (1-2)</SelectItem>
-                <SelectItem value="outOfStock">Out of Stock</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Sort By */}
-          <div>
-            <Label className="text-sm font-medium text-slate-700 mb-2 block">Sort By</Label>
-            <Select
-              value={filters.sortBy}
-              onValueChange={(value) => onFiltersChange({ ...filters, sortBy: value as any })}
-            >
-              <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300">
-                <SelectValue placeholder="Sort by..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name">Name (A-Z)</SelectItem>
-                <SelectItem value="stock">Stock Level</SelectItem>
-                <SelectItem value="price">Price</SelectItem>
-                <SelectItem value="vehicleType">Vehicle Type</SelectItem>
-                <SelectItem value="updated">Last Updated</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Sort Order */}
-          <div>
-            <Label className="text-sm font-medium text-slate-700 mb-2 block">Order</Label>
-            <Select
-              value={filters.sortOrder}
-              onValueChange={(value) => onFiltersChange({ ...filters, sortOrder: value as any })}
-            >
-              <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300">
-                <SelectValue placeholder="Order" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="asc">Ascending</SelectItem>
-                <SelectItem value="desc">Descending</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -632,87 +630,144 @@ const EnhancedEmptyState = ({
   );
 };
 
-// Enhanced Stock Alerts Component with Updated Design
+// Stock Alerts Component
 const StockAlertsBar = ({ 
   criticalCount, 
   warningCount,
-  outOfStockCount, // NEW: Added out of stock count
+  outOfStockCount,
   onShowDetails 
 }: { 
   criticalCount: number; 
   warningCount: number;
-  outOfStockCount: number; // NEW
+  outOfStockCount: number;
   onShowDetails: () => void;
 }) => {
-  if (criticalCount === 0 && warningCount === 0 && outOfStockCount === 0) return null;
+  const totalAlerts = criticalCount + warningCount + outOfStockCount;
+  
+  if (totalAlerts === 0) return null;
+
+  // Calculate percentages for the progress bar
+  const outOfStockPercent = (outOfStockCount / totalAlerts) * 100;
+  const criticalPercent = (criticalCount / totalAlerts) * 100;
+  const warningPercent = (warningCount / totalAlerts) * 100;
 
   return (
-    <div className="mb-6 space-y-3">
-      {/* Out of Stock Alert - NEW */}
-      {outOfStockCount > 0 && (
-        <div className="bg-gradient-to-r from-gray-600 to-gray-700 rounded-xl p-4 text-white shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer" onClick={onShowDetails}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                <PackageSearch className="h-6 w-6" />
-              </div>
-              <div>
-                <h4 className="font-bold text-lg">Out of Stock Alert</h4>
-                <p className="text-white/90">
-                  {outOfStockCount} item{outOfStockCount !== 1 ? 's are' : ' is'} completely out of stock and needs restocking.
-                </p>
+    <div 
+      className="mb-6 bg-gradient-to-r from-purple-500 via-purple-700 to-purple-800 rounded-xl p-1 shadow-x1 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:scale-[1.02]"
+      onClick={onShowDetails}
+    >
+      <div className="bg-white/95 backdrop-blur-sm rounded-xl p-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          {/* Left Section - Alert Icon and Main Message */}
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="p-3 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-lg">
+                <AlertTriangle className="h-6 w-6 text-white" />
               </div>
             </div>
-            <Button variant="outline" size="sm" className="bg-white/20 border-white/30 text-white hover:bg-white/30">
-              View Details
-            </Button>
+            
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                Stock Alerts Require Attention
+                <div className="flex gap-1">
+                  {outOfStockCount > 0 && <div className="w-2 h-2 bg-gray-600 rounded-full animate-pulse"></div>}
+                  {criticalCount > 0 && <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></div>}
+                  {warningCount > 0 && <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>}
+                </div>
+              </h3>
+              <p className="text-slate-600 text-sm mt-1">
+                {totalAlerts} item{totalAlerts !== 1 ? 's need' : ' needs'} immediate action across different stock levels
+              </p>
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Critical Stock Alert */}
-      {criticalCount > 0 && (
-        <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-xl p-4 text-white shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer" onClick={onShowDetails}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                <AlertTriangle className="h-6 w-6" />
-              </div>
-              <div>
-                <h4 className="font-bold text-lg">Critical Stock Alert</h4>
-                <p className="text-white/90">
-                  {criticalCount} item{criticalCount !== 1 ? 's are' : ' is'} at critical levels and needs immediate attention.
-                </p>
-              </div>
+          {/* Middle Section - Progress Bar Visualization */}
+          <div className="flex-1 max-w-md">
+            <div className="flex justify-between text-xs font-medium text-slate-700 mb-2">
+              <span>Stock Status Breakdown</span>
+              <span className="text-slate-500">Click for details</span>
             </div>
-            <Button variant="outline" size="sm" className="bg-white/20 border-white/30 text-white hover:bg-white/30">
-              View Details
-            </Button>
+            
+            <div className="flex h-4 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+              {outOfStockCount > 0 && (
+                <div 
+                  className="bg-gray-600 transition-all duration-500 ease-out"
+                  style={{ width: `${outOfStockPercent}%` }}
+                  title={`Out of Stock: ${outOfStockCount} items`}
+                ></div>
+              )}
+              {criticalCount > 0 && (
+                <div 
+                  className="bg-red-600 transition-all duration-500 ease-out"
+                  style={{ width: `${criticalPercent}%` }}
+                  title={`Critical: ${criticalCount} items`}
+                ></div>
+              )}
+              {warningCount > 0 && (
+                <div 
+                  className="bg-yellow-500 transition-all duration-500 ease-out"
+                  style={{ width: `${warningPercent}%` }}
+                  title={`Low Stock: ${warningCount} items`}
+                ></div>
+              )}
+            </div>
+            
+            {/* Legend */}
+            <div className="flex flex-wrap gap-4 mt-3 text-xs">
+              {outOfStockCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-gray-600 rounded"></div>
+                  <span className="text-slate-700 font-medium">Out of Stock: {outOfStockCount}</span>
+                </div>
+              )}
+              {criticalCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-red-600 rounded"></div>
+                  <span className="text-slate-700 font-medium">Critical: {criticalCount}</span>
+                </div>
+              )}
+              {warningCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                  <span className="text-slate-700 font-medium">Low Stock: {warningCount}</span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Low Stock Warning */}
-      {warningCount > 0 && (
-        <div className="bg-gradient-to-r from-yellow-600 to-amber-600 rounded-xl p-4 text-white shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer" onClick={onShowDetails}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                <AlertTriangle className="h-6 w-6" />
-              </div>
-              <div>
-                <h4 className="font-bold text-lg">Low Stock Warning</h4>
-                <p className="text-white/90">
-                  {warningCount} item{warningCount !== 1 ? 's are' : ' is'} running low and may need reordering soon.
-                </p>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" className="bg-white/20 border-white/30 text-white hover:bg-white/30">
-              View Details
+          {/* Right Section - Action Button */}
+          <div className="flex flex-col items-end gap-3">
+            <Button 
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl border-0"
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Review All Alerts
             </Button>
+            
+            {/* Quick Stats */}
+            <div className="flex gap-4 text-xs text-slate-600">
+              {outOfStockCount > 0 && (
+                <div className="text-center">
+                  <div className="font-bold text-gray-700">{outOfStockCount}</div>
+                  <div>Out of Stock</div>
+                </div>
+              )}
+              {criticalCount > 0 && (
+                <div className="text-center">
+                  <div className="font-bold text-red-700">{criticalCount}</div>
+                  <div>Critical</div>
+                </div>
+              )}
+              {warningCount > 0 && (
+                <div className="text-center">
+                  <div className="font-bold text-yellow-700">{warningCount}</div>
+                  <div>Low Stock</div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
@@ -1141,16 +1196,23 @@ export default function EnhancedInventoryPage() {
   const [mounted, setMounted] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  // Pagination / rows-per-page state
+  const [rowsPerPage, setRowsPerPage] = useState<number>(5);
+  const rowsPerPageOptions = [5, 10, 25, 50];
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
   const [isAddItemDialogOpen, setIsAddItemDialogOpen] = useState(false);
   const [isEditItemDialogOpen, setIsEditItemDialogOpen] = useState(false);
   const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
   const [isStockAdjustmentOpen, setIsStockAdjustmentOpen] = useState(false);
   const [isCriticalDetailsOpen, setIsCriticalDetailsOpen] = useState(false);
   const [isViewMoreOpen, setIsViewMoreOpen] = useState(false);
+  const [isSuccessConfirmationOpen, setIsSuccessConfirmationOpen] = useState(false);
 
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<InventoryItem | null>(null);
   const [adjustingItem, setAdjustingItem] = useState<InventoryItem | null>(null);
+  const [newlyAddedItem, setNewlyAddedItem] = useState<InventoryItem | null>(null);
 
   // Enhanced Filter State
   const [filters, setFilters] = useState<FilterState>({
@@ -1164,11 +1226,11 @@ export default function EnhancedInventoryPage() {
 
   // Form state for Add/Edit dialog
   const [itemName, setItemName] = useState('');
-  const [itemCategory, setItemCategory] = useState<InventoryItem['category']>('tire');
-  const [itemVehicleType, setItemVehicleType] = useState<InventoryItem['vehicle_type']>('car');
+  const [itemCategory, setItemCategory] = useState<InventoryItem['category']>('');
+  const [itemVehicleType, setItemVehicleType] = useState<InventoryItem['vehicle_type']>('');
   const [itemCostPrice, setItemCostPrice] = useState('');
   const [itemSalePrice, setItemSalePrice] = useState('');
-  const [itemStockQuantity, setItemStockQuantity] = useState('0');
+  const [itemStockQuantity, setItemStockQuantity] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -1289,6 +1351,22 @@ export default function EnhancedInventoryPage() {
     return filtered;
   }, [items, filters]);
 
+  // derive the currently visible slice for the table
+  const displayedItems = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage;
+    return processedItems.slice(start, start + rowsPerPage);
+  }, [processedItems, currentPage, rowsPerPage]);
+
+  // reset page when filters or page size change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters.search, filters.category, filters.vehicleType, filters.stockStatus, rowsPerPage, processedItems.length]);
+
+  function calculateMargin(item: InventoryItem) {
+    if (!item.cost_price || item.cost_price === 0) return 0;
+    return ((item.sale_price - item.cost_price) / item.cost_price) * 100;
+  }
+
   // Enhanced columns for DataTableWrapper with search functionality
   const enhancedColumns = [
     { 
@@ -1370,14 +1448,32 @@ export default function EnhancedInventoryPage() {
   const outOfStockCount = items.filter(p => p.stock_quantity === 0).length;
   const criticalStockCount = items.filter(p => p.stock_quantity > 0 && p.stock_quantity <= 2).length;
 
-  // Helper functions
+  // Add this state for tracking validation errors
+  const [formErrors, setFormErrors] = useState({
+    name: false,
+    category: false,
+    vehicleType: false,
+    costPrice: false,
+    salePrice: false,
+    stock: false
+  });
+
+  // Update the resetForm function to clear errors
   const resetForm = () => {
     setItemName('');
-    setItemCategory('tire');
-    setItemVehicleType('car');
+    setItemCategory('');
+    setItemVehicleType('');
     setItemCostPrice('');
     setItemSalePrice('');
     setItemStockQuantity('0');
+    setFormErrors({
+      name: false,
+      category: false,
+      vehicleType: false,
+      costPrice: false,
+      salePrice: false,
+      stock: false
+    });
   };
 
   const populateForm = (product: InventoryItem) => {
@@ -1413,29 +1509,62 @@ export default function EnhancedInventoryPage() {
 
   const handleSubmit = async () => {
     if (!supabase) return;
-    if (!itemName || !itemCostPrice || !itemSalePrice) { 
-      toast({ title: "Validation Error", description: "Name, Cost Price, and Sale Price are required.", variant: "destructive" });
+    
+    // Validate required fields and negative values
+    const stockQuantity = parseInt(itemStockQuantity || '0');
+    const costPrice = parseFloat(itemCostPrice || '0');
+    const salePrice = parseFloat(itemSalePrice || '0');
+    
+    const errors = {
+      name: !itemName.trim(),
+      category: !itemCategory,
+      vehicleType: !itemVehicleType,
+      costPrice: costPrice < 0,
+      salePrice: salePrice < 0,
+      stock: stockQuantity < 0
+    };
+    
+    setFormErrors(errors);
+    
+    // Check if any errors exist
+    if (Object.values(errors).some(error => error)) {
+      toast({ 
+        title: "Validation Error", 
+        description: "Please fix all errors before saving.", 
+        variant: "destructive" 
+      });
       return;
     }
     
     const itemData = {
-      name: itemName,
+      name: itemName.trim(),
       category: itemCategory,
       vehicle_type: itemVehicleType,
-      cost_price: parseFloat(itemCostPrice),
-      sale_price: parseFloat(itemSalePrice),
-      stock_quantity: parseInt(itemStockQuantity, 10),
+      cost_price: costPrice,
+      sale_price: salePrice,
+      stock_quantity: stockQuantity,
     };
 
     setIsLoading(true);
 
     let error;
+    let result;
+
     if (editingItem) {
-        const { error: updateError } = await supabase.from('inventory_item').update(itemData).eq('item_id', editingItem.item_id);
+        const { data, error: updateError } = await supabase
+          .from('inventory_item')
+          .update(itemData)
+          .eq('item_id', editingItem.item_id)
+          .select();
         error = updateError;
+        result = data;
     } else {
-        const { error: insertError } = await supabase.from('inventory_item').insert([itemData]);
+        const { data, error: insertError } = await supabase
+          .from('inventory_item')
+          .insert([itemData])
+          .select();
         error = insertError;
+        result = data;
     }
 
     setIsLoading(false);
@@ -1444,10 +1573,19 @@ export default function EnhancedInventoryPage() {
       console.error('Error saving item:', error);
       toast({ title: "Save Error", description: `Could not save item: ${error.message}`, variant: "destructive" });
     } else {
-      toast({ title: "Success", description: `Item ${editingItem ? 'updated' : 'saved'} successfully.` });
+      if (!editingItem && result && result[0]) {
+        // For new items, show the success confirmation with the created item
+        setNewlyAddedItem(result[0] as InventoryItem);
+        setIsSuccessConfirmationOpen(true);
+      } else {
+        // For edits, show toast
+        toast({ title: "Success", description: "Item updated successfully" });
+      }
+      
       setIsAddItemDialogOpen(false);
       setIsEditItemDialogOpen(false);
       setEditingItem(null);
+      resetForm();
       fetchProducts();
     }
   };
@@ -1552,12 +1690,6 @@ export default function EnhancedInventoryPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  // Calculate profit margin
-  const calculateMargin = (item: InventoryItem) => {
-    if (!item.cost_price || item.cost_price === 0) return 0;
-    return ((item.sale_price - item.cost_price) / item.cost_price) * 100;
   };
 
   return (
@@ -1681,13 +1813,6 @@ export default function EnhancedInventoryPage() {
               </button> 
           </div>
 
-        {/* Enhanced Filters */}
-        <AdvancedFilters 
-          filters={filters}
-          onFiltersChange={setFilters}
-          onClearFilters={handleClearFilters}
-        />
-
         {/* Enhanced Inventory Table using DataTableWrapper */}
         <section aria-labelledby="inventory-list-heading">
           {/* Using DataTableWrapper instead of custom table card */}
@@ -1703,207 +1828,370 @@ export default function EnhancedInventoryPage() {
               onAddItem={handleOpenAddDialog}
             />
           ) : (
-            <DataTableWrapper
-              title={
-                <div className="space-y-1">
-                  <div className="text-lg font-semibold">Inventory Items</div>
+            <>
+              {/* Single rounded card: gradient header + table (header spans full card width) */}
+              <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
+                <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-400 text-white p-4 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2 bg-white/20 rounded-lg">
+                      <PackageSearch className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <div className="text-xl font-bold font-poppins">Inventory Items</div>
+                      <div className="text-sm opacity-90">Track products, stock levels and pricing</div>
+                      {/* Total / Filtered count moved here (left, below title/subtitle) */}
+                      <div className="text-sm text-white/90 mt-1">
+                        {filters.search || filters.category !== 'all' || filters.stockStatus !== 'all' || filters.vehicleType !== 'all' ? (
+                          <>Filtered: <strong>{processedItems.length}</strong> of <strong>{items.length}</strong> items</>
+                        ) : (
+                          <>Total: <strong>{items.length}</strong> items</>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+ 
+                  {/* Rows per page relocated to the header (right side) */}
                   <div className="flex items-center gap-3">
-                    <div className="text-sm text-slate-600">
-                      {filters.search || filters.category !== 'all' || filters.stockStatus !== 'all' || filters.vehicleType !== 'all' ? (
-                        <>Filtered: <strong>{processedItems.length}</strong> of <strong>{items.length}</strong> items</>
-                      ) : (
-                        <>Total: <strong>{items.length}</strong> items</>
-                      )}
+                    <div className="text-sm text-white/90 mr-2">Rows per page:</div>
+                    <div className="w-28">
+                      <Select value={String(rowsPerPage)} onValueChange={(v) => setRowsPerPage(Number(v))}>
+                        <SelectTrigger className="w-full border-transparent bg-white/20 text-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {rowsPerPageOptions.map(option => (
+
+                            <SelectItem key={option} value={String(option)}>{option}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>
-              }
-               columns={enhancedColumns}
-               data={processedItems.map(i => ({...i, id: i.item_id}))}
-               onEdit={handleOpenEditDialog}
-               onDelete={handleOpenDeleteDialog}   
-            />
-          )}
-        </section>
+ 
+                {/* Advanced Filters now live directly under the gradient header so they appear as part of the table header */}
+                <div>
+                  <AdvancedFilters 
+                    filters={filters}
+                    onFiltersChange={setFilters}
+                    onClearFilters={handleClearFilters}
+                  />
+                </div>
 
-        {/* Enhanced Add/Edit Item Dialog - FIXED: White background and consistent UI */}
-        <Dialog open={isAddItemDialogOpen || isEditItemDialogOpen} onOpenChange={(isOpen) => {
-            if (isLoading) return;
-            if (!isOpen) {
-              setIsAddItemDialogOpen(false);
-              setIsEditItemDialogOpen(false);
-              setEditingItem(null);
-            }
-        }}>
-          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                {editingItem ? 'Edit Item' : 'Add New Item'}
-              </DialogTitle>
-              <DialogDescription className="text-slate-600">
-                {editingItem ? `Update details for ${editingItem.name}.` : 'Enter the details for the new item.'}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-              <div className="col-span-1 md:col-span-2 space-y-2">
-                <Label htmlFor="itemName" className="text-slate-700 font-medium">Item Name</Label>
-                <Input 
-                  id="itemName" 
-                  value={itemName} 
-                  onChange={(e) => setItemName(e.target.value)} 
-                  placeholder="Michelin Tire XZ" 
-                  className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white"
-                />
+                   {/* DataTableWrapper without its own title so the gradient header remains part of the same card */}
+                   <DataTableWrapper
+                     className="w-full"
+                     columns={enhancedColumns}
+                     data={displayedItems.map(i => ({ ...i, id: i.item_id }))}
+                     onEdit={handleOpenEditDialog}
+                     onDelete={handleOpenDeleteDialog}
+                   />
+                 {/* footer: rows-per-page + showing X of Y + simple pager */}
+                <div className="px-6 py-3 border-t border-slate-100 bg-white flex items-center justify-between">
+                  <div className="text-sm text-slate-600">
+                    Showing {processedItems.length === 0 ? 0 : ((currentPage - 1) * rowsPerPage + 1)} to {Math.min(currentPage * rowsPerPage, processedItems.length)} of {processedItems.length} entries
+                  </div>
+                  {/* Pager only (rows-per-page moved to header) */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="min-w-[36px] h-8 px-2 py-1"
+                    >
+                      «
+                    </Button>
+                    <div className="text-sm text-slate-700 px-3">Page {currentPage} of {Math.max(1, Math.ceil(processedItems.length / rowsPerPage))}</div>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(p => Math.min(Math.ceil(processedItems.length / rowsPerPage) || 1, p + 1))}
+                      disabled={currentPage >= Math.ceil(processedItems.length / rowsPerPage)}
+                      className="min-w-[36px] h-8 px-2 py-1"
+                    >
+                      »
+                    </Button>
+                  </div>
+                </div>
+               </div>
+             </>
+            )}
+          </section>
+        </div>
+
+      {/* === DIALOGS / MODALS === */}
+      {/* Add / Edit Item Dialog */}
+      <Dialog
+        open={isAddItemDialogOpen || isEditItemDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsAddItemDialogOpen(false);
+            setIsEditItemDialogOpen(false);
+            setEditingItem(null);
+            resetForm();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl bg-white border border-slate-200 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">
+              {isEditItemDialogOpen ? 'Edit Item' : 'Add New Item'}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditItemDialogOpen ? 'Update inventory item details' : 'Create a new inventory item'}
+            </DialogDescription>
+          </DialogHeader>
+ 
+          <div className="py-2">
+            {/* Compact form in list style */}
+            <div className="space-y-3">
+              {/* Row 1: Product Name and Stock */}
+              <div className="flex gap-4 items-start">
+                <div className="flex-1">
+                  <Label className="text-sm font-medium text-slate-700 mb-1 block">Product Name *</Label>
+                  <Input
+                    placeholder="[SIZE] [BRAND]"
+                    value={itemName}
+                    onChange={(e) => {
+                      setItemName(e.target.value);
+                      if (formErrors.name) {
+                        setFormErrors(prev => ({ ...prev, name: false }));
+                      }
+                    }}
+                    className={
+                      formErrors.name 
+                        ? "border-red-500 focus:border-red-500 bg-white h-9" 
+                        : "border-slate-300 focus:border-indigo-400 bg-white h-9"
+                    }
+                  />
+                  {formErrors.name && (
+                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Product Name is required
+                    </p>
+                  )}
+                </div>
+                
+                <div className="w-32">
+                  <Label className="text-sm font-medium text-slate-700 mb-1 block">Stock</Label>
+                  <div className="flex items-center border border-slate-300 rounded-md bg-white focus-within:border-indigo-400 overflow-hidden h-9">
+                    <button
+                      type="button"
+                      onClick={() => setItemStockQuantity(prev => Math.max(0, parseInt(prev || '0') - 1).toString())}
+                      className="px-2 py-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-colors border-r border-gray-200 flex items-center justify-center w-8 h-full text-sm"
+                    >
+                      -
+                    </button>
+                    <Input
+                      placeholder="0"
+                      value={itemStockQuantity}
+                      onChange={(e) => {
+                        setItemStockQuantity(e.target.value);
+                        // Clear stock error when user starts typing
+                        if (formErrors.stock) {
+                          setFormErrors(prev => ({ ...prev, stock: false }));
+                        }
+                      }}
+                      className={
+                        formErrors.stock 
+                          ? "border-0 text-center focus:ring-0 shadow-none flex-1 h-full text-sm px-1 border-red-500" 
+                          : "border-0 text-center focus:ring-0 shadow-none flex-1 h-full text-sm px-1"
+                      }
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setItemStockQuantity(prev => (parseInt(prev || '0') + 1).toString())}
+                      className="px-2 py-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-colors border-l border-gray-200 flex items-center justify-center w-8 h-full text-sm"
+                    >
+                      +
+                    </button>
+                  </div>
+                  {formErrors.stock && (
+                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Stock cannot be negative
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="itemCategory" className="text-slate-700 font-medium">Category</Label>
-                <Select value={itemCategory} onValueChange={(v) => setItemCategory(v as InventoryItem['category'])}>
-                  <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white">
-                    <SelectValue placeholder="Select category..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="tire">Tire</SelectItem>
-                    <SelectItem value="tool">Tool</SelectItem>
-                    <SelectItem value="accessory">Accessory</SelectItem>
-                  </SelectContent>
-                </Select>
+
+              {/* Row 2: Category and Vehicle Type */}
+              <div className="flex gap-4 items-start">
+                <div className="flex-1">
+                  <Label className="text-sm font-medium text-slate-700 mb-1 block">Category *</Label>
+                  <Select 
+                    value={itemCategory} 
+                    onValueChange={(v) => {
+                      setItemCategory(v as any);
+                      if (formErrors.category) {
+                        setFormErrors(prev => ({ ...prev, category: false }));
+                      }
+                    }}
+                  >
+                    <SelectTrigger className={
+                      formErrors.category 
+                        ? "border-red-500 focus:border-red-500 bg-white h-9" 
+                        : "border-slate-300 focus:border-indigo-400 bg-white h-9"
+                    }>
+                      <SelectValue placeholder="Select Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tire">Tire</SelectItem>
+                      <SelectItem value="tool">Tool</SelectItem>
+                      <SelectItem value="accessory">Accessory</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {formErrors.category && (
+                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Category is required
+                    </p>
+                  )}
+                </div>
+                
+                <div className="flex-1">
+                  <Label className="text-sm font-medium text-slate-700 mb-1 block">Vehicle Type *</Label>
+                  <Select 
+                    value={itemVehicleType} 
+                    onValueChange={(v) => {
+                      setItemVehicleType(v as any);
+                      if (formErrors.vehicleType) {
+                        setFormErrors(prev => ({ ...prev, vehicleType: false }));
+                      }
+                    }}
+                  >
+                    <SelectTrigger className={
+                      formErrors.vehicleType 
+                        ? "border-red-500 focus:border-red-500 bg-white h-9" 
+                        : "border-slate-300 focus:border-indigo-400 bg-white h-9"
+                    }>
+                      <SelectValue placeholder="Select Vehicle Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="car">Car</SelectItem>
+                      <SelectItem value="motor">Motorcycle</SelectItem>
+                      <SelectItem value="truck">Truck</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {formErrors.vehicleType && (
+                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Vehicle Type is required
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="itemVehicleType" className="text-slate-700 font-medium">Vehicle Type</Label>
-                <Select value={itemVehicleType} onValueChange={(v) => setItemVehicleType(v as InventoryItem['vehicle_type'])}>
-                  <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white">
-                    <SelectValue placeholder="Select vehicle type..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="car">Car</SelectItem>
-                    <SelectItem value="motor">Motorcycle</SelectItem>
-                    <SelectItem value="truck">Truck</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="itemStockQuantity" className="text-slate-700 font-medium">Initial Stock</Label>
-                <Input 
-                  id="itemStockQuantity" 
-                  type="number" 
-                  value={itemStockQuantity} 
-                  onChange={(e) => setItemStockQuantity(e.target.value)} 
-                  placeholder="10" 
-                  className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="itemCostPrice" className="text-slate-700 font-medium">Cost Price (₱)</Label>
-                <Input 
-                  id="itemCostPrice" 
-                  type="number" 
-                  step="0.01"
-                  value={itemCostPrice} 
-                  onChange={(e) => setItemCostPrice(e.target.value)} 
-                  placeholder="5000.00" 
-                  className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="itemSalePrice" className="text-slate-700 font-medium">Sale Price (₱)</Label>
-                <Input 
-                  id="itemSalePrice" 
-                  type="number" 
-                  step="0.01"
-                  value={itemSalePrice} 
-                  onChange={(e) => setItemSalePrice(e.target.value)} 
-                  placeholder="7500.00" 
-                  className="border-slate-300 focus:border-indigo-400 transition-all duration-300 bg-white"
-                />
+
+              {/* Row 3: Prices */}
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <Label className="text-sm font-medium text-slate-700 mb-1 block">Cost Price (₱)</Label>
+                  <Input
+                    placeholder="0.00"
+                    value={itemCostPrice}
+                    onChange={(e) => {
+                      setItemCostPrice(e.target.value);
+                      // Clear cost price error when user starts typing
+                      if (formErrors.costPrice) {
+                        setFormErrors(prev => ({ ...prev, costPrice: false }));
+                      }
+                    }}
+                    className={
+                      formErrors.costPrice 
+                        ? "border-red-500 focus:border-red-500 bg-white h-9" 
+                        : "border-slate-300 focus:border-indigo-400 bg-white h-9"
+                    }
+                  />
+                  {formErrors.costPrice && (
+                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Cost price cannot be negative
+                    </p>
+                  )}
+                </div>
+                
+                <div className="flex-1">
+                  <Label className="text-sm font-medium text-slate-700 mb-1 block">Sale Price (₱)</Label>
+                  <Input
+                    placeholder="0.00"
+                    value={itemSalePrice}
+                    onChange={(e) => {
+                      setItemSalePrice(e.target.value);
+                      // Clear sale price error when user starts typing
+                      if (formErrors.salePrice) {
+                        setFormErrors(prev => ({ ...prev, salePrice: false }));
+                      }
+                    }}
+                    className={
+                      formErrors.salePrice 
+                        ? "border-red-500 focus:border-red-500 bg-white h-9" 
+                        : "border-slate-300 focus:border-indigo-400 bg-white h-9"
+                    }
+                  />
+                  {formErrors.salePrice && (
+                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Sale price cannot be negative
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  disabled={isLoading}
-                  className="flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95"
-                >
-                  <X className="h-4 w-4" />
-                  Cancel
-                </Button>
-              </DialogClose>
-              <Button 
-                type="submit" 
-                onClick={handleSubmit} 
-                disabled={isLoading}
-                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-2"
-              >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                {editingItem ? 'Save Changes' : 'Save Item'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Stock Adjustment Dialog - FIXED: White background */}
-        <Dialog open={isStockAdjustmentOpen} onOpenChange={setIsStockAdjustmentOpen}>
-          <DialogContent className="sm:max-md bg-white border border-slate-200 shadow-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                Adjust Stock - {adjustingItem?.name}
-              </DialogTitle>
-              <DialogDescription className="text-slate-600">
-                Update the stock quantity for this item.
-              </DialogDescription>
-            </DialogHeader>
-            {adjustingItem && (
+          </div>
+ 
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsAddItemDialogOpen(false); setIsEditItemDialogOpen(false); resetForm(); }}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg hover:shadow-xl">
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+ 
+      {/* Stock Adjustment Dialog */}
+      <Dialog open={isStockAdjustmentOpen} onOpenChange={(open) => { if (!open) { setIsStockAdjustmentOpen(false); setAdjustingItem(null); } }}>
+        <DialogContent className="sm:max-w-xl bg-white border border-slate-200 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold">Adjust Stock</DialogTitle>
+            <DialogDescription>Modify stock quantity for the selected item</DialogDescription>
+          </DialogHeader>
+          {adjustingItem && (
+            <div className="p-4">
               <StockAdjustmentForm
                 item={adjustingItem}
-                onSave={handleStockAdjustment}
-                onCancel={() => setIsStockAdjustmentOpen(false)}
+                onSave={async (adj, reason) => { await handleStockAdjustment(adj, reason); }}
+                onCancel={() => { setIsStockAdjustmentOpen(false); setAdjustingItem(null); }}
               />
-            )}
-          </DialogContent>
-        </Dialog>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+ 
+      {/* Critical Stock Details (Review Alerts) */}
+      <CriticalStockDetails
+        items={items}
+        isOpen={isCriticalDetailsOpen}
+        onClose={() => setIsCriticalDetailsOpen(false)}
+      />
+ 
+      {/* View More Dialog */}
+      <ViewMoreDialog
+        items={items}
+        isOpen={isViewMoreOpen}
+        onClose={() => setIsViewMoreOpen(false)}
+      />
 
-        {/* Critical Stock Details Dialog - FIXED: White background */}
-        <CriticalStockDetails
-          items={items}
-          isOpen={isCriticalDetailsOpen}
-          onClose={() => setIsCriticalDetailsOpen(false)}
-        />
-
-        {/* View More Dialog - FIXED: White background */}
-        <ViewMoreDialog
-          items={processedItems}
-          isOpen={isViewMoreOpen}
-          onClose={() => setIsViewMoreOpen(false)}
-        />
-
-        {/* Delete Confirmation Dialog - FIXED: White background */}
-        <AlertDialog open={isDeleteConfirmationOpen} onOpenChange={setIsDeleteConfirmationOpen}>
-          <AlertDialogContent className="bg-white border border-slate-200 shadow-2xl">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-slate-900">Confirm Deletion</AlertDialogTitle>
-              <AlertDialogDescription className="text-slate-600">
-                Are you sure you want to delete <strong>{deletingItem?.name}</strong>? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95">
-                <X className="h-4 w-4" />
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={handleDeleteItem} 
-                disabled={isLoading} 
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-red-600 active:scale-95 flex items-center gap-2"
-              >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Archive className="h-4 w-4" />}
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
-
+      {/* Success Confirmation Dialog */}
+      <SuccessConfirmation
+        item={newlyAddedItem!}
+        isOpen={isSuccessConfirmationOpen}
+        onClose={() => {
+          setIsSuccessConfirmationOpen(false);
+          setNewlyAddedItem(null);
+        }}
+        onAddAnother={handleOpenAddDialog}
+      />
       {/* Error Display */}
       {fetchError && (
         <div className="w-full bg-red-50 border-t border-red-200 py-4">
