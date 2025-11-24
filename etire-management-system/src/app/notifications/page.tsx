@@ -22,8 +22,8 @@ export default function NotificationsPage() {
     const fetchNotifications = useCallback(async () => {
         if (!supabase || !authUser) return;
         setIsLoading(true);
-        const { data, error } = await supabase
-            .from('notification')
+        const { data, error } = await (supabase
+            .from('notification') as any)
             .select('*')
             .eq('user_id', authUser.user_id)
             .order('created_at', { ascending: false });
@@ -44,17 +44,17 @@ export default function NotificationsPage() {
 
     const markAsRead = async (notificationId: string) => {
         if (!supabase) return;
-        const { error } = await supabase
-            .from('notification')
+        const { error } = await (supabase
+            .from('notification') as any)
             .update({ is_read: true })
             .eq('notification_id', notificationId);
 
         if (error) {
             toast({ title: "Error", description: "Could not mark notification as read.", variant: "destructive" });
         } else {
-            setNotifications(prev => 
-                prev.map(notif => 
-                    notif.notification_id === notificationId 
+            setNotifications(prev =>
+                prev.map(notif =>
+                    notif.notification_id === notificationId
                         ? { ...notif, is_read: true }
                         : notif
                 )
@@ -64,8 +64,8 @@ export default function NotificationsPage() {
 
     const markAllAsRead = async () => {
         if (!supabase || !authUser) return;
-        const { error } = await supabase
-            .from('notification')
+        const { error } = await (supabase
+            .from('notification') as any)
             .update({ is_read: true })
             .eq('user_id', authUser.user_id)
             .eq('is_read', false);
@@ -73,7 +73,7 @@ export default function NotificationsPage() {
         if (error) {
             toast({ title: "Error", description: "Could not mark all notifications as read.", variant: "destructive" });
         } else {
-            setNotifications(prev => 
+            setNotifications(prev =>
                 prev.map(notif => ({ ...notif, is_read: true }))
             );
             toast({ title: "Success", description: "All notifications marked as read." });
@@ -82,15 +82,15 @@ export default function NotificationsPage() {
 
     const deleteNotification = async (notificationId: string) => {
         if (!supabase) return;
-        const { error } = await supabase
-            .from('notification')
+        const { error } = await (supabase
+            .from('notification') as any)
             .delete()
             .eq('notification_id', notificationId);
 
         if (error) {
             toast({ title: "Error", description: "Could not delete notification.", variant: "destructive" });
         } else {
-            setNotifications(prev => 
+            setNotifications(prev =>
                 prev.filter(notif => notif.notification_id !== notificationId)
             );
         }
@@ -141,14 +141,14 @@ export default function NotificationsPage() {
 
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-            <PageHeader 
-                title="Notifications & Alerts" 
+            <PageHeader
+                title="Notifications & Alerts"
                 description="View and manage your notifications and system alerts."
             >
                 {unreadCount > 0 && (
-                    <Button 
-                        size="sm" 
-                        variant="outline" 
+                    <Button
+                        size="sm"
+                        variant="outline"
                         onClick={markAllAsRead}
                         disabled={isLoading}
                     >
@@ -174,11 +174,10 @@ export default function NotificationsPage() {
                         </Card>
                     ) : (
                         notifications.map((notification) => (
-                            <Card 
-                                key={notification.notification_id} 
-                                className={`transition-all duration-200 hover:shadow-md ${
-                                    !notification.is_read ? 'border-l-4 border-l-primary bg-primary/5' : ''
-                                }`}
+                            <Card
+                                key={notification.notification_id}
+                                className={`transition-all duration-200 hover:shadow-md ${!notification.is_read ? 'border-l-4 border-l-primary bg-primary/5' : ''
+                                    }`}
                             >
                                 <CardHeader className="pb-3">
                                     <div className="flex items-start justify-between">
@@ -192,8 +191,8 @@ export default function NotificationsPage() {
                                                             New
                                                         </Badge>
                                                     )}
-                                                    <Badge 
-                                                        variant="outline" 
+                                                    <Badge
+                                                        variant="outline"
                                                         className={`text-xs ${getNotificationBadgeColor(notification.type)}`}
                                                     >
                                                         {notification.type}

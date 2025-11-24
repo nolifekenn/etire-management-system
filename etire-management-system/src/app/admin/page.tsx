@@ -3,23 +3,23 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+    DialogClose,
 } from '@/components/ui/dialog';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,76 +35,76 @@ import { User } from '@/lib/types';
 
 // Design system from POS page
 const buttonStyles = {
-  primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl",
-  secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95",
-  glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg"
+    primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl",
+    secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95",
+    glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg"
 };
 
 const microAnimations = {
-  cardHover: "transition-all duration-350 ease-spring hover:translate-y-[-6px] hover:shadow-2xl",
-  buttonHover: "transition-all duration-200 hover:scale-105 active:scale-95",
-  fadeIn: "animate-in fade-in duration-500",
-  iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
+    cardHover: "transition-all duration-350 ease-spring hover:translate-y-[-6px] hover:shadow-2xl",
+    buttonHover: "transition-all duration-200 hover:scale-105 active:scale-95",
+    fadeIn: "animate-in fade-in duration-500",
+    iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
 };
 
 // Updated columns with sortable flags and custom render functions
 const columns = [
-  { 
-    key: 'name', 
-    header: 'Name',
-    sortable: true
-  },
-  { 
-    key: 'username', 
-    header: 'Username',
-    sortable: true
-  },
-  { 
-    key: 'password_display', 
-    header: 'Password',
-    sortable: false
-  },
-  { 
-    key: 'role_display', 
-    header: 'Role',
-    sortable: true,
-    render: (value: any, item: any) => {
-      const role = (item as User).role;
-      if (role === 3) return <Badge variant="default" className="bg-red-600 hover:bg-red-700 text-white">Admin</Badge>;
-      if (role === 2) return <Badge variant="default" className="bg-purple-600 hover:bg-purple-700 text-white">Branch Manager</Badge>;
-      if (role === 1) return <Badge variant="default" className="bg-blue-600 hover:bg-blue-700 text-white">Staff</Badge>;
-      return <Badge variant="outline" className="text-slate-600">Guest</Badge>;
-    }
-  },
-  { 
-    key: 'status', 
-    header: 'Status',
-    sortable: true,
-    render: (value: any, item: any) => {
-      const role = (item as User).role;
-      if (role === 0) {
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-600 border-yellow-300">Pending Approval</Badge>;
-      } else if (role === 1) {
-        return <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-300">Active Staff</Badge>;
-      } else if (role === 2) {
-        return <Badge variant="outline" className="bg-purple-50 text-purple-600 border-purple-300">Manager</Badge>;
-      } else if (role === 3) {
-        return <Badge variant="outline" className="bg-red-50 text-red-600 border-red-300">Administrator</Badge>;
-      }
-      return <Badge variant="outline">Unknown</Badge>;
-    }
-  },
+    {
+        key: 'name',
+        header: 'Name',
+        sortable: true
+    },
+    {
+        key: 'username',
+        header: 'Username',
+        sortable: true
+    },
+    {
+        key: 'password_display',
+        header: 'Password',
+        sortable: false
+    },
+    {
+        key: 'role_display',
+        header: 'Role',
+        sortable: true,
+        render: (value: any, item: any) => {
+            const role = (item as User).role;
+            if (role === 3) return <Badge variant="default" className="bg-red-600 hover:bg-red-700 text-white">Admin</Badge>;
+            if (role === 2) return <Badge variant="default" className="bg-purple-600 hover:bg-purple-700 text-white">Branch Manager</Badge>;
+            if (role === 1) return <Badge variant="default" className="bg-blue-600 hover:bg-blue-700 text-white">Staff</Badge>;
+            return <Badge variant="outline" className="text-slate-600">Guest</Badge>;
+        }
+    },
+    {
+        key: 'status',
+        header: 'Status',
+        sortable: true,
+        render: (value: any, item: any) => {
+            const role = (item as User).role;
+            if (role === 0) {
+                return <Badge variant="outline" className="bg-yellow-50 text-yellow-600 border-yellow-300">Pending Approval</Badge>;
+            } else if (role === 1) {
+                return <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-300">Active Staff</Badge>;
+            } else if (role === 2) {
+                return <Badge variant="outline" className="bg-purple-50 text-purple-600 border-purple-300">Manager</Badge>;
+            } else if (role === 3) {
+                return <Badge variant="outline" className="bg-red-50 text-red-600 border-red-300">Administrator</Badge>;
+            }
+            return <Badge variant="outline">Unknown</Badge>;
+        }
+    },
 ];
 
 export default function AdminPage() {
     const { toast } = useToast();
     const { user, isLoading: isAuthLoading } = useAuth();
     const [mounted, setMounted] = useState(false);
-    
+
     const [users, setUsers] = useState<User[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [fetchError, setFetchError] = useState<string | null>(null);
-    
+
     const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
     const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
     const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
@@ -214,7 +214,7 @@ export default function AdminPage() {
             fetchUsers();
         }
     };
-    
+
     const handleDeleteUser = async () => {
         if (!deletingUser || !supabase) return;
         setIsLoading(true);
@@ -229,7 +229,7 @@ export default function AdminPage() {
             fetchUsers();
         }
     };
-    
+
     const getRoleName = (roleId: number) => {
         if (roleId === 3) return 'Admin';
         if (roleId === 2) return 'Branch Manager';
@@ -258,7 +258,7 @@ export default function AdminPage() {
             </div>
         );
     }
-    
+
     if (!user || (user.role !== 2 && user.role !== 3)) {
         return (
             <div className="min-h-screen bg-white text-slate-800 font-poppins">
@@ -282,7 +282,7 @@ export default function AdminPage() {
                         <AlertTriangle className="h-4 w-4" />
                         <AlertTitle>Access Denied</AlertTitle>
                         <AlertDescription>
-                            You do not have administrator privileges to access this page. 
+                            You do not have administrator privileges to access this page.
                             Only users with Admin (role = 3) or Branch Manager (role = 2) can access the admin panel.
                             {user && (
                                 <div className="mt-2">
@@ -320,9 +320,9 @@ export default function AdminPage() {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div className="flex gap-2">
-                            <Button 
+                            <Button
                                 onClick={refreshData}
                                 disabled={isLoading}
                                 className="bg-white/20 backdrop-blur-lg border border-white/30 hover:bg-white/30 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg active:scale-95"
@@ -408,26 +408,26 @@ export default function AdminPage() {
                                     {editingUser ? 'Edit User' : 'Add New User'}
                                 </DialogTitle>
                                 <DialogDescription>
-                                {editingUser ? `Update details for ${editingUser.name}.` : 'Enter the details for the new user.'}
+                                    {editingUser ? `Update details for ${editingUser.name}.` : 'Enter the details for the new user.'}
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4 py-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="name" className="text-slate-700 font-medium">Full Name</Label>
-                                    <Input 
-                                        id="name" 
-                                        value={name} 
-                                        onChange={(e) => setName(e.target.value)} 
+                                    <Input
+                                        id="name"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
                                         placeholder="John Doe"
                                         className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="username" className="text-slate-700 font-medium">Username</Label>
-                                    <Input 
-                                        id="username" 
-                                        value={username} 
-                                        onChange={(e) => setUsername(e.target.value)} 
+                                    <Input
+                                        id="username"
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value)}
                                         placeholder="johndoe"
                                         className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
                                     />
@@ -435,17 +435,17 @@ export default function AdminPage() {
                                 <div className="space-y-2">
                                     <Label htmlFor="password" className="text-slate-700 font-medium">Password</Label>
                                     <div className="relative">
-                                        <Input 
-                                            id="password" 
-                                            type={showPassword ? 'text' : 'password'} 
-                                            value={password} 
-                                            onChange={(e) => setPassword(e.target.value)} 
+                                        <Input
+                                            id="password"
+                                            type={showPassword ? 'text' : 'password'}
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
                                             placeholder={editingUser ? "Leave blank to keep current password" : "Enter a strong password"}
                                             className="border-slate-300 focus:border-indigo-400 transition-all duration-300 pr-10"
                                         />
-                                        <Button 
-                                            variant="ghost" 
-                                            size="icon" 
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
                                             className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 hover:bg-slate-100 transition-all duration-300"
                                             onClick={() => setShowPassword(!showPassword)}
                                         >
@@ -457,7 +457,7 @@ export default function AdminPage() {
                                     <Label htmlFor="role" className="text-slate-700 font-medium">Role</Label>
                                     <Select value={String(role)} onValueChange={(v) => setRole(Number(v))}>
                                         <SelectTrigger className="border-slate-300 focus:border-indigo-400">
-                                            <SelectValue/>
+                                            <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="0">Guest</SelectItem>
@@ -474,9 +474,9 @@ export default function AdminPage() {
                                         Cancel
                                     </Button>
                                 </DialogClose>
-                                <Button 
-                                    type="submit" 
-                                    onClick={handleSubmit} 
+                                <Button
+                                    type="submit"
+                                    onClick={handleSubmit}
                                     disabled={isLoading}
                                     className={buttonStyles.primary + " " + microAnimations.buttonHover}
                                 >
@@ -502,9 +502,9 @@ export default function AdminPage() {
                                 <AlertDialogCancel className="border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-600">
                                     Cancel
                                 </AlertDialogCancel>
-                                <AlertDialogAction 
-                                    onClick={handleDeleteUser} 
-                                    disabled={isLoading} 
+                                <AlertDialogAction
+                                    onClick={handleDeleteUser}
+                                    disabled={isLoading}
                                     className="bg-red-600 hover:bg-red-700 text-white transition-all duration-300"
                                 >
                                     {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Delete'}
@@ -548,3 +548,186 @@ export default function AdminPage() {
         </div>
     );
 }
+                                </div >
+    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+        <Users className="h-5 w-5 text-purple-600" />
+    </div>
+                            </div >
+                        </div >
+
+    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-lg hover:shadow-xl transition-all duration-300">
+        <div className="flex items-center justify-between">
+            <div>
+                <p className="text-sm font-medium text-slate-600">Staff</p>
+                <p className="text-2xl font-bold text-blue-600">{userStats.staff}</p>
+            </div>
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Users className="h-5 w-5 text-blue-600" />
+            </div>
+        </div>
+    </div>
+                    </div >
+
+    {/* Main Content */ }
+    < div className = {`transition-all duration-500 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        { fetchError && (
+            <Alert variant="destructive" className="mb-4 border-red-200 bg-red-50">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{fetchError}</AlertDescription>
+            </Alert>
+        )}
+
+                        <Dialog open={isAddUserDialogOpen || isEditUserDialogOpen} onOpenChange={isOpen => {
+                            if (!isOpen) {
+                                setIsAddUserDialogOpen(false);
+                                setIsEditUserDialogOpen(false);
+                            }
+                        }}>
+                            <DialogContent className="bg-white border-slate-200">
+                                <DialogHeader>
+                                    <DialogTitle className="flex items-center gap-2">
+                                        <UserPlus className="h-5 w-5 text-indigo-600" />
+                                        {editingUser ? 'Edit User' : 'Add New User'}
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                        {editingUser ? `Update details for ${editingUser.name}.` : 'Enter the details for the new user.'}
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="name" className="text-slate-700 font-medium">Full Name</Label>
+                                        <Input
+                                            id="name"
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                            placeholder="John Doe"
+                                            className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="username" className="text-slate-700 font-medium">Username</Label>
+                                        <Input
+                                            id="username"
+                                            value={username}
+                                            onChange={(e) => setUsername(e.target.value)}
+                                            placeholder="johndoe"
+                                            className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="password" className="text-slate-700 font-medium">Password</Label>
+                                        <div className="relative">
+                                            <Input
+                                                id="password"
+                                                type={showPassword ? 'text' : 'password'}
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                placeholder={editingUser ? "Leave blank to keep current password" : "Enter a strong password"}
+                                                className="border-slate-300 focus:border-indigo-400 transition-all duration-300 pr-10"
+                                            />
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 hover:bg-slate-100 transition-all duration-300"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                            >
+                                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="role" className="text-slate-700 font-medium">Role</Label>
+                                        <Select value={String(role)} onValueChange={(v) => setRole(Number(v))}>
+                                            <SelectTrigger className="border-slate-300 focus:border-indigo-400">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="0">Guest</SelectItem>
+                                                <SelectItem value="1">Staff</SelectItem>
+                                                <SelectItem value="2">Branch Manager</SelectItem>
+                                                <SelectItem value="3">Admin</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <DialogClose asChild>
+                                        <Button type="button" variant="outline" className="border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-600">
+                                            Cancel
+                                        </Button>
+                                    </DialogClose>
+                                    <Button
+                                        type="submit"
+                                        onClick={handleSubmit}
+                                        disabled={isLoading}
+                                        className={buttonStyles.primary + " " + microAnimations.buttonHover}
+                                    >
+                                        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        {editingUser ? 'Save Changes' : 'Create User'}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+
+                        <AlertDialog open={isDeleteConfirmationOpen} onOpenChange={setIsDeleteConfirmationOpen}>
+                            <AlertDialogContent className="bg-white border-slate-200">
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle className="flex items-center gap-2">
+                                        <AlertTriangle className="h-5 w-5 text-red-600" />
+                                        Confirm Deletion
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Are you sure you want to delete the user {deletingUser?.name}? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel className="border-slate-300 text-slate-600 hover:border-indigo-400 hover:text-indigo-600">
+                                        Cancel
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                        onClick={handleDeleteUser}
+                                        disabled={isLoading}
+                                        className="bg-red-600 hover:bg-red-700 text-white transition-all duration-300"
+                                    >
+                                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Delete'}
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+
+{/* Enhanced DataTableWrapper with all features */ }
+<DataTableWrapper
+    title="Registered Users"
+    columns={columns}
+    data={users.map(u => ({
+        ...u,
+        id: u.user_id,
+        password_display: '••••••••',
+        role_display: getRoleName(u.role),
+    }))}
+    rowsPerPageOptions={[5, 10, 25, 50]}
+    onAddNew={handleOpenAddDialog}
+    onEdit={handleOpenEditDialog}
+    onDelete={handleOpenDeleteDialog}
+    onRowClick={(user) => {
+        console.log('User clicked:', user);
+    }}
+/>
+                    </div >
+                </div >
+
+    <style jsx global>{`
+                @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+                
+                .font-poppins {
+                    font-family: 'Poppins', sans-serif;
+                }
+
+                .ease-spring {
+                    transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+                }
+            `}</style>
+            </div >
+        );
+    }

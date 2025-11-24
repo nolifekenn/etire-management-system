@@ -7,6 +7,8 @@ import { AuthProvider } from '@/hooks/useAuth';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { Toaster } from '@/components/ui/toaster';
+import { useNotificationListener } from '@/hooks/useNotificationListener';
 import './globals.css';
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
@@ -14,6 +16,9 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Enable real-time notification toasts
+  useNotificationListener();
 
   useEffect(() => {
     if (!isLoading && !user && pathname !== '/login') {
@@ -28,7 +33,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         router.push('/guest-access');
         return;
       }
-      
+
       if (user.role !== 0 && pathname === '/guest-access') {
         // Non-guest users shouldn't see guest access page
         router.push('/dashboard');
@@ -101,6 +106,7 @@ export default function AppLayout({
           <AuthWrapper>
             {children}
           </AuthWrapper>
+          <Toaster />
         </AuthProvider>
       </body>
     </html>

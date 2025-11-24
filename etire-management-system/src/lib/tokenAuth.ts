@@ -1,7 +1,21 @@
 // /lib/tokenAuth.ts
-import { Session, User } from "@supabase/supabase-js";
 
-// LocalStorage key for Supabase session
+// Custom types for authentication (not using Supabase Auth)
+export interface CustomUser {
+  user_id: string;
+  name: string;
+  username: string;
+  role: number; // 0: Guest, 1: Staff, 2: Branch Manager, 3: Admin
+}
+
+export interface CustomSession {
+  access_token: string;
+  refresh_token?: string;
+  expires_at: number; // Unix timestamp in seconds
+  user: CustomUser;
+}
+
+// LocalStorage key for custom auth session
 export const TOKEN_KEY = "etire_auth_session";
 export const FORM_STATE_PREFIX = "etire_form_";
 
@@ -9,8 +23,8 @@ export const FORM_STATE_PREFIX = "etire_form_";
 // 🔐 AUTH SESSION MANAGEMENT
 // ============================
 
-// Save Supabase session to localStorage
-export function saveAuthSession(session: Session): void {
+// Save custom auth session to localStorage
+export function saveAuthSession(session: CustomSession): void {
   try {
     localStorage.setItem(TOKEN_KEY, JSON.stringify(session));
   } catch (error) {
@@ -18,12 +32,12 @@ export function saveAuthSession(session: Session): void {
   }
 }
 
-// Retrieve Supabase session from localStorage
-export function getAuthSession(): Session | null {
+// Retrieve custom auth session from localStorage
+export function getAuthSession(): CustomSession | null {
   try {
     const sessionData = localStorage.getItem(TOKEN_KEY);
     if (!sessionData) return null;
-    const parsed = JSON.parse(sessionData) as Session;
+    const parsed = JSON.parse(sessionData) as CustomSession;
 
     // Check expiration
     if (parsed.expires_at && parsed.expires_at * 1000 < Date.now()) {
@@ -38,7 +52,7 @@ export function getAuthSession(): Session | null {
   }
 }
 
-// Clear Supabase session
+// Clear auth session
 export function clearAuthSession(): void {
   try {
     localStorage.removeItem(TOKEN_KEY);
@@ -54,7 +68,7 @@ export function isAuthenticated(): boolean {
 }
 
 // Get the current user from session
-export function getCurrentUser(): User | null {
+export function getCurrentUser(): CustomUser | null {
   const session = getAuthSession();
   return session?.user ?? null;
 }
