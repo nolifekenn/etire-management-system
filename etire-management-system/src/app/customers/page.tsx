@@ -231,7 +231,7 @@ const SearchInput = ({
   );
 };
 
-// Modern Widget Components
+// Modern Widget Components - Solid Color StatsOverview
 const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[], vehicles: any[], tireHistory: any[] }) => {
     const totalCustomers = customers.length;
     const totalVehicles = vehicles.length;
@@ -244,74 +244,107 @@ const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[],
     )].length;
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className={`bg-gradient-to-br from-purple-500 via-purple-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-purple-100 text-sm font-medium font-poppins">Total Customers</p>
-              <p className="text-3xl font-bold mt-2 font-poppins">{totalCustomers}</p>
-            </div>
-            <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-              <Users className="h-6 w-6" />
-            </div>
-          </div>
-          <div className="flex items-center gap-1 mt-4 text-purple-100 text-sm font-poppins">
-            <TrendingUp className="h-4 w-4" />
-            <span>Active customers</span>
-          </div>
-        </div>
+      <div className="mb-6">
+        {/* Solid Color Dashboard */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 border border-white/20 shadow-xl">
+          {/* Subtle Pattern Overlay */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px, rgba(255,255,255,0.15) 1px, transparent 0)] bg-[length:20px_20px]"></div>
+          
+          {/* Decorative Elements */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
 
-        <div className={`bg-gradient-to-br from-blue-500 via-blue-600 to-sky-700 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-blue-100 text-sm font-medium font-poppins">Total Vehicles</p>
-              <p className="text-3xl font-bold mt-2 font-poppins">{totalVehicles}</p>
-            </div>
-            <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-              <Car className="h-6 w-6" />
-            </div>
-          </div>
-          <div className="flex items-center gap-1 mt-4 text-blue-100 text-sm font-poppins">
-            <Car className="h-4 w-4" />
-            <span>Registered vehicles</span>
-          </div>
-        </div>
+          <div className="relative p-6">
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+              {/* Left Side - Content */}
+              <div className="flex-1 space-y-4">
+                {/* Header */}
+                <div className="space-y-2">
+                  <h2 className="text-xl font-bold text-white font-poppins drop-shadow-lg">
+                    Business Overview
+                  </h2>
+                  <p className="text-white/90 text-sm font-poppins">
+                    Real-time insights for your tire management
+                  </p>
+                </div>
 
-        <div className={`bg-gradient-to-br from-teal-400 via-cyan-500 to-green-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-teal-100 text-sm font-medium font-poppins">Recent Services</p>
-              <p className="text-3xl font-bold mt-2 font-poppins">{recentServices}</p>
-            </div>
-            <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-              <CheckCircle className="h-6 w-6" />
-            </div>
-          </div>
-          <div className="flex items-center gap-1 mt-4 text-teal-100 text-sm font-poppins">
-            <Calendar className="h-4 w-4" />
-            <span>This month</span>
-          </div>
-        </div>
+                {/* Integrated Stats Grid */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* Customer Stat */}
+                  <div className="bg-white/20 rounded-xl p-3 border border-white/30 hover:bg-white/25 transition-all duration-300 group">
+                    <div className="flex items-center justify-between">
+                      <div className="p-1.5 bg-white/30 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                        <Users className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="text-right">
+                        <p className="text-white/90 text-xs font-poppins mb-1">Customers</p>
+                        <p className="text-lg font-bold text-white font-poppins">{totalCustomers}</p>
+                      </div>
+                    </div>
+                  </div>
 
-        <div className={`bg-gradient-to-br from-purple-500 via-blue-500 to-cyan-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-purple-100 text-sm font-medium font-poppins">Vehicles Serviced</p>
-              <p className="text-3xl font-bold mt-2 font-poppins">{vehiclesWithRecentService}</p>
+                  {/* Vehicle Stat */}
+                  <div className="bg-white/20 rounded-xl p-3 border border-white/30 hover:bg-white/25 transition-all duration-300 group">
+                    <div className="flex items-center justify-between">
+                      <div className="p-1.5 bg-white/30 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                        <Car className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="text-right">
+                        <p className="text-white/90 text-xs font-poppins mb-1">Vehicles</p>
+                        <p className="text-lg font-bold text-white font-poppins">{totalVehicles}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Services Stat */}
+                  <div className="bg-white/20 rounded-xl p-3 border border-white/30 hover:bg-white/25 transition-all duration-300 group">
+                    <div className="flex items-center justify-between">
+                      <div className="p-1.5 bg-white/30 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                        <CheckCircle className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="text-right">
+                        <p className="text-white/90 text-xs font-poppins mb-1">Services</p>
+                        <p className="text-lg font-bold text-white font-poppins">{recentServices}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Serviced Stat */}
+                  <div className="bg-white/20 rounded-xl p-3 border border-white/30 hover:bg-white/25 transition-all duration-300 group">
+                    <div className="flex items-center justify-between">
+                      <div className="p-1.5 bg-white/30 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                        <Wrench className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="text-right">
+                        <p className="text-white/90 text-xs font-poppins mb-1">Serviced</p>
+                        <p className="text-lg font-bold text-white font-poppins">{vehiclesWithRecentService}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Side - Compact Car GIF */}
+              <div className="flex-shrink-0">
+                <div className="relative">
+                  <div className="bg-white/20 rounded-xl p-3 border border-white/30 shadow-lg">
+                    <img 
+                      src="/images/car.gif" 
+                      alt="Car Animation" 
+                      className="w-full h-auto max-w-[120px] md:max-w-[140px] rounded-lg"
+                      style={{ imageRendering: 'auto' }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-              <Wrench className="h-6 w-6" />
-            </div>
-          </div>
-          <div className="flex items-center gap-1 mt-4 text-purple-100 text-sm font-poppins">
-            <TrendingUp className="h-4 w-4" />
-            <span>This month</span>
           </div>
         </div>
       </div>
     );
 };
 
+// Solid Color QuickActions
 const QuickActions = ({ onAddCustomer, onAddVehicle, onAddHistory, onExportData }: { 
   onAddCustomer: () => void, 
   onAddVehicle: () => void, 
@@ -321,50 +354,49 @@ const QuickActions = ({ onAddCustomer, onAddVehicle, onAddHistory, onExportData 
   const actions = [
     {
       label: "New Customer",
-      description: "Add a new customer",
+      description: "Add customer",
       icon: UserPlus,
       onClick: onAddCustomer,
-      color: "from-purple-500 to-indigo-600"
+      gradient: "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
     },
     {
       label: "Add Vehicle",
-      description: "Register new vehicle",
+      description: "Register vehicle",
       icon: Car,
       onClick: onAddVehicle,
-      color: "from-blue-500 to-sky-600"
+      gradient: "bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
     },
     {
       label: "Service Record",
       description: "Add tire service",
       icon: History,
       onClick: onAddHistory,
-      color: "from-teal-500 to-green-600"
+      gradient: "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
     },
     {
       label: "Export Data",
       description: "Export to Excel",
       icon: Download,
       onClick: onExportData,
-      color: "from-orange-500 to-red-600"
+      gradient: "bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700"
     }
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
       {actions.map((action, index) => (
         <button
           key={action.label}
           onClick={action.onClick}
-          className={`bg-gradient-to-r ${action.color} rounded-xl p-4 text-white text-left shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 group font-poppins`}
-          style={{ animationDelay: `${index * 100}ms` }}
+          className={`${action.gradient} rounded-xl p-4 text-white text-left border border-white/20 shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 group font-poppins`}
         >
           <div className="flex items-center justify-between">
-            <div>
-              <p className="font-semibold text-lg">{action.label}</p>
-              <p className="text-white/80 text-sm mt-1">{action.description}</p>
+            <div className="flex-1">
+              <p className="font-semibold text-white text-sm">{action.label}</p>
+              <p className="text-white/90 text-xs mt-0.5">{action.description}</p>
             </div>
-            <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm group-hover:scale-110 transition-transform duration-300">
-              <action.icon className="h-5 w-5" />
+            <div className="p-2 bg-white/20 rounded-lg group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+              <action.icon className="h-4 w-4 text-white" />
             </div>
           </div>
         </button>
