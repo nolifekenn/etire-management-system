@@ -169,7 +169,7 @@ export default function NotificationsPage() {
                             <CardContent className="flex flex-col items-center justify-center py-12">
                                 <Bell className="h-12 w-12 text-muted-foreground mb-4" />
                                 <h3 className="text-lg font-semibold text-muted-foreground">No notifications</h3>
-                                <p className="text-sm text-muted-foreground">You're all caught up! No new notifications.</p>
+                                <p className="text-sm text-muted-foreground">You&apos;re all caught up! No new notifications.</p>
                             </CardContent>
                         </Card>
                     ) : (
