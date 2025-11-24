@@ -33,7 +33,7 @@ interface Column {
 interface DataTableWrapperProps<T> {
   title?: string;
   columns: Column[];
-  data: (T & { id: string | number })[];
+  data: T[];
   onEdit?: (item: T) => void;
   onDelete?: (item: T) => void;
   onRowClick?: (item: T) => void;
@@ -132,7 +132,7 @@ export function DataTableWrapper<T>({
                 ) : (
                   sortedData.map((item, index) => (
                     <TableRow 
-                      key={item.id}
+                      key={(item as any).id || `row-${index}`}
                       className={`
                         border-b border-slate-100 
                         transition-all duration-200 

@@ -10,16 +10,10 @@ import autoTable from "jspdf-autotable";
 // 🔹 FETCH INVENTORY REPORT
 // ---------------------------------------------------
 export async function fetchInventoryReport(filters: Record<string, any>) {
-  const token = localStorage.getItem("reportToken");
-  if (!token) {
-    throw new Error("Missing report token. Please log in again.");
-  }
-
   const res = await fetch("/api/reports/inventory", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`, // ✅ guaranteed non-empty
     },
     body: JSON.stringify(filters),
   });

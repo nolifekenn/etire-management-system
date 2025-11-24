@@ -11,16 +11,10 @@ import { FormattedSaleRow } from "./salesReportFormatter";
 // 🔹 FETCH SALES REPORT
 // ---------------------------------------------------
 export async function fetchSalesReport(filters: Record<string, any>) {
-  const token = localStorage.getItem("reportToken");
-  if (!token) {
-    throw new Error("Missing report token. Please log in again.");
-  }
-
   const res = await fetch("/api/reports/sales", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`, // ✅ guaranteed to be non-empty
     },
     body: JSON.stringify(filters),
   });

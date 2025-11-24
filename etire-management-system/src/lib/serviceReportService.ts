@@ -10,17 +10,11 @@ import autoTable from "jspdf-autotable";
 // 🔹 FETCH SERVICE JOBS REPORT
 // ---------------------------------------------------
 export async function fetchServiceJobsReport(filters: Record<string, any>) {
-  const token = localStorage.getItem("reportToken");
-  if (!token) {
-    throw new Error("Missing report token. Please log in again.");
-  }
-
   // ✅ Corrected endpoint to match route.ts
   const res = await fetch("/api/reports/service", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(filters),
   });
