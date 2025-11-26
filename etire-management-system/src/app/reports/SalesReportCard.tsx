@@ -1,4 +1,4 @@
-// app/reports/SalesReportCard.tsx
+// app/reports/SalesReportCard.tsx (Fixed Select components)
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -20,7 +20,9 @@ import {
   X,
   Calendar,
   Building,
-  Car
+  Car,
+  TrendingUp,
+  DollarSign
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,8 +33,8 @@ export default function SalesReportCard() {
   const [filters, setFilters] = useState({
     date_from: "",
     date_to: "",
-    branch_id: "",
-    vehicle_type_id: "",
+    branch_id: "all",
+    vehicle_type_id: "all",
   });
 
   const [loading, setLoading] = useState(false);
@@ -68,8 +70,15 @@ export default function SalesReportCard() {
   const handleFetch = async () => {
     try {
       setLoading(true);
-      setFilters(localFilters); // Apply local filters
-      const res = await fetchSalesReport(localFilters);
+      // Convert "all" to empty string for API
+      const apiFilters = {
+        ...localFilters,
+        branch_id: localFilters.branch_id === "all" ? "" : localFilters.branch_id,
+        vehicle_type_id: localFilters.vehicle_type_id === "all" ? "" : localFilters.vehicle_type_id,
+      };
+      
+      setFilters(apiFilters);
+      const res = await fetchSalesReport(apiFilters);
 
       if (!res || !res.sales) {
         toast({
@@ -139,13 +148,13 @@ export default function SalesReportCard() {
     setLocalFilters({
       date_from: "",
       date_to: "",
-      branch_id: "",
-      vehicle_type_id: "",
+      branch_id: "all",
+      vehicle_type_id: "all",
     });
   };
 
   const hasActiveFilters = localFilters.date_from || localFilters.date_to || 
-                          localFilters.branch_id || localFilters.vehicle_type_id;
+                          localFilters.branch_id !== "all" || localFilters.vehicle_type_id !== "all";
 
   // Calculate stats
   const totalRevenue = reportData.reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
@@ -223,7 +232,7 @@ export default function SalesReportCard() {
                   <SelectValue placeholder="All Branches" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Branches</SelectItem>
+                  <SelectItem value="all">All Branches</SelectItem>
                   {branches.map((b) => (
                     <SelectItem key={b.branch_id} value={b.branch_id}>
                       {b.name}
@@ -245,7 +254,7 @@ export default function SalesReportCard() {
                   <SelectValue placeholder="All Vehicle Types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Vehicle Types</SelectItem>
+                  <SelectItem value="all">All Vehicle Types</SelectItem>
                   {vehicleTypes.map((vt) => (
                     <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id}>
                       {vt.name}
@@ -315,12 +324,12 @@ export default function SalesReportCard() {
                     To: {localFilters.date_to}
                   </span>
                 )}
-                {localFilters.branch_id && (
+                {localFilters.branch_id !== "all" && (
                   <span className="bg-green-100 text-green-700 px-2 py-1 rounded-md text-xs">
                     Branch: {branches.find(b => b.branch_id === localFilters.branch_id)?.name}
                   </span>
                 )}
-                {localFilters.vehicle_type_id && (
+                {localFilters.vehicle_type_id !== "all" && (
                   <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-md text-xs">
                     Vehicle: {vehicleTypes.find(vt => vt.vehicle_type_id === localFilters.vehicle_type_id)?.name}
                   </span>

@@ -20,7 +20,8 @@ import {
   X,
   Building,
   Truck,
-  AlertTriangle
+  AlertTriangle,
+  TrendingUp
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,8 +30,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export default function InventoryReportCard() {
   const { toast } = useToast();
   const [filters, setFilters] = useState({
-    branch_id: "",
-    supplier_id: "",
+    branch_id: "all",
+    supplier_id: "all",
     category: "",
   });
 
@@ -63,8 +64,15 @@ export default function InventoryReportCard() {
   const handleFetch = async () => {
     try {
       setLoading(true);
-      setFilters(localFilters);
-      const res = await fetchInventoryReport(localFilters);
+      // Convert "all" to empty string for API
+      const apiFilters = {
+        ...localFilters,
+        branch_id: localFilters.branch_id === "all" ? "" : localFilters.branch_id,
+        supplier_id: localFilters.supplier_id === "all" ? "" : localFilters.supplier_id,
+      };
+      
+      setFilters(apiFilters);
+      const res = await fetchInventoryReport(apiFilters);
 
       if (!res || !res.inventory) {
         toast({
@@ -118,13 +126,13 @@ export default function InventoryReportCard() {
 
   const clearFilters = () => {
     setLocalFilters({
-      branch_id: "",
-      supplier_id: "",
+      branch_id: "all",
+      supplier_id: "all",
       category: "",
     });
   };
 
-  const hasActiveFilters = localFilters.branch_id || localFilters.supplier_id || localFilters.category;
+  const hasActiveFilters = localFilters.branch_id !== "all" || localFilters.supplier_id !== "all" || localFilters.category;
 
   // Calculate stats
   const totalStockValue = reportData.reduce((sum, i) => sum + (i.stock_value || 0), 0);
@@ -172,7 +180,7 @@ export default function InventoryReportCard() {
                   <SelectValue placeholder="All Branches" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Branches</SelectItem>
+                  <SelectItem value="all">All Branches</SelectItem>
                   {branches.map((b) => (
                     <SelectItem key={b.branch_id} value={b.branch_id}>
                       {b.name}
@@ -194,7 +202,7 @@ export default function InventoryReportCard() {
                   <SelectValue placeholder="All Suppliers" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Suppliers</SelectItem>
+                  <SelectItem value="all">All Suppliers</SelectItem>
                   {suppliers.map((s) => (
                     <SelectItem key={s.supplier_id} value={s.supplier_id}>
                       {s.name}
@@ -268,12 +276,12 @@ export default function InventoryReportCard() {
             <div className="mt-4 flex items-center gap-2 text-sm">
               <span className="text-slate-600">Active filters:</span>
               <div className="flex flex-wrap gap-2">
-                {localFilters.branch_id && (
+                {localFilters.branch_id !== "all" && (
                   <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-md text-xs">
                     Branch: {branches.find(b => b.branch_id === localFilters.branch_id)?.name}
                   </span>
                 )}
-                {localFilters.supplier_id && (
+                {localFilters.supplier_id !== "all" && (
                   <span className="bg-green-100 text-green-700 px-2 py-1 rounded-md text-xs">
                     Supplier: {suppliers.find(s => s.supplier_id === localFilters.supplier_id)?.name}
                   </span>
