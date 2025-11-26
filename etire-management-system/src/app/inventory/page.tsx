@@ -290,288 +290,188 @@ const AdvancedFilters = ({
   onFiltersChange: (filters: FilterState) => void;
   onClearFilters: () => void;
 }) => {
-  // Helper function to check if a specific filter is active
-  const isFilterActive = (category: string, value: string) => {
-    if (category === 'stockStatus') {
-      return filters.stockStatus === value;
-    } else if (category === 'category') {
-      return filters.category === value;
-    } else if (category === 'vehicleType') {
-      return filters.vehicleType === value;
-    }
-    return false;
-  };
-
-  // Toggle filter function - allows multiple categories to be selected
+  
   const handleFilterToggle = (category: 'stockStatus' | 'category' | 'vehicleType', value: string) => {
-    const currentValue = filters[category];
-    
-    if (currentValue === value) {
-      // If clicking the same filter that's already active, deactivate it
-      onFiltersChange({ 
-        ...filters, 
-        [category]: 'all' 
-      });
+    if (filters[category] === value) {
+      onFiltersChange({ ...filters, [category]: 'all' });
     } else {
-      // Otherwise, activate this filter in its category (don't reset other categories)
-      onFiltersChange({ 
-        ...filters, 
-        [category]: value
-      });
+      onFiltersChange({ ...filters, [category]: value });
     }
   };
 
-  // Check if any filters are active
+  const filterGroups = [
+    {
+      id: 'category' as const,
+      label: 'Category',
+      icon: PackageSearch,
+      options: [
+        { label: 'Tires', value: 'tire' },
+        { label: 'Tools', value: 'tool' },
+        { label: 'Accessory', value: 'accessory' }
+      ]
+    },
+    {
+      id: 'vehicleType' as const,
+      label: 'Vehicle Type',
+      icon: TrendingUp,
+      options: [
+        { label: 'Car', value: 'car' },
+        { label: 'Motorcycle', value: 'motor' },
+        { label: 'Truck', value: 'truck' }
+      ]
+    },
+    {
+      id: 'stockStatus' as const,
+      label: 'Stock Status',
+      icon: AlertTriangle,
+      options: [
+        { label: 'Low Stock', value: 'lowStock' },
+        { label: 'Critical', value: 'critical' },
+        { label: 'Out of Stock', value: 'outOfStock' }
+      ]
+    }
+  ];
+
   const hasActiveFilters = filters.search || 
                           filters.category !== 'all' || 
                           filters.stockStatus !== 'all' || 
                           filters.vehicleType !== 'all';
 
-  // Get active filter count for badges
-  const getActiveFilterCount = () => {
-    let count = 0;
-    if (filters.category !== 'all') count++;
-    if (filters.stockStatus !== 'all') count++;
-    if (filters.vehicleType !== 'all') count++;
-    if (filters.search) count++;
-    return count;
-  };
-
-  // Compact filter groups
-  const filterCategories = [
-    {
-      title: "Product Categories",
-      icon: PackageSearch,
-      category: 'category' as const,
-      filters: [
-        { label: "Tires", value: "tire", icon: PackageSearch },
-        { label: "Tools", value: "tool", icon: PackageSearch },
-        { label: "Accessories", value: "accessory", icon: PackageSearch }
-      ]
-    },
-    {
-      title: "Vehicle Types",
-      icon: PackageSearch,
-      category: 'vehicleType' as const,
-      filters: [
-        { label: "Car", value: "car", icon: PackageSearch },
-        { label: "Motorcycle", value: "motor", icon: PackageSearch },
-        { label: "Truck", value: "truck", icon: PackageSearch }
-      ]
-    },
-    {
-      title: "Stock Status",
-      icon: AlertTriangle,
-      category: 'stockStatus' as const,
-      filters: [
-        { label: "Low Stock", value: "lowStock", icon: AlertTriangle },
-        { label: "Critical", value: "critical", icon: AlertTriangle },
-        { label: "Out of Stock", value: "outOfStock", icon: PackageSearch }
-      ]
-    }
-  ];
-
   return (
-    <div className="bg-white p-6 border border-slate-100 shadow-sm">
-      {/* Search and Sort Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-end gap-4 mb-6">
-        {/* Search Box with Label */}
-        <div className="flex-1">
-          <Label className="text-sm font-medium text-slate-700 mb-2 block">Search Items</Label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4 transition-all duration-300" />
+    <div className="bg-white p-5 border-b border-slate-200">
+      
+      {/* Top Section: Search and Sort */}
+      <div className="flex flex-col lg:flex-row lg:items-end gap-4 mb-5">
+        <div className="flex-1 relative">
+          <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Search</Label>
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4 group-focus-within:text-indigo-500 transition-colors" />
             <Input
-              placeholder="Search products by name..."
+              placeholder="Search by name..."
               value={filters.search}
               onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
-              className="pl-10 border-slate-300 focus:border-indigo-400 transition-all duration-300"
+              className="pl-10 h-10 bg-slate-50 border-slate-200 focus:bg-white focus:border-indigo-500 transition-all rounded-md"
             />
             {filters.search && (
               <button
                 onClick={() => onFiltersChange({ ...filters, search: '' })}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-all duration-300"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
         </div>
 
-        {/* Sort By Dropdown */}
-        <div className="w-full lg:w-48">
-          <Label className="text-sm font-medium text-slate-700 mb-2 block">Sort By</Label>
-          <Select
-            value={filters.sortBy}
-            onValueChange={(value) => onFiltersChange({ ...filters, sortBy: value as any })}
-          >
-            <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300">
-              <SelectValue placeholder="Sort by..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="name">Name (A-Z)</SelectItem>
-              <SelectItem value="stock">Stock Level</SelectItem>
-              <SelectItem value="price">Price</SelectItem>
-              <SelectItem value="vehicleType">Vehicle Type</SelectItem>
-              <SelectItem value="updated">Last Updated</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Sort Order Dropdown */}
-        <div className="w-full lg:w-40">
-          <Label className="text-sm font-medium text-slate-700 mb-2 block">Order</Label>
-          <Select
-            value={filters.sortOrder}
-            onValueChange={(value) => onFiltersChange({ ...filters, sortOrder: value as any })}
-          >
-            <SelectTrigger className="border-slate-300 focus:border-indigo-400 transition-all duration-300">
-              <SelectValue placeholder="Order" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="asc">Ascending</SelectItem>
-              <SelectItem value="desc">Descending</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Clear Filters - Only show when filters are active */}
-        {hasActiveFilters && (
-          <div className="flex items-end">
-            <Button
-              variant="outline"
-              onClick={onClearFilters}
-              className="flex items-center gap-2 transition-all duration-300"
+        <div className="flex gap-2 w-full lg:w-auto">
+          <div className="w-1/2 lg:w-40">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Sort By</Label>
+            <Select
+              value={filters.sortBy}
+              onValueChange={(value) => onFiltersChange({ ...filters, sortBy: value as any })}
             >
-              <X className="h-4 w-4" />
-              Clear All Filters
-            </Button>
+              <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
+                <SelectValue placeholder="Sort..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="stock">Stock Level</SelectItem>
+                <SelectItem value="price">Price</SelectItem>
+                <SelectItem value="vehicleType">Vehicle Type</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        )}
-      </div>
 
-      {/* Compact Filter Groups - Elegant Design */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-        {filterCategories.map((categoryGroup) => {
-          const CategoryIcon = categoryGroup.icon;
-          const hasActiveFilterInCategory = filters[categoryGroup.category] !== 'all';
-          
-          return (
-            <div 
-              key={categoryGroup.title}
-              className="bg-slate-50/80 rounded-lg border border-slate-200 p-4"
+          <div className="w-1/2 lg:w-32">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Order</Label>
+            <Select
+              value={filters.sortOrder}
+              onValueChange={(value) => onFiltersChange({ ...filters, sortOrder: value as any })}
             >
-              {/* Compact Category Header */}
-              <div className="flex items-center gap-2 mb-3">
-                <div className={`p-1.5 rounded-md ${
-                  hasActiveFilterInCategory ? 'bg-indigo-100' : 'bg-slate-200'
-                }`}>
-                  <CategoryIcon className={`h-3.5 w-3.5 ${
-                    hasActiveFilterInCategory ? 'text-indigo-600' : 'text-slate-600'
-                  }`} />
-                </div>
-                <h3 className="text-sm font-semibold text-slate-700">{categoryGroup.title}</h3>
-                {hasActiveFilterInCategory && (
-                  <div className="w-2 h-2 bg-indigo-500 rounded-full ml-1"></div>
-                )}
-              </div>
-
-              {/* Compact Filter Buttons */}
-              <div className="flex flex-col gap-2">
-                {categoryGroup.filters.map((filter) => {
-                  const FilterIcon = filter.icon;
-                  const isActive = isFilterActive(categoryGroup.category, filter.value);
-
-                  return (
-                    <button
-                      key={filter.value}
-                      className={`cursor-pointer transition-all w-full text-left p-2.5 text-sm font-medium border rounded-md flex items-center justify-between ${
-                        isActive 
-                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-transparent shadow-sm' 
-                          : 'bg-white text-slate-700 border-slate-300 hover:border-indigo-300 hover:bg-slate-50'
-                      }`}
-                      onClick={() => handleFilterToggle(categoryGroup.category, filter.value)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <FilterIcon className="h-3.5 w-3.5" />
-                        <span>{filter.label}</span>
-                      </div>
-                      {isActive && (
-                        <div className="w-2 h-2 bg-white rounded-sm"></div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+              <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
+                <SelectValue placeholder="Order" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">Ascending</SelectItem>
+                <SelectItem value="desc">Descending</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {hasActiveFilters && (
+            <div className="hidden lg:flex items-end pb-0.5">
+              <Button
+                variant="outline"
+                onClick={onClearFilters}
+                className="h-10 px-3 text-slate-500 border-slate-200 hover:bg-slate-50 rounded-md"
+                title="Clear all filters"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-          );
-        })}
+          )}
+        </div>
       </div>
 
-      {/* Active Filters Indicator */}
+      {/* FILTER BOX CONTAINER */}
+      <div className="flex flex-col lg:flex-row border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
+        
+        {filterGroups.map((group, index) => (
+          <div 
+            key={group.id} 
+            className={`
+              flex-1 p-4 
+              ${index !== filterGroups.length - 1 ? 'border-b lg:border-b-0 lg:border-r border-slate-200' : ''}
+              hover:bg-slate-50/50 transition-colors
+            `}
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <group.icon className="h-4 w-4 text-slate-400" />
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                {group.label}
+              </span>
+            </div>
+
+            {/* Added w-full to container to ensure buttons stretch */}
+            <div className="flex flex-wrap gap-2 w-full">
+              {group.options.map((option) => {
+                const isActive = filters[group.id] === option.value;
+                
+                return (
+                  <button
+                    key={option.value}
+                    onClick={() => handleFilterToggle(group.id, option.value)}
+                    className={`
+                      /* Added flex-1 to make buttons grow to fill space */
+                      flex-1 
+                      min-w-[80px] /* Prevents them from getting too squished on mobile */
+                      px-3 py-1.5 text-xs font-medium rounded-md border transition-all duration-200
+                      flex items-center justify-center whitespace-nowrap
+                      ${isActive 
+                        ? 'bg-slate-800 text-white border-slate-800 shadow-sm' 
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-white hover:shadow-sm'
+                      }
+                    `}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+      </div>
+
       {hasActiveFilters && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 mb-4">
-          <div className="flex items-center gap-3 mb-2 sm:mb-0">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Filter className="h-4 w-4 text-blue-600" />
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-blue-900">Active Filters</h4>
-              <p className="text-xs text-blue-700">
-                Showing items that match {getActiveFilterCount()} filter{getActiveFilterCount() !== 1 ? 's' : ''}
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex flex-wrap gap-2">
-            {filters.stockStatus !== 'all' && (
-              <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300 flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                {filterCategories[0].filters.find(f => f.value === filters.stockStatus)?.label}
-                <button 
-                  onClick={() => onFiltersChange({ ...filters, stockStatus: 'all' })}
-                  className="ml-1 hover:text-blue-900"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            )}
-            {filters.category !== 'all' && (
-              <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300 flex items-center gap-1">
-                <PackageSearch className="h-3 w-3" />
-                {filterCategories[1].filters.find(f => f.value === filters.category)?.label}
-                <button 
-                  onClick={() => onFiltersChange({ ...filters, category: 'all' })}
-                  className="ml-1 hover:text-green-900"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            )}
-            {filters.vehicleType !== 'all' && (
-              <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300 flex items-center gap-1">
-                <PackageSearch className="h-3 w-3" />
-                {filterCategories[2].filters.find(f => f.value === filters.vehicleType)?.label}
-                <button 
-                  onClick={() => onFiltersChange({ ...filters, vehicleType: 'all' })}
-                  className="ml-1 hover:text-orange-900"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            )}
-            {filters.search && (
-              <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-300 flex items-center gap-1">
-                <Search className="h-3 w-3" />
-                Search: "{filters.search}"
-                <button 
-                  onClick={() => onFiltersChange({ ...filters, search: '' })}
-                  className="ml-1 hover:text-purple-900"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            )}
-          </div>
+        <div className="mt-4 lg:hidden">
+          <Button
+            variant="outline"
+            onClick={onClearFilters}
+            className="w-full h-9 text-slate-500 border-slate-200"
+          >
+            Clear All Filters
+          </Button>
         </div>
       )}
     </div>
@@ -631,6 +531,7 @@ const EnhancedEmptyState = ({
 };
 
 // Stock Alerts Component
+// Redesigned Stock Alerts Component
 const StockAlertsBar = ({ 
   criticalCount, 
   warningCount,
@@ -646,125 +547,85 @@ const StockAlertsBar = ({
   
   if (totalAlerts === 0) return null;
 
-  // Calculate percentages for the progress bar
+  // Determine the primary severity color for the card accent
+  const severityColor = outOfStockCount > 0 ? 'red' : criticalCount > 0 ? 'orange' : 'yellow';
+  
+  // Dynamic styles based on severity
+  const colors = {
+    red: { border: 'border-l-red-500', icon: 'text-red-600', bg: 'bg-red-50', badge: 'bg-red-100 text-red-700' },
+    orange: { border: 'border-l-orange-500', icon: 'text-orange-600', bg: 'bg-orange-50', badge: 'bg-orange-100 text-orange-700' },
+    yellow: { border: 'border-l-yellow-500', icon: 'text-yellow-600', bg: 'bg-yellow-50', badge: 'bg-yellow-100 text-yellow-700' }
+  }[severityColor];
+
+  // Calculate percentages
   const outOfStockPercent = (outOfStockCount / totalAlerts) * 100;
   const criticalPercent = (criticalCount / totalAlerts) * 100;
   const warningPercent = (warningCount / totalAlerts) * 100;
 
   return (
     <div 
-      className="mb-6 bg-gradient-to-r from-purple-500 via-purple-700 to-purple-800 rounded-xl p-1 shadow-x1 hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:scale-[1.02]"
-      onClick={onShowDetails}
+      className={`mb-8 bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 border-l-4 ${colors.border}`}
     >
-      <div className="bg-white/95 backdrop-blur-sm rounded-xl p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          {/* Left Section - Alert Icon and Main Message */}
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="p-3 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-lg">
-                <AlertTriangle className="h-6 w-6 text-white" />
-              </div>
+      <div className="p-5 sm:p-6">
+        <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-center">
+          
+          {/* Section 1: Icon & Main Message */}
+          <div className="flex items-start gap-4 flex-1">
+            <div className={`p-3 rounded-full shrink-0 ${colors.bg}`}>
+              <AlertTriangle className={`h-6 w-6 ${colors.icon}`} />
             </div>
-            
-            <div className="flex-1">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                Stock Alerts Require Attention
-                <div className="flex gap-1">
-                  {outOfStockCount > 0 && <div className="w-2 h-2 bg-gray-600 rounded-full animate-pulse"></div>}
-                  {criticalCount > 0 && <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></div>}
-                  {warningCount > 0 && <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>}
-                </div>
+            <div>
+              <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                Inventory Attention Needed
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${colors.badge}`}>
+                  {totalAlerts} Issues
+                </span>
               </h3>
-              <p className="text-slate-600 text-sm mt-1">
-                {totalAlerts} item{totalAlerts !== 1 ? 's need' : ' needs'} immediate action across different stock levels
+              <p className="text-slate-500 text-sm mt-1">
+                There are items with low or depleted stock levels that require reordering.
               </p>
             </div>
           </div>
 
-          {/* Middle Section - Progress Bar Visualization */}
-          <div className="flex-1 max-w-md">
-            <div className="flex justify-between text-xs font-medium text-slate-700 mb-2">
-              <span>Stock Status Breakdown</span>
-              <span className="text-slate-500">Click for details</span>
-            </div>
-            
-            <div className="flex h-4 bg-slate-200 rounded-full overflow-hidden shadow-inner">
+          {/* Section 2: Visual Breakdown (The Bar) */}
+          <div className="w-full lg:w-1/3 flex flex-col justify-center px-4 border-l border-r border-slate-100 mx-4">
+             <div className="flex h-2.5 w-full rounded-full overflow-hidden bg-slate-100">
               {outOfStockCount > 0 && (
-                <div 
-                  className="bg-gray-600 transition-all duration-500 ease-out"
-                  style={{ width: `${outOfStockPercent}%` }}
-                  title={`Out of Stock: ${outOfStockCount} items`}
-                ></div>
+                <div style={{ width: `${outOfStockPercent}%` }} className="bg-slate-700" title="Out of Stock" />
               )}
               {criticalCount > 0 && (
-                <div 
-                  className="bg-red-600 transition-all duration-500 ease-out"
-                  style={{ width: `${criticalPercent}%` }}
-                  title={`Critical: ${criticalCount} items`}
-                ></div>
+                <div style={{ width: `${criticalPercent}%` }} className="bg-red-500" title="Critical" />
               )}
               {warningCount > 0 && (
-                <div 
-                  className="bg-yellow-500 transition-all duration-500 ease-out"
-                  style={{ width: `${warningPercent}%` }}
-                  title={`Low Stock: ${warningCount} items`}
-                ></div>
+                <div style={{ width: `${warningPercent}%` }} className="bg-amber-400" title="Low Stock" />
               )}
             </div>
             
-            {/* Legend */}
-            <div className="flex flex-wrap gap-4 mt-3 text-xs">
-              {outOfStockCount > 0 && (
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-gray-600 rounded"></div>
-                  <span className="text-slate-700 font-medium">Out of Stock: {outOfStockCount}</span>
-                </div>
-              )}
-              {criticalCount > 0 && (
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-red-600 rounded"></div>
-                  <span className="text-slate-700 font-medium">Critical: {criticalCount}</span>
-                </div>
-              )}
-              {warningCount > 0 && (
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-                  <span className="text-slate-700 font-medium">Low Stock: {warningCount}</span>
-                </div>
-              )}
+            <div className="flex justify-between items-center mt-2 text-xs text-slate-500">
+              <div className="flex gap-3">
+                {outOfStockCount > 0 && (
+                  <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-slate-700"></span>Empty ({outOfStockCount})</div>
+                )}
+                {criticalCount > 0 && (
+                  <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500"></span>Critical ({criticalCount})</div>
+                )}
+                {warningCount > 0 && (
+                   <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400"></span>Low ({warningCount})</div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Right Section - Action Button */}
-          <div className="flex flex-col items-end gap-3">
+          {/* Section 3: Action Button */}
+          <div className="w-full lg:w-auto flex justify-end">
             <Button 
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl border-0"
+              onClick={onShowDetails}
+              variant="outline"
+              className="group border-slate-300 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-300 w-full sm:w-auto"
             >
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              Review All Alerts
+              Review Details
+              <ArrowUpDown className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1 rotate-90" />
             </Button>
-            
-            {/* Quick Stats */}
-            <div className="flex gap-4 text-xs text-slate-600">
-              {outOfStockCount > 0 && (
-                <div className="text-center">
-                  <div className="font-bold text-gray-700">{outOfStockCount}</div>
-                  <div>Out of Stock</div>
-                </div>
-              )}
-              {criticalCount > 0 && (
-                <div className="text-center">
-                  <div className="font-bold text-red-700">{criticalCount}</div>
-                  <div>Critical</div>
-                </div>
-              )}
-              {warningCount > 0 && (
-                <div className="text-center">
-                  <div className="font-bold text-yellow-700">{warningCount}</div>
-                  <div>Low Stock</div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>
@@ -772,7 +633,7 @@ const StockAlertsBar = ({
   );
 };
 
-// Stock Adjustment Form Component - FIXED: White background and consistent UI
+// Stock Adjustment Form Component
 const StockAdjustmentForm = ({ 
   item, 
   onSave, 
@@ -799,15 +660,27 @@ const StockAdjustmentForm = ({
 
   const newQuantity = item.stock_quantity + parseInt(adjustment || '0');
 
+  // Handle increment/decrement for adjustment amount
+  const handleIncrement = () => {
+    const currentValue = parseInt(adjustment || '0');
+    setAdjustment((currentValue + 1).toString());
+  };
+
+  const handleDecrement = () => {
+    const currentValue = parseInt(adjustment || '0');
+    setAdjustment((currentValue - 1).toString());
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-6">
+      {/* Current and New Stock Display */}
+      <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
         <div>
-          <Label className="text-sm font-medium text-slate-700">Current Stock</Label>
+          <Label className="text-sm font-medium text-slate-700 mb-2 block">Current Stock</Label>
           <div className="text-2xl font-bold text-slate-900">{item.stock_quantity}</div>
         </div>
         <div>
-          <Label className="text-sm font-medium text-slate-700">New Stock</Label>
+          <Label className="text-sm font-medium text-slate-700 mb-2 block">New Stock</Label>
           <div className={`text-2xl font-bold ${
             newQuantity < 0 ? 'text-red-600' : 
             newQuantity === 0 ? 'text-yellow-600' : 
@@ -818,67 +691,46 @@ const StockAdjustmentForm = ({
         </div>
       </div>
 
+      {/* Adjustment Amount - REMODELED to match Add New Item design */}
       <div>
-        <Label htmlFor="adjustment" className="text-sm font-medium text-slate-700 mb-2 block">
-          Adjustment Amount
-        </Label>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setAdjustment('-1')}
-            className="flex-1"
-          >
-            -1
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setAdjustment('-5')}
-            className="flex-1"
-          >
-            -5
-          </Button>
-          <Input
-            id="adjustment"
-            type="number"
-            value={adjustment}
-            onChange={(e) => setAdjustment(e.target.value)}
-            placeholder="0"
-            className="text-center border-slate-300 focus:border-indigo-400 bg-white"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setAdjustment('1')}
-            className="flex-1"
-          >
-            +1
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setAdjustment('5')}
-            className="flex-1"
-          >
-            +5
-          </Button>
-        </div>
-        <p className="text-xs text-slate-500 mt-1">
+        <Label className="text-sm font-medium text-slate-700 mb-2 block">Adjustment Amount</Label>
+        <p className="text-xs text-slate-500 mb-3">
           Use negative numbers to decrease stock, positive to increase
         </p>
+        
+        {/* New full-width input with +/- buttons - matching Add New Item design */}
+        <div className="flex items-center border border-slate-300 rounded-md bg-white focus-within:border-indigo-400 overflow-hidden h-9 w-full">
+          <button
+            type="button"
+            onClick={handleDecrement}
+            className="px-4 py-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-colors border-r border-gray-200 flex items-center justify-center w-16 h-full text-lg font-bold"
+          >
+            -
+          </button>
+          <Input
+            type="number"
+            value={adjustment}
+            placeholder="0"
+            onChange={(e) => setAdjustment(e.target.value)}
+            className="border-0 text-center focus:ring-0 shadow-none flex-1 h-full text-base px-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+          <button
+            type="button"
+            onClick={handleIncrement}
+            className="px-4 py-1 text-gray-600 hover:text-gray-800 hover:bg-gray-100 transition-colors border-l border-gray-200 flex items-center justify-center w-16 h-full text-lg font-bold"
+          >
+            +
+          </button>
+        </div>
       </div>
 
+      {/* Reason for Adjustment */}
       <div>
         <Label htmlFor="reason" className="text-sm font-medium text-slate-700 mb-2 block">
           Reason for Adjustment
         </Label>
         <Select value={reason} onValueChange={setReason}>
-          <SelectTrigger className="border-slate-300 focus:border-indigo-400 bg-white">
+          <SelectTrigger className="border-slate-300 focus:border-indigo-400 bg-white w-full">
             <SelectValue placeholder="Select reason..." />
           </SelectTrigger>
           <SelectContent>
@@ -902,12 +754,13 @@ const StockAdjustmentForm = ({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Enter specific reason..."
-            className="border-slate-300 focus:border-indigo-400 bg-white"
+            className="border-slate-300 focus:border-indigo-400 bg-white w-full"
           />
         </div>
       )}
 
-      <div className="flex gap-3 justify-end pt-4">
+      {/* Action Buttons */}
+      <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
         <Button
           variant="outline"
           onClick={onCancel}
@@ -919,18 +772,30 @@ const StockAdjustmentForm = ({
         </Button>
         <Button
           onClick={handleSubmit}
-          disabled={isLoading || !adjustment || !reason}
+          disabled={isLoading || !adjustment || !reason || newQuantity < 0}
           className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 flex items-center gap-2"
         >
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Apply Adjustment
         </Button>
       </div>
+
+      {/* Warning for negative stock */}
+      {newQuantity < 0 && (
+        <Alert variant="destructive" className="bg-red-50 border-red-200">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Warning</AlertTitle>
+          <AlertDescription>
+            Stock cannot be negative. Please adjust the amount.
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 };
 
-// Enhanced Critical Stock Details Form with Updated Design - FIXED: White background and icons
+//Critical Stock Details
+// Enhanced Critical Stock Details - Updated Labels
 const CriticalStockDetails = ({ 
   items, 
   isOpen, 
@@ -943,156 +808,236 @@ const CriticalStockDetails = ({
   const [notes, setNotes] = useState('');
   const [priority, setPriority] = useState('high');
   const [actionPlan, setActionPlan] = useState('');
+  
+  const [filterType, setFilterType] = useState<'all' | 'out' | 'critical' | 'low'>('all');
+  const [sortType, setSortType] = useState<'severity' | 'name' | 'vehicle'>('severity');
 
-  const outOfStockItems = items.filter(item => item.stock_quantity === 0); // NEW
-  const criticalItems = items.filter(item => item.stock_quantity <= 2 && item.stock_quantity > 0);
-  const lowStockItems = items.filter(item => item.stock_quantity > 2 && item.stock_quantity <= 5);
+  // 1. Get all relevant alert items first
+  const allAlertItems = useMemo(() => {
+    return items.filter(item => item.stock_quantity <= 5);
+  }, [items]);
+
+  // 2. Apply Filters and Sorting
+  const displayedItems = useMemo(() => {
+    let result = [...allAlertItems];
+
+    // Filter
+    if (filterType === 'out') result = result.filter(i => i.stock_quantity === 0);
+    if (filterType === 'critical') result = result.filter(i => i.stock_quantity > 0 && i.stock_quantity <= 2);
+    if (filterType === 'low') result = result.filter(i => i.stock_quantity > 2 && i.stock_quantity <= 5);
+
+    // Sort
+    result.sort((a, b) => {
+      if (sortType === 'name') return a.name.localeCompare(b.name);
+      
+      if (sortType === 'vehicle') {
+        const vA = a.vehicle_type || ''; 
+        const vB = b.vehicle_type || '';
+        return vA.localeCompare(vB);
+      }
+      
+      // Default: Severity (Out -> Critical -> Low)
+      return a.stock_quantity - b.stock_quantity;
+    });
+
+    return result;
+  }, [allAlertItems, filterType, sortType]);
+
+  const getVariant = (qty: number): 'out' | 'critical' | 'low' => {
+    if (qty === 0) return 'out';
+    if (qty <= 2) return 'critical';
+    return 'low';
+  };
+
+  // Row Component
+  const StockItemRow = ({ item }: { item: InventoryItem }) => {
+    const variant = getVariant(item.stock_quantity);
+    
+    const styles = {
+      out: {
+        border: 'border-l-slate-600',
+        bg: 'bg-slate-50 hover:bg-slate-100',
+        text: 'text-slate-700',
+        badge: 'bg-slate-200 text-slate-700 border-slate-300',
+        message: 'Completely out of stock'
+      },
+      critical: {
+        border: 'border-l-red-600',
+        bg: 'bg-red-50/50 hover:bg-red-50',
+        text: 'text-red-700',
+        badge: 'bg-red-100 text-red-700 border-red-200',
+        message: `Only ${item.stock_quantity} units remaining`
+      },
+      low: {
+        border: 'border-l-orange-500',
+        bg: 'bg-orange-50/50 hover:bg-orange-50',
+        text: 'text-orange-700',
+        badge: 'bg-orange-100 text-orange-800 border-orange-200',
+        message: `Running low: ${item.stock_quantity} units left`
+      }
+    }[variant];
+
+    const vehicleLabel = item.vehicle_type 
+      ? (item.vehicle_type === 'motor' ? 'Motorcycle' : item.vehicle_type.charAt(0).toUpperCase() + item.vehicle_type.slice(1))
+      : 'Unknown';
+
+    return (
+      <div className={`group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-r-lg border border-gray-200 border-l-[6px] shadow-sm transition-all ${styles.border} ${styles.bg}`}>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-lg text-slate-800">{item.name}</span>
+            <Badge variant="outline" className="text-xs font-normal text-slate-500 bg-white border-slate-200">
+              {vehicleLabel}
+            </Badge>
+          </div>
+          <div className={`font-medium flex items-center gap-2 ${styles.text}`}>
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {styles.message}
+          </div>
+        </div>
+
+        <div className="mt-3 sm:mt-0 flex items-center gap-4">
+          <div className="text-right hidden sm:block">
+            <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Cost</div>
+            <div className="text-sm font-medium">₱{item.cost_price?.toFixed(2) || '0.00'}</div>
+          </div>
+          {/* ✅ UPDATED BADGE LABELS HERE */}
+          <Badge variant="outline" className={`px-3 py-1 font-semibold ${styles.badge}`}>
+            {variant === 'out' ? 'Out of Stock' : variant === 'critical' ? 'Critical Stock' : 'Low Stock'}
+          </Badge>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-            Stock Alert Details
-          </DialogTitle>
-          <DialogDescription className="text-slate-600">
-            Review and plan actions for stock alerts
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-6">
-          {/* Out of Stock Section - NEW */}
-          {outOfStockItems.length > 0 && (
-            <div className="bg-gradient-to-r from-gray-50 to-slate-100 rounded-xl p-4 border border-gray-300">
-              <h4 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <PackageSearch className="h-4 w-4" />
-                Out of Stock Items (0 units)
-              </h4>
-              <div className="space-y-2">
-                {outOfStockItems.map(item => (
-                  <div key={item.item_id} className="flex items-center justify-between p-3 bg-white/80 rounded-lg border border-gray-300 backdrop-blur-sm">
-                    <div>
-                      <div className="font-medium text-gray-900">{item.name}</div>
-                      <div className="text-sm text-gray-700 flex items-center gap-2">
-                        <VehicleTypeBadge type={item.vehicle_type} />
-                        <span>Completely out of stock</span>
-                      </div>
-                    </div>
-                    <Badge className="bg-gray-100 text-gray-800 border-gray-300">Out of Stock</Badge>
-                  </div>
-                ))}
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl p-0 gap-0">
+        
+        {/* Header */}
+        <div className="p-6 border-b border-slate-100 bg-white sticky top-0 z-20">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <div className="p-2 bg-red-100 rounded-lg">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
               </div>
-            </div>
-          )}
+              Stock Attention Required
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 ml-12">
+              Review {allAlertItems.length} items below safety stock levels.
+            </DialogDescription>
+          </DialogHeader>
 
-          {/* Critical Items Section */}
-          {criticalItems.length > 0 && (
-            <div className="bg-gradient-to-r from-red-50 to-pink-50 rounded-xl p-4 border border-red-200">
-              <h4 className="font-semibold text-red-700 mb-3 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                Critical Items (1-2 units left)
-              </h4>
-              <div className="space-y-2">
-                {criticalItems.map(item => (
-                  <div key={item.item_id} className="flex items-center justify-between p-3 bg-white/80 rounded-lg border border-red-200/50 backdrop-blur-sm">
-                    <div>
-                      <div className="font-medium text-red-900">{item.name}</div>
-                      <div className="text-sm text-red-700 flex items-center gap-2">
-                        <VehicleTypeBadge type={item.vehicle_type} />
-                        <span>Only {item.stock_quantity} units remaining</span>
-                      </div>
-                    </div>
-                    <Badge className="bg-red-100 text-red-800 border-red-200">Critical</Badge>
-                  </div>
-                ))}
-              </div>
+          {/* Filter & Sort Toolbar */}
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200 ml-12">
+            
+            {/* ✅ UPDATED FILTER TABS HERE */}
+            <div className="flex gap-1 p-1 bg-white rounded-md border border-slate-200 shadow-sm">
+              {[
+                { id: 'all', label: 'All Alerts' },
+                { id: 'out', label: 'Out of Stock' },     // Changed from 'Empty'
+                { id: 'critical', label: 'Critical Stock' }, // Changed from 'Critical'
+                { id: 'low', label: 'Low Stock' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setFilterType(tab.id as any)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    filterType === tab.id 
+                      ? 'bg-slate-800 text-white shadow-sm' 
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-          )}
 
-          {/* Low Stock Items Section */}
-          {lowStockItems.length > 0 && (
-            <div className="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl p-4 border border-yellow-200">
-              <h4 className="font-semibold text-yellow-700 mb-3 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                Low Stock Items (3-5 units left)
-              </h4>
-              <div className="space-y-2">
-                {lowStockItems.map(item => (
-                  <div key={item.item_id} className="flex items-center justify-between p-3 bg-white/80 rounded-lg border border-yellow-200/50 backdrop-blur-sm">
-                    <div>
-                      <div className="font-medium text-yellow-900">{item.name}</div>
-                      <div className="text-sm text-yellow-700 flex items-center gap-2">
-                        <VehicleTypeBadge type={item.vehicle_type} />
-                        <span>{item.stock_quantity} units remaining</span>
-                      </div>
-                    </div>
-                    <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Low Stock</Badge>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Action Plan Section */}
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="priority" className="text-sm font-medium text-slate-700 mb-2 block">
-                Priority Level
-              </Label>
-              <Select value={priority} onValueChange={setPriority}>
-                <SelectTrigger className="border-slate-300 focus:border-indigo-400 bg-white">
-                  <SelectValue placeholder="Select priority..." />
+            {/* Sort Dropdown */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-slate-500">Sort by:</span>
+              <Select value={sortType} onValueChange={(v: any) => setSortType(v)}>
+                <SelectTrigger className="h-8 w-[140px] text-xs bg-white border-slate-300">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="high">High - Need immediate action</SelectItem>
-                  <SelectItem value="medium">Medium - Address within week</SelectItem>
-                  <SelectItem value="low">Low - Monitor and plan</SelectItem>
+                  <SelectItem value="severity">Severity (Default)</SelectItem>
+                  <SelectItem value="vehicle">Vehicle Type</SelectItem>
+                  <SelectItem value="name">Product Name</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="actionPlan" className="text-sm font-medium text-slate-700 mb-2 block">
-                Action Plan
-              </Label>
-              <Textarea
-                id="actionPlan"
-                value={actionPlan}
-                onChange={(e) => setActionPlan(e.target.value)}
-                placeholder="Describe the plan to address stock issues..."
-                className="min-h-[100px] border-slate-300 focus:border-indigo-400 bg-white"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="notes" className="text-sm font-medium text-slate-700 mb-2 block">
-                Additional Notes
-              </Label>
-              <Textarea
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Any additional information..."
-                className="min-h-[80px] border-slate-300 focus:border-indigo-400 bg-white"
-              />
             </div>
           </div>
         </div>
 
-        <DialogFooter>
-          <Button onClick={onClose} variant="outline" className="flex items-center gap-2">
-            <X className="h-4 w-4" />
-            Close
+        {/* Scrollable Content Area */}
+        <div className="p-6 space-y-8">
+          <div className="space-y-3 min-h-[200px]">
+            {displayedItems.length > 0 ? (
+              displayedItems.map(item => (
+                <StockItemRow key={item.item_id} item={item} />
+              ))
+            ) : (
+              <div className="text-center py-10 text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+                No items match this filter.
+              </div>
+            )}
+          </div>
+
+          {/* Action Plan Section */}
+          <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 mt-8">
+            <h4 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4" />
+              Restocking Action Plan
+            </h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Priority Level</Label>
+                  <Select value={priority} onValueChange={setPriority}>
+                    <SelectTrigger className="bg-white border-slate-300">
+                      <SelectValue placeholder="Select priority..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="high" className="text-red-600 font-medium">High - Immediate Order</SelectItem>
+                      <SelectItem value="medium" className="text-orange-600 font-medium">Medium - Within 3 Days</SelectItem>
+                      <SelectItem value="low" className="text-blue-600 font-medium">Low - Add to next scheduled order</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Supplier Notes</Label>
+                  <Textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="E.g., Contact Supplier X for bulk discount..."
+                    className="min-h-[80px] bg-white border-slate-300 resize-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Action Description</Label>
+                <Textarea
+                  value={actionPlan}
+                  onChange={(e) => setActionPlan(e.target.value)}
+                  placeholder="Describe the plan to address these stock issues..."
+                  className="min-h-[155px] bg-white border-slate-300 resize-none"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <DialogFooter className="p-6 border-t border-slate-100 bg-slate-50/50 sticky bottom-0 z-20">
+          <Button onClick={onClose} variant="outline" className="h-11 px-6 border-slate-300 hover:bg-slate-100">
+            Cancel
           </Button>
           <Button 
-            onClick={() => {
-              // Here you would typically save the action plan
-              alert('Action plan saved!');
-              onClose();
-            }}
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 flex items-center gap-2"
+            onClick={() => { alert('Action plan saved!'); onClose(); }}
+            className="h-11 px-8 bg-slate-900 hover:bg-slate-800 text-white shadow-md"
           >
-            <Save className="h-4 w-4" />
             Save Action Plan
           </Button>
         </DialogFooter>
@@ -1855,7 +1800,7 @@ export default function EnhancedInventoryPage() {
                     <div className="text-sm text-white/90 mr-2">Rows per page:</div>
                     <div className="w-28">
                       <Select value={String(rowsPerPage)} onValueChange={(v) => setRowsPerPage(Number(v))}>
-                        <SelectTrigger className="w-full border-transparent bg-white/20 text-white">
+                        <SelectTrigger className="w-full border-transparent bg-white text-black">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
