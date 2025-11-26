@@ -1,3 +1,4 @@
+// app/reports/SalesReportCard.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -10,7 +11,20 @@ import { useToast } from "@/hooks/use-toast";
 import { StatCard } from "@/components/StatCard";
 import { DataTableWrapper } from "@/components/DataTableWrapper";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabaseClient";   // ✅ Option 2 import
+import { supabase } from "@/lib/supabaseClient";
+import { 
+  Download, 
+  Filter, 
+  BarChart3, 
+  Search, 
+  X,
+  Calendar,
+  Building,
+  Car
+} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function SalesReportCard() {
   const { toast } = useToast();
@@ -25,8 +39,11 @@ export default function SalesReportCard() {
   const [reportData, setReportData] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
   const [vehicleTypes, setVehicleTypes] = useState<any[]>([]);
+  const [showFilters, setShowFilters] = useState(true);
 
-  // Fetch dropdown options
+  // Enhanced filter state
+  const [localFilters, setLocalFilters] = useState(filters);
+
   useEffect(() => {
     const fetchDropdowns = async () => {
       if (!supabase) {
@@ -51,12 +68,14 @@ export default function SalesReportCard() {
   const handleFetch = async () => {
     try {
       setLoading(true);
-      const res = await fetchSalesReport(filters);
+      setFilters(localFilters); // Apply local filters
+      const res = await fetchSalesReport(localFilters);
 
       if (!res || !res.sales) {
         toast({
           title: "No Data",
           description: "No sales found for the given filters.",
+          variant: "destructive"
         });
         setReportData([]);
         return;
@@ -72,183 +91,331 @@ export default function SalesReportCard() {
       toast({
         title: "Error",
         description: "Failed to load sales report.",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
 
-const handlePDF = () => {
-  if (!reportData.length) {
-    toast({ title: "No Data", description: "Generate the report first before exporting." });
-    return;
-  }
+  const handlePDF = () => {
+    if (!reportData.length) {
+      toast({
+        title: "No Data",
+        description: "Generate the report first before exporting.",
+        variant: "destructive"
+      });
+      return;
+    }
 
-  const formattedRows = reportData.flatMap((sale) =>
-    sale.sale_item.map((item) => ({
-      sale_date: sale.sale_date.substring(0, 10),
-      customer: sale.customer?.name || "—",
-      item: item.inventory_item.name,
-      quantity: item.quantity,
-      price: item.price_at_sale,
-      line_total: item.line_total,
-      profit: item.profit,
-    }))
-  );
+    const formattedRows = reportData.flatMap((sale) =>
+      sale.sale_item.map((item: any) => ({
+        sale_date: sale.sale_date?.substring(0, 10) || "—",
+        customer: sale.customer?.name || "—",
+        item: item.inventory_item?.name || "—",
+        quantity: item.quantity,
+        price: item.price_at_sale,
+        line_total: item.line_total,
+        profit: item.profit,
+      }))
+    );
 
-  exportSalesReportPDF(formattedRows, filters);
-};
-
+    exportSalesReportPDF(formattedRows, localFilters);
+  };
 
   const handleCSV = () => {
     if (!reportData.length) {
       toast({
         title: "No Data",
         description: "Generate the report first before exporting.",
+        variant: "destructive"
       });
       return;
     }
     exportSalesReportCSV(reportData);
   };
 
+  const clearFilters = () => {
+    setLocalFilters({
+      date_from: "",
+      date_to: "",
+      branch_id: "",
+      vehicle_type_id: "",
+    });
+  };
+
+  const hasActiveFilters = localFilters.date_from || localFilters.date_to || 
+                          localFilters.branch_id || localFilters.vehicle_type_id;
+
+  // Calculate stats
+  const totalRevenue = reportData.reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
+  const totalProfit = reportData.flatMap((sale) => sale.sale_item)
+    .reduce((sum: number, item: any) => sum + (item.profit || 0), 0);
+  const itemsSold = reportData.flatMap((sale) => sale.sale_item)
+    .reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
+
   return (
-    <div className="p-6 bg-white rounded-xl shadow-md space-y-6">
-      <h2 className="text-xl font-semibold">📊 Sales Report</h2>
-
-      {/* FILTERS */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Date From */}
-        <div>
-          <label className="text-sm">Date From</label>
-          <input
-            type="date"
-            className="form-input w-full"
-            value={filters.date_from}
-            onChange={(e) =>
-              setFilters({ ...filters, date_from: e.target.value })
-            }
-          />
-        </div>
-
-        {/* Date To */}
-        <div>
-          <label className="text-sm">Date To</label>
-          <input
-            type="date"
-            className="form-input w-full"
-            value={filters.date_to}
-            onChange={(e) =>
-              setFilters({ ...filters, date_to: e.target.value })
-            }
-          />
-        </div>
-
-        {/* Branch Dropdown */}
-        <div>
-          <label className="text-sm">Branch</label>
-          <select
-            className="form-select w-full"
-            value={filters.branch_id}
-            onChange={(e) =>
-              setFilters({ ...filters, branch_id: e.target.value })
-            }
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Gradient Header */}
+      <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-400 text-white p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-white/20 rounded-xl">
+              <BarChart3 className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold">Sales Report</h2>
+              <p className="text-white/90">Track sales performance and revenue analytics</p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            className="bg-white/20 text-white border-white/30 hover:bg-white/30"
+            onClick={() => setShowFilters(!showFilters)}
           >
-            <option value="">All Branches</option>
-            {branches.map((b) => (
-              <option key={b.branch_id} value={b.branch_id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Vehicle Type Dropdown */}
-        <div>
-          <label className="text-sm">Vehicle Type</label>
-          <select
-            className="form-select w-full"
-            value={filters.vehicle_type_id}
-            onChange={(e) =>
-              setFilters({ ...filters, vehicle_type_id: e.target.value })
-            }
-          >
-            <option value="">All Vehicle Types</option>
-            {vehicleTypes.map((vt) => (
-              <option key={vt.vehicle_type_id} value={vt.vehicle_type_id}>
-                {vt.name}
-              </option>
-            ))}
-          </select>
+            <Filter className="h-4 w-4 mr-2" />
+            {showFilters ? "Hide Filters" : "Show Filters"}
+          </Button>
         </div>
       </div>
 
-      {/* BUTTONS */}
-      <div className="flex gap-3">
-        <Button onClick={handleFetch} disabled={loading}>
-          {loading ? "Loading..." : "Generate Report"}
-        </Button>
-        <Button variant="outline" onClick={handlePDF}>
-          Export PDF
-        </Button>
-        <Button variant="outline" onClick={handleCSV}>
-          Export CSV
-        </Button>
-      </div>
+      {/* Filters Section */}
+      {showFilters && (
+        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            {/* Date From */}
+            <div>
+              <Label className="text-sm font-medium text-slate-700 mb-2 block">Date From</Label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+                <Input
+                  type="date"
+                  value={localFilters.date_from}
+                  onChange={(e) => setLocalFilters({ ...localFilters, date_from: e.target.value })}
+                  className="pl-10 border-slate-300 focus:border-indigo-400"
+                />
+              </div>
+            </div>
 
-      {/* KPI CARDS */}
+            {/* Date To */}
+            <div>
+              <Label className="text-sm font-medium text-slate-700 mb-2 block">Date To</Label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+                <Input
+                  type="date"
+                  value={localFilters.date_to}
+                  onChange={(e) => setLocalFilters({ ...localFilters, date_to: e.target.value })}
+                  className="pl-10 border-slate-300 focus:border-indigo-400"
+                />
+              </div>
+            </div>
+
+            {/* Branch */}
+            <div>
+              <Label className="text-sm font-medium text-slate-700 mb-2 block">Branch</Label>
+              <Select
+                value={localFilters.branch_id}
+                onValueChange={(value) => setLocalFilters({ ...localFilters, branch_id: value })}
+              >
+                <SelectTrigger className="border-slate-300 focus:border-indigo-400">
+                  <Building className="h-4 w-4 mr-2 text-slate-400" />
+                  <SelectValue placeholder="All Branches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Branches</SelectItem>
+                  {branches.map((b) => (
+                    <SelectItem key={b.branch_id} value={b.branch_id}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Vehicle Type */}
+            <div>
+              <Label className="text-sm font-medium text-slate-700 mb-2 block">Vehicle Type</Label>
+              <Select
+                value={localFilters.vehicle_type_id}
+                onValueChange={(value) => setLocalFilters({ ...localFilters, vehicle_type_id: value })}
+              >
+                <SelectTrigger className="border-slate-300 focus:border-indigo-400">
+                  <Car className="h-4 w-4 mr-2 text-slate-400" />
+                  <SelectValue placeholder="All Vehicle Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Vehicle Types</SelectItem>
+                  {vehicleTypes.map((vt) => (
+                    <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id}>
+                      {vt.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-between">
+            <div className="flex gap-3">
+              <Button 
+                onClick={handleFetch}
+                disabled={loading}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+              >
+                {loading ? "Loading..." : "Generate Report"}
+              </Button>
+              
+              <Button 
+                variant="outline"
+                onClick={handlePDF}
+                disabled={!reportData.length}
+                className="flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Export PDF
+              </Button>
+              
+              <Button 
+                variant="outline"
+                onClick={handleCSV}
+                disabled={!reportData.length}
+                className="flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Export CSV
+              </Button>
+            </div>
+
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                onClick={clearFilters}
+                className="text-slate-600 hover:text-slate-800"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear Filters
+              </Button>
+            )}
+          </div>
+
+          {/* Active Filters Badge */}
+          {hasActiveFilters && (
+            <div className="mt-4 flex items-center gap-2 text-sm">
+              <span className="text-slate-600">Active filters:</span>
+              <div className="flex flex-wrap gap-2">
+                {localFilters.date_from && (
+                  <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-md text-xs">
+                    From: {localFilters.date_from}
+                  </span>
+                )}
+                {localFilters.date_to && (
+                  <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-md text-xs">
+                    To: {localFilters.date_to}
+                  </span>
+                )}
+                {localFilters.branch_id && (
+                  <span className="bg-green-100 text-green-700 px-2 py-1 rounded-md text-xs">
+                    Branch: {branches.find(b => b.branch_id === localFilters.branch_id)?.name}
+                  </span>
+                )}
+                {localFilters.vehicle_type_id && (
+                  <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-md text-xs">
+                    Vehicle: {vehicleTypes.find(vt => vt.vehicle_type_id === localFilters.vehicle_type_id)?.name}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* KPI Cards */}
       {reportData.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatCard
-            title="Total Revenue"
-            value={`₱${reportData
-              .reduce((sum, sale) => sum + (sale.total_amount || 0), 0)
-              .toLocaleString()}`}
-            icon={() => <span>💰</span>}
-          />
-          <StatCard
-            title="Total Profit"
-            value={`₱${reportData
-              .flatMap((sale) => sale.sale_item)
-              .reduce((sum, item) => sum + (item.profit || 0), 0)
-              .toLocaleString()}`}
-            icon={() => <span>📈</span>}
-          />
-          <StatCard
-            title="Items Sold"
-            value={reportData
-              .flatMap((sale) => sale.sale_item)
-              .reduce((sum, item) => sum + (item.quantity || 0), 0)
-              .toString()}
-            icon={() => <span>📦</span>}
+        <div className="p-6 border-b border-slate-100">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <StatCard
+              title="Total Revenue"
+              value={`₱${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+              icon={() => <div className="p-3 bg-green-100 rounded-xl"><BarChart3 className="h-6 w-6 text-green-600" /></div>}
+              trend="up"
+            />
+            <StatCard
+              title="Total Profit"
+              value={`₱${totalProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+              icon={() => <div className="p-3 bg-blue-100 rounded-xl"><TrendingUp className="h-6 w-6 text-blue-600" /></div>}
+              trend="up"
+            />
+            <StatCard
+              title="Items Sold"
+              value={itemsSold.toLocaleString()}
+              icon={() => <div className="p-3 bg-purple-100 rounded-xl"><Download className="h-6 w-6 text-purple-600" /></div>}
+              trend="up"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Data Table */}
+      {reportData.length > 0 && (
+        <div className="p-6">
+          <DataTableWrapper
+            title="Sales Items"
+            columns={[
+              { key: "sale_date", header: "Date", sortable: true },
+              { key: "customer", header: "Customer" },
+              { key: "item", header: "Item" },
+              { key: "quantity", header: "Qty", sortable: true },
+              { 
+                key: "price", 
+                header: "Price", 
+                sortable: true,
+                render: (value: any) => `₱${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+              },
+              { 
+                key: "line_total", 
+                header: "Line Total", 
+                sortable: true,
+                render: (value: any) => `₱${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+              },
+              { 
+                key: "profit", 
+                header: "Profit", 
+                sortable: true,
+                render: (value: any) => `₱${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+              },
+            ]}
+            data={reportData.flatMap((sale) =>
+              sale.sale_item.map((item: any) => ({
+                sale_date: sale.sale_date?.substring(0, 10) || "—",
+                customer: sale.customer?.name || "—",
+                item: item.inventory_item?.name || "—",
+                quantity: item.quantity,
+                price: item.price_at_sale,
+                line_total: item.line_total,
+                profit: item.profit,
+              }))
+            )}
           />
         </div>
       )}
 
-      {/* TABLE */}
-      {reportData.length > 0 && (
-        <DataTableWrapper
-          title="Sales Items"
-          columns={[
-            { key: "sale_date", header: "Date", sortable: true },
-            { key: "customer", header: "Customer" },
-            { key: "item", header: "Item" },
-            { key: "quantity", header: "Qty", sortable: true },
-            { key: "price", header: "Price", sortable: true },
-            { key: "line_total", header: "Line Total", sortable: true },
-            { key: "profit", header: "Profit", sortable: true },
-          ]}
-          data={reportData.flatMap((sale) =>
-            sale.sale_item.map((item) => ({
-              sale_date: sale.sale_date.substring(0, 10),
-              customer: sale.customer?.name || "—",
-              item: item.inventory_item.name,
-              quantity: item.quantity,
-              price: item.price_at_sale,
-              line_total: item.line_total,
-              profit: item.profit,
-            }))
-          )}
-        />
+      {/* Empty State */}
+      {!reportData.length && !loading && (
+        <div className="p-12 text-center">
+          <BarChart3 className="h-16 w-16 text-slate-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-slate-700 mb-2">No Sales Data</h3>
+          <p className="text-slate-500 mb-6">
+            Generate a report to view sales analytics and performance metrics.
+          </p>
+          <Button 
+            onClick={handleFetch}
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+          >
+            Generate Report
+          </Button>
+        </div>
       )}
     </div>
   );
