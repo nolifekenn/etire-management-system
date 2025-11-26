@@ -1,4 +1,4 @@
-// /app/reports/page.tsx
+// app/reports/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -7,8 +7,23 @@ import SalesReportCard from "./SalesReportCard";
 import InventoryReportCard from "./InventoryReportCard";
 import ServiceReportCard from "./ServiceReportCard";
 import { StatCard } from "@/components/StatCard";
-import { fetchSalesReport } from "@/lib/salesReportService"; // ✅ reuse same service
+import { fetchSalesReport } from "@/lib/salesReportService";
 import { supabase } from "@/lib/supabaseClient";
+import { 
+  DollarSign, 
+  TrendingUp, 
+  Package, 
+  Rocket, 
+  CheckCircle, 
+  Wrench,
+  BarChart3,
+  ShoppingCart,
+  Tag
+} from "lucide-react";
+
+const poppins = {
+  className: "font-poppins"
+};
 
 export default function ReportsPage() {
   const [summary, setSummary] = useState({
@@ -104,48 +119,83 @@ export default function ReportsPage() {
   }, []);
 
   return (
-    <div className="p-6 space-y-8">
+    <div className={`p-6 space-y-8 ${poppins.className}`}>
       <PageHeader
         title="Reports & Analytics"
         description="Generate detailed reports for sales, inventory, and service jobs."
       />
 
-      {/* DASHBOARD SUMMARY */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* ENHANCED DASHBOARD SUMMARY */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Revenue"
           value={`₱${summary.totalRevenue.toLocaleString()}`}
-          icon={() => <span>💰</span>}
+          icon={() => (
+            <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl">
+              <DollarSign className="h-6 w-6 text-white" />
+            </div>
+          )}
+          trend="up"
         />
         <StatCard
           title="Total Profit"
           value={`₱${summary.totalProfit.toLocaleString()}`}
-          icon={() => <span>📈</span>}
+          icon={() => (
+            <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl">
+              <TrendingUp className="h-6 w-6 text-white" />
+            </div>
+          )}
+          trend="up"
         />
         <StatCard
           title="Items Sold"
           value={summary.itemsSold.toString()}
-          icon={() => <span>📦</span>}
+          icon={() => (
+            <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl">
+              <ShoppingCart className="h-6 w-6 text-white" />
+            </div>
+          )}
+          trend="up"
         />
         <StatCard
           title="Stock Value"
           value={`₱${summary.stockValue.toLocaleString()}`}
-          icon={() => <span>🏷️</span>}
+          icon={() => (
+            <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl">
+              <Package className="h-6 w-6 text-white" />
+            </div>
+          )}
         />
+      </div>
+
+      {/* SECOND ROW OF METRICS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard
           title="Potential Revenue"
           value={`₱${summary.potentialRevenue.toLocaleString()}`}
-          icon={() => <span>🚀</span>}
+          icon={() => (
+            <div className="p-3 bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl">
+              <Rocket className="h-6 w-6 text-white" />
+            </div>
+          )}
         />
         <StatCard
           title="Completed Jobs"
           value={summary.completedJobs.toString()}
-          icon={() => <span>✅</span>}
+          icon={() => (
+            <div className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl">
+              <CheckCircle className="h-6 w-6 text-white" />
+            </div>
+          )}
         />
         <StatCard
-          title="Service Fees (Completed)"
+          title="Service Fees"
           value={`₱${summary.serviceFees.toLocaleString()}`}
-          icon={() => <span>🛠️</span>}
+          icon={() => (
+            <div className="p-3 bg-gradient-to-br from-red-500 to-red-600 rounded-xl">
+              <Wrench className="h-6 w-6 text-white" />
+            </div>
+          )}
         />
       </div>
 
