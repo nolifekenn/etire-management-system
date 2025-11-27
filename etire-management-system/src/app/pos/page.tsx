@@ -511,7 +511,7 @@ const CategoryIcon = ({ category, className = "h-4 w-4" }: { category: string; c
 // UPDATED: Fixed vehicle type visuals to use purple/blue color scheme but keep the original structure
 const vehicleTypeVisuals = {
   all: {
-    label: 'All Vehicles',
+    label: 'All',
     icon: Package,
     buttonActive: 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg border-transparent',
     buttonInactive: 'bg-white text-slate-700 hover:text-slate-900 border-slate-200 hover:border-slate-400 hover:bg-slate-50',
@@ -525,7 +525,7 @@ const vehicleTypeVisuals = {
     badge: 'bg-purple-50 text-purple-700 border-purple-200'
   },
   motor: {
-    label: 'Motorcycle',
+    label: 'Mtrcycle',
     icon: Bike,
     buttonActive: 'bg-gradient-to-r from-violet-500 to-cyan-500 text-white shadow-lg border-transparent',
     buttonInactive: 'bg-white text-slate-700 hover:text-violet-700 border-slate-200 hover:border-violet-300 hover:bg-violet-50/70',
@@ -549,7 +549,7 @@ const vehicleTypes = Object.entries(vehicleTypeVisuals).map(([value, config]) =>
 // UPDATED: Fixed category visuals to use purple/blue color scheme but keep the original structure
 const categoryVisuals = {
   all: {
-    label: 'All Categories',
+    label: 'All',
     buttonActive: 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg border-transparent',
     buttonInactive: 'bg-white text-slate-700 hover:text-slate-900 border-slate-200 hover:border-slate-400 hover:bg-slate-50',
     badge: 'bg-slate-100 text-slate-700 border-slate-200',
