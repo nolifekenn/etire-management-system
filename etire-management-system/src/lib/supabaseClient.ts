@@ -1,5 +1,5 @@
 
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 
 // Database types based on your schema
 export interface Database {
@@ -14,6 +14,7 @@ export interface Database {
           role: number
           created_at: string
           updated_at: string
+          uuid?: string // Link to Supabase Auth
         }
         Insert: {
           user_id?: string
@@ -23,6 +24,7 @@ export interface Database {
           role?: number
           created_at?: string
           updated_at?: string
+          uuid?: string
         }
         Update: {
           user_id?: string
@@ -32,6 +34,7 @@ export interface Database {
           role?: number
           created_at?: string
           updated_at?: string
+          uuid?: string
         }
       }
       inventory_item: {
@@ -305,22 +308,9 @@ if (!supabaseUrl || !supabaseKey) {
   console.error('Current values:', { supabaseUrl, supabaseKey });
 }
 
-export const supabase = supabaseUrl && supabaseKey 
-  ? createClient<Database>(supabaseUrl, supabaseKey)
+export const supabase = supabaseUrl && supabaseKey
+  ? createBrowserClient<Database>(supabaseUrl, supabaseKey)
   : null
-
-// Server-side client for API routes
-export const createServerClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-  
-  return createClient<Database>(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  })
-}
 
 // Utility function to check if credentials are available
 export function areSupabaseCredentialsSufficient() {

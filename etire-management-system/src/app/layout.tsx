@@ -101,7 +101,7 @@ export default function AppLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
+      <body suppressHydrationWarning={true}>
         <AuthProvider>
           <AuthWrapper>
             {children}

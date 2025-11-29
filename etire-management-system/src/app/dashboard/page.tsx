@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
-import { 
-  BarChart, Blocks, DollarSign, AlertTriangle, Users, Wrench, Loader2, Bell, 
-  Building2, Package, Car, TrendingUp, FileText, Download, ArrowUpRight, 
+import {
+  BarChart, Blocks, DollarSign, AlertTriangle, Users, Wrench, Loader2, Bell,
+  Building2, Package, Car, TrendingUp, FileText, Download, ArrowUpRight,
   Calendar, Clock, RefreshCw, Plus, ChevronDown, ChevronUp, TrendingDown
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, XAxis, YAxis, Tooltip, Area, ReferenceLine } from 'recharts';
@@ -127,11 +127,11 @@ export default function DashboardPage() {
     </div>
   );
 
-  const EmptyState = ({ icon: Icon, title, description, action }: { 
-    icon: any, 
-    title: string, 
-    description: string, 
-    action?: string 
+  const EmptyState = ({ icon: Icon, title, description, action }: {
+    icon: any,
+    title: string,
+    description: string,
+    action?: string
   }) => (
     <div className="text-center py-12 px-6 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
       <Icon className="h-16 w-16 text-slate-400 mx-auto mb-4" />
@@ -145,11 +145,11 @@ export default function DashboardPage() {
     </div>
   );
 
-  const GetStartedLink = ({ onClick, children }: { 
-    onClick: (e: React.MouseEvent) => void; 
-    children: string 
+  const GetStartedLink = ({ onClick, children }: {
+    onClick: (e: React.MouseEvent) => void;
+    children: string
   }) => (
-    <button 
+    <button
       onClick={onClick}
       className="group relative inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 transition-all duration-300 pb-1 text-xs font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50"
     >
@@ -158,7 +158,7 @@ export default function DashboardPage() {
       <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-indigo-600 to-purple-600 transition-all duration-300 group-hover:w-[calc(100%-20px)] group-hover:left-2.5"></span>
     </button>
   );
-  
+
   const quickActions = [
     { label: "Create Sale", icon: Plus, href: "/pos", description: "Point of Sale", category: "financial" },
     { label: "Manage Inventory", icon: Package, href: "/inventory", description: "Stock items", category: "inventory" },
@@ -182,18 +182,103 @@ export default function DashboardPage() {
     }
   };
 
-  const handleCardKeyPress = (event: React.KeyboardEvent, cardId: string) => {
+  const handleCardKeyPress = async (event: React.KeyboardEvent, cardId: string) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      handleCardClick(cardId);
+      try {
+        // Create promises for all independent data fetches
+        const statsPromise = supabase
+          .rpc('get_dashboard_stats', { user_uuid: user.user_id } as any);
+
+        const recentSalesPromise = supabase
+          .from('sale_item')
+          .select(`
+          sale_item_id,
+          quantity,
+          price_at_sale,
+          created_at,
+          sale!inner(
+            sale_id,
+            sale_date,
+            user:user_id(name),
+            total_amount
+          ),
+          inventory_item!inner(name, category)
+        `)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        const salesChartPromise = supabase
+          .rpc('get_weekly_sales');
+
+        const lowStockPromise = supabase
+          .from('inventory_item')
+          .select('*')
+          .lte('stock_quantity', 5)
+          .order('stock_quantity', { ascending: true })
+          .limit(10);
+
+        const notificationsPromise = supabase
+          .from('notification')
+          .select('notification_id, title, message, type, is_read, created_at')
+          .eq('user_id', user.user_id)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        // Execute all promises in parallel
+        const [
+          { data: statsData, error: statsError },
+          { data: recentSalesData, error: recentSalesError },
+          { data: salesChartData, error: salesChartError },
+          { data: lowStockData, error: lowStockError },
+          { data: notificationsData, error: notificationsError }
+        ] = await Promise.all([
+          statsPromise,
+          recentSalesPromise,
+          salesChartPromise,
+          lowStockPromise,
+          notificationsPromise
+        ]);
+
+        if (statsError) throw statsError;
+        if (recentSalesError) throw recentSalesError;
+        if (salesChartError) throw salesChartError;
+        if (lowStockError) throw lowStockError;
+        if (notificationsError) throw notificationsError;
+
+        // Transform recent sales data to match the interface
+        const formattedRecentSales: RecentSale[] = (recentSalesData as any[] || []).map(item => ({
+          sale_item_id: item.sale_item_id,
+          quantity: item.quantity,
+          price_at_sale: item.price_at_sale,
+          created_at: item.created_at,
+          item_name: item.inventory_item?.name || 'Unknown',
+          item_category: item.inventory_item?.category || 'Unknown',
+          user_name: item.sale?.user?.name || 'Unknown',
+          total_amount: item.quantity * item.price_at_sale
+        }));
+
+        // Calculate 7-day average and enhance sales data
+        const enhancedSalesData = await calculateEnhancedSalesData(salesChartData as SalesDataPoint[]);
+
+        // Set all data
+        setStats(statsData as any as DashboardStats);
+        setSalesData(enhancedSalesData);
+        setLowStockItems(lowStockData as LowStockItem[] || []);
+        setNotifications(notificationsData || []);
+        setRecentSales(formattedRecentSales);
+
+        setLastUpdated(new Date());
+
+      } catch (err: any) {
+        console.error('Dashboard data fetch error:', err);
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // FIXED: Enhanced dashboard data fetching with proper recent sales
   const fetchDashboardData = useCallback(async () => {
     if (!supabase || !user?.user_id) {
       setIsLoading(false);
@@ -202,16 +287,13 @@ export default function DashboardPage() {
 
     setIsLoading(true);
     setError(null);
-    
-    try {
-      // Get dashboard stats
-      const { data: statsData, error: statsError } = await supabase
-        .rpc('get_dashboard_stats', { user_uuid: user.user_id });
-      
-      if (statsError) throw statsError;
 
-      // FIXED: Get recent sales from sale_item table with proper joins
-      const { data: recentSalesData, error: recentSalesError } = await supabase
+    try {
+      // Create promises for all independent data fetches
+      const statsPromise = supabase
+        .rpc('get_dashboard_stats', { user_uuid: user.user_id } as any);
+
+      const recentSalesPromise = supabase
         .from('sale_item')
         .select(`
           sale_item_id,
@@ -229,51 +311,61 @@ export default function DashboardPage() {
         .order('created_at', { ascending: false })
         .limit(10);
 
-      if (recentSalesError) throw recentSalesError;
-
-      // FIXED: Transform recent sales data to match the interface
-      const formattedRecentSales: RecentSale[] = (recentSalesData || []).map(item => ({
-        sale_item_id: item.sale_item_id,
-        quantity: item.quantity,
-        price_at_sale: item.price_at_sale,
-        created_at: item.created_at,
-        item_name: item.inventory_item.name,
-        item_category: item.inventory_item.category,
-        user_name: item.sale.user?.name || 'Unknown',
-        total_amount: item.quantity * item.price_at_sale
-      }));
-
-      // Get weekly sales data for chart
-      const { data: salesChartData, error: salesChartError } = await supabase
+      const salesChartPromise = supabase
         .rpc('get_weekly_sales');
 
-      if (salesChartError) throw salesChartError;
-
-      // FIXED: Calculate 7-day average and enhance sales data
-      const enhancedSalesData = await calculateEnhancedSalesData(salesChartData as SalesDataPoint[]);
-
-      // Get low stock items
-      const { data: lowStockData, error: lowStockError } = await supabase
+      const lowStockPromise = supabase
         .from('inventory_item')
         .select('*')
         .lte('stock_quantity', 5)
-        .order('stock_quantity', { ascending: true })
+        .order('created_at', { ascending: false })
         .limit(10);
 
-      if (lowStockError) throw lowStockError;
-
-      // Get notifications
-      const { data: notificationsData, error: notificationsError } = await supabase
+      const notificationsPromise = supabase
         .from('notification')
         .select('notification_id, title, message, type, is_read, created_at')
         .eq('user_id', user.user_id)
         .order('created_at', { ascending: false })
         .limit(5);
 
+      // Execute all promises in parallel
+      const [
+        { data: statsData, error: statsError },
+        { data: recentSalesData, error: recentSalesError },
+        { data: salesChartData, error: salesChartError },
+        { data: lowStockData, error: lowStockError },
+        { data: notificationsData, error: notificationsError }
+      ] = await Promise.all([
+        statsPromise,
+        recentSalesPromise,
+        salesChartPromise,
+        lowStockPromise,
+        notificationsPromise
+      ]);
+
+      if (statsError) throw statsError;
+      if (recentSalesError) throw recentSalesError;
+      if (salesChartError) throw salesChartError;
+      if (lowStockError) throw lowStockError;
       if (notificationsError) throw notificationsError;
 
+      // Transform recent sales data to match the interface
+      const formattedRecentSales: RecentSale[] = (recentSalesData as any[] || []).map(item => ({
+        sale_item_id: item.sale_item_id,
+        quantity: item.quantity,
+        price_at_sale: item.price_at_sale,
+        created_at: item.created_at,
+        item_name: item.inventory_item?.name || 'Unknown',
+        item_category: item.inventory_item?.category || 'Unknown',
+        user_name: item.sale?.user?.name || 'Unknown',
+        total_amount: item.quantity * item.price_at_sale
+      }));
+
+      // Calculate 7-day average and enhance sales data
+      const enhancedSalesData = await calculateEnhancedSalesData(salesChartData as SalesDataPoint[]);
+
       // Set all data
-      setStats(statsData as DashboardStats);
+      setStats(statsData as any as DashboardStats);
       setSalesData(enhancedSalesData);
       setLowStockItems(lowStockData as LowStockItem[] || []);
       setNotifications(notificationsData || []);
@@ -329,12 +421,16 @@ export default function DashboardPage() {
     }
   }, [fetchDashboardData, user]);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const handleRefresh = () => {
     fetchDashboardData();
   };
 
   const primaryStats = [
-    { id: 'sales', title: "Total Sales", value: `₱${stats.total_sales.toLocaleString()}`, icon: DollarSign, desc: "Last 7 days", category: "financial" },
+    { id: 'sales', title: "Total Sales", value: `₱${stats.total_sales.toLocaleString()} `, icon: DollarSign, desc: "Last 7 days", category: "financial" },
     { id: 'inventory', title: "Inventory Items", value: stats.total_items.toLocaleString(), icon: Blocks, desc: "In stock", category: "inventory" },
     { id: 'customers', title: "Customers", value: stats.total_customers.toLocaleString(), icon: Users, desc: "Registered", category: "customers" },
     { id: 'jobs', title: "Pending Jobs", value: stats.pending_jobs.toLocaleString(), icon: Wrench, desc: "Needs attention", category: "service" }
@@ -351,36 +447,31 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
-      
+
       {/* TOP BACKGROUND SECTION */}
       <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
-        <div 
+        <div
           className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
-          style={{ 
+          style={{
             backgroundImage: "url('/images/image2.jpg')",
             backgroundSize: "cover",
             backgroundPosition: "center 30%"
           }}
         ></div>
-        
+
         <div className="absolute top-0 left-0 w-32 h-32 bg-green-300/20 rounded-br-full"></div>
         <div className="absolute top-0 right-0 w-32 h-32 bg-teal-300/20 rounded-bl-full"></div>
         <div className="absolute bottom-10 left-20 w-16 h-16 bg-white/20 rounded-2xl rotate-45"></div>
         <div className="absolute bottom-16 right-24 w-12 h-12 bg-white/15 rounded-full"></div>
       </div>
 
-      {/* BOTTOM BACKGROUND SECTION */}
-      <div className="absolute top-64 left-0 w-full h-full bg-blue-50/10">
-        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-blue-100/15 to-blue-50/10"></div>
-      </div>
-
       <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-        
+
         {/* PROFILE HEADER SECTION */}
         <div className={`mb-12 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
           <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
-            
+
             <div className="relative z-10 flex-1">
               <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
                 Welcome back, {user?.name ?? 'User'}
@@ -404,8 +495,8 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-            
-            <Button 
+
+            <Button
               onClick={handleRefresh}
               disabled={isLoading}
               className={buttonStyles.glass + " active:scale-95"}
@@ -426,12 +517,12 @@ export default function DashboardPage() {
               <div
                 key={action.label}
                 className={`transform transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}
-                style={{ 
+                style={{
                   transitionDelay: `${index * 50}ms`,
                   transitionTimingFunction: springEasing
                 }}
               >
-                <div 
+                <div
                   className={`group bg-white border border-slate-200 rounded-2xl p-5 cursor-pointer h-full flex flex-col shadow-sm hover:border-indigo-300/25 active:scale-[0.98] ${microAnimations.cardHover} ${focusStyles}`}
                   onClick={() => router.push(action.href)}
                   onKeyPress={(e) => e.key === 'Enter' && router.push(action.href)}
@@ -441,31 +532,31 @@ export default function DashboardPage() {
                   style={{ transitionTimingFunction: springEasing }}
                 >
                   <div className="flex items-center gap-4 mb-3">
-                    <div 
+                    <div
                       className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${microAnimations.iconHover}`}
-                      style={{ 
+                      style={{
                         backgroundColor: (iconCategories as any)[action.category]?.background || 'rgba(99, 102, 241, 0.1)',
                         transitionTimingFunction: springEasing
                       }}
                     >
-                      <action.icon 
-                        className="w-5 h-5" 
+                      <action.icon
+                        className="w-5 h-5"
                         style={{ color: (iconCategories as any)[action.category]?.icon || '#6366f1' }}
                       />
                     </div>
                   </div>
-                  
+
                   <div className="flex-1 flex flex-col">
                     {/* CHANGED: Smaller font size for title */}
                     <h3 className="text-base font-semibold text-slate-900 group-hover:text-indigo-700 transition-colors leading-tight mb-2">
                       {action.label}
                     </h3>
-                    
+
                     {/* CHANGED: Smaller font size for description */}
                     <p className="text-xs text-slate-600 leading-relaxed flex-1 mb-3">
                       {action.description}
                     </p>
-                    
+
                     <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100 group-hover:border-indigo-100 transition-colors">
                       <span className="text-xs font-medium text-slate-500 group-hover:text-indigo-600 transition-colors">
                         Quick access
@@ -483,7 +574,7 @@ export default function DashboardPage() {
         {/* CHANGED: Added margin adjustment and smaller font size */}
         <section className="mb-10" aria-labelledby="key-metrics-heading">
           <h2 id="key-metrics-heading" className="text-xl font-bold text-slate-900 mb-6">Key Metrics</h2>
-          
+
           {isLoading ? (
             <MetricSkeleton />
           ) : (
@@ -497,7 +588,7 @@ export default function DashboardPage() {
                   tabIndex={0}
                   role="button"
                   aria-label={`View ${stat.title} details. Current value: ${stat.value}`}
-                  style={{ 
+                  style={{
                     transitionTimingFunction: springEasing,
                     transitionDelay: `${250 + i * 50}ms`,
                     transform: mounted ? 'translateY(0)' : 'translateY(20px)',
@@ -506,21 +597,21 @@ export default function DashboardPage() {
                   }}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <div 
+                    <div
                       className={`w-10 h-10 rounded-lg flex items-center justify-center ${microAnimations.iconHover}`}
-                      style={{ 
+                      style={{
                         backgroundColor: (iconCategories as any)[stat.category]?.background || 'rgba(99, 102, 241, 0.1)',
                         transitionTimingFunction: springEasing
                       }}
                     >
-                      <stat.icon 
-                        className="w-5 h-5" 
-                        style={{ color: (iconCategories as any)[stat.category]?.icon || '#6366f1' }} 
+                      <stat.icon
+                        className="w-5 h-5"
+                        style={{ color: (iconCategories as any)[stat.category]?.icon || '#6366f1' }}
                       />
                     </div>
-                    <div 
+                    <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-400 scale-90 translate-y-1 group-hover:scale-100 group-hover:translate-y-0"
-                      style={{ 
+                      style={{
                         backgroundColor: 'rgba(16, 185, 129, 0.15)',
                         transitionTimingFunction: springEasing,
                         transitionDelay: '0.1s'
@@ -529,13 +620,12 @@ export default function DashboardPage() {
                       <TrendingUp className="w-4 h-4 text-green-600" />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     {/* CHANGED: Smaller font size and updated color for values */}
-                    <p 
-                      className={`text-3xl font-extrabold tracking-tight tabular-nums leading-none mb-2 ${
-                        stat.value === '₱0' || stat.value === '0' ? 'text-slate-300' : 'text-slate-800'
-                      }`}
+                    <p
+                      className={`text-3xl font-extrabold tracking-tight tabular-nums leading-none mb-2 ${stat.value === '₱0' || stat.value === '0' ? 'text-slate-300' : 'text-slate-800'
+                        }`}
                       style={{ letterSpacing: '-0.03em' }}
                     >
                       {stat.value}
@@ -551,7 +641,7 @@ export default function DashboardPage() {
                   {stat.value === '₱0' || stat.value === '0' ? (
                     <div className="mt-3 p-2 bg-slate-50 rounded-lg border border-slate-200">
                       <p className="text-xs text-slate-400 opacity-70 italic mb-1">No data yet</p>
-                      <GetStartedLink 
+                      <GetStartedLink
                         onClick={(e) => {
                           e.stopPropagation();
                           router.push(stat.id === 'sales' ? '/pos' : `/${stat.id}`);
@@ -607,21 +697,21 @@ export default function DashboardPage() {
                   style={{ transitionTimingFunction: springEasing }}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <div 
+                    <div
                       className={`w-10 h-10 rounded-lg flex items-center justify-center ${microAnimations.iconHover}`}
-                      style={{ 
+                      style={{
                         backgroundColor: (iconCategories as any)[stat.category]?.background || 'rgba(99, 102, 241, 0.1)',
                         transitionTimingFunction: springEasing
                       }}
                     >
-                      <stat.icon 
-                        className="w-5 h-5" 
-                        style={{ color: (iconCategories as any)[stat.category]?.icon || '#6366f1' }} 
+                      <stat.icon
+                        className="w-5 h-5"
+                        style={{ color: (iconCategories as any)[stat.category]?.icon || '#6366f1' }}
                       />
                     </div>
-                    <div 
+                    <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-400 scale-90 translate-y-1 group-hover:scale-100 group-hover:translate-y-0"
-                      style={{ 
+                      style={{
                         backgroundColor: 'rgba(16, 185, 129, 0.15)',
                         transitionTimingFunction: springEasing,
                         transitionDelay: '0.1s'
@@ -630,13 +720,12 @@ export default function DashboardPage() {
                       <TrendingUp className="w-4 h-4 text-green-600" />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     {/* CHANGED: Smaller font size and updated color for values */}
-                    <p 
-                      className={`text-3xl font-extrabold tracking-tight tabular-nums leading-none ${
-                        stat.value === '0' ? 'text-slate-300' : 'text-slate-800'
-                      }`}
+                    <p
+                      className={`text-3xl font-extrabold tracking-tight tabular-nums leading-none ${stat.value === '0' ? 'text-slate-300' : 'text-slate-800'
+                        }`}
                       style={{ letterSpacing: '-0.03em' }}
                     >
                       {stat.value}
@@ -668,7 +757,7 @@ export default function DashboardPage() {
           </div>
           <div className="grid lg:grid-cols-3 gap-6 mb-8">
             {/* Sales Chart */}
-            <Card 
+            <Card
               className="lg:col-span-2 bg-white border-slate-200 shadow-lg transition-all duration-300 hover:shadow-xl"
               role="region"
               aria-labelledby="sales-chart-title"
@@ -678,12 +767,12 @@ export default function DashboardPage() {
                   <div>
                     {/* CHANGED: Smaller font size for title */}
                     <CardTitle id="sales-chart-title" className="flex items-center text-xl font-bold text-slate-800">
-  <BarChart className="mr-3 h-5 w-5 text-green-600" aria-hidden="true" />
-  Sales Overview
-</CardTitle>
-<CardDescription className="mt-2 text-slate-600">
-  Daily performance with 7-day average
-</CardDescription>
+                      <BarChart className="mr-3 h-5 w-5 text-green-600" aria-hidden="true" />
+                      Sales Overview
+                    </CardTitle>
+                    <CardDescription className="mt-2 text-slate-600">
+                      Daily performance with 7-day average
+                    </CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -696,71 +785,71 @@ export default function DashboardPage() {
                 ) : salesData.length > 0 ? (
                   <div className="h-80 w-full" aria-label="Sales trend chart showing daily sales for the past week with 7-day average">
                     <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={salesData}>
-  <defs>
-    {/* Single green gradient */}
-    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-      <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
-    </linearGradient>
-  </defs>
-  <XAxis 
-    dataKey="date" 
-    stroke="#64748b"
-    fontSize={12} 
-    tickLine={false} 
-    axisLine={false}
-  />
-  <YAxis 
-    stroke="#64748b"
-    fontSize={12} 
-    tickLine={false} 
-    axisLine={false} 
-    tickFormatter={(value) => `₱${(value/1000).toFixed(0)}k`}
-  />
-  <Tooltip
-    contentStyle={{
-      backgroundColor: "rgba(255, 255, 255, 0.95)",
-      backdropFilter: "blur(12px)",
-      border: `1px solid rgba(21, 128, 61, 0.2)`,
-      borderRadius: "12px",
-      boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
-      color: "#1e293b"
-    }}
-    formatter={(value, name) => {
-      if (name === 'sales') return [`₱${Number(value).toLocaleString()}`, 'Daily Sales'];
-      if (name === 'average') return [`₱${Number(value).toLocaleString()}`, '7-Day Average'];
-      return [value, name];
-    }}
-    labelFormatter={(label) => `Date: ${label}`}
-  />
-  {/* 7-Day Average Reference Line - Keep it but make it less prominent */}
-  <ReferenceLine 
-    y={salesData[0]?.average} 
-    stroke="#64748b" 
-    strokeWidth={1}
-    strokeDasharray="3 3"
-    label={{ 
-      value: '7-Day Avg', 
-      position: 'right',
-      fill: '#64748b',
-      fontSize: 10
-    }}
-  />
-  {/* Sales Area - Always green */}
-  <Area 
-    type="monotone" 
-    dataKey="sales" 
-    stroke="#10b981"
-    strokeWidth={3}
-    fillOpacity={1} 
-    fill="url(#colorSales)"
-  />
-</AreaChart>
+                      <AreaChart data={salesData}>
+                        <defs>
+                          {/* Single green gradient */}
+                          <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0.1} />
+                          </linearGradient>
+                        </defs>
+                        <XAxis
+                          dataKey="date"
+                          stroke="#64748b"
+                          fontSize={12}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <YAxis
+                          stroke="#64748b"
+                          fontSize={12}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "rgba(255, 255, 255, 0.95)",
+                            backdropFilter: "blur(12px)",
+                            border: `1px solid rgba(21, 128, 61, 0.2)`,
+                            borderRadius: "12px",
+                            boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+                            color: "#1e293b"
+                          }}
+                          formatter={(value, name) => {
+                            if (name === 'sales') return [`₱${Number(value).toLocaleString()}`, 'Daily Sales'];
+                            if (name === 'average') return [`₱${Number(value).toLocaleString()}`, '7-Day Average'];
+                            return [value, name];
+                          }}
+                          labelFormatter={(label) => `Date: ${label}`}
+                        />
+                        {/* 7-Day Average Reference Line - Keep it but make it less prominent */}
+                        <ReferenceLine
+                          y={salesData[0]?.average}
+                          stroke="#64748b"
+                          strokeWidth={1}
+                          strokeDasharray="3 3"
+                          label={{
+                            value: '7-Day Avg',
+                            position: 'right',
+                            fill: '#64748b',
+                            fontSize: 10
+                          }}
+                        />
+                        {/* Sales Area - Always green */}
+                        <Area
+                          type="monotone"
+                          dataKey="sales"
+                          stroke="#10b981"
+                          strokeWidth={3}
+                          fillOpacity={1}
+                          fill="url(#colorSales)"
+                        />
+                      </AreaChart>
                     </ResponsiveContainer>
                   </div>
                 ) : (
-                  <EmptyState 
+                  <EmptyState
                     icon={BarChart}
                     title="No Sales Data"
                     description="Start making sales to see your performance analytics"
@@ -771,7 +860,7 @@ export default function DashboardPage() {
             </Card>
 
             {/* Low Stock Alerts */}
-            <Card 
+            <Card
               className="bg-white border-slate-200 shadow-lg transition-all duration-300 hover:shadow-xl"
               role="region"
               aria-labelledby="low-stock-title"
@@ -790,8 +879,8 @@ export default function DashboardPage() {
                 {/* FIXED: Removed horizontal scroll by removing overflow-x-auto */}
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {lowStockItems.length > 0 ? lowStockItems.slice(0, 5).map((item) => (
-                    <div 
-                      key={item.item_id} 
+                    <div
+                      key={item.item_id}
                       className="p-4 rounded-xl border border-slate-200 hover:shadow-lg transition-all duration-300 cursor-pointer group bg-white hover:scale-105"
                       onClick={() => router.push('/inventory')}
                       onKeyPress={(e) => e.key === 'Enter' && router.push('/inventory')}
@@ -813,7 +902,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   )) : (
-                    <EmptyState 
+                    <EmptyState
                       icon={Package}
                       title="All Items Stocked"
                       description="All your inventory items are well stocked!"
@@ -831,7 +920,7 @@ export default function DashboardPage() {
           <h2 id="recent-activity-heading" className="text-xl font-bold mb-6 text-slate-800">Recent Activity</h2>
           <div className="grid lg:grid-cols-2 gap-6">
             {/* Recent Sales */}
-            <Card 
+            <Card
               className="bg-white border-slate-200 shadow-lg transition-all duration-300 hover:shadow-xl"
               role="region"
               aria-labelledby="recent-sales-title"
@@ -847,8 +936,8 @@ export default function DashboardPage() {
                     <CardDescription className="text-slate-600">Latest transactions</CardDescription>
                   </div>
                   {/* FIXED: Removed the green "Create Sale" button */}
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
                     className="flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-700 hover:text-indigo-800 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 hover:bg-indigo-50"
                     onClick={() => router.push('/pos')}
@@ -861,8 +950,8 @@ export default function DashboardPage() {
               <CardContent>
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {recentSales.length > 0 ? recentSales.slice(0, 5).map((sale) => (
-                    <div 
-                      key={sale.sale_item_id} 
+                    <div
+                      key={sale.sale_item_id}
                       className="p-4 rounded-xl border border-slate-200 hover:shadow-lg transition-all duration-300 cursor-pointer group bg-white hover:scale-105"
                       onClick={() => router.push('/pos')}
                       onKeyPress={(e) => e.key === 'Enter' && router.push('/pos')}
@@ -893,7 +982,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   )) : (
-                    <EmptyState 
+                    <EmptyState
                       icon={TrendingUp}
                       title="No Recent Sales"
                       description="Your recent sales will appear here"
@@ -905,7 +994,7 @@ export default function DashboardPage() {
             </Card>
 
             {/* Notifications */}
-            <Card 
+            <Card
               className="bg-white border-slate-200 shadow-lg transition-all duration-300 hover:shadow-xl"
               role="region"
               aria-labelledby="notifications-title"
@@ -920,9 +1009,9 @@ export default function DashboardPage() {
                     </CardTitle>
                     <CardDescription className="text-slate-600">Latest system alerts</CardDescription>
                   </div>
-                  <Button 
-                    asChild 
-                    size="sm" 
+                  <Button
+                    asChild
+                    size="sm"
                     className="flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-700 hover:text-indigo-800 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 hover:bg-indigo-50"
                   >
                     <Link href="/notifications">
@@ -935,8 +1024,8 @@ export default function DashboardPage() {
               <CardContent>
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {notifications.length > 0 ? notifications.map((notification) => (
-                    <div 
-                      key={notification.notification_id} 
+                    <div
+                      key={notification.notification_id}
                       className="p-4 rounded-xl border border-slate-200 hover:shadow-lg transition-all duration-300 cursor-pointer group bg-white hover:scale-105"
                       onClick={() => router.push('/notifications')}
                       onKeyPress={(e) => e.key === 'Enter' && router.push('/notifications')}
@@ -969,7 +1058,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   )) : (
-                    <EmptyState 
+                    <EmptyState
                       icon={Bell}
                       title="No Notifications"
                       description="You're all caught up with notifications"
@@ -991,7 +1080,7 @@ export default function DashboardPage() {
                 <AlertTriangle className="h-5 w-5 text-red-600" />
                 <span className="text-red-800">{error}</span>
               </div>
-              <button 
+              <button
                 onClick={() => setError(null)}
                 className="text-red-600 hover:text-red-800"
               >

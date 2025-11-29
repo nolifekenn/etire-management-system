@@ -1,12 +1,12 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { loginAction } from "@/lib/action"; // 🟢 Import the server action we created
+import { supabase } from "@/lib/supabaseClient";
+import { useRouter } from "next/navigation";
 
-// Match this interface to the data your 'user' table returns
 interface ExtendedUser {
   user_id: string;
-  name: string; // Ensure this matches your DB column (e.g. 'name' or 'first_name')
+  name: string;
   username: string;
   role: number;
 }
@@ -20,66 +20,77 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  isLoading: false,
+  isLoading: true,
   login: async () => false,
-  logout: () => {},
+  logout: () => { },
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<ExtendedUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
-  // 🟢 Try loading stored user from localStorage on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem("etire_user");
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        console.error("Failed to parse stored user", e);
-        localStorage.removeItem("etire_user");
+    const { data: { subscription } } = supabase!.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth State Change:", event, session?.user?.email);
+
+      if (session?.user) {
+        // Fetch user profile from public.user
+        const { data: profile, error } = await supabase!
+          .from("user")
+          .select("user_id, name, username, role")
+          .eq("uuid", session.user.id)
+          .single();
+
+        if (profile && !error) {
+          setUser(profile);
+        } else {
+          console.error("Failed to fetch user profile:", error);
+        }
+      } else {
+        setUser(null);
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // 🟣 Login using the Server Action (Safe "Username Only" login)
   const login = async (username: string, password: string): Promise<boolean> => {
+    console.log("useAuth: login called");
     setIsLoading(true);
-
     try {
-      console.log("🔐 Attempting login via Server Action for:", username);
+      // Use dummy email format as per project convention
+      const email = `${username}@etire-system.local`;
 
-      // 1. Call the Server Action instead of Supabase Auth directly
-      const result = await loginAction(username, password);
+      const { error } = await supabase!.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      if (result.success && result.user) {
-        console.log("✅ Login successful");
-        
-        // 2. Save user to state
-        setUser(result.user as ExtendedUser);
-        
-        // 3. Persist to localStorage so they stay logged in on refresh
-        localStorage.setItem("etire_user", JSON.stringify(result.user));
-        return true;
+      if (error) {
+        console.error("Login Error:", error.message);
+        return false;
       }
-      
-      // Handle failure
-      console.error("❌ Login failed:", result.message);
-      return false;
 
+      console.log("Login successful");
+      return true;
     } catch (err) {
-      console.error("❌ Unexpected Login Error:", err);
+      console.error("Login Exception:", err);
       return false;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    console.log("🚪 Logging out...");
+  const logout = async () => {
+    setIsLoading(true);
+    await supabase!.auth.signOut();
     setUser(null);
-    localStorage.removeItem("etire_user");
+    router.push("/login");
+    setIsLoading(false);
   };
 
   return (

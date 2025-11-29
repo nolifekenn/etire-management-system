@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-    getFormState, 
-    clearFormState, 
-    clearAllFormStates 
-} from '@/lib/tokenAuth';
+import {
+    getFormState,
+    clearFormState,
+    clearAllFormStates
+} from '@/lib/formPersistence';
 import { Trash2, Save, Clock } from 'lucide-react';
 
 interface FormPersistenceIndicatorProps {
@@ -16,10 +16,10 @@ interface FormPersistenceIndicatorProps {
     showClearButton?: boolean;
 }
 
-export function FormPersistenceIndicator({ 
-    formId, 
-    onClear, 
-    showClearButton = true 
+export function FormPersistenceIndicator({
+    formId,
+    onClear,
+    showClearButton = true
 }: FormPersistenceIndicatorProps) {
     const [hasSavedData, setHasSavedData] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -41,7 +41,7 @@ export function FormPersistenceIndicator({
         };
 
         checkSavedData();
-        
+
         // Check for saved data every 5 seconds
         const interval = setInterval(checkSavedData, 5000);
         return () => clearInterval(interval);

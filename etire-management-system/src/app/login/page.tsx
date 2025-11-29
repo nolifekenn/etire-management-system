@@ -13,277 +13,275 @@ import { useAuth } from '@/hooks/useAuth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useFormFieldPersistence } from '@/hooks/useFormPersistence';
 import { CustomCheckbox } from '@/components/ui/custom-checkbox';
+import { registerAction } from "@/lib/auth-actions";
 
 // Tire Loading Animation Component
 const TireLoadingAnimation = ({ isLoading }: { isLoading: boolean }) => {
-  if (!isLoading) return null;
+    if (!isLoading) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300">
-        <div className="relative w-24 h-24 mx-auto mb-6">
-          {/* Tire Outer Ring */}
-          <div className="absolute inset-0 border-8 border-gray-300 rounded-full animate-spin"></div>
-          {/* Tire Gradient Ring */}
-          <div className="absolute inset-2 border-6 border-transparent rounded-full bg-gradient-to-r from-purple-600 to-blue-600 animate-spin" style={{ animationDuration: '1.5s' }}></div>
-          {/* Tire Inner Ring */}
-          <div className="absolute inset-6 border-4 border-gray-200 rounded-full"></div>
-          {/* Center Hub */}
-          <div className="absolute inset-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center">
-            <Car className="h-6 w-6 text-white" />
-          </div>
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300">
+                <div className="relative w-24 h-24 mx-auto mb-6">
+                    {/* Tire Outer Ring */}
+                    <div className="absolute inset-0 border-8 border-gray-300 rounded-full animate-spin"></div>
+                    {/* Tire Gradient Ring */}
+                    <div className="absolute inset-2 border-6 border-transparent rounded-full bg-gradient-to-r from-purple-600 to-blue-600 animate-spin" style={{ animationDuration: '1.5s' }}></div>
+                    {/* Tire Inner Ring */}
+                    <div className="absolute inset-6 border-4 border-gray-200 rounded-full"></div>
+                    {/* Center Hub */}
+                    <div className="absolute inset-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center">
+                        <Car className="h-6 w-6 text-white" />
+                    </div>
+                </div>
+
+                <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins">
+                    Signing You In
+                </h3>
+
+                <p className="text-slate-600 mb-4 font-poppins">
+                    Welcome to eTire Manager
+                </p>
+
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-gradient-to-r from-purple-600 to-blue-600 h-2 rounded-full animate-pulse"></div>
+                </div>
+            </div>
         </div>
-        
-        <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins">
-          Signing You In
-        </h3>
-        
-        <p className="text-slate-600 mb-4 font-poppins">
-          Welcome to eTire Manager
-        </p>
-        
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 h-2 rounded-full animate-pulse"></div>
-        </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 // Enhanced Password Strength Indicator with Red to Green
 const PasswordStrengthIndicator = ({ password }: { password: string }) => {
-  const getStrength = (pass: string) => {
-    let score = 0;
-    if (pass.length >= 8) score++;
-    if (/[A-Z]/.test(pass)) score++;
-    if (/[a-z]/.test(pass)) score++;
-    if (/[0-9]/.test(pass)) score++;
-    if (/[^A-Za-z0-9]/.test(pass)) score++;
-    return score;
-  };
+    const getStrength = (pass: string) => {
+        let score = 0;
+        if (pass.length >= 8) score++;
+        if (/[A-Z]/.test(pass)) score++;
+        if (/[a-z]/.test(pass)) score++;
+        if (/[0-9]/.test(pass)) score++;
+        if (/[^A-Za-z0-9]/.test(pass)) score++;
+        return score;
+    };
 
-  const strength = getStrength(password);
-  
-  // Color mapping from red to green
-  const getStrengthColor = (score: number) => {
-    switch(score) {
-      case 0: return 'bg-red-500';
-      case 1: return 'bg-red-400';
-      case 2: return 'bg-orange-400';
-      case 3: return 'bg-yellow-400';
-      case 4: return 'bg-green-400';
-      case 5: return 'bg-green-500';
-      default: return 'bg-red-500';
-    }
-  };
+    const strength = getStrength(password);
 
-  const getStrengthLabel = (score: number) => {
-    switch(score) {
-      case 0: return 'Very Weak';
-      case 1: return 'Weak';
-      case 2: return 'Fair';
-      case 3: return 'Good';
-      case 4: return 'Strong';
-      case 5: return 'Very Strong';
-      default: return 'Very Weak';
-    }
-  };
+    // Color mapping from red to green
+    const getStrengthColor = (score: number) => {
+        switch (score) {
+            case 0: return 'bg-red-500';
+            case 1: return 'bg-red-400';
+            case 2: return 'bg-orange-400';
+            case 3: return 'bg-yellow-400';
+            case 4: return 'bg-green-400';
+            case 5: return 'bg-green-500';
+            default: return 'bg-red-500';
+        }
+    };
 
-  const requirements = [
-    { met: password.length >= 8, text: 'At least 8 characters' },
-    { met: /[A-Z]/.test(password), text: 'One uppercase letter' },
-    { met: /[a-z]/.test(password), text: 'One lowercase letter' },
-    { met: /[0-9]/.test(password), text: 'One number' },
-    { met: /[^A-Za-z0-9]/.test(password), text: 'One special character' },
-  ];
+    const getStrengthLabel = (score: number) => {
+        switch (score) {
+            case 0: return 'Very Weak';
+            case 1: return 'Weak';
+            case 2: return 'Fair';
+            case 3: return 'Good';
+            case 4: return 'Strong';
+            case 5: return 'Very Strong';
+            default: return 'Very Weak';
+        }
+    };
 
-  return (
-    <div className="space-y-3 mt-2">
-      <div className="flex justify-between items-center">
-        <span className="text-sm font-medium text-gray-700">Password Strength</span>
-        <span className={`text-sm font-semibold ${
-          strength <= 1 ? 'text-red-600' :
-          strength === 2 ? 'text-orange-600' :
-          strength === 3 ? 'text-yellow-600' :
-          strength >= 4 ? 'text-green-600' : 'text-red-600'
-        }`}>
-          {getStrengthLabel(strength)}
-        </span>
-      </div>
-      
-      <div className="w-full bg-gray-200 rounded-full h-2">
-        <div 
-          className={`h-2 rounded-full transition-all duration-500 ${getStrengthColor(strength)}`}
-          style={{ width: `${(strength / 5) * 100}%` }}
-        />
-      </div>
+    const requirements = [
+        { met: password.length >= 8, text: 'At least 8 characters' },
+        { met: /[A-Z]/.test(password), text: 'One uppercase letter' },
+        { met: /[a-z]/.test(password), text: 'One lowercase letter' },
+        { met: /[0-9]/.test(password), text: 'One number' },
+        { met: /[^A-Za-z0-9]/.test(password), text: 'One special character' },
+    ];
 
-      <div className="space-y-2">
-        {requirements.map((req, index) => (
-          <div key={index} className="flex items-center gap-2">
-            {req.met ? (
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            ) : (
-              <XCircle className="h-4 w-4 text-gray-400" />
-            )}
-            <span className={`text-sm ${req.met ? 'text-green-600' : 'text-gray-500'}`}>
-              {req.text}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+    return (
+        <div className="space-y-3 mt-2">
+            <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-gray-700">Password Strength</span>
+                <span className={`text-sm font-semibold ${strength <= 1 ? 'text-red-600' :
+                    strength === 2 ? 'text-orange-600' :
+                        strength === 3 ? 'text-yellow-600' :
+                            strength >= 4 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                    {getStrengthLabel(strength)}
+                </span>
+            </div>
+
+            <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                    className={`h-2 rounded-full transition-all duration-500 ${getStrengthColor(strength)}`}
+                    style={{ width: `${(strength / 5) * 100}%` }}
+                />
+            </div>
+
+            <div className="space-y-2">
+                {requirements.map((req, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                        {req.met ? (
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                        ) : (
+                            <XCircle className="h-4 w-4 text-gray-400" />
+                        )}
+                        <span className={`text-sm ${req.met ? 'text-green-600' : 'text-gray-500'}`}>
+                            {req.text}
+                        </span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
 };
 
-// Step Progress Indicator - FIXED ALIGNMENT
+// Step Progress Indicator
 const StepProgress = ({ currentStep, totalSteps }: { currentStep: number; totalSteps: number }) => {
-  return (
-    <div className="flex items-center justify-between mb-8 px-2">
-      {Array.from({ length: totalSteps }).map((_, index) => (
-        <div key={index} className="flex items-center flex-1 last:flex-none">
-          <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
-            index + 1 <= currentStep 
-              ? 'bg-purple-600 border-purple-600 text-white' 
-              : 'border-gray-300 text-gray-500'
-          } font-semibold text-sm transition-all duration-300`}>
-            {index + 1}
-          </div>
-          {index < totalSteps - 1 && (
-            <div className={`flex-1 h-1 mx-2 ${
-              index + 1 < currentStep ? 'bg-purple-600' : 'bg-gray-300'
-            } transition-all duration-300`} />
-          )}
+    return (
+        <div className="flex items-center justify-between mb-8 px-2">
+            {Array.from({ length: totalSteps }).map((_, index) => (
+                <div key={index} className="flex items-center flex-1 last:flex-none">
+                    <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${index + 1 <= currentStep
+                        ? 'bg-purple-600 border-purple-600 text-white'
+                        : 'border-gray-300 text-gray-500'
+                        } font-semibold text-sm transition-all duration-300`}>
+                        {index + 1}
+                    </div>
+                    {index < totalSteps - 1 && (
+                        <div className={`flex-1 h-1 mx-2 ${index + 1 < currentStep ? 'bg-purple-600' : 'bg-gray-300'
+                            } transition-all duration-300`} />
+                    )}
+                </div>
+            ))}
         </div>
-      ))}
-    </div>
-  );
+    );
 };
 
 // Success Confirmation Component
-const SuccessConfirmation = ({ 
-  isOpen, 
-  onClose, 
-  type,
-  userData 
-}: { 
-  isOpen: boolean; 
-  onClose: () => void;
-  type: 'login' | 'register';
-  userData?: { firstName: string; lastName: string; username: string };
+const SuccessConfirmation = ({
+    isOpen,
+    onClose,
+    type,
+    userData
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    type: 'login' | 'register';
+    userData?: { firstName: string; lastName: string; username: string };
 }) => {
-  if (!isOpen) return null;
+    if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full mx-auto animate-in zoom-in duration-300">
-        <div className="p-6 text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="h-8 w-8 text-green-600" />
-          </div>
-          
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            {type === 'register' ? 'Account Created Successfully!' : 'Welcome Back!'}
-          </h2>
-          
-          <p className="text-gray-600 mb-6">
-            {type === 'register' 
-              ? `Welcome to eTire Manager, ${userData?.firstName}! Your account has been created successfully.`
-              : `You have successfully signed in to your eTire Manager account.`
-            }
-          </p>
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full mx-auto animate-in zoom-in duration-300">
+                <div className="p-6 text-center">
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <CheckCircle className="h-8 w-8 text-green-600" />
+                    </div>
 
-          {type === 'register' && userData && (
-            <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-              <h3 className="font-semibold text-gray-800 mb-2">Account Details:</h3>
-              <div className="space-y-1 text-sm text-gray-600">
-                <p><span className="font-medium">Name:</span> {userData.firstName} {userData.lastName}</p>
-                <p><span className="font-medium">Username:</span> {userData.username}</p>
-                <p><span className="font-medium">Status:</span> Active</p>
-              </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                        {type === 'register' ? 'Account Created Successfully!' : 'Welcome Back!'}
+                    </h2>
+
+                    <p className="text-gray-600 mb-6">
+                        {type === 'register'
+                            ? `Welcome to eTire Manager, ${userData?.firstName}! Your account has been created successfully.`
+                            : `You have successfully signed in to your eTire Manager account.`
+                        }
+                    </p>
+
+                    {type === 'register' && userData && (
+                        <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+                            <h3 className="font-semibold text-gray-800 mb-2">Account Details:</h3>
+                            <div className="space-y-1 text-sm text-gray-600">
+                                <p><span className="font-medium">Name:</span> {userData.firstName} {userData.lastName}</p>
+                                <p><span className="font-medium">Username:</span> {userData.username}</p>
+                                <p><span className="font-medium">Status:</span> Active</p>
+                            </div>
+                        </div>
+                    )}
+
+                    <Button
+                        onClick={onClose}
+                        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                    >
+                        {type === 'register' ? 'Continue to Login' : 'Go to Dashboard'}
+                    </Button>
+                </div>
             </div>
-          )}
-
-          <Button
-            onClick={onClose}
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-          >
-            {type === 'register' ? 'Continue to Login' : 'Go to Dashboard'}
-          </Button>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 // Terms and Conditions Dialog
 const TermsAndConditionsDialog = ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) => {
-  if (!open) return null;
+    if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">Terms and Conditions</h2>
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                <div className="p-6 border-b border-gray-200">
+                    <h2 className="text-2xl font-bold text-gray-900">Terms and Conditions</h2>
+                </div>
+
+                <div className="p-6 space-y-4 text-sm text-gray-700">
+                    <p><strong>Last Updated:</strong> {new Date().toLocaleDateString()}</p>
+
+                    <section>
+                        <h3 className="text-lg font-semibold mb-2">1. Acceptance of Terms</h3>
+                        <p>By accessing and using eTire Manager, you accept and agree to be bound by the terms and provision of this agreement.</p>
+                    </section>
+
+                    <section>
+                        <h3 className="text-lg font-semibold mb-2">2. Use License</h3>
+                        <p>Permission is granted to temporarily use eTire Manager for personal and business purposes. This is the grant of a license, not a transfer of title.</p>
+                    </section>
+
+                    <section>
+                        <h3 className="text-lg font-semibold mb-2">3. Account Registration</h3>
+                        <p>You must provide accurate and complete information when creating an account. You are responsible for maintaining the security of your account and password.</p>
+                    </section>
+
+                    <section>
+                        <h3 className="text-lg font-semibold mb-2">4. Data Privacy</h3>
+                        <p>We collect and use personal data in accordance with our Privacy Policy. By using our services, you agree to the collection and use of information.</p>
+                    </section>
+
+                    <section>
+                        <h3 className="text-lg font-semibold mb-2">5. Service Modifications</h3>
+                        <p>We reserve the right to modify or discontinue, temporarily or permanently, the service with or without notice.</p>
+                    </section>
+
+                    <section>
+                        <h3 className="text-lg font-semibold mb-2">6. Limitation of Liability</h3>
+                        <p>eTire Manager shall not be liable for any indirect, incidental, special, consequential or punitive damages resulting from your use of the service.</p>
+                    </section>
+
+                    <section>
+                        <h3 className="text-lg font-semibold mb-2">7. Governing Law</h3>
+                        <p>These terms shall be governed by and construed in accordance with the laws of the Philippines, without regard to its conflict of law provisions.</p>
+                    </section>
+                </div>
+
+                <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={() => onOpenChange(false)}
+                        className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                    >
+                        Close
+                    </Button>
+                    <Button
+                        onClick={() => onOpenChange(false)}
+                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                    >
+                        I Understand
+                    </Button>
+                </div>
+            </div>
         </div>
-        
-        <div className="p-6 space-y-4 text-sm text-gray-700">
-          <p><strong>Last Updated:</strong> {new Date().toLocaleDateString()}</p>
-          
-          <section>
-            <h3 className="text-lg font-semibold mb-2">1. Acceptance of Terms</h3>
-            <p>By accessing and using eTire Manager, you accept and agree to be bound by the terms and provision of this agreement.</p>
-          </section>
-
-          <section>
-            <h3 className="text-lg font-semibold mb-2">2. Use License</h3>
-            <p>Permission is granted to temporarily use eTire Manager for personal and business purposes. This is the grant of a license, not a transfer of title.</p>
-          </section>
-
-          <section>
-            <h3 className="text-lg font-semibold mb-2">3. Account Registration</h3>
-            <p>You must provide accurate and complete information when creating an account. You are responsible for maintaining the security of your account and password.</p>
-          </section>
-
-          <section>
-            <h3 className="text-lg font-semibold mb-2">4. Data Privacy</h3>
-            <p>We collect and use personal data in accordance with our Privacy Policy. By using our services, you agree to the collection and use of information.</p>
-          </section>
-
-          <section>
-            <h3 className="text-lg font-semibold mb-2">5. Service Modifications</h3>
-            <p>We reserve the right to modify or discontinue, temporarily or permanently, the service with or without notice.</p>
-          </section>
-
-          <section>
-            <h3 className="text-lg font-semibold mb-2">6. Limitation of Liability</h3>
-            <p>eTire Manager shall not be liable for any indirect, incidental, special, consequential or punitive damages resulting from your use of the service.</p>
-          </section>
-
-          <section>
-            <h3 className="text-lg font-semibold mb-2">7. Governing Law</h3>
-            <p>These terms shall be governed by and construed in accordance with the laws of the Philippines, without regard to its conflict of law provisions.</p>
-          </section>
-        </div>
-
-        <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-          <Button 
-            variant="outline" 
-            onClick={() => onOpenChange(false)}
-            className="border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            Close
-          </Button>
-          <Button 
-            onClick={() => onOpenChange(false)}
-            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-          >
-            I Understand
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default function LoginPage() {
@@ -307,7 +305,7 @@ export default function LoginPage() {
     // Login State with persistence
     const { value: loginUsername, setValue: setLoginUsername } = useFormFieldPersistence('login-form', 'username', '');
     const { value: loginPassword, setValue: setLoginPassword } = useFormFieldPersistence('login-form', 'password', '');
-    
+
     // Register State with persistence
     const { value: firstName, setValue: setFirstName } = useFormFieldPersistence('register-form', 'firstName', '');
     const { value: lastName, setValue: setLastName } = useFormFieldPersistence('register-form', 'lastName', '');
@@ -322,7 +320,7 @@ export default function LoginPage() {
 
     const [isLoading, setIsLoading] = useState(false);
     const [formLoading, setFormLoading] = useState(false);
-    
+
     // Password visibility states
     const [showLoginPassword, setShowLoginPassword] = useState(false);
     const [showRegisterPassword, setShowRegisterPassword] = useState(false);
@@ -337,35 +335,47 @@ export default function LoginPage() {
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
+        console.log("handleLogin started");
         setFormLoading(true);
         setRegistrationError(null);
 
         if (!loginUsername || !loginPassword) {
+            console.log("Missing credentials");
             toast({ title: 'Error', description: 'Username and password are required.', variant: 'destructive' });
             setFormLoading(false);
             return;
         }
 
         try {
+            console.log("Setting isLoading(true)");
             setIsLoading(true);
+            console.log("Calling login()");
             const success = await login(loginUsername, loginPassword);
+            console.log("Login returned:", success);
+
             if (success) {
+                console.log("Login success, setting isLoading(false)");
+                setIsLoading(false);
                 // Show success confirmation
                 setSuccessType('login');
                 setShowSuccess(true);
-                
+
                 // Redirect after confirmation
                 setTimeout(() => {
+                    console.log("Redirecting to dashboard");
                     router.push('/dashboard');
                 }, 3000);
             } else {
+                console.log("Login failed (success=false)");
                 toast({ title: 'Login Failed', description: 'Invalid username or password.', variant: 'destructive' });
                 setIsLoading(false);
             }
         } catch (error: any) {
+            console.error("Login error caught:", error);
             toast({ title: 'Login Error', description: error.message, variant: 'destructive' });
             setIsLoading(false);
         } finally {
+            console.log("handleLogin finally block");
             setFormLoading(false);
         }
     };
@@ -398,25 +408,18 @@ export default function LoginPage() {
         setFormLoading(true);
 
         try {
-            const res = await fetch("/api/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    action: "register",
-                    firstName,
-                    lastName,
-                    email,
-                    phone,
-                    address,
-                    username: registerUsername,
-                    password: registerPassword,
-                }),
+            const result = await registerAction({
+                firstName,
+                lastName,
+                username: registerUsername,
+                password: registerPassword,
+                email,
+                phone,
+                address
             });
 
-            const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error || "Registration failed");
+            if (!result.success) {
+                throw new Error(result.message || "Registration failed");
             }
 
             // Store user data for success confirmation
@@ -425,6 +428,7 @@ export default function LoginPage() {
             setShowSuccess(true);
 
         } catch (error: any) {
+            console.error("Registration error caught in UI:", error);
             toast({
                 title: "Registration Error",
                 description: error.message,
@@ -487,7 +491,7 @@ export default function LoginPage() {
 
     // Step validation
     const validateStep = (step: number) => {
-        switch(step) {
+        switch (step) {
             case 1:
                 return firstName.trim() && lastName.trim();
             case 2:
@@ -502,7 +506,7 @@ export default function LoginPage() {
     };
 
     const renderRegistrationStep = () => {
-        switch(currentStep) {
+        switch (currentStep) {
             case 1:
                 return (
                     <div className="space-y-4 animate-in fade-in duration-500">
@@ -511,38 +515,38 @@ export default function LoginPage() {
                             <h3 className="text-xl font-semibold text-slate-800">Personal Information</h3>
                             <p className="text-slate-600">Tell us about yourself</p>
                         </div>
-                        
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="first-name" className="text-sm font-semibold text-slate-700">
                                     First Name *
                                 </Label>
-                                <Input 
-                                    id="first-name" 
+                                <Input
+                                    id="first-name"
                                     placeholder="John"
-                                    value={firstName} 
+                                    value={firstName}
                                     onChange={(e) => setFirstName(e.target.value)}
                                     className="h-11 border-2 border-slate-200 focus:border-purple-500 transition-all duration-300 rounded-xl"
-                                    required 
+                                    required
                                 />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="last-name" className="text-sm font-semibold text-slate-700">
                                     Last Name *
                                 </Label>
-                                <Input 
-                                    id="last-name" 
+                                <Input
+                                    id="last-name"
                                     placeholder="Doe"
-                                    value={lastName} 
+                                    value={lastName}
                                     onChange={(e) => setLastName(e.target.value)}
                                     className="h-11 border-2 border-slate-200 focus:border-purple-500 transition-all duration-300 rounded-xl"
-                                    required 
+                                    required
                                 />
                             </div>
                         </div>
                     </div>
                 );
-            
+
             case 2:
                 return (
                     <div className="space-y-4 animate-in fade-in duration-500">
@@ -557,38 +561,38 @@ export default function LoginPage() {
                                 <Label htmlFor="email" className="text-sm font-semibold text-slate-700">
                                     Email Address *
                                 </Label>
-                                <Input 
-                                    id="email" 
+                                <Input
+                                    id="email"
                                     type="email"
                                     placeholder="john.doe@example.com"
-                                    value={email} 
+                                    value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     className="h-11 border-2 border-slate-200 focus:border-purple-500 transition-all duration-300 rounded-xl"
-                                    required 
+                                    required
                                 />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="phone" className="text-sm font-semibold text-slate-700">
                                     Phone Number *
                                 </Label>
-                                <Input 
-                                    id="phone" 
+                                <Input
+                                    id="phone"
                                     type="tel"
                                     placeholder="+1 (555) 123-4567"
-                                    value={phone} 
+                                    value={phone}
                                     onChange={(e) => setPhone(e.target.value)}
                                     className="h-11 border-2 border-slate-200 focus:border-purple-500 transition-all duration-300 rounded-xl"
-                                    required 
+                                    required
                                 />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="address" className="text-sm font-semibold text-slate-700">
                                     Address
                                 </Label>
-                                <Input 
-                                    id="address" 
+                                <Input
+                                    id="address"
                                     placeholder="123 Main Street, City, State"
-                                    value={address} 
+                                    value={address}
                                     onChange={(e) => setAddress(e.target.value)}
                                     className="h-11 border-2 border-slate-200 focus:border-purple-500 transition-all duration-300 rounded-xl"
                                 />
@@ -596,7 +600,7 @@ export default function LoginPage() {
                         </div>
                     </div>
                 );
-            
+
             case 3:
                 return (
                     <div className="space-y-4 animate-in fade-in duration-500">
@@ -611,13 +615,13 @@ export default function LoginPage() {
                                 <Label htmlFor="register-username" className="text-sm font-semibold text-slate-700">
                                     Username *
                                 </Label>
-                                <Input 
-                                    id="register-username" 
+                                <Input
+                                    id="register-username"
                                     placeholder="Choose a unique username"
-                                    value={registerUsername} 
+                                    value={registerUsername}
                                     onChange={(e) => setRegisterUsername(e.target.value)}
                                     className="h-11 border-2 border-slate-200 focus:border-purple-500 transition-all duration-300 rounded-xl"
-                                    required 
+                                    required
                                 />
                             </div>
                             <div className="space-y-2">
@@ -625,14 +629,14 @@ export default function LoginPage() {
                                     Password *
                                 </Label>
                                 <div className="relative">
-                                    <Input 
-                                        id="register-password" 
+                                    <Input
+                                        id="register-password"
                                         type={showRegisterPassword ? "text" : "password"}
                                         placeholder="Create a strong password"
-                                        value={registerPassword} 
+                                        value={registerPassword}
                                         onChange={(e) => setRegisterPassword(e.target.value)}
                                         className="h-11 pr-12 border-2 border-slate-200 focus:border-purple-500 transition-all duration-300 rounded-xl"
-                                        required 
+                                        required
                                     />
                                     <Button
                                         type="button"
@@ -655,14 +659,14 @@ export default function LoginPage() {
                                     Confirm Password *
                                 </Label>
                                 <div className="relative">
-                                    <Input 
-                                        id="confirm-password" 
+                                    <Input
+                                        id="confirm-password"
                                         type={showConfirmPassword ? "text" : "password"}
                                         placeholder="Re-enter your password"
-                                        value={confirmPassword} 
+                                        value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
                                         className="h-11 pr-12 border-2 border-slate-200 focus:border-purple-500 transition-all duration-300 rounded-xl"
-                                        required 
+                                        required
                                     />
                                     <Button
                                         type="button"
@@ -682,7 +686,7 @@ export default function LoginPage() {
                         </div>
                     </div>
                 );
-            
+
             case 4:
                 return (
                     <div className="space-y-4 animate-in fade-in duration-500">
@@ -713,8 +717,8 @@ export default function LoginPage() {
 
                         <div className="space-y-3">
                             <div className="flex items-center space-x-2">
-                                <CustomCheckbox 
-                                    id="terms" 
+                                <CustomCheckbox
+                                    id="terms"
                                     checked={acceptedTerms}
                                     onCheckedChange={setAcceptedTerms}
                                 />
@@ -733,7 +737,7 @@ export default function LoginPage() {
                         </div>
                     </div>
                 );
-            
+
             default:
                 return null;
         }
@@ -745,8 +749,8 @@ export default function LoginPage() {
             <TireLoadingAnimation isLoading={isLoading} />
 
             {/* Success Confirmation Dialog */}
-            <SuccessConfirmation 
-                isOpen={showSuccess} 
+            <SuccessConfirmation
+                isOpen={showSuccess}
                 onClose={handleSuccessClose}
                 type={successType}
                 userData={successUserData || undefined}
@@ -758,8 +762,8 @@ export default function LoginPage() {
             {/* Left Side - Your Image */}
             <div className="hidden lg:flex flex-1 items-center justify-center bg-white p-8">
                 <div className="relative w-full h-full flex items-center justify-center">
-                    <img 
-                        src="/images/Auto.png" 
+                    <img
+                        src="/images/Auto.png"
                         alt="eTire Manager"
                         className="max-w-full max-h-[80vh] w-auto h-auto object-contain rounded-2xl"
                     />
@@ -773,7 +777,7 @@ export default function LoginPage() {
                         // Login Form
                         <Card key={formKey} className="border-0 shadow-xl bg-white rounded-2xl overflow-hidden">
                             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-600 via-blue-600 to-emerald-600"></div>
-                            
+
                             <form onSubmit={handleLogin}>
                                 <CardHeader className="space-y-1 pb-6 pt-8 px-8">
                                     <CardTitle className="text-2xl font-bold text-slate-800 text-center">
@@ -789,13 +793,13 @@ export default function LoginPage() {
                                             <Label htmlFor="login-username" className="text-sm font-semibold text-slate-700">
                                                 Username
                                             </Label>
-                                            <Input 
-                                                id="login-username" 
+                                            <Input
+                                                id="login-username"
                                                 placeholder="Enter your username"
-                                                value={loginUsername} 
+                                                value={loginUsername}
                                                 onChange={(e) => setLoginUsername(e.target.value)}
                                                 className="h-12 border-2 border-slate-200 focus:border-purple-500 transition-all duration-300 rounded-xl"
-                                                required 
+                                                required
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -803,14 +807,14 @@ export default function LoginPage() {
                                                 Password
                                             </Label>
                                             <div className="relative">
-                                                <Input 
-                                                    id="login-password" 
+                                                <Input
+                                                    id="login-password"
                                                     type={showLoginPassword ? "text" : "password"}
                                                     placeholder="Enter your password"
-                                                    value={loginPassword} 
+                                                    value={loginPassword}
                                                     onChange={(e) => setLoginPassword(e.target.value)}
                                                     className="h-12 pr-12 border-2 border-slate-200 focus:border-purple-500 transition-all duration-300 rounded-xl"
-                                                    required 
+                                                    required
                                                 />
                                                 <Button
                                                     type="button"
@@ -831,8 +835,8 @@ export default function LoginPage() {
 
                                     <div className="flex items-center justify-between animate-in fade-in duration-500 delay-400">
                                         <div className="flex items-center space-x-2">
-                                            <CustomCheckbox 
-                                                id="remember-me" 
+                                            <CustomCheckbox
+                                                id="remember-me"
                                                 checked={rememberMe}
                                                 onCheckedChange={setRememberMe}
                                             />
@@ -849,9 +853,9 @@ export default function LoginPage() {
                                         </Button>
                                     </div>
 
-                                    <Button 
-                                        className="w-full h-12 text-base font-semibold bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl animate-in fade-in duration-500 delay-500" 
-                                        type="submit" 
+                                    <Button
+                                        className="w-full h-12 text-base font-semibold bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl animate-in fade-in duration-500 delay-500"
+                                        type="submit"
                                         disabled={formLoading}
                                     >
                                         {formLoading ? (
@@ -887,7 +891,7 @@ export default function LoginPage() {
                         // Registration Form with Steps
                         <Card key={formKey} className="border-0 shadow-xl bg-white rounded-2xl overflow-hidden">
                             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-600 via-blue-600 to-emerald-600"></div>
-                            
+
                             <form onSubmit={handleRegister}>
                                 <CardHeader className="space-y-1 pb-4 pt-8 px-8">
                                     <Button
@@ -925,9 +929,8 @@ export default function LoginPage() {
                                     {renderRegistrationStep()}
 
                                     {/* Navigation Buttons */}
-                                    <div className={`flex gap-3 mt-8 ${
-                                        currentStep === 1 ? 'justify-end' : 'justify-between'
-                                    }`}>
+                                    <div className={`flex gap-3 mt-8 ${currentStep === 1 ? 'justify-end' : 'justify-between'
+                                        }`}>
                                         {currentStep > 1 && (
                                             <Button
                                                 type="button"
@@ -939,7 +942,7 @@ export default function LoginPage() {
                                                 Previous
                                             </Button>
                                         )}
-                                        
+
                                         {currentStep < totalSteps ? (
                                             <Button
                                                 type="button"
@@ -951,9 +954,9 @@ export default function LoginPage() {
                                                 <ChevronRight className="h-4 w-4" />
                                             </Button>
                                         ) : (
-                                            <Button 
-                                                className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl ml-auto" 
-                                                type="submit" 
+                                            <Button
+                                                className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl ml-auto"
+                                                type="submit"
                                                 disabled={formLoading || !acceptedTerms}
                                             >
                                                 {formLoading ? (
