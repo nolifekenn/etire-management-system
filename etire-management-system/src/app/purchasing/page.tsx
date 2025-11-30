@@ -34,7 +34,7 @@ import {
   Loader2, PlusCircle, AlertTriangle, Package, Truck, ShoppingCart, Users, Building2, 
   RefreshCw, Search, X, Download, Eye, ArrowUpDown, Filter, Clock, TrendingUp,
   Calendar, Phone, Mail, MapPin, FileText, CheckCircle, Clock4, TruckIcon, ArrowLeft,
-  CreditCard, DollarSign, Shield, AlertCircle, Edit, Trash2,
+  CreditCard, DollarSign, Shield, AlertCircle, Edit, Trash2, Save,
   History, CalendarDays, FileSearch, CreditCard as CreditCardIcon, List, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { DataTableWrapper } from '@/components/DataTableWrapper';
@@ -44,6 +44,103 @@ import { useAuth } from '@/hooks/useAuth';
 import { Supplier, PurchaseOrder, Branch, InventoryItem, User } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+
+// ===== SUCCESS ANIMATION COMPONENT =====
+const SuccessAnimation = ({
+  isVisible,
+  title,
+  message,
+  actionType,
+  onConfirm
+}: {
+  isVisible: boolean;
+  title: string;
+  message: string;
+  actionType?: 'add' | 'edit' | 'delete' | 'export' | 'create' | 'payment' | 'save' | 'credit';
+  onConfirm: () => void;
+}) => {
+  if (!isVisible) return null;
+
+  const getActionConfig = () => {
+    switch (actionType) {
+      case 'add':
+        return { 
+          gradient: 'from-green-500 to-emerald-600',
+          icon: PlusCircle 
+        };
+      case 'edit':
+        return { 
+          gradient: 'from-blue-500 to-cyan-600',
+          icon: Edit 
+        };
+      case 'delete':
+        return { 
+          gradient: 'from-red-500 to-orange-600',
+          icon: Trash2 
+        };
+      case 'export':
+        return { 
+          gradient: 'from-purple-500 to-indigo-600',
+          icon: Download 
+        };
+      case 'create':
+        return { 
+          gradient: 'from-teal-500 to-green-600',
+          icon: FileText 
+        };
+      case 'payment':
+        return { 
+          gradient: 'from-amber-500 to-yellow-600',
+          icon: DollarSign 
+        };
+      case 'save':
+        return { 
+          gradient: 'from-blue-500 to-cyan-600',
+          icon: Save 
+        };
+      case 'credit':
+        return { 
+          gradient: 'from-purple-500 to-indigo-600',
+          icon: CreditCard 
+        };
+      default:
+        return { 
+          gradient: 'from-purple-500 to-indigo-600',
+          icon: CheckCircle 
+        };
+    }
+  };
+
+  const { gradient, icon: ActionIcon } = getActionConfig();
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300">
+      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300">
+        <div className={`w-20 h-20 bg-gradient-to-r ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500`}>
+          <ActionIcon className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
+        </div>
+
+        <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins">
+          {title}
+        </h3>
+
+        <p className="text-slate-600 mb-6 font-poppins">
+          {message}
+        </p>
+
+        <div className="flex gap-3 justify-center">
+          <Button
+            className={`bg-gradient-to-r ${gradient} hover:scale-105 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins`}
+            onClick={onConfirm}
+          >
+            <CheckCircle className="h-5 w-5 mr-2" />
+            Confirm
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ===== ENHANCED DESIGN SYSTEM =====
 const buttonStyles = {
@@ -1347,6 +1444,19 @@ export default function EnhancedPurchasingPage() {
   const [mounted, setMounted] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   
+  // Success Animation State
+  const [successAnimation, setSuccessAnimation] = useState<{
+    isVisible: boolean;
+    title: string;
+    message: string;
+    actionType: 'add' | 'edit' | 'delete' | 'export' | 'create' | 'payment' | 'save' | 'credit';
+  }>({
+    isVisible: false,
+    title: '',
+    message: '',
+    actionType: 'add'
+  });
+  
   // State management
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isSupplierLoading, setIsSupplierLoading] = useState(true);
@@ -1688,9 +1798,12 @@ export default function EnhancedPurchasingPage() {
     link.click();
     document.body.removeChild(link);
 
-    toast({
-      title: "Export Successful",
-      description: `${dataToExport.length} ${activeTab === 'suppliers' ? 'suppliers' : activeTab === 'transaction-history' ? 'transactions' : activeTab === 'credit-management' ? 'credit orders' : 'purchase orders'} exported to ${filename}`,
+    // Show success animation for export
+    setSuccessAnimation({
+      isVisible: true,
+      title: "Export Successful!",
+      message: `${dataToExport.length} ${activeTab === 'suppliers' ? 'suppliers' : activeTab === 'transaction-history' ? 'transactions' : activeTab === 'credit-management' ? 'credit orders' : 'purchase orders'} exported to ${filename}`,
+      actionType: 'export'
     });
   };
   
@@ -1792,18 +1905,26 @@ export default function EnhancedPurchasingPage() {
       if (error) {
         toast({ title: "Save Error", description: error.message, variant: "destructive" });
       } else {
-        // Add this success message that specifically mentions delivery status
-        toast({ 
-          title: "Success", 
-          description: `Purchase order ${editingPO ? 'updated' : 'added'} successfully. ${
-            editingPO && poFormData.deliveryStatus === 'delivered' 
-              ? 'Delivery status set to Delivered.' 
-              : ''
-          }` 
-        });
-        setIsPODialogOpen(false);
-        resetPOForm();
-        fetchPurchaseOrders();
+        // Show success animation for supplier action
+        if (editingSupplier) {
+          setSuccessAnimation({
+            isVisible: true,
+            title: "Supplier Updated Successfully!",
+            message: `Supplier "${supplierName}" has been updated in the system.`,
+            actionType: 'edit'
+          });
+        } else {
+          setSuccessAnimation({
+            isVisible: true,
+            title: "Supplier Added Successfully!",
+            message: `Supplier "${supplierName}" has been added to the system.`,
+            actionType: 'add'
+          });
+        }
+        
+        setIsSupplierDialogOpen(false);
+        resetSupplierForm();
+        fetchSuppliers();
       }
       
     } catch (error: any) {
@@ -1885,10 +2006,23 @@ export default function EnhancedPurchasingPage() {
       if (error) {
         toast({ title: "Save Error", description: error.message, variant: "destructive" });
       } else {
-        toast({ 
-          title: "Success", 
-          description: `Purchase order ${editingPO ? 'updated' : 'added'} successfully.` 
-        });
+        // Show success animation for PO action
+        if (editingPO) {
+          setSuccessAnimation({
+            isVisible: true,
+            title: "PO Updated Successfully!",
+            message: `Purchase order ${poFormData.poNumber} has been updated.`,
+            actionType: 'save'
+          });
+        } else {
+          setSuccessAnimation({
+            isVisible: true,
+            title: "PO Created Successfully!",
+            message: `Purchase order ${poFormData.poNumber} has been created.`,
+            actionType: 'create'
+          });
+        }
+        
         setIsPODialogOpen(false);
         resetPOForm();
         fetchPurchaseOrders();
@@ -1923,7 +2057,14 @@ export default function EnhancedPurchasingPage() {
       if (error) {
         toast({ title: "Delete Error", description: error.message, variant: "destructive" });
       } else {
-        toast({ title: "Success", description: `${deletingItem.type === 'supplier' ? 'Supplier' : 'Purchase order'} deleted successfully.` });
+        // Show success animation for delete action
+        setSuccessAnimation({
+          isVisible: true,
+          title: "Item Deleted Successfully!",
+          message: `${deletingItem.type === 'supplier' ? 'Supplier' : 'Purchase order'} has been removed from the system.`,
+          actionType: 'delete'
+        });
+        
         setIsDeleteDialogOpen(false);
         if (deletingItem.type === 'supplier') {
           fetchSuppliers();
@@ -1938,6 +2079,14 @@ export default function EnhancedPurchasingPage() {
 
   const handlePaymentRecorded = () => {
     fetchPurchaseOrders(); // Refresh data after payment is recorded
+    
+    // Show success animation for payment
+    setSuccessAnimation({
+      isVisible: true,
+      title: "Payment Recorded Successfully!",
+      message: "Payment has been recorded and applied to the purchase order.",
+      actionType: 'payment'
+    });
   };
 
   const renderSupplierCell = (item: any, columnKey: string, value: any) => {
@@ -2113,6 +2262,15 @@ export default function EnhancedPurchasingPage() {
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
+      
+      {/* Success Animation */}
+      <SuccessAnimation
+        isVisible={successAnimation.isVisible}
+        title={successAnimation.title}
+        message={successAnimation.message}
+        actionType={successAnimation.actionType}
+        onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))}
+      />
       
       {/* Background Sections */}
       <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
