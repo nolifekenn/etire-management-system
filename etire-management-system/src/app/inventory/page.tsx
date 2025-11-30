@@ -6,7 +6,7 @@ import { DataTableWrapper } from '@/components/DataTableWrapper';
 import { 
   Archive, Coins, AlertTriangle, PlusCircle, PackageSearch, Loader2, Filter,
   TrendingUp, Clock, RefreshCw, Plus, Search, X, Download, SlidersHorizontal,
-  ArrowUpDown, Eye, Save
+  ArrowUpDown, Eye, Save, CheckCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -176,6 +176,91 @@ const VehicleTypeBadge = ({ type }: { type: 'car' | 'motor' | 'truck' }) => {
     <Badge variant="outline" className={`capitalize ${config.color}`}>
       {config.label}
     </Badge>
+  );
+};
+
+// ============================================
+// SUCCESS ANIMATION COMPONENT
+// ============================================
+const SuccessAnimation = ({
+  isVisible,
+  title,
+  message,
+  actionType,
+  onConfirm
+}: {
+  isVisible: boolean;
+  title: string;
+  message: string;
+  actionType?: 'add' | 'edit' | 'delete' | 'export' | 'adjust';
+  onConfirm: () => void;
+}) => {
+  if (!isVisible) return null;
+
+  // Different icons and colors based on action type
+  const getActionConfig = () => {
+    switch (actionType) {
+      case 'add':
+        return { 
+          gradient: 'from-green-500 to-emerald-600',
+          icon: PlusCircle 
+        };
+      case 'edit':
+        return { 
+          gradient: 'from-blue-500 to-cyan-600',
+          icon: Save 
+        };
+      case 'delete':
+        return { 
+          gradient: 'from-red-500 to-orange-600',
+          icon: Archive 
+        };
+      case 'export':
+        return { 
+          gradient: 'from-purple-500 to-indigo-600',
+          icon: Download 
+        };
+      case 'adjust':
+        return { 
+          gradient: 'from-amber-500 to-yellow-600',
+          icon: ArrowUpDown 
+        };
+      default:
+        return { 
+          gradient: 'from-purple-500 to-indigo-600',
+          icon: CheckCircle 
+        };
+    }
+  };
+
+  const { gradient, icon: ActionIcon } = getActionConfig();
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300">
+      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300">
+        <div className={`w-20 h-20 bg-gradient-to-r ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500`}>
+          <ActionIcon className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
+        </div>
+
+        <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins">
+          {title}
+        </h3>
+
+        <p className="text-slate-600 mb-6 font-poppins">
+          {message}
+        </p>
+
+        <div className="flex gap-3 justify-center">
+          <Button
+            className={`bg-gradient-to-r ${gradient} hover:scale-105 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins`}
+            onClick={onConfirm}
+          >
+            <CheckCircle className="h-5 w-5 mr-2" />
+            Confirm
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -1141,6 +1226,19 @@ export default function EnhancedInventoryPage() {
   const [mounted, setMounted] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  // Add this state near your other useState declarations
+const [successAnimation, setSuccessAnimation] = useState<{
+  isVisible: boolean;
+  title: string;
+  message: string;
+  actionType: 'add' | 'edit' | 'delete' | 'export' | 'adjust';
+}>({
+  isVisible: false,
+  title: '',
+  message: '',
+  actionType: 'add'
+});
+
   // Pagination / rows-per-page state
   const [rowsPerPage, setRowsPerPage] = useState<number>(5);
   const rowsPerPageOptions = [5, 10, 25, 50];
@@ -1152,12 +1250,10 @@ export default function EnhancedInventoryPage() {
   const [isStockAdjustmentOpen, setIsStockAdjustmentOpen] = useState(false);
   const [isCriticalDetailsOpen, setIsCriticalDetailsOpen] = useState(false);
   const [isViewMoreOpen, setIsViewMoreOpen] = useState(false);
-  const [isSuccessConfirmationOpen, setIsSuccessConfirmationOpen] = useState(false);
 
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<InventoryItem | null>(null);
   const [adjustingItem, setAdjustingItem] = useState<InventoryItem | null>(null);
-  const [newlyAddedItem, setNewlyAddedItem] = useState<InventoryItem | null>(null);
 
   // Enhanced Filter State
   const [filters, setFilters] = useState<FilterState>({
@@ -1489,12 +1585,12 @@ export default function EnhancedInventoryPage() {
       sale_price: salePrice,
       stock_quantity: stockQuantity,
     };
-
+  
     setIsLoading(true);
-
+  
     let error;
     let result;
-
+  
     if (editingItem) {
         const { data, error: updateError } = await supabase
           .from('inventory_item')
@@ -1511,39 +1607,47 @@ export default function EnhancedInventoryPage() {
         error = insertError;
         result = data;
     }
-
+  
     setIsLoading(false);
-
+  
     if (error) {
       console.error('Error saving item:', error);
       toast({ title: "Save Error", description: `Could not save item: ${error.message}`, variant: "destructive" });
     } else {
-      if (!editingItem && result && result[0]) {
-        // For new items, show the success confirmation with the created item
-        setNewlyAddedItem(result[0] as InventoryItem);
-        setIsSuccessConfirmationOpen(true);
+      // Show success animation based on action type
+      if (editingItem) {
+        setSuccessAnimation({
+          isVisible: true,
+          title: "Item Updated Successfully!",
+          message: "The inventory item has been updated in the system.",
+          actionType: 'edit'
+        });
       } else {
-        // For edits, show toast
-        toast({ title: "Success", description: "Item updated successfully" });
+        setSuccessAnimation({
+          isVisible: true,
+          title: "Item Added Successfully!",
+          message: "Your new inventory item has been added to the system.",
+          actionType: 'add'
+        });
       }
       
       setIsAddItemDialogOpen(false);
       setIsEditItemDialogOpen(false);
       setEditingItem(null);
       resetForm();
-      fetchProducts();
+      fetchProducts();      
     }
   };
 
   const handleStockAdjustment = async (adjustment: number, reason: string) => {
     if (!adjustingItem || !supabase) return;
-
+  
     const newQuantity = adjustingItem.stock_quantity + adjustment;
     if (newQuantity < 0) {
       toast({ title: "Error", description: "Stock cannot be negative.", variant: "destructive" });
       return;
     }
-
+  
     setIsLoading(true);
     const { error } = await supabase
       .from('inventory_item')
@@ -1552,18 +1656,26 @@ export default function EnhancedInventoryPage() {
         updated_at: new Date().toISOString()
       })
       .eq('item_id', adjustingItem.item_id);
-
+  
     setIsLoading(false);
-
-    if (error) {
-      console.error('Error adjusting stock:', error);
-      toast({ title: "Adjustment Error", description: `Could not adjust stock: ${error.message}`, variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: `Stock adjusted by ${adjustment}. New quantity: ${newQuantity}` });
-      setIsStockAdjustmentOpen(false);
-      setAdjustingItem(null);
-      fetchProducts();
-    }
+  
+    // In handleStockAdjustment function, replace the success handling with:
+if (error) {
+  console.error('Error adjusting stock:', error);
+  toast({ title: "Adjustment Error", description: `Could not adjust stock: ${error.message}`, variant: "destructive" });
+} else {
+  // Show success animation for stock adjustment
+  setSuccessAnimation({
+    isVisible: true,
+    title: "Stock Adjusted Successfully!",
+    message: `Stock has been updated by ${adjustment}. New quantity: ${newQuantity}`,
+    actionType: 'adjust'
+  });
+  
+  setIsStockAdjustmentOpen(false);
+  setAdjustingItem(null);
+  fetchProducts();
+}
   };
 
   const handleDeleteItem = async () => {
@@ -1574,16 +1686,24 @@ export default function EnhancedInventoryPage() {
       .delete()
       .eq('item_id', deletingItem.item_id);
     setIsLoading(false);
-
-    if (error) {
-      console.error('Error deleting item:', error);
-      toast({ title: "Delete Error", description: `Could not delete item: ${error.message}`, variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: "Item deleted successfully." });
-      setIsDeleteConfirmationOpen(false);
-      setDeletingItem(null);
-      fetchProducts();
-    }
+  
+    // In handleDeleteItem function, replace the success handling with:
+if (error) {
+  console.error('Error deleting item:', error);
+  toast({ title: "Delete Error", description: `Could not delete item: ${error.message}`, variant: "destructive" });
+} else {
+  // Show success animation for deletion
+  setSuccessAnimation({
+    isVisible: true,
+    title: "Item Deleted Successfully!",
+    message: "The inventory item has been removed from the system.",
+    actionType: 'delete'
+  });
+  
+  setIsDeleteConfirmationOpen(false);
+  setDeletingItem(null);
+  fetchProducts();
+}
   };
 
   const handleRefresh = () => {
@@ -1602,40 +1722,48 @@ export default function EnhancedInventoryPage() {
   };
 
   // Enhanced Excel Export with better formatting
-  const handleExportExcel = () => {
-    const headers = ['Product Name', 'Category', 'Vehicle Type', 'Stock Level', 'Cost Price (₱)', 'Sale Price (₱)', 'Margin %', 'Status'];
-    
-    const csvContent = [
-      headers.join(','),
-      ...processedItems.map(item => {
-        const margin = calculateMargin(item);
-        const status = item.stock_quantity === 0 ? 'Out of Stock' : 
-                      item.stock_quantity <= 2 ? 'Critical' : 
-                      item.stock_quantity <= 5 ? 'Low Stock' : 'In Stock';
-        
-        return [
-          `"${item.name}"`,
-          item.category,
-          item.vehicle_type,
-          item.stock_quantity,
-          item.cost_price.toFixed(2),
-          item.sale_price.toFixed(2),
-          margin.toFixed(1),
-          status
-        ].join(',');
-      })
-    ].join('\n');
+const handleExportExcel = () => {
+  const headers = ['Product Name', 'Category', 'Vehicle Type', 'Stock Level', 'Cost Price (₱)', 'Sale Price (₱)', 'Margin %', 'Status'];
+  
+  const csvContent = [
+    headers.join(','),
+    ...processedItems.map(item => {
+      const margin = calculateMargin(item);
+      const status = item.stock_quantity === 0 ? 'Out of Stock' : 
+                    item.stock_quantity <= 2 ? 'Critical' : 
+                    item.stock_quantity <= 5 ? 'Low Stock' : 'In Stock';
+      
+      return [
+        `"${item.name}"`,
+        item.category,
+        item.vehicle_type,
+        item.stock_quantity,
+        item.cost_price.toFixed(2),
+        item.sale_price.toFixed(2),
+        margin.toFixed(1),
+        status
+      ].join(',');
+    })
+  ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `inventory_export_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `inventory_export_${new Date().toISOString().split('T')[0]}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  // Show success animation for export
+  setSuccessAnimation({
+    isVisible: true,
+    title: "Export Successful!",
+    message: `Exported ${processedItems.length} items to CSV file.`,
+    actionType: 'export'
+  });
+};
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
@@ -2127,16 +2255,15 @@ export default function EnhancedInventoryPage() {
         onClose={() => setIsViewMoreOpen(false)}
       />
 
-      {/* Success Confirmation Dialog */}
-      <SuccessConfirmation
-        item={newlyAddedItem!}
-        isOpen={isSuccessConfirmationOpen}
-        onClose={() => {
-          setIsSuccessConfirmationOpen(false);
-          setNewlyAddedItem(null);
-        }}
-        onAddAnother={handleOpenAddDialog}
-      />
+      {/* Success Animation for All Actions */}
+<SuccessAnimation
+  isVisible={successAnimation.isVisible}
+  title={successAnimation.title}
+  message={successAnimation.message}
+  actionType={successAnimation.actionType}
+  onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))}
+/>
+
       {/* Error Display */}
       {fetchError && (
         <div className="w-full bg-red-50 border-t border-red-200 py-4">
