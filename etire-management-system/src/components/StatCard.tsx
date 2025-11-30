@@ -9,6 +9,7 @@ interface StatCardProps {
   description?: string;
   className?: string;
   iconClassName?: string;
+  trend?: string;
 }
 
 export function StatCard({ title, value, icon: Icon, description, className, iconClassName }: StatCardProps) {

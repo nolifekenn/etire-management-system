@@ -5,36 +5,42 @@ export async function POST(request: Request) {
   try {
     const filters = await request.json();
 
+    if (!supabase) {
+      return NextResponse.json({ error: "Supabase client not initialized" }, { status: 500 });
+    }
+
     // 1️⃣ Build base query
     let query = supabase
-  .from("sale")
-  .select(`
-    sale_id,
-    customer_id,
-    branch_id,
-    payment_method,
-    total_amount,
-    discount_amount,
-    tax_amount,
-    sale_date:created_at,
-    sale_item (
-      item_id,
-      quantity,
-      price_at_sale,
-      installation_fee,
-      inventory_item (
-        name,
-        category
-      )
-    )
-  `);
+      .from("sale")
+      .select(`
+        sale_id,
+        customer_id,
+        branch_id,
+        payment_method,
+        total_amount,
+        discount_amount,
+        tax_amount,
+        sale_date:created_at,
+        customer:customer_id ( name ),
+        sale_item (
+          item_id,
+          quantity,
+          price_at_sale,
+          installation_fee,
+          inventory_item (
+            name,
+            category,
+            cost_price
+          )
+        )
+      `);
 
     // 2️⃣ Apply filters if provided
     if (filters.date_from && filters.date_to) {
-  const start = `${filters.date_from}T00:00:00Z`;
-  const end = `${filters.date_to}T23:59:59Z`;
-  query = query.gte("created_at", start).lte("created_at", end);
-}
+      const start = `${filters.date_from}T00:00:00Z`;
+      const end = `${filters.date_to}T23:59:59Z`;
+      query = query.gte("created_at", start).lte("created_at", end);
+    }
     if (filters.branchId) {
       query = query.eq("branch_id", filters.branchId);
     }
@@ -53,8 +59,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // 4️⃣ Return sales data
-    return NextResponse.json({ sales: data });
+    // 4️⃣ Post-process data to calculate line_total and profit
+    const processedData = data.map((sale: any) => ({
+      ...sale,
+      sale_item: sale.sale_item.map((item: any) => {
+        const quantity = item.quantity || 0;
+        const price = item.price_at_sale || 0;
+        const cost = item.inventory_item?.cost_price || 0;
+
+        const line_total = quantity * price;
+        const profit = (price - cost) * quantity;
+
+        return {
+          ...item,
+          line_total,
+          profit
+        };
+      })
+    }));
+
+    // 5️⃣ Return sales data
+    return NextResponse.json({ sales: processedData });
   } catch (error: any) {
     console.error("Sales report route error:", error);
     return NextResponse.json(

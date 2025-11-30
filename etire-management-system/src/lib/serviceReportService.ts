@@ -70,7 +70,8 @@ export function exportServiceJobsReportPDF(rows: any[], filters: Record<string, 
       headStyles: { fillColor: [34, 197, 94] },
     });
 
-    doc.save("service_jobs_report.pdf");
+    const date = new Date().toISOString().split('T')[0];
+    doc.save(`service_jobs_report, ${date}.pdf`);
   } catch (error) {
     console.error("PDF Export Error:", error);
   }
@@ -98,7 +99,8 @@ export function exportServiceJobsReportCSV(rows: any[]) {
 
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = "service_jobs_report.csv";
+    const date = new Date().toISOString().split('T')[0];
+    link.download = `service_jobs_report, ${date}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
   } catch (error) {

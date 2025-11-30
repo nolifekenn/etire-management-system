@@ -70,7 +70,8 @@ export function exportInventoryReportPDF(rows: any[], filters: Record<string, an
       headStyles: { fillColor: [59, 130, 246] }, // Tailwind blue-500
     });
 
-    doc.save("inventory_report.pdf");
+    const date = new Date().toISOString().split('T')[0];
+    doc.save(`inventory_report, ${date}.pdf`);
   } catch (error) {
     console.error("PDF Export Error:", error);
   }
@@ -98,7 +99,8 @@ export function exportInventoryReportCSV(rows: any[]) {
 
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = "inventory_report.csv";
+    const date = new Date().toISOString().split('T')[0];
+    link.download = `inventory_report, ${date}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
   } catch (error) {

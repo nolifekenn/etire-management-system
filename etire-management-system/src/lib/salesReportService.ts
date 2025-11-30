@@ -62,26 +62,26 @@ export function exportSalesReportPDF(
 
     // Table Data
     const tableData = rows.map((r) => [
-  r.sale_date,
-  r.customer,
-  r.item,
-  r.item_category ?? "—",
-  r.quantity ?? 0,
-  (r.price ?? 0).toLocaleString(),
-  (r.line_total ?? 0).toLocaleString(),
-  r.payment_method ?? "N/A",
-]);
+      r.sale_date,
+      r.customer,
+      r.item_name,
+      r.quantity ?? 0,
+      (r.price_at_sale ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+      (r.line_total ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+      (r.profit ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 }),
+    ]);
 
 
     autoTable(doc, {
       startY,
-      head: [["Date", "Item", "Category", "Qty", "Price", "Total", "Payment"]],
-      body: tableData,
+      head: [["Date", "Customer", "Item", "Qty", "Unit Price", "Line Total", "Profit"]],
+      body: tableData as any,
       styles: { fontSize: 9 },
       headStyles: { fillColor: [16, 185, 129] }, // Tailwind emerald-500
     });
 
-    doc.save("sales_report.pdf");
+    const date = new Date().toISOString().split('T')[0];
+    doc.save(`sales_report, ${date}.pdf`);
   } catch (error) {
     console.error("PDF Export Error:", error);
   }
@@ -100,8 +100,10 @@ export function exportSalesReportCSV(rows: FormattedSaleRow[]) {
       "Qty",
       "Price",
       "Line Total",
+      "Profit",
       "Payment Method",
       "Customer ID",
+      "Customer Name",
       "Branch",
       "Vehicle Type",
     ];
@@ -114,8 +116,10 @@ export function exportSalesReportCSV(rows: FormattedSaleRow[]) {
       r.quantity,
       r.price_at_sale,
       r.line_total,
+      r.profit,
       r.payment_method ?? "",
       r.customer_id ?? "",
+      r.customer ?? "",
       r.branch_id ?? "",
       r.vehicle_type ?? "",
     ]);
@@ -129,7 +133,8 @@ export function exportSalesReportCSV(rows: FormattedSaleRow[]) {
 
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = "sales_report.csv";
+    const date = new Date().toISOString().split('T')[0];
+    link.download = `sales_report, ${date}.csv`;
     link.click();
 
     URL.revokeObjectURL(link.href);

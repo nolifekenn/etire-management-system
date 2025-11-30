@@ -7,21 +7,21 @@ import {
   exportSalesReportPDF,
   exportSalesReportCSV,
 } from "@/lib/salesReportService";
+import { formatSalesReportData } from "@/lib/salesReportFormatter";
 import { useToast } from "@/hooks/use-toast";
 import { StatCard } from "@/components/StatCard";
 import { DataTableWrapper } from "@/components/DataTableWrapper";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
-import { 
-  Download, 
-  Filter, 
-  BarChart3, 
+import {
+  Download,
+  Filter,
+  BarChart3,
   X,
   Calendar,
   Building,
   Car,
   TrendingUp,
-  DollarSign,
   CheckCircle
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -81,7 +81,7 @@ export default function SalesReportCard() {
         branch_id: localFilters.branch_id === "all" ? "" : localFilters.branch_id,
         vehicle_type_id: localFilters.vehicle_type_id === "all" ? "" : localFilters.vehicle_type_id,
       };
-      
+
       setFilters(apiFilters);
       const res = await fetchSalesReport(apiFilters);
 
@@ -122,17 +122,7 @@ export default function SalesReportCard() {
       return;
     }
 
-    const formattedRows = reportData.flatMap((sale) =>
-      sale.sale_item.map((item: any) => ({
-        sale_date: sale.sale_date?.substring(0, 10) || "—",
-        customer: sale.customer?.name || "—",
-        item: item.inventory_item?.name || "—",
-        quantity: item.quantity,
-        price: item.price_at_sale,
-        line_total: item.line_total,
-        profit: item.profit,
-      }))
-    );
+    const formattedRows = formatSalesReportData(reportData);
 
     exportSalesReportPDF(formattedRows, localFilters);
     toast({
@@ -150,7 +140,10 @@ export default function SalesReportCard() {
       });
       return;
     }
-    exportSalesReportCSV(reportData);
+
+    const formattedRows = formatSalesReportData(reportData);
+
+    exportSalesReportCSV(formattedRows);
     toast({
       title: "✅ CSV Export Completed",
       description: "Thank you! Sales report CSV has been exported successfully.",
@@ -170,8 +163,8 @@ export default function SalesReportCard() {
     });
   };
 
-  const hasActiveFilters = localFilters.date_from || localFilters.date_to || 
-                          localFilters.branch_id !== "all" || localFilters.vehicle_type_id !== "all";
+  const hasActiveFilters = localFilters.date_from || localFilters.date_to ||
+    localFilters.branch_id !== "all" || localFilters.vehicle_type_id !== "all";
 
   // Calculate stats
   const totalRevenue = reportData.reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
@@ -293,7 +286,7 @@ export default function SalesReportCard() {
           {/* Enhanced Action Buttons */}
           <div className="flex items-center justify-between">
             <div className="flex gap-3">
-              <Button 
+              <Button
                 onClick={handleFetch}
                 disabled={loading}
                 className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md transition-all duration-200"
@@ -310,8 +303,8 @@ export default function SalesReportCard() {
                   </>
                 )}
               </Button>
-              
-              <Button 
+
+              <Button
                 variant="outline"
                 onClick={handlePDF}
                 disabled={!reportData.length}
@@ -320,8 +313,8 @@ export default function SalesReportCard() {
                 <Download className="h-4 w-4" />
                 Export PDF
               </Button>
-              
-              <Button 
+
+              <Button
                 variant="outline"
                 onClick={handleCSV}
                 disabled={!reportData.length}
@@ -385,19 +378,22 @@ export default function SalesReportCard() {
             <StatCard
               title="Total Revenue"
               value={`₱${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
-              icon={() => <div className="p-3 bg-green-100 rounded-xl"><BarChart3 className="h-6 w-6 text-green-600" /></div>}
+              icon={BarChart3}
+              iconClassName="text-green-600"
               trend="up"
             />
             <StatCard
               title="Total Profit"
               value={`₱${totalProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
-              icon={() => <div className="p-3 bg-blue-100 rounded-xl"><TrendingUp className="h-6 w-6 text-blue-600" /></div>}
+              icon={TrendingUp}
+              iconClassName="text-blue-600"
               trend="up"
             />
             <StatCard
               title="Items Sold"
               value={itemsSold.toLocaleString()}
-              icon={() => <div className="p-3 bg-purple-100 rounded-xl"><CheckCircle className="h-6 w-6 text-purple-600" /></div>}
+              icon={CheckCircle}
+              iconClassName="text-purple-600"
               trend="up"
             />
           </div>
@@ -409,11 +405,10 @@ export default function SalesReportCard() {
         <div className="p-6">
           <DataTableWrapper
             title="Sales Report"
-            description="Detailed breakdown of sales transactions and performance metrics"
             columns={[
-              { 
-                key: "sale_date", 
-                header: "Date", 
+              {
+                key: "sale_date",
+                header: "Date",
                 sortable: true,
                 render: (value: any) => (
                   <span className="font-medium text-slate-700">
@@ -421,23 +416,23 @@ export default function SalesReportCard() {
                   </span>
                 )
               },
-              { 
-                key: "customer", 
+              {
+                key: "customer",
                 header: "Customer",
                 render: (value: any) => (
                   <span className="text-slate-600">{value || "—"}</span>
                 )
               },
-              { 
-                key: "item", 
+              {
+                key: "item",
                 header: "Item",
                 render: (value: any) => (
                   <span className="font-medium text-slate-800">{value || "—"}</span>
                 )
               },
-              { 
-                key: "quantity", 
-                header: "Quantity", 
+              {
+                key: "quantity",
+                header: "Quantity",
                 sortable: true,
                 render: (value: any) => (
                   <span className="inline-flex items-center justify-center px-2 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-medium">
@@ -445,9 +440,9 @@ export default function SalesReportCard() {
                   </span>
                 )
               },
-              { 
-                key: "price", 
-                header: "Unit Price", 
+              {
+                key: "price",
+                header: "Unit Price",
                 sortable: true,
                 render: (value: any) => (
                   <span className="font-medium text-slate-700">
@@ -455,9 +450,9 @@ export default function SalesReportCard() {
                   </span>
                 )
               },
-              { 
-                key: "line_total", 
-                header: "Line Total", 
+              {
+                key: "line_total",
+                header: "Line Total",
                 sortable: true,
                 render: (value: any) => (
                   <span className="font-semibold text-green-600">
@@ -465,9 +460,9 @@ export default function SalesReportCard() {
                   </span>
                 )
               },
-              { 
-                key: "profit", 
-                header: "Profit", 
+              {
+                key: "profit",
+                header: "Profit",
                 sortable: true,
                 render: (value: any) => (
                   <span className={`font-semibold ${Number(value) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -499,7 +494,7 @@ export default function SalesReportCard() {
           <p className="text-slate-500 mb-6">
             Generate a report to view sales analytics and performance metrics.
           </p>
-          <Button 
+          <Button
             onClick={handleFetch}
             className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
           >
