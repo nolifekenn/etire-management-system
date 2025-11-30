@@ -2026,197 +2026,197 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
     }, [formData.serviceFee, calculateItemsTotal]);
 
 // ...existing code...
-const handleSubmit = async () => {
-  if (!supabase || !authUser) return;
+    const handleSubmit = async () => {
+      if (!supabase || !authUser) return;
 
-  const finalJobDescription =
-    formData.selectedServiceType === 'Other (Please specify below)'
-      ? formData.customJobDescription
-      : formData.jobDescription;
+      const finalJobDescription =
+        formData.selectedServiceType === 'Other (Please specify below)'
+          ? formData.customJobDescription
+          : formData.jobDescription;
 
-  if (!finalJobDescription) {
-    toast({
-      title: 'Validation Error',
-      description: 'Job description is required.',
-      variant: 'destructive',
-    });
-    return;
-  }
-
-  const feeOnly = parseFloat(formData.serviceFee) || 0;
-
-  // Valid items and items total
-  const validItems = (formData.selectedItems || []).filter(
-    (i) => i.item_id && i.quantity > 0
-  );
-  const itemsTotal = validItems.reduce((total, item) => {
-    const inv = inventoryItems.find((i) => i.item_id === item.item_id);
-    return inv ? total + inv.sale_price * item.quantity : total;
-  }, 0);
-
-  const isNowCompleted = formData.jobStatus === 'completed';
-  const wasNotCompleted = editingJob ? formData.originalStatus !== 'completed' : true;
-  const shouldCreateSale = isNowCompleted && wasNotCompleted;
-
-  // Client-side stock validation before completing
-  if (shouldCreateSale && validItems.length > 0) {
-    for (const item of validItems) {
-      const inventoryItem = inventoryItems.find((i) => i.item_id === item.item_id);
-      if (inventoryItem && inventoryItem.stock_quantity < item.quantity) {
+      if (!finalJobDescription) {
         toast({
-          title: 'Insufficient Stock',
-          description: `Not enough stock for ${inventoryItem.name}. Available: ${inventoryItem.stock_quantity}`,
+          title: 'Validation Error',
+          description: 'Job description is required.',
           variant: 'destructive',
         });
         return;
       }
-    }
-  }
 
-  setIsLoading(true);
+      const feeOnly = parseFloat(formData.serviceFee) || 0;
 
-  try {
-    const jobData = {
-      user_id: authUser.user_id,
-      customer_id: formData.customerId === ANONYMOUS_CUSTOMER_ID ? null : formData.customerId,
-      job_description: finalJobDescription,
-      status: formData.jobStatus,
-      service_fee: feeOnly,
-      remarks: formData.remarks || null,
-      vehicle_type_id: formData.vehicleTypeId ? formData.vehicleTypeId : null,
-    };
+      // Valid items and items total
+      const validItems = (formData.selectedItems || []).filter(
+        (i) => i.item_id && i.quantity > 0
+      );
+      const itemsTotal = validItems.reduce((total, item) => {
+        const inv = inventoryItems.find((i) => i.item_id === item.item_id);
+        return inv ? total + inv.sale_price * item.quantity : total;
+      }, 0);
 
-    let jobId: string;
+      const isNowCompleted = formData.jobStatus === 'completed';
+      const wasNotCompleted = editingJob ? formData.originalStatus !== 'completed' : true;
+      const shouldCreateSale = isNowCompleted && wasNotCompleted;
 
-    if (editingJob) {
-      const { error: updateError } = await supabase
-        .from('service_job')
-        .update(jobData)
-        .eq('job_id', editingJob.job_id);
-      if (updateError) throw updateError;
-
-      jobId = editingJob.job_id;
-
-      // Replace items with new selection (no stock changes here)
-      await supabase.from('service_job_item').delete().eq('job_id', jobId);
-    } else {
-      const { data: inserted, error: insertError } = await supabase
-        .from('service_job')
-        .insert([jobData])
-        .select('job_id')
-        .limit(1);
-      if (insertError) throw insertError;
-      jobId = inserted?.[0]?.job_id;
-      if (!jobId) throw new Error('Failed to create job.');
-    }
-
-    // Insert items for the job
-    if (validItems.length > 0) {
-      await supabase
-        .from('service_job_item')
-        .insert(
-          validItems.map((i) => ({
-            job_id: jobId,
-            item_id: i.item_id,
-            quantity: i.quantity,
-          }))
-        );
-
-      // Create sale ONLY when becoming completed, idempotent
-      if (shouldCreateSale) {
-        const { data: existingSale, error: saleFetchErr } = await supabase
-          .from('sale')
-          .select('sale_id')
-          .eq('service_job_id', jobId)
-          .maybeSingle();
-        if (saleFetchErr) throw saleFetchErr;
-
-        if (existingSale?.sale_id) {
-          toast({
-            title: 'Already Processed',
-            description: 'Sale already recorded for this job.',
-          });
-        } else {
-          let saleId: string | null = null;
-          const firstInv = inventoryItems.find((i) => i.item_id === validItems[0].item_id);
-
-          if (firstInv) {
-            const { data: newSale, error: saleCreateErr } = await supabase
-              .from('sale')
-              .insert([
-                {
-                  user_id: authUser.user_id,
-                  branch_id: firstInv.branch_id,
-                  customer_id:
-                    formData.customerId === ANONYMOUS_CUSTOMER_ID ? null : formData.customerId,
-                  sale_date: new Date().toISOString(),
-                  service_job_id: jobId,
-                  total_amount: itemsTotal,
-                  payment_method: 'cash',
-                },
-              ])
-              .select('sale_id')
-              .single();
-            if (saleCreateErr) throw saleCreateErr;
-            saleId = newSale?.sale_id || null;
-          }
-
-          if (saleId) {
-            for (const item of validItems) {
-              const { data: currentItem, error: invErr } = await supabase
-                .from('inventory_item')
-                .select('sale_price')
-                .eq('item_id', item.item_id)
-                .maybeSingle();
-              if (invErr) throw invErr;
-
-              // Avoid duplicate sale_item
-              const { data: existingSaleItem, error: saleItemFetchErr } = await supabase
-                .from('sale_item')
-                .select('sale_item_id')
-                .eq('sale_id', saleId)
-                .eq('item_id', item.item_id)
-                .maybeSingle();
-              if (saleItemFetchErr) throw saleItemFetchErr;
-
-              if (!existingSaleItem) {
-                await supabase.from('sale_item').insert([
-                  {
-                    sale_id: saleId,
-                    item_id: item.item_id,
-                    quantity: item.quantity,
-                    price_at_sale: currentItem?.sale_price ?? 0,
-                    installation_fee: 0,
-                  },
-                ]);
-              }
-            }
+      // Client-side stock validation before completing
+      if (shouldCreateSale && validItems.length > 0) {
+        for (const item of validItems) {
+          const inventoryItem = inventoryItems.find((i) => i.item_id === item.item_id);
+          if (inventoryItem && inventoryItem.stock_quantity < item.quantity) {
             toast({
-              title: 'Sale Recorded',
-              description: `Items sale recorded.`,
+              title: 'Insufficient Stock',
+              description: `Not enough stock for ${inventoryItem.name}. Available: ${inventoryItem.stock_quantity}`,
+              variant: 'destructive',
             });
+            return;
           }
         }
       }
-    }
 
-    toast({
-      title: 'Success',
-      description: `Service job ${editingJob ? 'updated' : 'created'} successfully.`,
-    });
+      setIsLoading(true);
 
-    setIsAddDialogOpen(false);
-    setIsEditDialogOpen(false);
-    resetForm();
-    fetchJobs();
-    fetchInventoryItems();
-  } catch (error: any) {
-    toast({ title: 'Error', description: error.message, variant: 'destructive' });
-  } finally {
-    setIsLoading(false);
-  }
-};
-// ...existing code...
+      try {
+        const jobData = {
+          user_id: authUser.user_id,
+          customer_id: formData.customerId === ANONYMOUS_CUSTOMER_ID ? null : formData.customerId,
+          job_description: finalJobDescription,
+          status: formData.jobStatus,
+          service_fee: feeOnly,
+          remarks: formData.remarks || null,
+          vehicle_type_id: formData.vehicleTypeId ? formData.vehicleTypeId : null,
+        };
+
+        let jobId: string;
+
+        if (editingJob) {
+          const { error: updateError } = await supabase
+            .from('service_job')
+            .update(jobData)
+            .eq('job_id', editingJob.job_id);
+          if (updateError) throw updateError;
+
+          jobId = editingJob.job_id;
+
+          // Replace items with new selection (no stock changes here)
+          await supabase.from('service_job_item').delete().eq('job_id', jobId);
+        } else {
+          const { data: inserted, error: insertError } = await supabase
+            .from('service_job')
+            .insert([jobData])
+            .select('job_id')
+            .limit(1);
+          if (insertError) throw insertError;
+          jobId = inserted?.[0]?.job_id;
+          if (!jobId) throw new Error('Failed to create job.');
+        }
+
+        // Insert items for the job
+        if (validItems.length > 0) {
+          await supabase
+            .from('service_job_item')
+            .insert(
+              validItems.map((i) => ({
+                job_id: jobId,
+                item_id: i.item_id,
+                quantity: i.quantity,
+              }))
+            );
+
+          // Create sale ONLY when becoming completed, idempotent
+          if (shouldCreateSale) {
+            const { data: existingSale, error: saleFetchErr } = await supabase
+              .from('sale')
+              .select('sale_id')
+              .eq('service_job_id', jobId)
+              .maybeSingle();
+            if (saleFetchErr) throw saleFetchErr;
+
+            if (existingSale?.sale_id) {
+              toast({
+                title: 'Already Processed',
+                description: 'Sale already recorded for this job.',
+              });
+            } else {
+              let saleId: string | null = null;
+              const firstInv = inventoryItems.find((i) => i.item_id === validItems[0].item_id);
+
+              if (firstInv) {
+                const { data: newSale, error: saleCreateErr } = await supabase
+                  .from('sale')
+                  .insert([
+                    {
+                      user_id: authUser.user_id,
+                      branch_id: firstInv.branch_id,
+                      customer_id:
+                        formData.customerId === ANONYMOUS_CUSTOMER_ID ? null : formData.customerId,
+                      sale_date: new Date().toISOString(),
+                      service_job_id: jobId,
+                      total_amount: itemsTotal,
+                      payment_method: 'cash',
+                    },
+                  ])
+                  .select('sale_id')
+                  .single();
+                if (saleCreateErr) throw saleCreateErr;
+                saleId = newSale?.sale_id || null;
+              }
+
+              if (saleId) {
+                for (const item of validItems) {
+                  const { data: currentItem, error: invErr } = await supabase
+                    .from('inventory_item')
+                    .select('sale_price')
+                    .eq('item_id', item.item_id)
+                    .maybeSingle();
+                  if (invErr) throw invErr;
+
+                  // Avoid duplicate sale_item
+                  const { data: existingSaleItem, error: saleItemFetchErr } = await supabase
+                    .from('sale_item')
+                    .select('sale_item_id')
+                    .eq('sale_id', saleId)
+                    .eq('item_id', item.item_id)
+                    .maybeSingle();
+                  if (saleItemFetchErr) throw saleItemFetchErr;
+
+                  if (!existingSaleItem) {
+                    await supabase.from('sale_item').insert([
+                      {
+                        sale_id: saleId,
+                        item_id: item.item_id,
+                        quantity: item.quantity,
+                        price_at_sale: currentItem?.sale_price ?? 0,
+                        installation_fee: 0,
+                      },
+                    ]);
+                  }
+                }
+                toast({
+                  title: 'Sale Recorded',
+                  description: `Items sale recorded.`,
+                });
+              }
+            }
+          }
+        }
+
+        toast({
+          title: 'Success',
+          description: `Service job ${editingJob ? 'updated' : 'created'} successfully.`,
+        });
+
+        setIsAddDialogOpen(false);
+        setIsEditDialogOpen(false);
+        resetForm();
+        fetchJobs();
+        fetchInventoryItems();
+      } catch (error: any) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
 
     const handleDelete = async () => {
         if (!deletingJob || !supabase) return;
