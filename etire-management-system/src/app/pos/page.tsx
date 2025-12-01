@@ -1605,7 +1605,7 @@ export default function POSPage() {
         <div
           className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
           style={{
-            backgroundImage: "url('/images/image2.jpg')",
+            backgroundImage: "url('/images/image4.png')",
             backgroundSize: "cover",
             backgroundPosition: "center 30%"
           }}
