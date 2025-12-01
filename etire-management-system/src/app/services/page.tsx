@@ -366,6 +366,8 @@ const StatusPopover = ({
 };
 
 // Quick Filter Chips Component
+// ...existing code...
+
 const QuickFilterChips = ({ 
   serviceJobs, 
   activeFilters, 
@@ -375,16 +377,45 @@ const QuickFilterChips = ({
   activeFilters: { today: boolean; pending: boolean; inProgress: boolean; last7Days: boolean };
   onFilterChange: (filters: { today: boolean; pending: boolean; inProgress: boolean; last7Days: boolean }) => void;
 }) => {
-  const today = new Date().toDateString();
-  const last7Days = new Date();
-  last7Days.setDate(last7Days.getDate() - 7);
+  const counts = useMemo(() => {
+    // ✅ FIX: Create local date boundaries
+    const now = new Date();
+    const todayLocal = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    );
+    
+    const last7DaysStart = new Date(todayLocal);
+    last7DaysStart.setDate(last7DaysStart.getDate() - 7);
 
-  const counts = {
-    today: serviceJobs.filter(job => new Date(job.job_date).toDateString() === today).length,
-    pending: serviceJobs.filter(job => job.status === 'pending').length,
-    inProgress: serviceJobs.filter(job => job.status === 'in-progress').length,
-    last7Days: serviceJobs.filter(job => new Date(job.job_date) >= last7Days).length,
-  };
+    const todayJobs = serviceJobs.filter(job => {
+      const jobDate = new Date(job.job_date);
+      const jobLocalDate = new Date(
+        jobDate.getFullYear(),
+        jobDate.getMonth(),
+        jobDate.getDate()
+      );
+      return jobLocalDate.getTime() === todayLocal.getTime();
+    });
+    
+    const last7Jobs = serviceJobs.filter(job => {
+      const jobDate = new Date(job.job_date);
+      const jobLocalDate = new Date(
+        jobDate.getFullYear(),
+        jobDate.getMonth(),
+        jobDate.getDate()
+      );
+      return jobLocalDate >= last7DaysStart;
+    });
+    
+    return {
+      today: todayJobs.length,
+      pending: serviceJobs.filter(job => job.status === 'pending').length,
+      inProgress: serviceJobs.filter(job => job.status === 'in-progress').length,
+      last7Days: last7Jobs.length,
+    };
+  }, [serviceJobs]);
 
   const handleChipClick = (chip: keyof typeof activeFilters) => {
     onFilterChange({
@@ -466,6 +497,8 @@ const QuickFilterChips = ({
     </div>
   );
 };
+
+// ...existing code...
 
 // Stats Overview Component - Updated with proper number formatting
 const ServiceStats = ({ serviceJobs }: { serviceJobs: ServiceJob[] }) => {
@@ -1352,6 +1385,7 @@ const TabbedServiceForm = ({
   );
 };
 
+
 const ExpandableRow = ({ 
   job, 
   isExpanded, 
@@ -1369,12 +1403,17 @@ const ExpandableRow = ({
   onDelete: (job: ServiceJob) => void;
   onStatusUpdate: (jobId: string, status: ServiceJob['status']) => Promise<void>;
 }) => {
+  // ✅ FIX: Calculate items total
   const itemsTotal = job.items ? job.items.reduce((total, item) => {
     const inventoryItem = inventoryItems.find(i => i.item_id === item.item_id);
     return total + (inventoryItem ? inventoryItem.sale_price * item.quantity : 0);
   }, 0) : 0;
   
-  const serviceFeeOnly = job.service_fee - itemsTotal;
+  // ✅ FIX: service_fee is ALREADY labor-only, don't subtract
+  const serviceFeeOnly = job.service_fee;
+  
+  // ✅ FIX: Calculate grand total
+  const grandTotal = serviceFeeOnly + itemsTotal;
 
   return (
     <div className="transition-all duration-300">
@@ -1416,7 +1455,7 @@ const ExpandableRow = ({
         {/* Vehicle Type */}
         <div className="col-span-2">
           <div className="flex items-center gap-2">
-            <VehicleIcon className="h-4 w-4 text-slate-400" />
+            <VehicleIcon vehicleType={job.vehicle_type?.name} />
             <span className="text-sm text-slate-700 capitalize font-poppins">
               {job.vehicle_type?.name || 'Not specified'}
             </span>
@@ -1433,7 +1472,7 @@ const ExpandableRow = ({
           </div>
         </div>
 
-        {/* Date & Fee */}
+        {/* ✅ FIX: Date & Fee - Show grand total with breakdown */}
         <div className="col-span-2 space-y-1">
           <p className="text-sm text-slate-700 font-poppins">
             {new Date(job.job_date).toLocaleDateString()}
@@ -1441,26 +1480,25 @@ const ExpandableRow = ({
           <p className="text-xs text-slate-500 font-poppins">
             {getRelativeTime(job.job_date)}
           </p>
-          <div className="flex items-center">
+          <div className="flex flex-col">
             <span className="text-sm font-semibold text-green-600 font-poppins">
-              ₱{job.service_fee.toFixed(2)}
+              ₱{grandTotal.toFixed(2)}
             </span>
-            {job.items && job.items.length > 0 && (
-              <Badge variant="outline" className="ml-2 text-xs font-poppins">
-                <Package className="h-3 w-3 mr-1" />
-                {job.items.length}
-              </Badge>
+            {itemsTotal > 0 && (
+              <span className="text-xs text-slate-500 font-poppins">
+                (₱{serviceFeeOnly.toFixed(2)} + ₱{itemsTotal.toFixed(2)})
+              </span>
             )}
           </div>
         </div>
 
         {/* Status */}
         <div className="col-span-1">
-  <StatusPopover 
-    job={job}
-    onStatusUpdate={onStatusUpdate} // CHANGE THIS LINE
-  />
-</div>
+          <StatusPopover 
+            job={job}
+            onStatusUpdate={onStatusUpdate}
+          />
+        </div>
       </div>
 
       {/* Expanded Content */}
@@ -1511,13 +1549,13 @@ const ExpandableRow = ({
               )}
             </div>
 
-            {/* Right Column - Pricing & Items */}
+            {/* ✅ FIX: Right Column - Pricing & Items */}
             <div className="space-y-3">
               <h4 className="font-semibold text-slate-800 font-poppins">Pricing Breakdown</h4>
               
               <div className="space-y-2 p-3 bg-white rounded-lg border border-slate-200">
                 <div className="flex justify-between">
-                  <span className="text-sm text-slate-600 font-poppins">Service Fee:</span>
+                  <span className="text-sm text-slate-600 font-poppins">Service Fee (Labor):</span>
                   <span className="text-sm font-semibold text-slate-800 font-poppins">
                     ₱{serviceFeeOnly.toFixed(2)}
                   </span>
@@ -1537,7 +1575,7 @@ const ExpandableRow = ({
                 <div className="flex justify-between">
                   <span className="text-sm font-semibold text-slate-800 font-poppins">Grand Total:</span>
                   <span className="text-sm font-bold text-green-600 font-poppins">
-                    ₱{job.service_fee.toFixed(2)}
+                    ₱{grandTotal.toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -1603,6 +1641,7 @@ const ExpandableRow = ({
   );
 };
 
+
 // Helper function to get vehicle icon
 const VehicleIcon = ({ vehicleType }: { vehicleType?: string | null }) => {
   const Icon = getVehicleIcon(vehicleType || 'car');
@@ -1612,16 +1651,52 @@ const VehicleIcon = ({ vehicleType }: { vehicleType?: string | null }) => {
 // Helper function to get relative time
 const getRelativeTime = (dateString: string) => {
   const date = new Date(dateString);
+  
+  if (isNaN(date.getTime())) {
+    return 'Invalid date';
+  }
+  
+  // ✅ FIX: Compare using local dates
+  const jobLocalDate = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate()
+  );
+  
   const now = new Date();
-  const diffTime = Math.abs(now.getTime() - date.getTime());
+  const todayLocal = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  );
+  
+  const diffTime = todayLocal.getTime() - jobLocalDate.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   
+  // ✅ NEW: More granular time ranges
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-  return `${Math.floor(diffDays / 30)} months ago`;
+  if (diffDays === 2) return '2 days ago';
+  if (diffDays === 3) return '3 days ago';
+  if (diffDays === 4) return '4 days ago';
+  if (diffDays === 5) return '5 days ago';
+  if (diffDays === 6) return '6 days ago';
+  if (diffDays === 7) return '1 week ago';
+  if (diffDays < 14) return '1 week ago'; // 8-13 days
+  if (diffDays < 21) return '2 weeks ago'; // 14-20 days
+  if (diffDays < 28) return '3 weeks ago'; // 21-27 days
+  if (diffDays < 60) return '1 month ago'; // 28-59 days
+  if (diffDays < 90) return '2 months ago'; // 60-89 days
+  if (diffDays < 120) return '3 months ago'; // 90-119 days
+  if (diffDays < 180) return '4-5 months ago'; // 120-179 days
+  if (diffDays < 365) return '6+ months ago'; // 180-364 days
+  
+  const years = Math.floor(diffDays / 365);
+  if (years === 1) return '1 year ago';
+  return `${years} years ago`;
 };
+
+// ...existing code...
 
 export default function EnhancedServiceManagementPage() {
     const { toast } = useToast();
@@ -1830,6 +1905,10 @@ export default function EnhancedServiceManagementPage() {
     }
 
     // Filter jobs with quick filters
+// ...existing code...
+
+// ...existing code...
+
 const filteredJobs = useMemo(() => {
   let filtered = serviceJobs.filter(job => {
     const matchesSearch =
@@ -1840,15 +1919,44 @@ const filteredJobs = useMemo(() => {
     const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
     const matchesVehicleType = vehicleTypeFilter === 'all' || job.vehicle_type_id === vehicleTypeFilter;
 
-    // Quick filters
-    const today = new Date().toDateString();
-    const last7Days = new Date();
-    last7Days.setDate(last7Days.getDate() - 7);
+    // ✅ FIX: Parse UTC date and convert to local date-only comparison
+    const jobDate = new Date(job.job_date);
+    
+    // Validate date
+    if (isNaN(jobDate.getTime())) {
+      console.warn(`Invalid date for job ${job.job_id}:`, job.job_date);
+      return false;
+    }
+    
+    // ✅ CRITICAL: Get date in LOCAL timezone (not UTC)
+    const jobLocalDate = new Date(
+      jobDate.getFullYear(),
+      jobDate.getMonth(),
+      jobDate.getDate()
+    );
+    
+    const today = new Date();
+    const todayLocal = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+    
+    const yesterdayLocal = new Date(todayLocal);
+    yesterdayLocal.setDate(yesterdayLocal.getDate() - 1);
+    
+    const last7DaysStart = new Date(todayLocal);
+    last7DaysStart.setDate(last7DaysStart.getDate() - 7);
 
-    const matchesToday = !quickFilters.today || new Date(job.job_date).toDateString() === today;
+    // ✅ FIX: Compare dates using getTime() for accurate comparison
+    const matchesToday = !quickFilters.today || 
+      jobLocalDate.getTime() === todayLocal.getTime();
+    
     const matchesPending = !quickFilters.pending || job.status === 'pending';
     const matchesInProgress = !quickFilters.inProgress || job.status === 'in-progress';
-    const matchesLast7Days = !quickFilters.last7Days || new Date(job.job_date) >= last7Days;
+    
+    const matchesLast7Days = !quickFilters.last7Days || 
+      jobLocalDate >= last7DaysStart;
 
     return matchesSearch && matchesStatus && matchesVehicleType && 
            matchesToday && matchesPending && matchesInProgress && matchesLast7Days;
@@ -2084,6 +2192,7 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
           service_fee: feeOnly,
           remarks: formData.remarks || null,
           vehicle_type_id: formData.vehicleTypeId ? formData.vehicleTypeId : null,
+          ...(!editingJob && { job_date: new Date().toISOString() }),
         };
 
         let jobId: string;
