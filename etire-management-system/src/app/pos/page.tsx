@@ -48,7 +48,11 @@ import {
   Edit,
   Ban,
   Lock,
-  X
+  X,
+  ArrowUpDown,
+  Save,
+  Archive,
+  Printer
 } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import {
@@ -444,36 +448,83 @@ const CustomerSearch = ({
 // ============================================
 const SuccessAnimation = ({
   isVisible,
-  saleId,
+  title,
+  message,
+  actionType,
   onConfirm
 }: {
   isVisible: boolean;
-  saleId: string | null;
+  title: string;
+  message: string;
+  actionType: 'sale' | 'receipt' | 'void' | 'access' | 'edit' | 'export';
   onConfirm: () => void;
 }) => {
   if (!isVisible) return null;
 
+  // Different icons and colors based on action type
+  const getActionConfig = () => {
+    switch (actionType) {
+      case 'sale':
+        return { 
+          gradient: 'from-green-500 to-emerald-600',
+          icon: CheckCircle 
+        };
+      case 'receipt':
+        return { 
+          gradient: 'from-blue-500 to-cyan-600',
+          icon: Printer 
+        };
+      case 'void':
+        return { 
+          gradient: 'from-red-500 to-orange-600',
+          icon: Archive 
+        };
+      case 'access':
+        return { 
+          gradient: 'from-purple-500 to-indigo-600',
+          icon: Lock 
+        };
+      case 'edit':
+        return { 
+          gradient: 'from-amber-500 to-yellow-600',
+          icon: Save 
+        };
+      case 'export':
+        return { 
+          gradient: 'from-teal-500 to-green-600',
+          icon: Download 
+        };
+      default:
+        return { 
+          gradient: 'from-purple-500 to-indigo-600',
+          icon: CheckCircle 
+        };
+    }
+  };
+
+  const { gradient, icon: ActionIcon } = getActionConfig();
+
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300">
       <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300">
-        <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500">
-          <CheckCircle className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
+        <div className={`w-20 h-20 bg-gradient-to-r ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500`}>
+          <ActionIcon className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
         </div>
 
         <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins">
-          Sale Completed!
+          {title}
         </h3>
 
         <p className="text-slate-600 mb-6 font-poppins">
-          The transaction has been processed successfully.
+          {message}
         </p>
 
         <div className="flex gap-3 justify-center">
           <Button
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins"
+            className={`bg-gradient-to-r ${gradient} hover:scale-105 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins`}
             onClick={onConfirm}
           >
-            <CheckCircle className="h-4 w-4 mr-2" />
+            <CheckCircle className="h-5 w-5 mr-2" />
             Confirm
           </Button>
         </div>
@@ -606,8 +657,17 @@ export default function POSPage() {
   const [showSalesHistory, setShowSalesHistory] = useState(false);
 
   // State for Success Animation
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [lastSaleId, setLastSaleId] = useState<string | null>(null);
+  const [successAnimation, setSuccessAnimation] = useState<{
+    isVisible: boolean;
+    title: string;
+    message: string;
+    actionType: 'sale' | 'receipt' | 'void' | 'access' | 'edit' | 'export';
+  }>({
+    isVisible: false,
+    title: '',
+    message: '',
+    actionType: 'sale'
+  });
 
   // State for Void Management
   const [showVoidManagement, setShowVoidManagement] = useState(false);
@@ -772,12 +832,12 @@ export default function POSPage() {
   const updateQuantity = (itemId: string, newQuantity: number) => {
     const item = inventory.find(p => p.item_id === itemId);
     if (!item) return;
-
+  
     const cartItem = cart.find(c => c.item_id === itemId);
     if (!cartItem) return;
-
+  
     const quantityDifference = newQuantity - cartItem.quantity;
-
+  
     if (newQuantity > 0 && newQuantity <= item.stock_quantity + cartItem.quantity) {
       // Update inventory based on quantity change
       setInventory(prevInventory => 
@@ -823,14 +883,14 @@ export default function POSPage() {
       });
       return;
     }
-
+  
     if (!authUser) {
       toast({ title: 'Not Authenticated', description: 'You must be logged in to process a sale.', variant: 'destructive' });
       return;
     }
-
+  
     setIsSubmitting(true);
-
+  
     try {
       // If editing a sale, void the original first
       if (editingSale) {
@@ -838,17 +898,17 @@ export default function POSPage() {
           .from('sale_item')
           .delete()
           .eq('sale_id', editingSale.sale_id);
-
+  
         if (deleteItemsError) throw deleteItemsError;
-
+  
         const { error: deleteSaleError } = await supabase
           .from('sale')
           .delete()
           .eq('sale_id', editingSale.sale_id);
-
+  
         if (deleteSaleError) throw deleteSaleError;
       }
-
+  
       const response = await fetch("/api/sales", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -860,11 +920,11 @@ export default function POSPage() {
           branchId: null,
         }),
       });
-
+  
       const data = await response.json();
-
+  
       if (!response.ok) throw new Error(data.error || "Failed to process sale");
-
+  
       // Generate receipt
       try {
         const businessInfo: BusinessInfo = {
@@ -874,18 +934,18 @@ export default function POSPage() {
           taxInfo: 'To be given',
           footerMessage: 'Thank You!',
         };
-
+  
         const receiptItems: ReceiptItem[] = cart.map(item => ({
           name: item.name,
           quantity: item.quantity,
           price: item.sale_price,
         }));
-
+  
         const selectedCustomerObj = customers.find(c => c.customer_id === selectedCustomerId);
         const receiptCustomer: ReceiptCustomer | undefined = selectedCustomerObj
           ? { name: selectedCustomerObj.name, phone: selectedCustomerObj.phone }
           : undefined;
-
+  
         const newSaleObject: Sale = {
           sale_id: data.sale_id,
           sale_date: new Date().toISOString(),
@@ -896,7 +956,7 @@ export default function POSPage() {
           tax_amount: 0,
           total_amount: total,
         };
-
+  
         const receiptData: ReceiptData = {
           sale: newSaleObject,
           items: receiptItems,
@@ -904,25 +964,23 @@ export default function POSPage() {
           customer: receiptCustomer,
           businessInfo: businessInfo,
         };
-
+  
         const html = generateHtmlReceipt(receiptData);
         printReceipt(html);
-
+  
       } catch (receiptError: any) {
         console.error('Receipt generation failed:', receiptError);
         toast({ title: 'Receipt Error', description: `Sale was saved (ID: ${data.sale_id}), but receipt failed to print: ${receiptError.message}`, variant: 'destructive' });
       }
-
-      setLastSaleId(data.sale_id);
-      setShowSuccess(true);
-
-      setTimeout(() => {
-        setCart([]);
-        setSelectedCustomerId(ANONYMOUS_CUSTOMER_ID);
-        setEditingSale(null);
-        fetchInitialData();
-      }, 3000);
-
+  
+      // Show success animation
+      setSuccessAnimation({
+        isVisible: true,
+        title: "Sale Completed!",
+        message: "The transaction has been processed successfully.",
+        actionType: 'sale'
+      });
+  
     } catch (err: any) {
       toast({
         title: "Checkout Failed ❌",
@@ -1009,9 +1067,11 @@ export default function POSPage() {
       const html = generateHtmlReceipt(receiptData);
       printReceipt(html);
 
-      toast({
-        title: "Receipt Ready",
-        description: "Opening print dialog for receipt.",
+      setSuccessAnimation({
+        isVisible: true,
+        title: "Receipt Ready!",
+        message: "Opening print dialog for receipt.",
+        actionType: 'receipt'
       });
 
     } catch (error: any) {
@@ -1023,11 +1083,6 @@ export default function POSPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleConfirmSuccess = () => {
-    setShowSuccess(false);
-    setLastSaleId(null);
   };
 
   const handleVoidClick = () => {
@@ -1054,9 +1109,13 @@ export default function POSPage() {
         setShowPasswordDialog(false);
         setManagerPassword('');
         setPasswordError(null);
-        toast({
-          title: "Access Granted",
-          description: "Admin access: You can now manage sales transactions.",
+        
+        // Show success animation for access granted
+        setSuccessAnimation({
+          isVisible: true,
+          title: "Access Granted!",
+          message: "Admin access: You can now manage sales transactions.",
+          actionType: 'access'
         });
         return;
       }
@@ -1100,9 +1159,13 @@ export default function POSPage() {
         setShowPasswordDialog(false);
         setManagerPassword('');
         setPasswordError(null);
-        toast({
-          title: "Access Granted ✓",
-          description: `Welcome, ${matchedUser.name}. You can now manage sales transactions.`,
+        
+        // Show success animation for access granted
+        setSuccessAnimation({
+          isVisible: true,
+          title: "Access Granted!",
+          message: `Welcome, ${matchedUser.name}. You can now manage sales transactions.`,
+          actionType: 'access'
         });
       } else {
         // ❌ FAILED: Password doesn't match any role 2 user
@@ -1153,9 +1216,12 @@ export default function POSPage() {
       setShowVoidManagement(false);
       setShowSalesHistory(false);
       
-      toast({
-        title: "Sale Loaded for Editing",
-        description: `Sale ${sale.sale_id} has been loaded into the cart. Make your changes and process the sale again.`,
+      // Show success animation for edit
+      setSuccessAnimation({
+        isVisible: true,
+        title: "Sale Loaded!",
+        message: `Sale ${sale.sale_id} has been loaded into the cart. Make your changes and process the sale again.`,
+        actionType: 'edit'
       });
     } catch (error: any) {
       toast({
@@ -1253,9 +1319,11 @@ export default function POSPage() {
 
       if (deleteSaleError) throw deleteSaleError;
 
-      toast({
-        title: "Sale Voided",
-        description: `Sale ${saleId} has been voided and inventory has been restored.`,
+      setSuccessAnimation({
+        isVisible: true,
+        title: "Sale Voided!",
+        message: `Sale ${saleId} has been voided and inventory has been restored.`,
+        actionType: 'void'
       });
 
       fetchInitialData();
@@ -1515,6 +1583,7 @@ export default function POSPage() {
   const totalSalesAmount = sales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
   const todaySales = sales.filter(s => new Date(s.sale_date).toDateString() === new Date().toDateString());
   const todayRevenue = todaySales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
+  
   if (fetchError) {
     return (
       <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
@@ -1610,11 +1679,22 @@ export default function POSPage() {
           </div>
         </div>
 
-        {/* Success Animation */}
+        {/* Enhanced Success Animation */}
         <SuccessAnimation
-          isVisible={showSuccess}
-          saleId={lastSaleId}
-          onConfirm={handleConfirmSuccess}
+          isVisible={successAnimation.isVisible}
+          title={successAnimation.title}
+          message={successAnimation.message}
+          actionType={successAnimation.actionType}
+          onConfirm={() => {
+            setSuccessAnimation(prev => ({ ...prev, isVisible: false }));
+            // Clear cart only for sale completion
+            if (successAnimation.actionType === 'sale') {
+              setCart([]);
+              setSelectedCustomerId(ANONYMOUS_CUSTOMER_ID);
+              setEditingSale(null);
+              fetchInitialData();
+            }
+          }}
         />
 
         {/* Password Dialog for Void Management */}
