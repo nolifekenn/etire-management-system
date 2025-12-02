@@ -31,7 +31,8 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   Loader2, PlusCircle, AlertTriangle, Users, Car, History, 
   RefreshCw, Clock, Edit, Trash2, Search, X, ArrowLeft, Download,
-  Eye, TrendingUp, CheckCircle, UserPlus, Calendar, Wrench
+  Eye, TrendingUp, CheckCircle, UserPlus, Calendar, Wrench,
+  Save, ArrowUpDown, Archive, PackageSearch
 } from 'lucide-react';
 import { DataTableWrapper } from '@/components/DataTableWrapper';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +56,89 @@ const microAnimations = {
   iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
 };
 
+// ===== SUCCESS ANIMATION COMPONENT =====
+const SuccessAnimation = ({
+  isVisible,
+  title,
+  message,
+  actionType,
+  onConfirm
+}: {
+  isVisible: boolean;
+  title: string;
+  message: string;
+  actionType?: 'add' | 'edit' | 'delete' | 'export' | 'create';
+  onConfirm: () => void;
+}) => {
+  if (!isVisible) return null;
+
+  // Different icons and colors based on action type
+  const getActionConfig = () => {
+    switch (actionType) {
+      case 'add':
+        return { 
+          gradient: 'from-green-500 to-emerald-600',
+          icon: PlusCircle 
+        };
+      case 'edit':
+        return { 
+          gradient: 'from-blue-500 to-cyan-600',
+          icon: Save 
+        };
+      case 'delete':
+        return { 
+          gradient: 'from-red-500 to-orange-600',
+          icon: Archive 
+        };
+      case 'export':
+        return { 
+          gradient: 'from-purple-500 to-indigo-600',
+          icon: Download 
+        };
+      case 'create':
+        return { 
+          gradient: 'from-purple-500 to-indigo-600',
+          icon: CheckCircle 
+        };
+      default:
+        return { 
+          gradient: 'from-purple-500 to-indigo-600',
+          icon: CheckCircle 
+        };
+    }
+  };
+
+  const { gradient, icon: ActionIcon } = getActionConfig();
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300">
+      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300">
+        <div className={`w-20 h-20 bg-gradient-to-r ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500`}>
+          <ActionIcon className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
+        </div>
+
+        <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins">
+          {title}
+        </h3>
+
+        <p className="text-slate-600 mb-6 font-poppins">
+          {message}
+        </p>
+
+        <div className="flex gap-3 justify-center">
+          <Button
+            className={`bg-gradient-to-r ${gradient} hover:scale-105 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins`}
+            onClick={onConfirm}
+          >
+            <CheckCircle className="h-5 w-5 mr-2" />
+            Continue
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Vehicle Type Icons Mapping
 const VehicleIcons = {
   car: Car,
@@ -76,7 +160,7 @@ const serviceTypeColors = {
   replacement: "bg-blue-100 text-blue-700 border-blue-200",
   rotation: "bg-green-100 text-green-700 border-green-200",
   balancing: "bg-purple-100 text-purple-700 border-purple-200",
-  service: "bg-indigo-100 text-indigo-700 border-indigo-200"  // ✅ ADD THISs
+  service: "bg-indigo-100 text-indigo-700 border-indigo-200"
 };
 
 interface VehicleType {
@@ -86,11 +170,10 @@ interface VehicleType {
 
 // Column definitions
 const customerColumns = [
-  { key: 'name', header: 'Customer Name' },
-  { key: 'phone', header: 'Phone' },
-  { key: 'vehicle_count', header: 'Vehicles' },
+  { key: 'name', header: 'Customer Name', sortable: true },
+  { key: 'phone', header: 'Phone', sortable: true },
+  { key: 'vehicle_count', header: 'Vehicles', sortable: true },
 ];
-
 
 const vehicleColumns = [
   { key: 'plate_number', header: 'Plate Number', sortable: true },
@@ -119,9 +202,8 @@ const historyColumns = [
   },
   {
     key: 'item_name',
-    header: 'Service/Item', // ✅ CHANGED from 'Tire/Item'
+    header: 'Service/Item',
     render: (_value: any, item: any) => {
-      // ✅ ADD: Show different badge for service jobs
       if (item.source === 'service_job') {
         return (
           <Badge className="bg-purple-100 text-purple-700 border-purple-200 font-poppins">
@@ -134,9 +216,8 @@ const historyColumns = [
   },
   {
     key: 'service_type',
-    header: 'Type', // ✅ CHANGED from 'Service Type'
+    header: 'Type',
     render: (_value: any, item: any) => {
-      // ✅ ADD: Show service type badge differently for service jobs
       if (item.source === 'service_job') {
         return (
           <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 font-poppins">
@@ -160,11 +241,11 @@ const historyColumns = [
   {
     key: 'mileage',
     header: 'Mileage',
-    render: (value: any) => (value ? `${value.toLocaleString()} km` : <span className="text-slate-400">-</span>), // ✅ ADD km formatting
+    render: (value: any) => (value ? `${value.toLocaleString()} km` : <span className="text-slate-400">-</span>),
   },
   {
     key: 'notes',
-    header: 'Notes/Description', // ✅ CHANGED from just being a fallback
+    header: 'Notes/Description',
     render: (value: any) => value || <span className="text-slate-400">-</span>,
   },
   {
@@ -174,9 +255,70 @@ const historyColumns = [
   },
 ];
 
-// ...existing code...
+// Enhanced Empty State Component
+const EnhancedEmptyState = ({ 
+  type,
+  onAddNew,
+  onClearFilters
+}: { 
+  type: 'customers' | 'vehicles' | 'history';
+  onAddNew: () => void;
+  onClearFilters?: () => void;
+}) => {
+  const config = {
+    customers: {
+      title: "No Customers Found",
+      description: "Get started by adding your first customer to manage their vehicles and services.",
+      icon: Users,
+      buttonText: "Add First Customer"
+    },
+    vehicles: {
+      title: "No Vehicles Found",
+      description: "Add vehicles to track service history and manage customer records.",
+      icon: Car,
+      buttonText: "Add First Vehicle"
+    },
+    history: {
+      title: "No Service History",
+      description: "Record tire services to build a complete history for each vehicle.",
+      icon: History,
+      buttonText: "Add First Service Record"
+    }
+  };
 
-// Custom Date Input Component with better styling
+  const { title, description, icon: Icon, buttonText } = config[type];
+
+  return (
+    <div className="text-center py-12 px-6 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50 animate-in fade-in duration-500">
+      <Icon className="h-16 w-16 text-slate-400 mx-auto mb-4" />
+      <h3 className="text-lg font-semibold text-slate-700 mb-2">{title}</h3>
+      <p className="text-slate-500 mb-4">
+        {description}
+      </p>
+      <div className="flex gap-3 justify-center">
+        <Button 
+          onClick={onAddNew}
+          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 hover:scale-105"
+        >
+          <PlusCircle className="h-4 w-4 mr-2" />
+          {buttonText}
+        </Button>
+        {onClearFilters && (
+          <Button 
+            onClick={onClearFilters}
+            variant="outline"
+            className="flex items-center gap-2 transition-all duration-300 hover:scale-105"
+          >
+            <X className="h-4 w-4" />
+            Clear Filters
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Custom Date Input Component
 const CustomDateInput = ({ value, onChange, id, className = "" }: { value: string; onChange: (value: string) => void; id: string; className?: string }) => {
   return (
     <div className="relative">
@@ -213,12 +355,10 @@ const SearchInput = ({
   const handleChange = (newValue: string) => {
     setLocalValue(newValue);
     
-    // Clear previous timeout
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
     
-    // Set new timeout for debounced update
     timeoutRef.current = setTimeout(() => {
       onChange(newValue);
     }, 150);
@@ -268,20 +408,15 @@ const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[],
 
     return (
       <div className="mb-6">
-        {/* Solid Color Dashboard */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 border border-white/20 shadow-xl">
-          {/* Subtle Pattern Overlay */}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px, rgba(255,255,255,0.15) 1px, transparent 0)] bg-[length:20px_20px]"></div>
           
-          {/* Decorative Elements */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
 
           <div className="relative p-6">
             <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-              {/* Left Side - Content */}
               <div className="flex-1 space-y-4">
-                {/* Header */}
                 <div className="space-y-2">
                   <h2 className="text-xl font-bold text-white font-poppins drop-shadow-lg">
                     Business Overview
@@ -291,9 +426,7 @@ const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[],
                   </p>
                 </div>
 
-                {/* Integrated Stats Grid */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  {/* Customer Stat */}
                   <div className="bg-white/20 rounded-xl p-3 border border-white/30 hover:bg-white/25 transition-all duration-300 group">
                     <div className="flex items-center justify-between">
                       <div className="p-1.5 bg-white/30 rounded-lg group-hover:scale-110 transition-transform duration-300">
@@ -306,7 +439,6 @@ const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[],
                     </div>
                   </div>
 
-                  {/* Vehicle Stat */}
                   <div className="bg-white/20 rounded-xl p-3 border border-white/30 hover:bg-white/25 transition-all duration-300 group">
                     <div className="flex items-center justify-between">
                       <div className="p-1.5 bg-white/30 rounded-lg group-hover:scale-110 transition-transform duration-300">
@@ -319,7 +451,6 @@ const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[],
                     </div>
                   </div>
 
-                  {/* Services Stat */}
                   <div className="bg-white/20 rounded-xl p-3 border border-white/30 hover:bg-white/25 transition-all duration-300 group">
                     <div className="flex items-center justify-between">
                       <div className="p-1.5 bg-white/30 rounded-lg group-hover:scale-110 transition-transform duration-300">
@@ -332,7 +463,6 @@ const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[],
                     </div>
                   </div>
 
-                  {/* Serviced Stat */}
                   <div className="bg-white/20 rounded-xl p-3 border border-white/30 hover:bg-white/25 transition-all duration-300 group">
                     <div className="flex items-center justify-between">
                       <div className="p-1.5 bg-white/30 rounded-lg group-hover:scale-110 transition-transform duration-300">
@@ -347,7 +477,6 @@ const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[],
                 </div>
               </div>
 
-              {/* Right Side - Compact Car GIF */}
               <div className="flex-shrink-0">
                 <div className="relative">
                   <div className="bg-white/20 rounded-xl p-3 border border-white/30 shadow-lg">
@@ -484,6 +613,19 @@ export default function EnhancedCustomersPage() {
     const [vehicleError, setVehicleError] = useState<string | null>(null);
     const [historyError, setHistoryError] = useState<string | null>(null);
     
+    // Success animation state
+    const [successAnimation, setSuccessAnimation] = useState<{
+      isVisible: boolean;
+      title: string;
+      message: string;
+      actionType: 'add' | 'edit' | 'delete' | 'export' | 'create';
+    }>({
+      isVisible: false,
+      title: '',
+      message: '',
+      actionType: 'add'
+    });
+    
     // Dialog states
     const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
     const [isVehicleDialogOpen, setIsVehicleDialogOpen] = useState(false);
@@ -529,7 +671,6 @@ export default function EnhancedCustomersPage() {
 
     const handleTabChange = (tab: string) => {
         setActiveTab(tab);
-        // Reset all searches when switching tabs
         setCustomerSearch('');
         setVehicleSearch('');
         setHistorySearch('');
@@ -626,12 +767,9 @@ export default function EnhancedCustomersPage() {
         return (
           customer.name.toLowerCase().includes(searchLower) ||
           customer.phone?.toLowerCase().includes(searchLower)
-          // removed: email, address
         );
       });
     }, [customers, customerSearch]);
-
-    // ...existing code...
     
     const filteredVehicles = useMemo(() => {
         const q = vehicleSearch.trim().toLowerCase();
@@ -644,10 +782,8 @@ export default function EnhancedCustomersPage() {
             v.model?.toLowerCase().includes(q) ||
             v.color?.toLowerCase().includes(q)
         );
-        }, [vehicles, vehicleSearch]);
+    }, [vehicles, vehicleSearch]);
         
-        // ...existing code...
-
     const filteredHistory = useMemo(() => {
         return tireHistory.filter(history => {
             const searchLower = historySearch.toLowerCase();
@@ -766,7 +902,7 @@ export default function EnhancedCustomersPage() {
         if (activeTab === 'customers') {
         dataToExport = filteredCustomers;
         filename = 'customers_export.csv';
-        headers = ['Customer Name', 'Phone', 'Vehicles Count']; // removed Email, Address
+        headers = ['Customer Name', 'Phone', 'Vehicles Count'];
         } else if (activeTab === 'vehicles') {
         dataToExport = filteredVehicles;
         filename = 'vehicles_export.csv';
@@ -802,9 +938,12 @@ export default function EnhancedCustomersPage() {
         link.click();
         document.body.removeChild(link);
 
-        toast({
-            title: "Export Successful",
-            description: `${dataToExport.length} ${activeTab} exported to ${filename}`,
+        // Show success animation for export
+        setSuccessAnimation({
+            isVisible: true,
+            title: "Export Successful!",
+            message: `Exported ${dataToExport.length} ${activeTab} to CSV file.`,
+            actionType: 'export'
         });
     };
 
@@ -874,7 +1013,16 @@ export default function EnhancedCustomersPage() {
         if (error) {
             toast({ title: "Save Error", description: `Could not save customer: ${error.message}`, variant: "destructive" });
         } else {
-            toast({ title: "Success", description: `Customer ${editingCustomer ? 'updated' : 'created'} successfully.` });
+            // Show success animation
+            setSuccessAnimation({
+                isVisible: true,
+                title: editingCustomer ? "Customer Updated Successfully!" : "Customer Added Successfully!",
+                message: editingCustomer 
+                    ? `Customer "${customerName}" has been updated in the system.`
+                    : `Customer "${customerName}" has been added to the system.`,
+                actionType: editingCustomer ? 'edit' : 'add'
+            });
+            
             setIsCustomerDialogOpen(false);
             fetchCustomers();
         }
@@ -917,7 +1065,16 @@ export default function EnhancedCustomersPage() {
         if (error) {
             toast({ title: "Save Error", description: `Could not save vehicle: ${error.message}`, variant: "destructive" });
         } else {
-            toast({ title: "Success", description: `Vehicle ${editingVehicle ? 'updated' : 'created'} successfully.` });
+            // Show success animation
+            setSuccessAnimation({
+                isVisible: true,
+                title: editingVehicle ? "Vehicle Updated Successfully!" : "Vehicle Added Successfully!",
+                message: editingVehicle 
+                    ? `Vehicle "${plateNumber}" has been updated in the system.`
+                    : `Vehicle "${plateNumber}" has been added to the system.`,
+                actionType: editingVehicle ? 'edit' : 'add'
+            });
+            
             setIsVehicleDialogOpen(false);
             fetchVehicles();
             fetchCustomers();
@@ -962,7 +1119,16 @@ export default function EnhancedCustomersPage() {
         if (error) {
             toast({ title: "Save Error", description: `Could not save tire history: ${error.message}`, variant: "destructive" });
         } else {
-            toast({ title: "Success", description: `Tire history ${editingHistory ? 'updated' : 'created'} successfully.` });
+            // Show success animation
+            setSuccessAnimation({
+                isVisible: true,
+                title: editingHistory ? "Service Record Updated!" : "Service Record Added!",
+                message: editingHistory 
+                    ? "Tire service record has been updated successfully."
+                    : "New tire service record has been created successfully.",
+                actionType: editingHistory ? 'edit' : 'add'
+            });
+            
             setIsHistoryDialogOpen(false);
             fetchTireHistory();
         }
@@ -984,8 +1150,17 @@ export default function EnhancedCustomersPage() {
         if (error) {
             toast({ title: "Delete Error", description: `Could not delete ${deletingItem.type}: ${error.message}`, variant: "destructive" });
         } else {
-            toast({ title: "Success", description: `${deletingItem.type} deleted successfully.` });
+            // Show success animation for deletion
+            setSuccessAnimation({
+                isVisible: true,
+                title: `${deletingItem.type === 'customer' ? 'Customer' : deletingItem.type === 'vehicle' ? 'Vehicle' : 'Service Record'} Deleted!`,
+                message: `${deletingItem.type === 'customer' ? 'Customer' : deletingItem.type === 'vehicle' ? 'Vehicle' : 'Service record'} has been removed from the system.`,
+                actionType: 'delete'
+            });
+            
             setIsDeleteDialogOpen(false);
+            setDeletingItem(null);
+            
             if (deletingItem.type === 'customer') {
                 fetchCustomers();
             } else if (deletingItem.type === 'vehicle') {
@@ -1000,23 +1175,21 @@ export default function EnhancedCustomersPage() {
     // Custom cell renderers
     const renderCustomerCell = (item: any, columnKey: string, value: any) => {
         if (columnKey === 'vehicle_count') {
-            return item.vehicle_count || 0;
+            return (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                    {item.vehicle_count || 0} vehicles
+                </Badge>
+            );
         }
         if (columnKey === 'phone' && !value) {
-            return <span className="text-slate-400">No phone</span>;
-        }
-        if (columnKey === 'email' && !value) {
-            return <span className="text-slate-400">No email</span>;
-        }
-        if (columnKey === 'address' && !value) {
-            return <span className="text-slate-400">No address</span>;
+            return <span className="text-slate-400">-</span>;
         }
         return String(value || '');
     };
 
     const renderVehicleCell = (item: any, columnKey: string, value: any) => {
         if (columnKey === 'customer_name') {
-            return item.customer?.name || 'Unknown Customer';
+            return <span className="font-medium text-slate-800">{item.customer?.name || 'Unknown Customer'}</span>;
         }
         if (columnKey === 'vehicle_type') {
             if (!item.vehicle_type) return <Badge variant="outline">N/A</Badge>;
@@ -1032,15 +1205,14 @@ export default function EnhancedCustomersPage() {
         if (!value) {
             return <span className="text-slate-400">-</span>;
         }
-        return String(value);
+        return <span className="text-slate-700">{String(value)}</span>;
     };
 
     const renderHistoryCell = (item: any, columnKey: string, value: any) => {
     if (columnKey === 'plate_number') {
-        return item.vehicle?.plate_number || '—';
+        return <span className="font-medium text-slate-800">{item.vehicle?.plate_number || '—'}</span>;
     }
     if (columnKey === 'item_name') {
-        // Show badge for service jobs
         if (item.source === 'service_job') {
         return (
             <Badge className="bg-purple-100 text-purple-700 border-purple-200 font-poppins">
@@ -1051,7 +1223,6 @@ export default function EnhancedCustomersPage() {
         return item.inventory_item?.name || '—';
     }
     if (columnKey === 'service_type') {
-        // Show different badge for service jobs
         if (item.source === 'service_job') {
         return (
             <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 font-poppins">
@@ -1070,15 +1241,20 @@ export default function EnhancedCustomersPage() {
         return value ? new Date(value).toLocaleDateString('en-US') : '—';
     }
     if (columnKey === 'mileage') {
-        return value ? `${value.toLocaleString()} km` : <span className="text-slate-400">-</span>;
+        return value ? <span className="font-medium">{value.toLocaleString()} km</span> : <span className="text-slate-400">-</span>;
     }
     if (columnKey === 'notes') {
         return value || <span className="text-slate-400">-</span>;
     }
     if (columnKey === 'created_by_name') {
-        return item.user?.name || '—';
+        return <span className="text-slate-700">{item.user?.name || '—'}</span>;
     }
     return String(value ?? '');
+    };
+
+    // Helper function to convert to title case
+    const toTitle = (str: string) => {
+        return str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase() || '';
     };
 
     return (
@@ -1159,16 +1335,23 @@ export default function EnhancedCustomersPage() {
 
                 <EnhancedTabs value={activeTab} onValueChange={handleTabChange}>
                     {/* Customers Tab */}
-                    <TabsContent value="customers" className="space-y-6">
+                    <TabsContent value="customers" className="space-y-6 animate-in fade-in duration-500">
                         <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
                             <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-purple-50/50 border-b border-slate-200/50">
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                     <div>
                                         <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Customer Management</CardTitle>
                                         <CardDescription className="text-slate-600 font-poppins">
                                             {filteredCustomers.length} of {customers.length} customer{filteredCustomers.length !== 1 ? 's' : ''} shown
                                         </CardDescription>
                                     </div>
+                                    <Button 
+                                        onClick={handleOpenCustomerDialog}
+                                        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-poppins"
+                                    >
+                                        <UserPlus className="h-4 w-4 mr-2" />
+                                        Add Customer
+                                    </Button>
                                 </div>
 
                                 {/* Filter Bar */}
@@ -1206,6 +1389,12 @@ export default function EnhancedCustomersPage() {
                                     <div className="flex justify-center items-center h-64">
                                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                     </div>
+                                ) : filteredCustomers.length === 0 ? (
+                                    <EnhancedEmptyState 
+                                        type="customers"
+                                        onAddNew={handleOpenCustomerDialog}
+                                        onClearFilters={clearCustomerFilters}
+                                    />
                                 ) : (
                                     <DataTableWrapper
                                         title=""
@@ -1217,6 +1406,8 @@ export default function EnhancedCustomersPage() {
                                         onAddNew={handleOpenCustomerDialog}
                                         searchTerm={customerSearch}
                                         onSearchChange={setCustomerSearch}
+                                        enableStripes={true}
+                                        rowClassName="hover:bg-purple-50/50 transition-colors duration-200"
                                     />
                                 )}
                             </CardContent>
@@ -1224,16 +1415,23 @@ export default function EnhancedCustomersPage() {
                     </TabsContent>
 
                     {/* Vehicles Tab */}
-                    <TabsContent value="vehicles" className="space-y-6">
+                    <TabsContent value="vehicles" className="space-y-6 animate-in fade-in duration-500">
                         <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
                             <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-blue-50/50 border-b border-slate-200/50">
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                     <div>
                                         <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Vehicle Management</CardTitle>
                                         <CardDescription className="text-slate-600 font-poppins">
                                             {filteredVehicles.length} of {vehicles.length} vehicle{filteredVehicles.length !== 1 ? 's' : ''} shown
                                         </CardDescription>
                                     </div>
+                                    <Button 
+                                        onClick={handleOpenVehicleDialog}
+                                        className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-poppins"
+                                    >
+                                        <Car className="h-4 w-4 mr-2" />
+                                        Add Vehicle
+                                    </Button>
                                 </div>
 
                                 {/* Filter Bar */}
@@ -1306,6 +1504,12 @@ export default function EnhancedCustomersPage() {
                                     <div className="flex justify-center items-center h-64">
                                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                     </div>
+                                ) : filteredVehicles.length === 0 ? (
+                                    <EnhancedEmptyState 
+                                        type="vehicles"
+                                        onAddNew={handleOpenVehicleDialog}
+                                        onClearFilters={clearVehicleFilters}
+                                    />
                                 ) : (
                                     <DataTableWrapper
                                         title=""
@@ -1317,6 +1521,8 @@ export default function EnhancedCustomersPage() {
                                         renderCell={renderVehicleCell}
                                         searchTerm={vehicleSearch}
                                         onSearchChange={setVehicleSearch}
+                                        enableStripes={true}
+                                        rowClassName="hover:bg-blue-50/50 transition-colors duration-200"
                                     />
                                 )}
                             </CardContent>
@@ -1324,16 +1530,23 @@ export default function EnhancedCustomersPage() {
                     </TabsContent>
 
                     {/* History Tab */}
-                    <TabsContent value="history" className="space-y-6">
+                    <TabsContent value="history" className="space-y-6 animate-in fade-in duration-500">
                         <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
                             <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-green-50/50 border-b border-slate-200/50">
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                     <div>
                                         <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Tire Service History</CardTitle>
                                         <CardDescription className="text-slate-600 font-poppins">
                                             {filteredHistory.length} of {tireHistory.length} service record{filteredHistory.length !== 1 ? 's' : ''} shown
                                         </CardDescription>
                                     </div>
+                                    <Button 
+                                        onClick={handleOpenHistoryDialog}
+                                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-poppins"
+                                    >
+                                        <History className="h-4 w-4 mr-2" />
+                                        Add Record
+                                    </Button>
                                 </div>
 
                                 {/* Filter Bar */}
@@ -1388,6 +1601,12 @@ export default function EnhancedCustomersPage() {
                                     <div className="flex justify-center items-center h-64">
                                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                     </div>
+                                ) : filteredHistory.length === 0 ? (
+                                    <EnhancedEmptyState 
+                                        type="history"
+                                        onAddNew={handleOpenHistoryDialog}
+                                        onClearFilters={clearHistoryFilters}
+                                    />
                                 ) : (
                                 <DataTableWrapper
                                 title=""
@@ -1405,12 +1624,23 @@ export default function EnhancedCustomersPage() {
                                 renderCell={renderHistoryCell}
                                 searchTerm={historySearch}
                                 onSearchChange={setHistorySearch}
+                                enableStripes={true}
+                                rowClassName="hover:bg-green-50/50 transition-colors duration-200"
                                 />
                                 )}
                             </CardContent>
                         </Card>
                     </TabsContent>
                 </EnhancedTabs>
+
+                {/* Success Animation for All Actions */}
+                <SuccessAnimation
+                    isVisible={successAnimation.isVisible}
+                    title={successAnimation.title}
+                    message={successAnimation.message}
+                    actionType={successAnimation.actionType}
+                    onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))}
+                />
 
                 {/* Enhanced Customer Dialog */}
                 <Dialog open={isCustomerDialogOpen} onOpenChange={(isOpen) => {
@@ -1419,7 +1649,7 @@ export default function EnhancedCustomersPage() {
                         resetCustomerForm();
                     }
                 }}>
-                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins">
+                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins animate-in zoom-in duration-300">
                         <DialogHeader>
                             <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
                                 {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
@@ -1474,7 +1704,7 @@ export default function EnhancedCustomersPage() {
                         resetVehicleForm();
                     }
                 }}>
-                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins">
+                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins animate-in zoom-in duration-300">
                         <DialogHeader>
                             <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
                                 {editingVehicle ? 'Edit Vehicle' : 'Add New Vehicle'}
@@ -1581,7 +1811,7 @@ export default function EnhancedCustomersPage() {
                         resetHistoryForm();
                     }
                 }}>
-                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins">
+                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins animate-in zoom-in duration-300">
                         <DialogHeader>
                             <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
                                 {editingHistory ? 'Edit Tire History' : 'Add Tire History'}
@@ -1684,7 +1914,7 @@ export default function EnhancedCustomersPage() {
 
                 {/* Enhanced Delete Confirmation Dialog */}
                 <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                    <AlertDialogContent className="bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins">
+                    <AlertDialogContent className="bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins animate-in zoom-in duration-300">
                         <AlertDialogHeader>
                             <AlertDialogTitle className="text-slate-900 font-poppins">Confirm Deletion</AlertDialogTitle>
                             <AlertDialogDescription className="text-slate-600 font-poppins">
@@ -1748,6 +1978,49 @@ export default function EnhancedCustomersPage() {
                 /* Smooth transitions for all interactive elements */
                 button, input, select, textarea {
                     transition: all 0.3s ease;
+                }
+
+                /* Enhanced table row styling */
+                .table-row-striped:nth-child(even) {
+                    background-color: rgba(241, 245, 249, 0.3);
+                }
+
+                /* Better hover effects */
+                .btn-hover-effect:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+                }
+
+                /* Mobile optimizations */
+                @media (max-width: 640px) {
+                    .mobile-stack {
+                        flex-direction: column !important;
+                        gap: 1rem !important;
+                    }
+                    
+                    .mobile-full {
+                        width: 100% !important;
+                    }
+                    
+                    .mobile-text-center {
+                        text-align: center !important;
+                    }
+                    
+                    .mobile-p-4 {
+                        padding: 1rem !important;
+                    }
+                }
+
+                /* Loading animation */
+                @keyframes shimmer {
+                    0% { background-position: -200% 0; }
+                    100% { background-position: 200% 0; }
+                }
+
+                .animate-shimmer {
+                    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+                    background-size: 200% 100%;
+                    animation: shimmer 1.5s infinite;
                 }
             `}</style>
         </div>
