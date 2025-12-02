@@ -30,7 +30,8 @@ import {
   Loader2, PlusCircle, AlertTriangle, Wrench, Clock, CheckCircle, XCircle, 
   RefreshCw, Search, Filter, X, Edit, Trash2, Car, Bike, Truck, Users, Calendar,
   TrendingUp, DollarSign, Package, ArrowUpDown, Download, ArrowLeft, Eye, Plus, Minus,
-  ChevronDown, ChevronUp, Check, ArrowUp, ArrowDown, ChevronFirst, ChevronLast, ChevronLeft, ChevronRight 
+  ChevronDown, ChevronUp, Check, ArrowUp, ArrowDown, ChevronFirst, ChevronLast, ChevronLeft, ChevronRight,
+  Archive, Save
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -1458,6 +1459,88 @@ const TabbedServiceForm = ({
 };
 
 
+// Success Animation Component
+const ServiceJobSuccessAnimation = ({
+  isVisible,
+  title,
+  message,
+  actionType,
+  onConfirm
+}: {
+  isVisible: boolean;
+  title: string;
+  message: string;
+  actionType?: 'add' | 'edit' | 'delete' | 'export' | 'status';
+  onConfirm: () => void;
+}) => {
+  if (!isVisible) return null;
+
+  const getActionConfig = () => {
+    switch (actionType) {
+      case 'add':
+        return { 
+          gradient: 'from-green-500 to-emerald-600',
+          icon: PlusCircle 
+        };
+      case 'edit':
+        return { 
+          gradient: 'from-blue-500 to-cyan-600',
+          icon: Save 
+        };
+      case 'delete':
+        return { 
+          gradient: 'from-red-500 to-orange-600',
+          icon: Archive 
+        };
+      case 'export':
+        return { 
+          gradient: 'from-purple-500 to-indigo-600',
+          icon: Download 
+        };
+      case 'status':
+        return { 
+          gradient: 'from-amber-500 to-yellow-600',
+          icon: CheckCircle 
+        };
+      default:
+        return { 
+          gradient: 'from-purple-500 to-indigo-600',
+          icon: CheckCircle 
+        };
+    }
+  };
+
+  const { gradient, icon: ActionIcon } = getActionConfig();
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300">
+      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300">
+        <div className={`w-20 h-20 bg-gradient-to-r ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500`}>
+          <ActionIcon className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
+        </div>
+
+        <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins">
+          {title}
+        </h3>
+
+        <p className="text-slate-600 mb-6 font-poppins">
+          {message}
+        </p>
+
+        <div className="flex gap-3 justify-center">
+          <Button
+            className={`bg-gradient-to-r ${gradient} hover:scale-105 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins`}
+            onClick={onConfirm}
+          >
+            <CheckCircle className="h-5 w-5 mr-2" />
+            Confirm
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ExpandableRow = ({ 
   job, 
   isExpanded, 
@@ -1571,6 +1654,11 @@ const ExpandableRow = ({
             onStatusUpdate={onStatusUpdate}
           />
         </div>
+  <StatusPopover 
+    job={job}
+    onStatusUpdate={onStatusUpdate}
+  />
+</div>
       </div>
 
       {/* Expanded Content */}
@@ -1790,10 +1878,22 @@ export default function EnhancedServiceManagementPage() {
     const [customerVehicles, setCustomerVehicles] = useState<Vehicle[]>([]);
 
     const [isLoading, setIsLoading] = useState(true);
-    const [isDataLoading, setIsDataLoading] = useState(true);
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+    // Add success animation state
+    const [successAnimation, setSuccessAnimation] = useState<{
+      isVisible: boolean;
+      title: string;
+      message: string;
+      actionType: 'add' | 'edit' | 'delete' | 'export' | 'status';
+    }>({
+      isVisible: false,
+      title: '',
+      message: '',
+      actionType: 'add'
+    });
 
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -1929,7 +2029,6 @@ export default function EnhancedServiceManagementPage() {
 
     const fetchCustomers = useCallback(async () => {
         if (!supabase) return;
-        setIsDataLoading(true);
         
         try {
             const { data, error } = await supabase
@@ -1950,8 +2049,6 @@ export default function EnhancedServiceManagementPage() {
                 variant: 'destructive'
             });
         }
-        
-        setIsDataLoading(false);
     }, [toast]);
 
     const fetchVehicleTypes = useCallback(async () => {
@@ -2230,9 +2327,12 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
         link.click();
         document.body.removeChild(link);
 
-        toast({
-            title: "Export Successful",
-            description: `${filteredJobs.length} service jobs exported to service_jobs_export.csv`,
+        // Show success animation for export
+        setSuccessAnimation({
+          isVisible: true,
+          title: "Export Successful!",
+          message: `${filteredJobs.length} service jobs exported to CSV file.`,
+          actionType: 'export'
         });
     };
 
@@ -2481,7 +2581,14 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
             if (error) {
                 toast({ title: 'Delete Error', description: error.message, variant: 'destructive' });
             } else {
-                toast({ title: 'Success', description: 'Service job deleted successfully.' });
+                // Show success animation for deletion
+                setSuccessAnimation({
+                  isVisible: true,
+                  title: "Service Job Deleted!",
+                  message: "The service job has been removed from the system.",
+                  actionType: 'delete'
+                });
+                
                 setIsDeleteConfirmationOpen(false);
                 fetchJobs();
             }
@@ -2713,7 +2820,7 @@ USING (true);`}
                 <div 
                     className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
                     style={{ 
-                        backgroundImage: "url('/images/image2.jpg')",
+                        backgroundImage: "url('/images/image3.png')",
                         backgroundSize: "cover",
                         backgroundPosition: "center 30%"
                     }}
@@ -2778,6 +2885,15 @@ USING (true);`}
                     onAddJob={handleOpenAddDialog} 
                     onExportData={handleExportData}
                     onViewCalendar={() => setIsCalendarOpen(true)}
+                />
+
+                {/* Success Animation */}
+                <ServiceJobSuccessAnimation
+                  isVisible={successAnimation.isVisible}
+                  title={successAnimation.title}
+                  message={successAnimation.message}
+                  actionType={successAnimation.actionType}
+                  onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))}
                 />
 
                 {/* Main Table Card */}
