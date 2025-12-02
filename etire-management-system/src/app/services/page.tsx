@@ -31,7 +31,7 @@ import {
   RefreshCw, Search, Filter, X, Edit, Trash2, Car, Bike, Truck, Users, Calendar,
   TrendingUp, DollarSign, Package, ArrowUpDown, Download, ArrowLeft, Eye, Plus, Minus,
   ChevronDown, ChevronUp, Check, ArrowUp, ArrowDown, ChevronFirst, ChevronLast, ChevronLeft, ChevronRight,
-  Archive, Save
+  CheckSquare, Save, Archive, Eye as EyeIcon
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -55,6 +55,178 @@ const microAnimations = {
   fadeIn: "animate-in fade-in duration-500",
   iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
 };
+
+// ============================================
+// SUCCESS ANIMATION COMPONENT FOR SERVICE MANAGEMENT
+// ============================================
+const ServiceSuccessAnimation = ({
+  isVisible,
+  title,
+  message,
+  actionType,
+  jobDetails,
+  onConfirm
+}: {
+  isVisible: boolean;
+  title: string;
+  message: string;
+  actionType: 'add' | 'edit' | 'delete' | 'status_change' | 'export' | 'refresh';
+  jobDetails?: {
+    jobId?: string;
+    description?: string;
+    customer?: string;
+    status?: string;
+    total?: number;
+    oldStatus?: string;
+    newStatus?: string;
+  };
+  onConfirm: () => void;
+}) => {
+  if (!isVisible) return null;
+
+  // Different icons and colors based on action type
+  const getActionConfig = () => {
+    switch (actionType) {
+      case 'add':
+        return { 
+          gradient: 'from-green-500 to-emerald-600',
+          icon: PlusCircle,
+          bg: 'bg-green-50 border-green-200'
+        };
+      case 'edit':
+        return { 
+          gradient: 'from-blue-500 to-cyan-600',
+          icon: Save,
+          bg: 'bg-blue-50 border-blue-200'
+        };
+      case 'delete':
+        return { 
+          gradient: 'from-red-500 to-orange-600',
+          icon: Trash2,
+          bg: 'bg-red-50 border-red-200'
+        };
+      case 'status_change':
+        return { 
+          gradient: 'from-purple-500 to-indigo-600',
+          icon: CheckSquare,
+          bg: 'bg-purple-50 border-purple-200'
+        };
+      case 'export':
+        return { 
+          gradient: 'from-amber-500 to-yellow-600',
+          icon: Download,
+          bg: 'bg-amber-50 border-amber-200'
+        };
+      case 'refresh':
+        return { 
+          gradient: 'from-teal-500 to-green-600',
+          icon: RefreshCw,
+          bg: 'bg-teal-50 border-teal-200'
+        };
+      default:
+        return { 
+          gradient: 'from-purple-500 to-indigo-600',
+          icon: CheckCircle,
+          bg: 'bg-indigo-50 border-indigo-200'
+        };
+    }
+  };
+
+  const { gradient, icon: ActionIcon, bg } = getActionConfig();
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[999] animate-in fade-in duration-300">
+      <div className={`rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300 ${bg} border shadow-2xl`}>
+        {/* Success Icon with Animation */}
+        <div className={`w-20 h-20 bg-gradient-to-r ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500`}>
+          <ActionIcon className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
+        </div>
+
+        {/* Success Title */}
+        <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins">
+          {title}
+        </h3>
+
+        {/* Success Message */}
+        <p className="text-slate-600 mb-6 font-poppins">
+          {message}
+        </p>
+
+        {/* Job Details (if provided) */}
+        {jobDetails && (
+          <div className="mb-6 p-4 bg-white/50 rounded-lg border border-slate-200">
+            {jobDetails.description && (
+              <div className="text-left mb-2">
+                <span className="text-sm font-medium text-slate-700">Service: </span>
+                <span className="text-sm font-semibold text-slate-900">{jobDetails.description}</span>
+              </div>
+            )}
+            {jobDetails.customer && (
+              <div className="text-left mb-2">
+                <span className="text-sm font-medium text-slate-700">Customer: </span>
+                <span className="text-sm font-semibold text-slate-900">{jobDetails.customer}</span>
+              </div>
+            )}
+            {jobDetails.status && (
+              <div className="text-left mb-2">
+                <span className="text-sm font-medium text-slate-700">Status: </span>
+                <Badge className={`ml-2 ${
+                  jobDetails.status === 'completed' ? 'bg-green-100 text-green-700' :
+                  jobDetails.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
+                  jobDetails.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-red-100 text-red-700'
+                }`}>
+                  {jobDetails.status}
+                </Badge>
+              </div>
+            )}
+            {jobDetails.total && (
+              <div className="text-left">
+                <span className="text-sm font-medium text-slate-700">Total: </span>
+                <span className="text-sm font-semibold text-green-600">₱{jobDetails.total.toFixed(2)}</span>
+              </div>
+            )}
+            {jobDetails.oldStatus && jobDetails.newStatus && (
+              <div className="text-left">
+                <span className="text-sm font-medium text-slate-700">Status Change: </span>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge className="bg-slate-100 text-slate-700">{jobDetails.oldStatus}</Badge>
+                  <ArrowRight className="h-4 w-4 text-slate-400" />
+                  <Badge className={`${
+                    jobDetails.newStatus === 'completed' ? 'bg-green-100 text-green-700' :
+                    jobDetails.newStatus === 'in-progress' ? 'bg-blue-100 text-blue-700' :
+                    jobDetails.newStatus === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
+                    {jobDetails.newStatus}
+                  </Badge>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Confirm Button */}
+        <div className="flex gap-3 justify-center">
+          <Button
+            className={`bg-gradient-to-r ${gradient} hover:scale-105 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins`}
+            onClick={onConfirm}
+          >
+            <CheckCircle className="h-5 w-5 mr-2" />
+            Continue
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Helper ArrowRight icon component
+const ArrowRight = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+  </svg>
+);
 
 // Vehicle Type Icons
 const VehicleIcons = {
@@ -107,7 +279,7 @@ const COMMON_SERVICES = [
   "Other (Please specify below)"
 ];
 
-// ✅ UPDATE: ServiceJob interface - add mileage
+// ServiceJob interface
 interface ServiceJob {
     job_id: string;
     user_id: string;
@@ -119,7 +291,7 @@ interface ServiceJob {
     service_fee: number;
     remarks: string | null;
     vehicle_type_id: string | null;
-    mileage?: number | null; // ✅ ADD THIS LINE
+    mileage?: number | null;
     
     user?: { 
         user_id: string;
@@ -147,7 +319,7 @@ interface ServiceJob {
     is_recent?: boolean;
 }
 
-// ✅ ADD: Service Job Item interface
+// Service Job Item interface
 interface ServiceJobItem {
   service_job_item_id?: string;
   job_id?: string;
@@ -156,6 +328,7 @@ interface ServiceJobItem {
   name?: string;
   category?: string;
 }
+
 interface Vehicle {
   vehicle_id: string;
   plate_number: string;
@@ -165,17 +338,16 @@ interface Vehicle {
   vehicle_type_id?: string;
 }
 
-// ✅ ADD: Inventory Item interface
-// ✅ UPDATE: Match your actual database columns
+// Inventory Item interface
 interface InventoryItem {
   item_id: string;
   name: string;
   category: 'tire' | 'tool' | 'accessory';
   vehicle_type_id: string | null;
-  vehicle_type?: string | null; // Added field from your DB
-  stock_quantity: number; // Changed from 'quantity'
-  cost_price: number; // Changed from 'unit_cost'
-  sale_price: number; // Changed from 'selling_price'
+  vehicle_type?: string | null;
+  stock_quantity: number;
+  cost_price: number;
+  sale_price: number;
   reorder_level: number;
   supplier_id?: string | null;
   branch_id: string;
@@ -185,20 +357,19 @@ interface InventoryItem {
   updated_at?: string;
 }
 
-// ✅ UPDATED: Customer interface with service stats
+// Customer interface with service stats
 interface Customer {
     customer_id: string;
     name: string;
     phone?: string;
     email?: string;
-    // ✅ ADD: Calculated fields
-    service_count?: number;      // Total services
-    last_service_date?: string;  // Most recent service
+    service_count?: number;
+    last_service_date?: string;
 }
 
 const ANONYMOUS_CUSTOMER_ID = "anonymous_customer";
 
-// Custom Date Input Component with better styling
+// Custom Date Input Component
 const CustomDateInput = ({ value, onChange, id, className = "" }: { value: string; onChange: (value: string) => void; id: string; className?: string }) => {
   return (
     <div className="relative">
@@ -235,12 +406,10 @@ const SearchInput = ({
   const handleChange = (newValue: string) => {
     setLocalValue(newValue);
     
-    // Clear previous timeout
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
     
-    // Set new timeout for debounced update
     timeoutRef.current = setTimeout(() => {
       onChange(newValue);
     }, 150);
@@ -379,8 +548,6 @@ const StatusPopover = ({
 };
 
 // Quick Filter Chips Component
-// ...existing code...
-
 const QuickFilterChips = ({ 
   serviceJobs, 
   activeFilters, 
@@ -391,7 +558,6 @@ const QuickFilterChips = ({
   onFilterChange: (filters: { today: boolean; pending: boolean; inProgress: boolean; last7Days: boolean }) => void;
 }) => {
   const counts = useMemo(() => {
-    // ✅ FIX: Create local date boundaries
     const now = new Date();
     const todayLocal = new Date(
       now.getFullYear(),
@@ -511,22 +677,18 @@ const QuickFilterChips = ({
   );
 };
 
-// ...existing code...
-
-// Stats Overview Component - Updated with proper number formatting
+// Stats Overview Component
 const ServiceStats = ({ serviceJobs }: { serviceJobs: ServiceJob[] }) => {
   const totalJobs = serviceJobs.length;
   const pendingJobs = serviceJobs.filter(job => job.status === 'pending').length;
   const inProgressJobs = serviceJobs.filter(job => job.status === 'in-progress').length;
   const completedJobs = serviceJobs.filter(job => job.status === 'completed').length;
-  // ✅ UPDATED: Only count revenue from completed jobs
   const totalRevenue = serviceJobs
     .filter(job => job.status === 'completed')
     .reduce((acc, job) => acc + job.service_fee, 0);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-      {/* Total Jobs - Purple to Indigo (same as Active Suppliers) */}
       <div className={`bg-gradient-to-br from-purple-500 via-purple-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
         <div className="flex items-center justify-between">
           <div>
@@ -543,7 +705,6 @@ const ServiceStats = ({ serviceJobs }: { serviceJobs: ServiceJob[] }) => {
         </div>
       </div>
 
-      {/* Pending Jobs - Blue to Sky Blue (same as Pending POs) */}
       <div className={`bg-gradient-to-br from-blue-500 via-blue-600 to-sky-700 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
         <div className="flex items-center justify-between">
           <div>
@@ -560,7 +721,6 @@ const ServiceStats = ({ serviceJobs }: { serviceJobs: ServiceJob[] }) => {
         </div>
       </div>
 
-      {/* In Progress - Teal to Green (same as Delivered This Month) */}
       <div className={`bg-gradient-to-br from-teal-400 via-cyan-500 to-green-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
         <div className="flex items-center justify-between">
           <div>
@@ -577,7 +737,6 @@ const ServiceStats = ({ serviceJobs }: { serviceJobs: ServiceJob[] }) => {
         </div>
       </div>
 
-      {/* Total Revenue - Purple to Cyan (same as Total PO Value) */}
       <div className={`bg-gradient-to-br from-purple-500 via-blue-500 to-cyan-500 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 ${microAnimations.cardHover}`}>
         <div className="flex items-center justify-between">
           <div>
@@ -597,8 +756,12 @@ const ServiceStats = ({ serviceJobs }: { serviceJobs: ServiceJob[] }) => {
   );
 };
 
-// Quick Actions Component with functional buttons
-const QuickActions = ({ onAddJob, onExportData, onViewCalendar }: { 
+// Quick Actions Component
+const QuickActions = ({ 
+  onAddJob, 
+  onExportData, 
+  onViewCalendar 
+}: { 
   onAddJob: () => void, 
   onExportData: () => void,
   onViewCalendar: () => void 
@@ -652,7 +815,11 @@ const QuickActions = ({ onAddJob, onExportData, onViewCalendar }: {
 };
 
 // Calendar View Component
-const CalendarView = ({ serviceJobs, isOpen, onClose }: { 
+const CalendarView = ({ 
+  serviceJobs, 
+  isOpen, 
+  onClose 
+}: { 
   serviceJobs: ServiceJob[], 
   isOpen: boolean, 
   onClose: () => void 
@@ -710,7 +877,6 @@ const CalendarView = ({ serviceJobs, isOpen, onClose }: {
               <div key={day} className="font-semibold text-slate-600 py-2">{day}</div>
             ))}
             
-            {/* Calendar days would go here - simplified for this example */}
             <div className="col-span-7 p-4 bg-slate-50 rounded-lg text-slate-500 text-center">
               Calendar grid implementation would go here
             </div>
@@ -883,7 +1049,7 @@ const TabbedServiceForm = ({
 }) => {
   const [activeTab, setActiveTab] = useState('basic');
   const { customers, vehicleTypes, inventoryItems, customerVehicles } = formData;
-  // Calculate totals
+  
   const calculateItemsTotal = useMemo(() => {
     return formData.selectedItems.reduce((total: number, item: any) => {
       const inventoryItem = inventoryItems.find((i: any) => i.item_id === item.item_id);
@@ -995,7 +1161,7 @@ const TabbedServiceForm = ({
                 <Label htmlFor="customer" className="text-slate-700 font-medium font-poppins">Customer</Label>
                 <Select 
                   value={formData.customerId} 
-                  onValueChange={(value) => onFormDataChange({ ...formData, customerId: value, vehicleId: '' })} // reset vehicleId
+                  onValueChange={(value) => onFormDataChange({ ...formData, customerId: value, vehicleId: '' })}
                   disabled={isFieldsLocked}
                 >
                   <SelectTrigger className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins ${isFieldsLocked ? 'bg-slate-100 cursor-not-allowed' : 'bg-white/80'}`}>
@@ -1012,7 +1178,6 @@ const TabbedServiceForm = ({
                 </Select>
               </div>              
               
-              {/* ✅ UPDATE: Vehicle Selection Field - Auto-set vehicle type */}
               {formData.customerId && formData.customerId !== ANONYMOUS_CUSTOMER_ID && (
                 <div className="space-y-2">
                   <Label htmlFor="vehicle" className="text-slate-700 font-medium font-poppins">
@@ -1022,12 +1187,11 @@ const TabbedServiceForm = ({
                     <Select 
                       value={formData.vehicleId} 
                       onValueChange={(value) => {
-                        // ✅ UPDATE: Find selected vehicle and auto-set vehicle type
                         const selectedVehicle = customerVehicles.find((v: Vehicle) => v.vehicle_id === value);
                         onFormDataChange({ 
                           ...formData, 
                           vehicleId: value,
-                          vehicleTypeId: selectedVehicle?.vehicle_type_id || formData.vehicleTypeId // Auto-set vehicle type
+                          vehicleTypeId: selectedVehicle?.vehicle_type_id || formData.vehicleTypeId
                         });
                       }}
                       disabled={isFieldsLocked}
@@ -1141,7 +1305,6 @@ const TabbedServiceForm = ({
           {/* Items Tab */}
           <TabsContent value="items" className="space-y-4">
                 <div className="space-y-4">
-                {/* ✅ ADD: Mileage Field */}
                 <div className="space-y-2">
                   <Label htmlFor="mileage" className="text-slate-700 font-medium font-poppins">
                     Vehicle Mileage (km)
@@ -1188,7 +1351,6 @@ const TabbedServiceForm = ({
 
               {formData.selectedItems.length > 0 && (
                 <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {/* Column Headers */}
                   <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-slate-100 rounded-lg">
                     <div className="col-span-5 text-xs font-semibold text-slate-600 font-poppins">Item Name</div>
                     <div className="col-span-2 text-xs font-semibold text-slate-600 font-poppins">Type</div>
@@ -1203,7 +1365,6 @@ const TabbedServiceForm = ({
                     
                     return (
                       <div key={index} className="grid grid-cols-12 gap-2 items-center p-3 bg-slate-50 rounded-lg border border-slate-200 hover:bg-white transition-colors">
-                        {/* Item Name */}
                         <div className="col-span-5 space-y-1">
                           <Select 
                             value={item.item_id} 
@@ -1233,21 +1394,18 @@ const TabbedServiceForm = ({
                           </Select>
                         </div>
 
-                        {/* Type */}
                         <div className="col-span-2">
                           <div className="h-9 px-3 flex items-center text-sm bg-slate-100 text-slate-600 rounded font-poppins border border-slate-200">
                             {item.category ? item.category.charAt(0).toUpperCase() + item.category.slice(1) : '—'}
                           </div>
                         </div>
 
-                        {/* Price */}
                         <div className="col-span-2">
                           <div className="h-9 px-3 flex items-center text-sm bg-green-50 text-green-700 rounded font-poppins border border-green-200 font-semibold">
                             ₱{inventoryItem?.sale_price.toFixed(2) || '0.00'}
                           </div>
                         </div>
 
-                        {/* Quantity */}
                         <div className="col-span-2">
                           <div className="flex items-center gap-1">
                             <Button
@@ -1296,7 +1454,6 @@ const TabbedServiceForm = ({
                           </div>
                         </div>
 
-                        {/* Remove button */}
                         <div className="col-span-1 flex justify-end">
                           <Button
                             type="button"
@@ -1316,7 +1473,6 @@ const TabbedServiceForm = ({
                     );
                   })}
 
-                  {/* Items Total Summary */}
                   {formData.selectedItems.length > 0 && calculateItemsTotal > 0 && (
                     <div className="p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
                       <div className="flex justify-between items-center">
@@ -1458,89 +1614,6 @@ const TabbedServiceForm = ({
   );
 };
 
-
-// Success Animation Component
-const ServiceJobSuccessAnimation = ({
-  isVisible,
-  title,
-  message,
-  actionType,
-  onConfirm
-}: {
-  isVisible: boolean;
-  title: string;
-  message: string;
-  actionType?: 'add' | 'edit' | 'delete' | 'export' | 'status';
-  onConfirm: () => void;
-}) => {
-  if (!isVisible) return null;
-
-  const getActionConfig = () => {
-    switch (actionType) {
-      case 'add':
-        return { 
-          gradient: 'from-green-500 to-emerald-600',
-          icon: PlusCircle 
-        };
-      case 'edit':
-        return { 
-          gradient: 'from-blue-500 to-cyan-600',
-          icon: Save 
-        };
-      case 'delete':
-        return { 
-          gradient: 'from-red-500 to-orange-600',
-          icon: Archive 
-        };
-      case 'export':
-        return { 
-          gradient: 'from-purple-500 to-indigo-600',
-          icon: Download 
-        };
-      case 'status':
-        return { 
-          gradient: 'from-amber-500 to-yellow-600',
-          icon: CheckCircle 
-        };
-      default:
-        return { 
-          gradient: 'from-purple-500 to-indigo-600',
-          icon: CheckCircle 
-        };
-    }
-  };
-
-  const { gradient, icon: ActionIcon } = getActionConfig();
-
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300">
-      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300">
-        <div className={`w-20 h-20 bg-gradient-to-r ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500`}>
-          <ActionIcon className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
-        </div>
-
-        <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins">
-          {title}
-        </h3>
-
-        <p className="text-slate-600 mb-6 font-poppins">
-          {message}
-        </p>
-
-        <div className="flex gap-3 justify-center">
-          <Button
-            className={`bg-gradient-to-r ${gradient} hover:scale-105 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins`}
-            onClick={onConfirm}
-          >
-            <CheckCircle className="h-5 w-5 mr-2" />
-            Confirm
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const ExpandableRow = ({ 
   job, 
   isExpanded, 
@@ -1558,16 +1631,12 @@ const ExpandableRow = ({
   onDelete: (job: ServiceJob) => void;
   onStatusUpdate: (jobId: string, status: ServiceJob['status']) => Promise<void>;
 }) => {
-  // ✅ FIX: Calculate items total
   const itemsTotal = job.items ? job.items.reduce((total, item) => {
     const inventoryItem = inventoryItems.find(i => i.item_id === item.item_id);
     return total + (inventoryItem ? inventoryItem.sale_price * item.quantity : 0);
   }, 0) : 0;
   
-  // ✅ FIX: service_fee is ALREADY labor-only, don't subtract
   const serviceFeeOnly = job.service_fee;
-  
-  // ✅ FIX: Calculate grand total
   const grandTotal = serviceFeeOnly + itemsTotal;
 
   return (
@@ -1627,7 +1696,7 @@ const ExpandableRow = ({
           </div>
         </div>
 
-        {/* ✅ FIX: Date & Fee - Show grand total with breakdown */}
+        {/* Date & Fee */}
         <div className="col-span-2 space-y-1">
           <p className="text-sm text-slate-700 font-poppins">
             {new Date(job.job_date).toLocaleDateString()}
@@ -1654,11 +1723,6 @@ const ExpandableRow = ({
             onStatusUpdate={onStatusUpdate}
           />
         </div>
-  <StatusPopover 
-    job={job}
-    onStatusUpdate={onStatusUpdate}
-  />
-</div>
       </div>
 
       {/* Expanded Content */}
@@ -1684,7 +1748,6 @@ const ExpandableRow = ({
                   </div>
                 )}
 
-                {/* ✅ ADD: Vehicle Plate Number */}
                 {job.vehicle?.plate_number && (
                   <div className="flex justify-between">
                     <span className="text-sm text-slate-600 font-poppins">Vehicle Plate:</span>
@@ -1719,7 +1782,7 @@ const ExpandableRow = ({
               )}
             </div>
 
-            {/* ✅ FIX: Right Column - Pricing & Items */}
+            {/* Right Column - Pricing & Items */}
             <div className="space-y-3">
               <h4 className="font-semibold text-slate-800 font-poppins">Pricing Breakdown</h4>
               
@@ -1811,7 +1874,6 @@ const ExpandableRow = ({
   );
 };
 
-
 // Helper function to get vehicle icon
 const VehicleIcon = ({ vehicleType }: { vehicleType?: string | null }) => {
   const Icon = getVehicleIcon(vehicleType || 'car');
@@ -1826,7 +1888,6 @@ const getRelativeTime = (dateString: string) => {
     return 'Invalid date';
   }
   
-  // ✅ FIX: Compare using local dates
   const jobLocalDate = new Date(
     date.getFullYear(),
     date.getMonth(),
@@ -1843,7 +1904,6 @@ const getRelativeTime = (dateString: string) => {
   const diffTime = todayLocal.getTime() - jobLocalDate.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   
-  // ✅ NEW: More granular time ranges
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Yesterday';
   if (diffDays === 2) return '2 days ago';
@@ -1852,21 +1912,19 @@ const getRelativeTime = (dateString: string) => {
   if (diffDays === 5) return '5 days ago';
   if (diffDays === 6) return '6 days ago';
   if (diffDays === 7) return '1 week ago';
-  if (diffDays < 14) return '1 week ago'; // 8-13 days
-  if (diffDays < 21) return '2 weeks ago'; // 14-20 days
-  if (diffDays < 28) return '3 weeks ago'; // 21-27 days
-  if (diffDays < 60) return '1 month ago'; // 28-59 days
-  if (diffDays < 90) return '2 months ago'; // 60-89 days
-  if (diffDays < 120) return '3 months ago'; // 90-119 days
-  if (diffDays < 180) return '4-5 months ago'; // 120-179 days
-  if (diffDays < 365) return '6+ months ago'; // 180-364 days
+  if (diffDays < 14) return '1 week ago';
+  if (diffDays < 21) return '2 weeks ago';
+  if (diffDays < 28) return '3 weeks ago';
+  if (diffDays < 60) return '1 month ago';
+  if (diffDays < 90) return '2 months ago';
+  if (diffDays < 120) return '3 months ago';
+  if (diffDays < 180) return '4-5 months ago';
+  if (diffDays < 365) return '6+ months ago';
   
   const years = Math.floor(diffDays / 365);
   if (years === 1) return '1 year ago';
   return `${years} years ago`;
 };
-
-// ...existing code...
 
 export default function EnhancedServiceManagementPage() {
     const { toast } = useToast();
@@ -1878,22 +1936,10 @@ export default function EnhancedServiceManagementPage() {
     const [customerVehicles, setCustomerVehicles] = useState<Vehicle[]>([]);
 
     const [isLoading, setIsLoading] = useState(true);
+    const [isDataLoading, setIsDataLoading] = useState(true);
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [mounted, setMounted] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
-    // Add success animation state
-    const [successAnimation, setSuccessAnimation] = useState<{
-      isVisible: boolean;
-      title: string;
-      message: string;
-      actionType: 'add' | 'edit' | 'delete' | 'export' | 'status';
-    }>({
-      isVisible: false,
-      title: '',
-      message: '',
-      actionType: 'add'
-    });
 
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -1919,9 +1965,30 @@ export default function EnhancedServiceManagementPage() {
 
     const [selectedVehicleId, setSelectedVehicleId] = useState('');
 
-
     // Expanded rows state
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+    // ✅ ADD: Success Animation State
+    const [successAnimation, setSuccessAnimation] = useState<{
+      isVisible: boolean;
+      title: string;
+      message: string;
+      actionType: 'add' | 'edit' | 'delete' | 'status_change' | 'export' | 'refresh';
+      jobDetails?: {
+        jobId?: string;
+        description?: string;
+        customer?: string;
+        status?: string;
+        total?: number;
+        oldStatus?: string;
+        newStatus?: string;
+      };
+    }>({
+      isVisible: false,
+      title: '',
+      message: '',
+      actionType: 'add'
+    });
 
     // Form state for tabbed form
     const [formData, setFormData] = useState({
@@ -1934,7 +2001,7 @@ export default function EnhancedServiceManagementPage() {
       jobStatus: 'pending' as 'pending' | 'in-progress' | 'completed' | 'cancelled',
       serviceFee: '0',
       vehicleTypeId: '',
-      mileage: '', // ✅ ADD THIS LINE
+      mileage: '',
       selectedItems: [] as ServiceJobItem[],
       originalStatus: null as ServiceJob['status'] | null
     });
@@ -1943,7 +2010,7 @@ export default function EnhancedServiceManagementPage() {
         setMounted(true);
     }, []);
 
-    // ✅ UPDATE: Fetch customer vehicles with vehicle_type_id
+    // Fetch customer vehicles
     useEffect(() => {
       const fetchCustomerVehicles = async () => {
         if (!supabase || !formData.customerId || formData.customerId === ANONYMOUS_CUSTOMER_ID) {
@@ -1954,7 +2021,7 @@ export default function EnhancedServiceManagementPage() {
 
         const { data, error } = await supabase
           .from('vehicle')
-          .select('vehicle_id, plate_number, make, model, customer_id, vehicle_type_id') // ✅ ADD vehicle_type_id
+          .select('vehicle_id, plate_number, make, model, customer_id, vehicle_type_id')
           .eq('customer_id', formData.customerId)
           .order('plate_number');
 
@@ -2025,10 +2092,9 @@ export default function EnhancedServiceManagementPage() {
         setLastUpdated(new Date());
     }, [toast, supabase]);
     
-    // ...existing code...
-
     const fetchCustomers = useCallback(async () => {
         if (!supabase) return;
+        setIsDataLoading(true);
         
         try {
             const { data, error } = await supabase
@@ -2049,6 +2115,8 @@ export default function EnhancedServiceManagementPage() {
                 variant: 'destructive'
             });
         }
+        
+        setIsDataLoading(false);
     }, [toast]);
 
     const fetchVehicleTypes = useCallback(async () => {
@@ -2137,73 +2205,65 @@ export default function EnhancedServiceManagementPage() {
     }
 
     // Filter jobs with quick filters
-// ...existing code...
+    const filteredJobs = useMemo(() => {
+      let filtered = serviceJobs.filter(job => {
+        const matchesSearch =
+          job.job_description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (job.remarks || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (job.customer?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-// ...existing code...
+        const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
+        const matchesVehicleType = vehicleTypeFilter === 'all' || job.vehicle_type_id === vehicleTypeFilter;
 
-const filteredJobs = useMemo(() => {
-  let filtered = serviceJobs.filter(job => {
-    const matchesSearch =
-      job.job_description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (job.remarks || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (job.customer?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+        const jobDate = new Date(job.job_date);
+        
+        if (isNaN(jobDate.getTime())) {
+          console.warn(`Invalid date for job ${job.job_id}:`, job.job_date);
+          return false;
+        }
+        
+        const jobLocalDate = new Date(
+          jobDate.getFullYear(),
+          jobDate.getMonth(),
+          jobDate.getDate()
+        );
+        
+        const today = new Date();
+        const todayLocal = new Date(
+          today.getFullYear(),
+          today.getMonth(),
+          today.getDate()
+        );
+        
+        const yesterdayLocal = new Date(todayLocal);
+        yesterdayLocal.setDate(yesterdayLocal.getDate() - 1);
+        
+        const last7DaysStart = new Date(todayLocal);
+        last7DaysStart.setDate(last7DaysStart.getDate() - 7);
 
-    const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
-    const matchesVehicleType = vehicleTypeFilter === 'all' || job.vehicle_type_id === vehicleTypeFilter;
+        const matchesToday = !quickFilters.today || 
+          jobLocalDate.getTime() === todayLocal.getTime();
+        
+        const matchesPending = !quickFilters.pending || job.status === 'pending';
+        const matchesInProgress = !quickFilters.inProgress || job.status === 'in-progress';
+        
+        const matchesLast7Days = !quickFilters.last7Days || 
+          jobLocalDate >= last7DaysStart;
 
-    // ✅ FIX: Parse UTC date and convert to local date-only comparison
-    const jobDate = new Date(job.job_date);
-    
-    // Validate date
-    if (isNaN(jobDate.getTime())) {
-      console.warn(`Invalid date for job ${job.job_id}:`, job.job_date);
-      return false;
-    }
-    
-    // ✅ CRITICAL: Get date in LOCAL timezone (not UTC)
-    const jobLocalDate = new Date(
-      jobDate.getFullYear(),
-      jobDate.getMonth(),
-      jobDate.getDate()
-    );
-    
-    const today = new Date();
-    const todayLocal = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate()
-    );
-    
-    const yesterdayLocal = new Date(todayLocal);
-    yesterdayLocal.setDate(yesterdayLocal.getDate() - 1);
-    
-    const last7DaysStart = new Date(todayLocal);
-    last7DaysStart.setDate(last7DaysStart.getDate() - 7);
+        return matchesSearch && matchesStatus && matchesVehicleType && 
+               matchesToday && matchesPending && matchesInProgress && matchesLast7Days;
+      });
 
-    // ✅ FIX: Compare dates using getTime() for accurate comparison
-    const matchesToday = !quickFilters.today || 
-      jobLocalDate.getTime() === todayLocal.getTime();
-    
-    const matchesPending = !quickFilters.pending || job.status === 'pending';
-    const matchesInProgress = !quickFilters.inProgress || job.status === 'in-progress';
-    
-    const matchesLast7Days = !quickFilters.last7Days || 
-      jobLocalDate >= last7DaysStart;
+      return filtered;
+    }, [serviceJobs, searchTerm, statusFilter, vehicleTypeFilter, quickFilters]);
 
-    return matchesSearch && matchesStatus && matchesVehicleType && 
-           matchesToday && matchesPending && matchesInProgress && matchesLast7Days;
-  });
+    // Paginated jobs
+    const paginatedJobs = useMemo(() => {
+      const startIndex = (currentPage - 1) * rowsPerPage;
+      return filteredJobs.slice(startIndex, startIndex + rowsPerPage);
+    }, [filteredJobs, currentPage, rowsPerPage]);
 
-  return filtered;
-}, [serviceJobs, searchTerm, statusFilter, vehicleTypeFilter, quickFilters]);
-
-// Paginated jobs
-const paginatedJobs = useMemo(() => {
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  return filteredJobs.slice(startIndex, startIndex + rowsPerPage);
-}, [filteredJobs, currentPage, rowsPerPage]);
-
-const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
+    const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
 
     const clearFilters = () => {
         setSearchTerm('');
@@ -2228,7 +2288,7 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
           jobStatus: 'pending',
           serviceFee: '0',
           vehicleTypeId: '',
-          mileage: '', // ✅ ADD THIS LINE
+          mileage: '',
           selectedItems: [],
           originalStatus: null
         });
@@ -2282,7 +2342,7 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
           jobStatus: job.status,
           serviceFee: serviceFeeValue,
           vehicleTypeId: job.vehicle_type_id || '',
-          mileage: job.mileage ? String(job.mileage) : '', // ✅ ADD THIS LINE
+          mileage: job.mileage ? String(job.mileage) : '',
           selectedItems: job.items || [],
           originalStatus: job.status
         });
@@ -2295,13 +2355,30 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
         setIsDeleteConfirmationOpen(true);
     };
 
+    // ✅ UPDATE: Enhanced Refresh with Success Animation
     const handleRefresh = () => {
-        fetchJobs();
-        fetchCustomers();
-        fetchVehicleTypes();
+        setIsLoading(true);
+        Promise.all([
+            fetchJobs(),
+            fetchCustomers(),
+            fetchVehicleTypes(),
+            fetchInventoryItems()
+        ]).then(() => {
+            // Show success animation for refresh
+            setSuccessAnimation({
+                isVisible: true,
+                title: "Data Refreshed!",
+                message: "Service data has been successfully refreshed with latest information.",
+                actionType: 'refresh'
+            });
+        }).catch(() => {
+            // Error handling is done in individual fetch functions
+        }).finally(() => {
+            setIsLoading(false);
+        });
     };
 
-    // Export Data Functionality
+    // ✅ UPDATE: Enhanced Export with Success Animation
     const handleExportData = () => {
         if (filteredJobs.length === 0) {
             toast({
@@ -2329,10 +2406,10 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
 
         // Show success animation for export
         setSuccessAnimation({
-          isVisible: true,
-          title: "Export Successful!",
-          message: `${filteredJobs.length} service jobs exported to CSV file.`,
-          actionType: 'export'
+            isVisible: true,
+            title: "Export Successful!",
+            message: `Exported ${filteredJobs.length} service jobs to CSV file.`,
+            actionType: 'export'
         });
     };
 
@@ -2371,7 +2448,7 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
         return fee + calculateItemsTotal;
     }, [formData.serviceFee, calculateItemsTotal]);
 
-// ...existing code...
+    // ✅ UPDATE: Enhanced Submit with Success Animation
     const handleSubmit = async () => {
       if (!supabase || !authUser) return;
 
@@ -2404,7 +2481,7 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
       const wasNotCompleted = editingJob ? formData.originalStatus !== 'completed' : true;
       const shouldCreateSale = isNowCompleted && wasNotCompleted;
 
-      // Client-side stock validation before completing
+      // Client-side stock validation
       if (shouldCreateSale && validItems.length > 0) {
         for (const item of validItems) {
           const inventoryItem = inventoryItems.find((i) => i.item_id === item.item_id);
@@ -2425,17 +2502,19 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
         const jobData = {
           user_id: authUser.user_id,
           customer_id: formData.customerId === ANONYMOUS_CUSTOMER_ID ? null : formData.customerId,
-          vehicle_id: formData.vehicleId || null, // ✅ ADD THIS LINE
+          vehicle_id: formData.vehicleId || null,
           job_description: finalJobDescription,
           status: formData.jobStatus,
           service_fee: feeOnly,
           remarks: formData.remarks || null,
           vehicle_type_id: formData.vehicleTypeId ? formData.vehicleTypeId : null,
-          mileage: formData.mileage ? parseInt(formData.mileage) : null, // ✅ ADD THIS LINE
+          mileage: formData.mileage ? parseInt(formData.mileage) : null,
           ...(!editingJob && { job_date: new Date().toISOString() }),
         };
 
         let jobId: string;
+        let successTitle = '';
+        let successMessage = '';
 
         if (editingJob) {
           const { error: updateError } = await supabase
@@ -2445,9 +2524,8 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
           if (updateError) throw updateError;
 
           jobId = editingJob.job_id;
-
-          // Replace items with new selection (no stock changes here)
-          await supabase.from('service_job_item').delete().eq('job_id', jobId);
+          successTitle = 'Service Job Updated!';
+          successMessage = 'The service job has been successfully updated.';
         } else {
           const { data: inserted, error: insertError } = await supabase
             .from('service_job')
@@ -2457,6 +2535,8 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
           if (insertError) throw insertError;
           jobId = inserted?.[0]?.job_id;
           if (!jobId) throw new Error('Failed to create job.');
+          successTitle = 'Service Job Created!';
+          successMessage = 'A new service job has been added successfully.';
         }
 
         // Insert items for the job
@@ -2471,7 +2551,7 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
               }))
             );
 
-          // Create sale ONLY when becoming completed, idempotent
+          // Create sale if completed
           if (shouldCreateSale) {
             const { data: existingSale, error: saleFetchErr } = await supabase
               .from('sale')
@@ -2512,14 +2592,13 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
 
               if (saleId) {
                 for (const item of validItems) {
-                  const { data: currentItem, error: invErr } = await supabase
+                  const { data: currentItem, error: itemErr } = await supabase
                     .from('inventory_item')
                     .select('sale_price')
                     .eq('item_id', item.item_id)
                     .maybeSingle();
-                  if (invErr) throw invErr;
+                  if (itemErr) throw itemErr;
 
-                  // Avoid duplicate sale_item
                   const { data: existingSaleItem, error: saleItemFetchErr } = await supabase
                     .from('sale_item')
                     .select('sale_item_id')
@@ -2540,18 +2619,24 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
                     ]);
                   }
                 }
-                toast({
-                  title: 'Sale Recorded',
-                  description: `Items sale recorded.`,
-                });
               }
             }
           }
         }
 
-        toast({
-          title: 'Success',
-          description: `Service job ${editingJob ? 'updated' : 'created'} successfully.`,
+        // Show success animation
+        setSuccessAnimation({
+          isVisible: true,
+          title: successTitle,
+          message: successMessage,
+          actionType: editingJob ? 'edit' : 'add',
+          jobDetails: {
+            description: finalJobDescription,
+            customer: formData.customerId === ANONYMOUS_CUSTOMER_ID ? 'Walk-in Customer' : 
+                     customers.find((c: any) => c.customer_id === formData.customerId)?.name,
+            status: formData.jobStatus,
+            total: calculateGrandTotal
+          }
         });
 
         setIsAddDialogOpen(false);
@@ -2566,7 +2651,7 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
       }
     };
 
-
+    // ✅ UPDATE: Enhanced Delete with Success Animation
     const handleDelete = async () => {
         if (!deletingJob || !supabase) return;
         
@@ -2585,11 +2670,16 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
                 setSuccessAnimation({
                   isVisible: true,
                   title: "Service Job Deleted!",
-                  message: "The service job has been removed from the system.",
-                  actionType: 'delete'
+                  message: "The service job has been permanently removed from the system.",
+                  actionType: 'delete',
+                  jobDetails: {
+                    description: deletingJob.job_description,
+                    customer: deletingJob.customer?.name || 'Walk-in Customer'
+                  }
                 });
                 
                 setIsDeleteConfirmationOpen(false);
+                setDeletingJob(null);
                 fetchJobs();
             }
         } catch (error: any) {
@@ -2599,179 +2689,172 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
         setIsLoading(false);
     };
 
-            const handleStatusUpdate = async (jobId: string, status: ServiceJob['status']) => {
-                if (!supabase || !authUser) return;
-                const job = serviceJobs.find(j => j.job_id === jobId);
-                if (!job) return;
-                if (job.status === status) return;
+    // ✅ UPDATE: Enhanced Status Update with Success Animation
+    const handleStatusUpdate = async (jobId: string, status: ServiceJob['status']) => {
+        if (!supabase || !authUser) return;
+        const job = serviceJobs.find(j => j.job_id === jobId);
+        if (!job) return;
+        if (job.status === status) return;
 
-                const itemsTotal = (job.items || []).reduce((t, it) => {
+        const itemsTotal = (job.items || []).reduce((t, it) => {
+            const inv = inventoryItems.find(i => i.item_id === it.item_id);
+            return inv ? t + inv.sale_price * it.quantity : t;
+        }, 0);
+
+        const isBecomingCompleted = status === 'completed' && job.status !== 'completed';
+        const isLeavingCompleted = job.status === 'completed' && status !== 'completed';
+        const isCancelled = status === 'cancelled';
+
+        setIsLoading(true);
+
+        try {
+            if (isBecomingCompleted && job.items && job.items.length > 0) {
+                for (const it of job.items) {
                     const inv = inventoryItems.find(i => i.item_id === it.item_id);
-                    return inv ? t + inv.sale_price * it.quantity : t;
-                }, 0);
-
-                const isBecomingCompleted = status === 'completed' && job.status !== 'completed';
-                const isLeavingCompleted = job.status === 'completed' && status !== 'completed'; // includes cancellation
-                const isCancelled = status === 'cancelled';
-
-                setIsLoading(true);
-
-                try {
-                    if (isBecomingCompleted && job.items && job.items.length > 0) {
-                        for (const it of job.items) {
-                            const inv = inventoryItems.find(i => i.item_id === it.item_id);
-                            if (inv && inv.stock_quantity < it.quantity) {
-                                toast({
-                                    title: 'Insufficient Stock',
-                                    description: `Not enough stock for ${inv.name}. Available: ${inv.stock_quantity}`,
-                                    variant: 'destructive'
-                                });
-                                setIsLoading(false);
-                                return;
-                            }
-                        }
+                    if (inv && inv.stock_quantity < it.quantity) {
+                        toast({
+                            title: 'Insufficient Stock',
+                            description: `Not enough stock for ${inv.name}. Available: ${inv.stock_quantity}`,
+                            variant: 'destructive'
+                        });
+                        setIsLoading(false);
+                        return;
                     }
-
-                    const { error: statusErr } = await supabase
-                        .from('service_job')
-                        .update({ status })
-                        .eq('job_id', jobId);
-                    if (statusErr) throw statusErr;
-
-                    if (isBecomingCompleted && job.items && job.items.length > 0) {
-                        // Idempotent completion: only create sale if none exists
-                        const { data: existingSale, error: saleCheckErr } = await supabase
-                            .from('sale')
-                            .select('sale_id')
-                            .eq('service_job_id', jobId)
-                            .maybeSingle();
-                        if (saleCheckErr) throw saleCheckErr;
-
-                        if (existingSale) {
-                            toast({ title: 'Already Processed', description: 'Sale already exists.', variant: 'default' });
-                        } else {
-                            // create sale
-                            const firstItem = job.items[0];
-                            const { data: firstInv, error: invErr } = await supabase
-                                .from('inventory_item')
-                                .select('branch_id')
-                                .eq('item_id', firstItem.item_id)
-                                .maybeSingle();
-                            if (invErr) throw invErr;
-
-                            let saleId: string | null = null;
-                            if (firstInv) {
-                                const { data: newSale, error: saleCreateErr } = await supabase
-                                    .from('sale')
-                                    .insert([{
-                                        user_id: authUser.user_id,
-                                        branch_id: firstInv.branch_id,
-                                        customer_id: job.customer_id || null,
-                                        sale_date: new Date().toISOString(),
-                                        service_job_id: jobId,
-                                        total_amount: itemsTotal,
-                                        payment_method: 'cash'
-                                    }])
-                                    .select('sale_id')
-                                    .single();
-                                if (saleCreateErr) throw saleCreateErr;
-                                saleId = newSale?.sale_id || null;
-                            }
-                            if (saleId) {
-                                for (const it of job.items) {
-                                    const { data: currentItem, error: itemErr } = await supabase
-                                        .from('inventory_item')
-                                        .select('sale_price')
-                                        .eq('item_id', it.item_id)
-                                        .maybeSingle();
-                                    if (itemErr) throw itemErr;
-
-                                    await supabase.from('sale_item').insert([{
-                                        sale_id: saleId,
-                                        item_id: it.item_id,
-                                        quantity: it.quantity,
-                                        price_at_sale: currentItem?.sale_price ?? 0,
-                                        installation_fee: 0
-                                    }]);
-                                }
-                                toast({ title: 'Sale Recorded', description: `₱${itemsTotal.toFixed(2)}`, variant: 'default' });
-                            }
-                        }
-                    }
-
-                    if (isLeavingCompleted) {
-                        // Revert strictly based on existing sale items to avoid over/under-restoration
-                        const { data: sale, error: saleErr } = await supabase
-                            .from('sale')
-                            .select('sale_id')
-                            .eq('service_job_id', jobId)
-                            .maybeSingle();
-                        if (saleErr) throw saleErr;
-
-                        if (sale?.sale_id) {
-                            const saleId = sale.sale_id;
-
-                            // Fetch sale_items actually recorded for this job
-                            const { data: saleItems, error: saleItemsErr } = await supabase
-                                .from('sale_item')
-                                .select('item_id, quantity')
-                                .eq('sale_id', saleId);
-                            if (saleItemsErr) throw saleItemsErr;
-
-                            // Restore stock exactly as per sale items
-                            for (const si of (saleItems || [])) {
-                                const { data: currentItem, error: itemErr } = await supabase
-                                    .from('inventory_item')
-                                    .select('stock_quantity')
-                                    .eq('item_id', si.item_id)
-                                    .maybeSingle();
-                                if (itemErr) throw itemErr;
-                                if (!currentItem) continue;
-
-                                await supabase
-                                    .from('inventory_item')
-                                    .update({ stock_quantity: currentItem.stock_quantity + si.quantity })
-                                    .eq('item_id', si.item_id);
-                            }
-
-                            // Remove sale and its items
-                            const { error: delItemsErr } = await supabase
-                                .from('sale_item')
-                                .delete()
-                                .eq('sale_id', saleId);
-                            if (delItemsErr) throw delItemsErr;
-
-                            const { error: delSaleErr } = await supabase
-                                .from('sale')
-                                .delete()
-                                .eq('sale_id', saleId);
-                            if (delSaleErr) throw delSaleErr;
-
-                            toast({
-                                title: isCancelled ? 'Cancelled & Reverted' : 'Reverted',
-                                description: 'Sale removed and stock restored.',
-                                variant: 'default'
-                            });
-                        } else {
-                            // No sale to revert; do nothing to stock
-                            toast({
-                                title: isCancelled ? 'Cancelled' : 'Status Updated',
-                                description: 'No sale found to revert.',
-                                variant: 'default'
-                            });
-                        }
-                    }
-
-                    toast({ title: 'Status Updated', description: `Changed to ${status}.` });
-                    fetchJobs();
-                    fetchInventoryItems();
-                } catch (e: any) {
-                    toast({ title: 'Error', description: e.message, variant: 'destructive' });
-                } finally {
-                    setIsLoading(false);
                 }
-            };
-// ...existing code...
+            }
+
+            const { error: statusErr } = await supabase
+                .from('service_job')
+                .update({ status })
+                .eq('job_id', jobId);
+            if (statusErr) throw statusErr;
+
+            if (isBecomingCompleted && job.items && job.items.length > 0) {
+                const { data: existingSale, error: saleCheckErr } = await supabase
+                    .from('sale')
+                    .select('sale_id')
+                    .eq('service_job_id', jobId)
+                    .maybeSingle();
+                if (saleCheckErr) throw saleCheckErr;
+
+                if (existingSale) {
+                    toast({ title: 'Already Processed', description: 'Sale already exists.', variant: 'default' });
+                } else {
+                    const firstItem = job.items[0];
+                    const { data: firstInv, error: invErr } = await supabase
+                        .from('inventory_item')
+                        .select('branch_id')
+                        .eq('item_id', firstItem.item_id)
+                        .maybeSingle();
+                    if (invErr) throw invErr;
+
+                    let saleId: string | null = null;
+                    if (firstInv) {
+                        const { data: newSale, error: saleCreateErr } = await supabase
+                            .from('sale')
+                            .insert([{
+                                user_id: authUser.user_id,
+                                branch_id: firstInv.branch_id,
+                                customer_id: job.customer_id || null,
+                                sale_date: new Date().toISOString(),
+                                service_job_id: jobId,
+                                total_amount: itemsTotal,
+                                payment_method: 'cash'
+                            }])
+                            .select('sale_id')
+                            .single();
+                        if (saleCreateErr) throw saleCreateErr;
+                        saleId = newSale?.sale_id || null;
+                    }
+                    if (saleId) {
+                        for (const it of job.items) {
+                            const { data: currentItem, error: itemErr } = await supabase
+                                .from('inventory_item')
+                                .select('sale_price')
+                                .eq('item_id', it.item_id)
+                                .maybeSingle();
+                            if (itemErr) throw itemErr;
+
+                            await supabase.from('sale_item').insert([{
+                                sale_id: saleId,
+                                item_id: it.item_id,
+                                quantity: it.quantity,
+                                price_at_sale: currentItem?.sale_price ?? 0,
+                                installation_fee: 0
+                            }]);
+                        }
+                    }
+                }
+            }
+
+            if (isLeavingCompleted) {
+                const { data: sale, error: saleErr } = await supabase
+                    .from('sale')
+                    .select('sale_id')
+                    .eq('service_job_id', jobId)
+                    .maybeSingle();
+                if (saleErr) throw saleErr;
+
+                if (sale?.sale_id) {
+                    const saleId = sale.sale_id;
+
+                    const { data: saleItems, error: saleItemsErr } = await supabase
+                        .from('sale_item')
+                        .select('item_id, quantity')
+                        .eq('sale_id', saleId);
+                    if (saleItemsErr) throw saleItemsErr;
+
+                    for (const si of (saleItems || [])) {
+                        const { data: currentItem, error: itemErr } = await supabase
+                            .from('inventory_item')
+                            .select('stock_quantity')
+                            .eq('item_id', si.item_id)
+                            .maybeSingle();
+                        if (itemErr) throw itemErr;
+                        if (!currentItem) continue;
+
+                        await supabase
+                            .from('inventory_item')
+                            .update({ stock_quantity: currentItem.stock_quantity + si.quantity })
+                            .eq('item_id', si.item_id);
+                    }
+
+                    const { error: delItemsErr } = await supabase
+                        .from('sale_item')
+                        .delete()
+                        .eq('sale_id', saleId);
+                    if (delItemsErr) throw delItemsErr;
+
+                    const { error: delSaleErr } = await supabase
+                        .from('sale')
+                        .delete()
+                        .eq('sale_id', saleId);
+                    if (delSaleErr) throw delSaleErr;
+                }
+            }
+
+            // Show success animation for status change
+            setSuccessAnimation({
+                isVisible: true,
+                title: "Status Updated!",
+                message: `Service job status has been changed to ${status}.`,
+                actionType: 'status_change',
+                jobDetails: {
+                    description: job.job_description,
+                    customer: job.customer?.name || 'Walk-in Customer',
+                    oldStatus: job.status,
+                    newStatus: status
+                }
+            });
+
+            fetchJobs();
+            fetchInventoryItems();
+        } catch (e: any) {
+            toast({ title: 'Error', description: e.message, variant: 'destructive' });
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     // Toggle row expansion
     const toggleRowExpansion = (jobId: string) => {
@@ -2784,34 +2867,6 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
         setExpandedRows(newExpanded);
     };
 
-    if (fetchError && fetchError.includes('infinite recursion')) {
-        return (
-            <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
-                <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-                    <Alert variant="destructive" className="mt-4">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Database Security Policy Error</AlertTitle>
-                        <AlertDescription>
-                            {fetchError}
-                            <p className="font-bold mt-4">How to fix:</p>
-                            <p>Go to your Supabase project's SQL Editor and run the following script to fix the recursive policy on the `users` table. This script will safely remove the old policy if it exists and create a correct one.</p>
-                            <pre className="mt-2 p-2 bg-gray-800 text-white rounded-md text-xs whitespace-pre-wrap">
-{`-- This script safely replaces a potentially recursive policy on the 'users' table.
-DROP POLICY IF EXISTS "Allow all read access on users" ON public.users;
-
-CREATE POLICY "Allow all read access on users"
-ON public.users
-FOR SELECT
-USING (true);`}
-                            </pre>
-                            <p className="mt-2">After running the script, refresh this page.</p>
-                        </AlertDescription>
-                    </Alert>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
             
@@ -2820,7 +2875,7 @@ USING (true);`}
                 <div 
                     className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
                     style={{ 
-                        backgroundImage: "url('/images/image3.png')",
+                        backgroundImage: "url('/images/image2.jpg')",
                         backgroundSize: "cover",
                         backgroundPosition: "center 30%"
                     }}
@@ -2885,15 +2940,6 @@ USING (true);`}
                     onAddJob={handleOpenAddDialog} 
                     onExportData={handleExportData}
                     onViewCalendar={() => setIsCalendarOpen(true)}
-                />
-
-                {/* Success Animation */}
-                <ServiceJobSuccessAnimation
-                  isVisible={successAnimation.isVisible}
-                  title={successAnimation.title}
-                  message={successAnimation.message}
-                  actionType={successAnimation.actionType}
-                  onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))}
                 />
 
                 {/* Main Table Card */}
@@ -3027,7 +3073,6 @@ USING (true);`}
       </div>
     )}
 
-    {/* ===== MOVE PAGINATION CONTROLS HERE - OUTSIDE THE LOADING CONDITION ===== */}
     {filteredJobs.length > 0 && (
       <PaginationControls
         currentPage={currentPage}
@@ -3096,6 +3141,16 @@ USING (true);`}
                     isOpen={isCalendarOpen} 
                     onClose={() => setIsCalendarOpen(false)} 
                 />
+
+                {/* ✅ ADD: Success Animation Component */}
+                <ServiceSuccessAnimation
+                    isVisible={successAnimation.isVisible}
+                    title={successAnimation.title}
+                    message={successAnimation.message}
+                    actionType={successAnimation.actionType}
+                    jobDetails={successAnimation.jobDetails}
+                    onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))}
+                />
             </div>
 
             <style jsx global>{`
@@ -3125,7 +3180,6 @@ USING (true);`}
                     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
                 }
 
-                /* Custom date input styling */
                 .custom-date-input::-webkit-calendar-picker-indicator {
                     background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%236b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>');
                     cursor: pointer;
@@ -3137,18 +3191,15 @@ USING (true);`}
                     background-color: #f3f4f6;
                 }
 
-                /* Improved focus styles for all inputs */
                 input:focus, textarea:focus, select:focus {
                     outline: none;
                     ring: 2px;
                 }
 
-                /* Smooth transitions for all interactive elements */
                 button, input, select, textarea {
                     transition: all 0.3s ease;
                 }
 
-                /* Animation for expandable content */
                 @keyframes fadeIn {
                     from { opacity: 0; }
                     to { opacity: 1; }
