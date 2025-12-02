@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -107,19 +106,20 @@ const COMMON_SERVICES = [
   "Other (Please specify below)"
 ];
 
-// ✅ UPDATED: ServiceJob interface with calculated fields
+// ✅ UPDATE: ServiceJob interface - add mileage
 interface ServiceJob {
     job_id: string;
     user_id: string;
     customer_id?: string;
+    vehicle_id?: string;
     job_description: string;
     job_date: string;
     status: 'pending' | 'in-progress' | 'completed' | 'cancelled';
     service_fee: number;
     remarks: string | null;
     vehicle_type_id: string | null;
+    mileage?: number | null; // ✅ ADD THIS LINE
     
-    // ✅ JOINED DATA
     user?: { 
         user_id: string;
         name: string;
@@ -129,15 +129,19 @@ interface ServiceJob {
         name: string;
         phone?: string;
     } | null;
+    vehicle?: {
+        vehicle_id: string;
+        plate_number: string;
+        make?: string;
+        model?: string;
+    } | null;
     vehicle_type?: {
         vehicle_type_id: string;
         name: string;
     } | null;
     
-    // ✅ ADD THIS LINE:
     items?: ServiceJobItem[];
     
-    // ✅ CALCULATED FIELDS
     days_ago?: number;
     is_recent?: boolean;
 }
@@ -150,6 +154,14 @@ interface ServiceJobItem {
   quantity: number;
   name?: string;
   category?: string;
+}
+interface Vehicle {
+  vehicle_id: string;
+  plate_number: string;
+  make?: string;
+  model?: string;
+  customer_id?: string;
+  vehicle_type_id?: string;
 }
 
 // ✅ ADD: Inventory Item interface
@@ -869,8 +881,7 @@ const TabbedServiceForm = ({
   isEdit?: boolean;
 }) => {
   const [activeTab, setActiveTab] = useState('basic');
-  const { customers, vehicleTypes, inventoryItems } = formData;
-
+  const { customers, vehicleTypes, inventoryItems, customerVehicles } = formData;
   // Calculate totals
   const calculateItemsTotal = useMemo(() => {
     return formData.selectedItems.reduce((total: number, item: any) => {
@@ -983,7 +994,7 @@ const TabbedServiceForm = ({
                 <Label htmlFor="customer" className="text-slate-700 font-medium font-poppins">Customer</Label>
                 <Select 
                   value={formData.customerId} 
-                  onValueChange={(value) => onFormDataChange({ ...formData, customerId: value })}
+                  onValueChange={(value) => onFormDataChange({ ...formData, customerId: value, vehicleId: '' })} // reset vehicleId
                   disabled={isFieldsLocked}
                 >
                   <SelectTrigger className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins ${isFieldsLocked ? 'bg-slate-100 cursor-not-allowed' : 'bg-white/80'}`}>
@@ -998,8 +1009,48 @@ const TabbedServiceForm = ({
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
+              </div>              
+              
+              {/* ✅ UPDATE: Vehicle Selection Field - Auto-set vehicle type */}
+              {formData.customerId && formData.customerId !== ANONYMOUS_CUSTOMER_ID && (
+                <div className="space-y-2">
+                  <Label htmlFor="vehicle" className="text-slate-700 font-medium font-poppins">
+                    Vehicle (Plate Number)
+                  </Label>
+                  {customerVehicles && customerVehicles.length > 0 ? (
+                    <Select 
+                      value={formData.vehicleId} 
+                      onValueChange={(value) => {
+                        // ✅ UPDATE: Find selected vehicle and auto-set vehicle type
+                        const selectedVehicle = customerVehicles.find((v: Vehicle) => v.vehicle_id === value);
+                        onFormDataChange({ 
+                          ...formData, 
+                          vehicleId: value,
+                          vehicleTypeId: selectedVehicle?.vehicle_type_id || formData.vehicleTypeId // Auto-set vehicle type
+                        });
+                      }}
+                      disabled={isFieldsLocked}
+                    >
+                      <SelectTrigger className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins ${isFieldsLocked ? 'bg-slate-100 cursor-not-allowed' : 'bg-white/80'}`}>
+                        <SelectValue placeholder="Select vehicle (optional)"/>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {customerVehicles.map((vehicle: Vehicle) => (
+                          <SelectItem key={vehicle.vehicle_id} value={vehicle.vehicle_id} className="font-poppins">
+                            {vehicle.plate_number}
+                            {vehicle.make && vehicle.model && ` - ${vehicle.make} ${vehicle.model}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200 font-poppins">
+                      No vehicles registered for this customer. You can add vehicles in the Customer Management page.
+                    </p>
+                  )}
+                </div>
+              )}
+              
               <div className="space-y-2">
                 <Label htmlFor="vehicle-type" className="text-slate-700 font-medium font-poppins">Vehicle Type</Label>
                 <Select 
@@ -1088,6 +1139,27 @@ const TabbedServiceForm = ({
 
           {/* Items Tab */}
           <TabsContent value="items" className="space-y-4">
+                <div className="space-y-4">
+                {/* ✅ ADD: Mileage Field */}
+                <div className="space-y-2">
+                  <Label htmlFor="mileage" className="text-slate-700 font-medium font-poppins">
+                    Vehicle Mileage (km)
+                  </Label>
+                  <Input
+                    id="mileage"
+                    type="number"
+                    value={formData.mileage}
+                    onChange={(e) => onFormDataChange({ ...formData, mileage: e.target.value })}
+                    placeholder="Enter current mileage (optional)"
+                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
+                    disabled={isFieldsLocked}
+                  />
+                  <p className="text-xs text-slate-500 font-poppins">
+                    Record the vehicle's current mileage for service history tracking
+                  </p>
+                </div>
+                </div>
+
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-slate-700 font-medium font-poppins">Items Used (Optional)</Label>
@@ -1523,6 +1595,16 @@ const ExpandableRow = ({
                     <span className="text-sm text-slate-800 font-poppins">{job.customer.phone}</span>
                   </div>
                 )}
+
+                {/* ✅ ADD: Vehicle Plate Number */}
+                {job.vehicle?.plate_number && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-slate-600 font-poppins">Vehicle Plate:</span>
+                    <span className="text-sm font-semibold text-slate-800 font-poppins bg-slate-100 px-3 py-1 rounded-md">
+                      {job.vehicle.plate_number}
+                    </span>
+                  </div>
+                )}
                 
                 <div className="flex justify-between">
                   <span className="text-sm text-slate-600 font-poppins">Vehicle Type:</span>
@@ -1705,6 +1787,7 @@ export default function EnhancedServiceManagementPage() {
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
     const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+    const [customerVehicles, setCustomerVehicles] = useState<Vehicle[]>([]);
 
     const [isLoading, setIsLoading] = useState(true);
     const [isDataLoading, setIsDataLoading] = useState(true);
@@ -1734,12 +1817,16 @@ export default function EnhancedServiceManagementPage() {
       last7Days: false
     });
 
+    const [selectedVehicleId, setSelectedVehicleId] = useState('');
+
+
     // Expanded rows state
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
     // Form state for tabbed form
     const [formData, setFormData] = useState({
       customerId: ANONYMOUS_CUSTOMER_ID,
+      vehicleId: '',
       jobDescription: '',
       customJobDescription: '',
       selectedServiceType: '',
@@ -1747,6 +1834,7 @@ export default function EnhancedServiceManagementPage() {
       jobStatus: 'pending' as 'pending' | 'in-progress' | 'completed' | 'cancelled',
       serviceFee: '0',
       vehicleTypeId: '',
+      mileage: '', // ✅ ADD THIS LINE
       selectedItems: [] as ServiceJobItem[],
       originalStatus: null as ServiceJob['status'] | null
     });
@@ -1754,6 +1842,37 @@ export default function EnhancedServiceManagementPage() {
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // ✅ UPDATE: Fetch customer vehicles with vehicle_type_id
+    useEffect(() => {
+      const fetchCustomerVehicles = async () => {
+        if (!supabase || !formData.customerId || formData.customerId === ANONYMOUS_CUSTOMER_ID) {
+          setCustomerVehicles([]);
+          setFormData(prev => ({ ...prev, vehicleId: '' }));
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('vehicle')
+          .select('vehicle_id, plate_number, make, model, customer_id, vehicle_type_id') // ✅ ADD vehicle_type_id
+          .eq('customer_id', formData.customerId)
+          .order('plate_number');
+
+        if (error && (error.message || error.code || error.hint)) {
+          toast({
+            title: 'Vehicle Fetch Error',
+            description: error.message || 'Failed to load vehicles',
+            variant: 'destructive'
+          });
+          setCustomerVehicles([]);
+          return;
+        }
+
+        setCustomerVehicles((data || []) as Vehicle[]);
+      };
+
+      fetchCustomerVehicles();
+    }, [formData.customerId, supabase, toast]);
 
     // Handle service type selection
     useEffect(() => {
@@ -1771,7 +1890,21 @@ export default function EnhancedServiceManagementPage() {
         
         try {
             const { data, error } = await supabase
-                .rpc('get_service_jobs_complete');
+                .from('service_job')
+                .select(`
+                    *,
+                    user:user_id (user_id, name),
+                    customer:customer_id (customer_id, name, phone),
+                    vehicle:vehicle_id (vehicle_id, plate_number, make, model),
+                    vehicle_type:vehicle_type_id (vehicle_type_id, name),
+                    items:service_job_item (
+                        service_job_item_id,
+                        job_id,
+                        item_id,
+                        quantity
+                    )
+                `)
+                .order('job_date', { ascending: false });
             
             if (error) {
                 setFetchError(error.message);
@@ -1790,7 +1923,9 @@ export default function EnhancedServiceManagementPage() {
         
         setIsLoading(false);
         setLastUpdated(new Date());
-    }, [toast]);
+    }, [toast, supabase]);
+    
+    // ...existing code...
 
     const fetchCustomers = useCallback(async () => {
         if (!supabase) return;
@@ -1984,10 +2119,11 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
           last7Days: false
         });
     };
-
+    
     const resetForm = () => {
         setFormData({
           customerId: ANONYMOUS_CUSTOMER_ID,
+          vehicleId: '',
           jobDescription: '',
           customJobDescription: '',
           selectedServiceType: '',
@@ -1995,6 +2131,7 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
           jobStatus: 'pending',
           serviceFee: '0',
           vehicleTypeId: '',
+          mileage: '', // ✅ ADD THIS LINE
           selectedItems: [],
           originalStatus: null
         });
@@ -2005,7 +2142,7 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
         resetForm();
         setIsAddDialogOpen(true);
     };
-    
+
     const handleOpenEditDialog = (job: ServiceJob) => {
         setEditingJob(job);
         
@@ -2025,8 +2162,7 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
             const parts = cleanRemarks.split('\n\nRemarks: ');
             cleanRemarks = parts.length > 1 ? parts[1] : '';
         }
-
-        // Calculate the original service fee by subtracting items total
+    
         let serviceFeeValue = String(job.service_fee);
         if (job.items && job.items.length > 0) {
             const itemsTotal = job.items.reduce((total, item) => {
@@ -2038,9 +2174,10 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
             }, 0);
             serviceFeeValue = String(job.service_fee - itemsTotal);
         }
-
+    
         setFormData({
           customerId: customerToSet,
+          vehicleId: job.vehicle_id || '',
           jobDescription: job.job_description,
           selectedServiceType: job.job_description,
           customJobDescription: job.job_description,
@@ -2048,6 +2185,7 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
           jobStatus: job.status,
           serviceFee: serviceFeeValue,
           vehicleTypeId: job.vehicle_type_id || '',
+          mileage: job.mileage ? String(job.mileage) : '', // ✅ ADD THIS LINE
           selectedItems: job.items || [],
           originalStatus: job.status
         });
@@ -2187,11 +2325,13 @@ const totalPages = Math.ceil(filteredJobs.length / rowsPerPage);
         const jobData = {
           user_id: authUser.user_id,
           customer_id: formData.customerId === ANONYMOUS_CUSTOMER_ID ? null : formData.customerId,
+          vehicle_id: formData.vehicleId || null, // ✅ ADD THIS LINE
           job_description: finalJobDescription,
           status: formData.jobStatus,
           service_fee: feeOnly,
           remarks: formData.remarks || null,
           vehicle_type_id: formData.vehicleTypeId ? formData.vehicleTypeId : null,
+          mileage: formData.mileage ? parseInt(formData.mileage) : null, // ✅ ADD THIS LINE
           ...(!editingJob && { job_date: new Date().toISOString() }),
         };
 
@@ -2802,7 +2942,8 @@ USING (true);`}
                         ...formData,
                         customers,
                         vehicleTypes,
-                        inventoryItems
+                        inventoryItems,
+                        customerVehicles
                     }}
                     onFormDataChange={setFormData}
                     isEdit={!!editingJob}

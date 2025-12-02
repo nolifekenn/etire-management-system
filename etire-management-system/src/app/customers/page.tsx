@@ -75,7 +75,8 @@ const serviceTypeColors = {
   repair: "bg-orange-100 text-orange-700 border-orange-200",
   replacement: "bg-blue-100 text-blue-700 border-blue-200",
   rotation: "bg-green-100 text-green-700 border-green-200",
-  balancing: "bg-purple-100 text-purple-700 border-purple-200"
+  balancing: "bg-purple-100 text-purple-700 border-purple-200",
+  service: "bg-indigo-100 text-indigo-700 border-indigo-200"  // ✅ ADD THISs
 };
 
 interface VehicleType {
@@ -109,7 +110,6 @@ const vehicleColumns = [
   { key: 'model', header: 'Model', sortable: true },
   { key: 'color', header: 'Color', sortable: true },
 ];
-// ...existing code...
 
 const historyColumns = [
   {
@@ -119,13 +119,31 @@ const historyColumns = [
   },
   {
     key: 'item_name',
-    header: 'Tire/Item',
-    render: (_value: any, item: any) => item.inventory_item?.name || '—',
+    header: 'Service/Item', // ✅ CHANGED from 'Tire/Item'
+    render: (_value: any, item: any) => {
+      // ✅ ADD: Show different badge for service jobs
+      if (item.source === 'service_job') {
+        return (
+          <Badge className="bg-purple-100 text-purple-700 border-purple-200 font-poppins">
+            Service Job
+          </Badge>
+        );
+      }
+      return item.inventory_item?.name || '—';
+    },
   },
   {
     key: 'service_type',
-    header: 'Service Type',
+    header: 'Type', // ✅ CHANGED from 'Service Type'
     render: (_value: any, item: any) => {
+      // ✅ ADD: Show service type badge differently for service jobs
+      if (item.source === 'service_job') {
+        return (
+          <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 font-poppins">
+            General Service
+          </Badge>
+        );
+      }
       const st = String(item.service_type ?? '').toLowerCase();
       return (
         <Badge className={`capitalize ${serviceTypeColors[st as keyof typeof serviceTypeColors] ?? ''} font-poppins`}>
@@ -142,7 +160,12 @@ const historyColumns = [
   {
     key: 'mileage',
     header: 'Mileage',
-    render: (value: any) => (value ? value : <span className="text-slate-400">-</span>),
+    render: (value: any) => (value ? `${value.toLocaleString()} km` : <span className="text-slate-400">-</span>), // ✅ ADD km formatting
+  },
+  {
+    key: 'notes',
+    header: 'Notes/Description', // ✅ CHANGED from just being a fallback
+    render: (value: any) => value || <span className="text-slate-400">-</span>,
   },
   {
     key: 'created_by_name',
@@ -1017,9 +1040,25 @@ export default function EnhancedCustomersPage() {
         return item.vehicle?.plate_number || '—';
     }
     if (columnKey === 'item_name') {
+        // Show badge for service jobs
+        if (item.source === 'service_job') {
+        return (
+            <Badge className="bg-purple-100 text-purple-700 border-purple-200 font-poppins">
+            Service Job
+            </Badge>
+        );
+        }
         return item.inventory_item?.name || '—';
     }
     if (columnKey === 'service_type') {
+        // Show different badge for service jobs
+        if (item.source === 'service_job') {
+        return (
+            <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 font-poppins">
+            General Service
+            </Badge>
+        );
+        }
         const st = String(item.service_type ?? '').toLowerCase();
         return (
         <Badge className={`capitalize ${serviceTypeColors[st as keyof typeof serviceTypeColors] ?? ''} font-poppins`}>
@@ -1030,8 +1069,11 @@ export default function EnhancedCustomersPage() {
     if (columnKey === 'service_date') {
         return value ? new Date(value).toLocaleDateString('en-US') : '—';
     }
-    if (columnKey === 'mileage' && !value) {
-        return <span className="text-slate-400">-</span>;
+    if (columnKey === 'mileage') {
+        return value ? `${value.toLocaleString()} km` : <span className="text-slate-400">-</span>;
+    }
+    if (columnKey === 'notes') {
+        return value || <span className="text-slate-400">-</span>;
     }
     if (columnKey === 'created_by_name') {
         return item.user?.name || '—';
