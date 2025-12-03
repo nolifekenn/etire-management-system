@@ -291,7 +291,6 @@ interface ServiceJob {
     service_fee: number;
     remarks: string | null;
     vehicle_type_id: string | null;
-    mileage?: number | null;
     
     user?: { 
         user_id: string;
@@ -1304,25 +1303,6 @@ const TabbedServiceForm = ({
 
           {/* Items Tab */}
           <TabsContent value="items" className="space-y-4">
-                <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="mileage" className="text-slate-700 font-medium font-poppins">
-                    Vehicle Mileage (km)
-                  </Label>
-                  <Input
-                    id="mileage"
-                    type="number"
-                    value={formData.mileage}
-                    onChange={(e) => onFormDataChange({ ...formData, mileage: e.target.value })}
-                    placeholder="Enter current mileage (optional)"
-                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
-                    disabled={isFieldsLocked}
-                  />
-                  <p className="text-xs text-slate-500 font-poppins">
-                    Record the vehicle's current mileage for service history tracking
-                  </p>
-                </div>
-                </div>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -2001,7 +1981,6 @@ export default function EnhancedServiceManagementPage() {
       jobStatus: 'pending' as 'pending' | 'in-progress' | 'completed' | 'cancelled',
       serviceFee: '0',
       vehicleTypeId: '',
-      mileage: '',
       selectedItems: [] as ServiceJobItem[],
       originalStatus: null as ServiceJob['status'] | null
     });
@@ -2342,7 +2321,6 @@ export default function EnhancedServiceManagementPage() {
           jobStatus: job.status,
           serviceFee: serviceFeeValue,
           vehicleTypeId: job.vehicle_type_id || '',
-          mileage: job.mileage ? String(job.mileage) : '',
           selectedItems: job.items || [],
           originalStatus: job.status
         });
@@ -2468,7 +2446,6 @@ export default function EnhancedServiceManagementPage() {
 
       const feeOnly = parseFloat(formData.serviceFee) || 0;
 
-      // Valid items and items total
       const validItems = (formData.selectedItems || []).filter(
         (i) => i.item_id && i.quantity > 0
       );
@@ -2481,7 +2458,6 @@ export default function EnhancedServiceManagementPage() {
       const wasNotCompleted = editingJob ? formData.originalStatus !== 'completed' : true;
       const shouldCreateSale = isNowCompleted && wasNotCompleted;
 
-      // Client-side stock validation
       if (shouldCreateSale && validItems.length > 0) {
         for (const item of validItems) {
           const inventoryItem = inventoryItems.find((i) => i.item_id === item.item_id);
@@ -2508,142 +2484,146 @@ export default function EnhancedServiceManagementPage() {
           service_fee: feeOnly,
           remarks: formData.remarks || null,
           vehicle_type_id: formData.vehicleTypeId ? formData.vehicleTypeId : null,
-          mileage: formData.mileage ? parseInt(formData.mileage) : null,
-          ...(!editingJob && { job_date: new Date().toISOString() }),
+          ...(!editingJob && { job_date: new Date().toISOString() })
         };
 
         let jobId: string;
-        let successTitle = '';
-        let successMessage = '';
-
+        
         if (editingJob) {
-          const { error: updateError } = await supabase
+          const { error } = await supabase
             .from('service_job')
             .update(jobData)
             .eq('job_id', editingJob.job_id);
-          if (updateError) throw updateError;
-
+          
+          if (error) throw error;
           jobId = editingJob.job_id;
-          successTitle = 'Service Job Updated!';
-          successMessage = 'The service job has been successfully updated.';
+
+          await supabase.from('service_job_item').delete().eq('job_id', jobId);
         } else {
-          const { data: inserted, error: insertError } = await supabase
+          const { data, error } = await supabase
             .from('service_job')
             .insert([jobData])
             .select('job_id')
-            .limit(1);
-          if (insertError) throw insertError;
-          jobId = inserted?.[0]?.job_id;
-          if (!jobId) throw new Error('Failed to create job.');
-          successTitle = 'Service Job Created!';
-          successMessage = 'A new service job has been added successfully.';
+            .single();
+          
+          if (error) throw error;
+          if (!data) throw new Error('Failed to create service job');
+          jobId = data.job_id;
         }
 
-        // Insert items for the job
         if (validItems.length > 0) {
-          await supabase
+          const itemsToInsert = validItems.map(item => ({
+            job_id: jobId,
+            item_id: item.item_id,
+            quantity: item.quantity
+          }));
+          
+          const { error: itemsError } = await supabase
             .from('service_job_item')
-            .insert(
-              validItems.map((i) => ({
-                job_id: jobId,
-                item_id: i.item_id,
-                quantity: i.quantity,
-              }))
-            );
+            .insert(itemsToInsert);
+          
+          if (itemsError) throw itemsError;
+        }
 
-          // Create sale if completed
-          if (shouldCreateSale) {
-            const { data: existingSale, error: saleFetchErr } = await supabase
-              .from('sale')
-              .select('sale_id')
-              .eq('service_job_id', jobId)
-              .maybeSingle();
-            if (saleFetchErr) throw saleFetchErr;
+        if (shouldCreateSale && validItems.length > 0) {
+          const saleData = {
+            customer_id: formData.customerId === ANONYMOUS_CUSTOMER_ID ? null : formData.customerId,
+            total_amount: itemsTotal,
+            payment_method: 'cash',
+            status: 'completed',
+            user_id: authUser.user_id,
+            job_id: jobId
+          };
 
-            if (existingSale?.sale_id) {
-              toast({
-                title: 'Already Processed',
-                description: 'Sale already recorded for this job.',
-              });
-            } else {
-              let saleId: string | null = null;
-              const firstInv = inventoryItems.find((i) => i.item_id === validItems[0].item_id);
+          const { data: saleResult, error: saleError } = await supabase
+            .from('sale')
+            .insert([saleData])
+            .select('sale_id')
+            .single();
 
-              if (firstInv) {
-                const { data: newSale, error: saleCreateErr } = await supabase
-                  .from('sale')
-                  .insert([
-                    {
-                      user_id: authUser.user_id,
-                      branch_id: firstInv.branch_id,
-                      customer_id:
-                        formData.customerId === ANONYMOUS_CUSTOMER_ID ? null : formData.customerId,
-                      sale_date: new Date().toISOString(),
-                      service_job_id: jobId,
-                      total_amount: itemsTotal,
-                      payment_method: 'cash',
-                    },
-                  ])
-                  .select('sale_id')
-                  .single();
-                if (saleCreateErr) throw saleCreateErr;
-                saleId = newSale?.sale_id || null;
-              }
+          if (saleError) throw saleError;
 
-              if (saleId) {
-                for (const item of validItems) {
-                  const { data: currentItem, error: itemErr } = await supabase
-                    .from('inventory_item')
-                    .select('sale_price')
-                    .eq('item_id', item.item_id)
-                    .maybeSingle();
-                  if (itemErr) throw itemErr;
+          if (saleResult) {
+            const saleItems = validItems.map(item => ({
+              sale_id: saleResult.sale_id,
+              item_id: item.item_id,
+              quantity: item.quantity,
+              price: inventoryItems.find(i => i.item_id === item.item_id)?.sale_price || 0
+            }));
 
-                  const { data: existingSaleItem, error: saleItemFetchErr } = await supabase
-                    .from('sale_item')
-                    .select('sale_item_id')
-                    .eq('sale_id', saleId)
-                    .eq('item_id', item.item_id)
-                    .maybeSingle();
-                  if (saleItemFetchErr) throw saleItemFetchErr;
+            const { error: saleItemsError } = await supabase
+              .from('sale_item')
+              .insert(saleItems);
 
-                  if (!existingSaleItem) {
-                    await supabase.from('sale_item').insert([
-                      {
-                        sale_id: saleId,
-                        item_id: item.item_id,
-                        quantity: item.quantity,
-                        price_at_sale: currentItem?.sale_price ?? 0,
-                        installation_fee: 0,
-                      },
-                    ]);
-                  }
-                }
+            if (saleItemsError) throw saleItemsError;
+
+            for (const item of validItems) {
+              const inventoryItem = inventoryItems.find(i => i.item_id === item.item_id);
+              if (inventoryItem) {
+                const newStock = inventoryItem.stock_quantity - item.quantity;
+                await supabase
+                  .from('inventory_item')
+                  .update({ stock_quantity: newStock })
+                  .eq('item_id', item.item_id);
               }
             }
           }
         }
 
-        // Show success animation
+        // ✅ UPDATED: Only write tire_history if job is completed AND has a vehicle (registered customer)
+        if (jobData.vehicle_id && jobData.customer_id) {
+          if (formData.jobStatus === 'completed') {
+            // Upsert tire_history when completed
+            const { error: thErr } = await supabase
+              .from('tire_history')
+              .upsert([{
+                history_id: jobId,
+                vehicle_id: jobData.vehicle_id,
+                item_id: null,
+                service_type: jobData.job_description,
+                service_date: editingJob ? editingJob.job_date : new Date().toISOString(),
+                notes: jobData.remarks,
+                created_by: jobData.user_id
+              }], { onConflict: 'history_id' });
+          
+            if (thErr) {
+              toast({ title: 'Tire History Error', description: thErr.message, variant: 'destructive' });
+            }
+        
+            // Sync tire_history_item rows
+            await supabase.from('tire_history_item').delete().eq('history_id', jobId);
+            if (validItems.length > 0) {
+              const { error: thiInsErr } = await supabase
+                .from('tire_history_item')
+                .insert(validItems.map(i => ({
+                  history_id: jobId,
+                  item_id: i.item_id,
+                  quantity: i.quantity
+                })));
+              if (thiInsErr) {
+                toast({ title: 'Tire History Item Error', description: thiInsErr.message, variant: 'destructive' });
+              }
+            }
+          } else {
+            // Remove from tire_history if status is not completed
+            await supabase.from('tire_history_item').delete().eq('history_id', jobId);
+            await supabase.from('tire_history').delete().eq('history_id', jobId);
+          }
+        }
+
         setSuccessAnimation({
           isVisible: true,
-          title: successTitle,
-          message: successMessage,
-          actionType: editingJob ? 'edit' : 'add',
-          jobDetails: {
-            description: finalJobDescription,
-            customer: formData.customerId === ANONYMOUS_CUSTOMER_ID ? 'Walk-in Customer' : 
-                     customers.find((c: any) => c.customer_id === formData.customerId)?.name,
-            status: formData.jobStatus,
-            total: calculateGrandTotal
-          }
+          title: editingJob ? 'Service Job Updated!' : 'Service Job Created!',
+          message: editingJob 
+            ? 'Service job has been updated successfully.'
+            : 'New service job has been created successfully.',
+          actionType: editingJob ? 'edit' : 'add'
         });
 
-        setIsAddDialogOpen(false);
         setIsEditDialogOpen(false);
         resetForm();
         fetchJobs();
-        fetchInventoryItems();
+
       } catch (error: any) {
         toast({ title: 'Error', description: error.message, variant: 'destructive' });
       } finally {
@@ -2689,25 +2669,25 @@ export default function EnhancedServiceManagementPage() {
         setIsLoading(false);
     };
 
-    // ✅ UPDATE: Enhanced Status Update with Success Animation
+    // ✅ CORRECTED: handleStatusUpdate function
     const handleStatusUpdate = async (jobId: string, status: ServiceJob['status']) => {
         if (!supabase || !authUser) return;
         const job = serviceJobs.find(j => j.job_id === jobId);
         if (!job) return;
         if (job.status === status) return;
-
+    
         const itemsTotal = (job.items || []).reduce((t, it) => {
             const inv = inventoryItems.find(i => i.item_id === it.item_id);
             return inv ? t + inv.sale_price * it.quantity : t;
         }, 0);
-
+    
         const isBecomingCompleted = status === 'completed' && job.status !== 'completed';
         const isLeavingCompleted = job.status === 'completed' && status !== 'completed';
-        const isCancelled = status === 'cancelled';
-
+    
         setIsLoading(true);
-
+    
         try {
+            // ✅ 1. Check stock if becoming completed
             if (isBecomingCompleted && job.items && job.items.length > 0) {
                 for (const it of job.items) {
                     const inv = inventoryItems.find(i => i.item_id === it.item_id);
@@ -2722,21 +2702,67 @@ export default function EnhancedServiceManagementPage() {
                     }
                 }
             }
-
+    
+            // ✅ 2. Update job status
             const { error: statusErr } = await supabase
                 .from('service_job')
                 .update({ status })
                 .eq('job_id', jobId);
             if (statusErr) throw statusErr;
-
+    
+            // ✅ 3. Handle tire_history ONLY if vehicle + customer exist
+            if (job.vehicle_id && job.customer_id) {
+                if (isBecomingCompleted) {
+                    // ✅ A. CREATE tire_history record (ONE record)
+                    const { error: thErr } = await supabase
+                        .from('tire_history')
+                        .upsert([{
+                            history_id: jobId,
+                            vehicle_id: job.vehicle_id,
+                            service_type: job.job_description,
+                            service_date: job.job_date,
+                            notes: job.remarks,
+                            created_by: job.user_id
+                        }], { onConflict: 'history_id' });
+                    
+                    if (thErr) {
+                        toast({ title: 'Tire History Error', description: thErr.message, variant: 'destructive' });
+                    }
+    
+                    // ✅ B. Sync tire_history_item (ALL items at once)
+                    await supabase.from('tire_history_item').delete().eq('history_id', jobId);
+                    
+                    if (job.items && job.items.length > 0) {
+                        const historyItems = job.items.map(i => ({
+                            history_id: jobId,
+                            item_id: i.item_id,
+                            quantity: i.quantity
+                        }));
+    
+                        const { error: thiInsErr } = await supabase
+                            .from('tire_history_item')
+                            .insert(historyItems); // ✅ Insert ALL items in one call
+                        
+                        if (thiInsErr) {
+                            toast({ title: 'Tire History Item Error', description: thiInsErr.message, variant: 'destructive' });
+                        }
+                    }
+                } else if (isLeavingCompleted) {
+                    // ✅ C. Remove from tire_history when leaving completed status
+                    await supabase.from('tire_history_item').delete().eq('history_id', jobId);
+                    await supabase.from('tire_history').delete().eq('history_id', jobId);
+                }
+            }
+    
+            // ✅ 4. Handle sales logic (existing code - unchanged)
             if (isBecomingCompleted && job.items && job.items.length > 0) {
                 const { data: existingSale, error: saleCheckErr } = await supabase
                     .from('sale')
                     .select('sale_id')
-                    .eq('service_job_id', jobId)
+                    .eq('job_id', jobId)
                     .maybeSingle();
                 if (saleCheckErr) throw saleCheckErr;
-
+    
                 if (existingSale) {
                     toast({ title: 'Already Processed', description: 'Sale already exists.', variant: 'default' });
                 } else {
@@ -2747,7 +2773,7 @@ export default function EnhancedServiceManagementPage() {
                         .eq('item_id', firstItem.item_id)
                         .maybeSingle();
                     if (invErr) throw invErr;
-
+    
                     let saleId: string | null = null;
                     if (firstInv) {
                         const { data: newSale, error: saleCreateErr } = await supabase
@@ -2757,7 +2783,7 @@ export default function EnhancedServiceManagementPage() {
                                 branch_id: firstInv.branch_id,
                                 customer_id: job.customer_id || null,
                                 sale_date: new Date().toISOString(),
-                                service_job_id: jobId,
+                                job_id: jobId,
                                 total_amount: itemsTotal,
                                 payment_method: 'cash'
                             }])
@@ -2774,7 +2800,7 @@ export default function EnhancedServiceManagementPage() {
                                 .eq('item_id', it.item_id)
                                 .maybeSingle();
                             if (itemErr) throw itemErr;
-
+    
                             await supabase.from('sale_item').insert([{
                                 sale_id: saleId,
                                 item_id: it.item_id,
@@ -2786,24 +2812,24 @@ export default function EnhancedServiceManagementPage() {
                     }
                 }
             }
-
+    
             if (isLeavingCompleted) {
                 const { data: sale, error: saleErr } = await supabase
                     .from('sale')
                     .select('sale_id')
-                    .eq('service_job_id', jobId)
+                    .eq('job_id', jobId)
                     .maybeSingle();
                 if (saleErr) throw saleErr;
-
+    
                 if (sale?.sale_id) {
                     const saleId = sale.sale_id;
-
+    
                     const { data: saleItems, error: saleItemsErr } = await supabase
                         .from('sale_item')
                         .select('item_id, quantity')
                         .eq('sale_id', saleId);
                     if (saleItemsErr) throw saleItemsErr;
-
+    
                     for (const si of (saleItems || [])) {
                         const { data: currentItem, error: itemErr } = await supabase
                             .from('inventory_item')
@@ -2812,19 +2838,19 @@ export default function EnhancedServiceManagementPage() {
                             .maybeSingle();
                         if (itemErr) throw itemErr;
                         if (!currentItem) continue;
-
+    
                         await supabase
                             .from('inventory_item')
                             .update({ stock_quantity: currentItem.stock_quantity + si.quantity })
                             .eq('item_id', si.item_id);
                     }
-
+    
                     const { error: delItemsErr } = await supabase
                         .from('sale_item')
                         .delete()
                         .eq('sale_id', saleId);
                     if (delItemsErr) throw delItemsErr;
-
+    
                     const { error: delSaleErr } = await supabase
                         .from('sale')
                         .delete()
@@ -2832,8 +2858,8 @@ export default function EnhancedServiceManagementPage() {
                     if (delSaleErr) throw delSaleErr;
                 }
             }
-
-            // Show success animation for status change
+    
+            // ✅ 5. Show success animation
             setSuccessAnimation({
                 isVisible: true,
                 title: "Status Updated!",
@@ -2846,7 +2872,7 @@ export default function EnhancedServiceManagementPage() {
                     newStatus: status
                 }
             });
-
+    
             fetchJobs();
             fetchInventoryItems();
         } catch (e: any) {
