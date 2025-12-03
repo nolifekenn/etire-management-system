@@ -194,44 +194,41 @@ const vehicleColumns = [
   { key: 'color', header: 'Color', sortable: true },
 ];
 
+// ✅ Tire History columns per your spec
 const historyColumns = [
   {
     key: 'plate_number',
     header: 'Vehicle',
     render: (_value: any, item: any) => item.vehicle?.plate_number || '—',
   },
-  {
-    key: 'item_name',
-    header: 'Service/Item',
+{
+    key: 'items',
+    header: 'Item(s)',
     render: (_value: any, item: any) => {
-      if (item.source === 'service_job') {
+        // Now items is always an array
+        if (Array.isArray(item.items) && item.items.length > 0) {
         return (
-          <Badge className="bg-purple-100 text-purple-700 border-purple-200 font-poppins">
-            Service Job
-          </Badge>
+            <div className="space-y-1">
+            {item.items.map((it: any, idx: number) => (
+                <div key={idx} className="text-xs">
+                {it.name} {it.quantity > 1 ? `(×${it.quantity})` : ''}
+                </div>
+            ))}
+            </div>
         );
-      }
-      return item.inventory_item?.name || '—';
+        }
+        return '—';
     },
-  },
+},
+
   {
     key: 'service_type',
     header: 'Type',
-    render: (_value: any, item: any) => {
-      if (item.source === 'service_job') {
-        return (
-          <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 font-poppins">
-            General Service
-          </Badge>
-        );
-      }
-      const st = String(item.service_type ?? '').toLowerCase();
-      return (
-        <Badge className={`capitalize ${serviceTypeColors[st as keyof typeof serviceTypeColors] ?? ''} font-poppins`}>
-          {st || '—'}
-        </Badge>
-      );
-    },
+    render: (_value: any, item: any) => (
+      <span className="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+        {item.service_type || '—'}
+      </span>
+    ),
   },
   {
     key: 'service_date',
@@ -239,13 +236,8 @@ const historyColumns = [
     render: (value: any) => (value ? new Date(value).toLocaleDateString('en-US') : '—'),
   },
   {
-    key: 'mileage',
-    header: 'Mileage',
-    render: (value: any) => (value ? `${value.toLocaleString()} km` : <span className="text-slate-400">-</span>),
-  },
-  {
     key: 'notes',
-    header: 'Notes/Description',
+    header: 'Notes/Descriptions',
     render: (value: any) => value || <span className="text-slate-400">-</span>,
   },
   {
@@ -496,11 +488,10 @@ const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[],
     );
 };
 
-// Solid Color QuickActions
-const QuickActions = ({ onAddCustomer, onAddVehicle, onAddHistory, onExportData }: { 
+// Update QuickActions to remove "Add Service Record" button
+const QuickActions = ({ onAddCustomer, onAddVehicle, onExportData }: { 
   onAddCustomer: () => void, 
-  onAddVehicle: () => void, 
-  onAddHistory: () => void,
+  onAddVehicle: () => void,
   onExportData: () => void 
 }) => {
   const actions = [
@@ -519,13 +510,6 @@ const QuickActions = ({ onAddCustomer, onAddVehicle, onAddHistory, onExportData 
       gradient: "bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
     },
     {
-      label: "Service Record",
-      description: "Add tire service",
-      icon: History,
-      onClick: onAddHistory,
-      gradient: "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
-    },
-    {
       label: "Export Data",
       description: "Export to Excel",
       icon: Download,
@@ -535,7 +519,7 @@ const QuickActions = ({ onAddCustomer, onAddVehicle, onAddHistory, onExportData 
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-8">
       {actions.map((action, index) => (
         <button
           key={action.label}
@@ -629,13 +613,11 @@ export default function EnhancedCustomersPage() {
     // Dialog states
     const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
     const [isVehicleDialogOpen, setIsVehicleDialogOpen] = useState(false);
-    const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     
     // Editing states
     const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
     const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
-    const [editingHistory, setEditingHistory] = useState<TireHistory | null>(null);
     const [deletingItem, setDeletingItem] = useState<any>(null);
 
     // Separate search terms for each tab
@@ -657,12 +639,6 @@ export default function EnhancedCustomersPage() {
     const [model, setModel] = useState('');
     const [color, setColor] = useState('');
     const [selectedVehicleType, setSelectedVehicleType] = useState('');
-    const [selectedVehicle, setSelectedVehicle] = useState('');
-    const [selectedItem, setSelectedItem] = useState('');
-    const [serviceType, setServiceType] = useState<'repair' | 'replacement' | 'rotation' | 'balancing'>('repair');
-    const [serviceDate, setServiceDate] = useState('');
-    const [mileage, setMileage] = useState('');
-    const [historyNotes, setHistoryNotes] = useState('');
 
     useEffect(() => {
         setMounted(true);
@@ -784,20 +760,27 @@ export default function EnhancedCustomersPage() {
         );
     }, [vehicles, vehicleSearch]);
         
+    // ...existing code...
     const filteredHistory = useMemo(() => {
         return tireHistory.filter(history => {
             const searchLower = historySearch.toLowerCase();
+    
+            const itemNames = Array.isArray(history.items)
+              ? history.items.map((it: any) => it.name?.toLowerCase()).filter(Boolean)
+              : [];
+    
             const matchesSearch = !historySearch || 
-                history.vehicle?.plate_number.toLowerCase().includes(searchLower) ||
-                history.inventory_item?.name.toLowerCase().includes(searchLower) ||
+                history.vehicle?.plate_number?.toLowerCase().includes(searchLower) ||
+                itemNames.some((n: string) => n.includes(searchLower)) ||
                 history.vehicle?.customer?.name?.toLowerCase().includes(searchLower);
-
+    
             const matchesService = serviceTypeFilter === 'all' || 
                                  history.service_type === serviceTypeFilter;
-
+    
             return matchesSearch && matchesService;
         });
     }, [tireHistory, historySearch, serviceTypeFilter]);
+    // ...existing code...
 
     const clearCustomerFilters = () => {
         setCustomerSearch('');
@@ -830,16 +813,6 @@ export default function EnhancedCustomersPage() {
         setEditingVehicle(null);
     };
 
-    const resetHistoryForm = () => {
-        setSelectedVehicle('');
-        setSelectedItem('');
-        setServiceType('repair');
-        setServiceDate('');
-        setMileage('');
-        setHistoryNotes('');
-        setEditingHistory(null);
-    };
-
     const handleOpenCustomerDialog = () => {
         resetCustomerForm();
         setIsCustomerDialogOpen(true);
@@ -848,11 +821,6 @@ export default function EnhancedCustomersPage() {
     const handleOpenVehicleDialog = () => {
         resetVehicleForm();
         setIsVehicleDialogOpen(true);
-    };
-
-    const handleOpenHistoryDialog = () => {
-        resetHistoryForm();
-        setIsHistoryDialogOpen(true);
     };
 
     const handleEditCustomer = (customer: Customer) => {
@@ -871,17 +839,6 @@ export default function EnhancedCustomersPage() {
         setColor(vehicle.color || '');
         setSelectedVehicleType(vehicle.vehicle_type_id || '');
         setIsVehicleDialogOpen(true);
-    };
-
-    const handleEditHistory = (history: TireHistory) => {
-        setEditingHistory(history);
-        setSelectedVehicle(history.vehicle_id);
-        setSelectedItem(history.item_id);
-        setServiceType(history.service_type);
-        setServiceDate(history.service_date.split('T')[0]);
-        setMileage(history.mileage?.toString() || '');
-        setHistoryNotes(history.notes || '');
-        setIsHistoryDialogOpen(true);
     };
 
     const handleDeleteItem = (item: any, type: 'customer' | 'vehicle' | 'history') => {
@@ -910,7 +867,7 @@ export default function EnhancedCustomersPage() {
         } else {
             dataToExport = filteredHistory;
             filename = 'tire_history_export.csv';
-            headers = ['Vehicle', 'Tire/Item', 'Service Type', 'Date', 'Mileage', 'Service By'];
+            headers = ['Vehicle', 'Item(s)', 'Service Type', 'Date','Notes/Descriptions', 'Service By'];
         }
 
         if (dataToExport.length === 0) {
@@ -947,38 +904,54 @@ export default function EnhancedCustomersPage() {
         });
     };
 
-    const convertToCSV = (data: any[], headers: string[], type: string) => {
-    const headerRow = headers.join(',') + '\n'; 
-    const dataRows = data.map(item => {
+    // ...existing code...
+    const convertToCSV = (data: any[], headers: string[], type: 'customers' | 'vehicles' | 'history') => {
+      const headerRow = headers.join(',') + '\n';
+    
+      const toTitle = (str: string) => str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : '';
+    
+      const rows = data.map((item) => {
         if (type === 'customers') {
-        return [
-            `"${item.name || ''}"`,
-            `"${item.phone || ''}"`,
-            `"${item.vehicle_count || 0}"`
-        ].join(',');
-        } else if (type === 'vehicles') {
-        return [
-            `"${item.plate_number || ''}"`,
-            `"${item.customer?.name || ''}"`,
-            `"${item.vehicle_type?.name || ''}"`,
-            `"${item.make || ''}"`,
-            `"${item.model || ''}"`,
-            `"${item.color || ''}"`
-        ].join(',');
-        } else {
-        return [
-            `"${item.vehicle?.plate_number || ''}"`,
-            `"${item.inventory_item?.name || ''}"`,
-            `"${toTitle(item.service_type) || ''}"`,
-            `"${item.service_date ? new Date(item.service_date).toLocaleDateString('en-US') : ''}"`,
-            `"${item.mileage || ''}"`,
-            `"${item.user?.name || ''}"`
-        ].join(',');
+          return [
+            `"${item.name ?? ''}"`,
+            `"${item.phone ?? ''}"`,
+            `"${item.vehicle_count ?? 0}"`
+          ].join(',');
         }
-    }).join('\n');
-
-    return headerRow + dataRows;
+    
+        if (type === 'vehicles') {
+          return [
+            `"${item.plate_number ?? ''}"`,
+            `"${item.customer?.name ?? ''}"`,
+            `"${item.vehicle_type?.name ?? ''}"`,
+            `"${item.make ?? ''}"`,
+            `"${item.model ?? ''}"`,
+            `"${item.color ?? ''}"`
+          ].join(',');
+        }
+    
+        // history (aggregated items array)
+        const itemsList = Array.isArray(item.items) && item.items.length
+          ? item.items.map((it: any) => {
+              const name = it?.name ?? '';
+              const qty = it?.quantity && it.quantity > 1 ? ` (×${it.quantity})` : '';
+              return `${name}${qty}`;
+            }).join('; ')
+          : '';
+    
+        return [
+          `"${item.vehicle?.plate_number ?? ''}"`,
+          `"${itemsList}"`,
+          `"${toTitle(item.service_type ?? '')}"`,
+          `"${item.service_date ? new Date(item.service_date).toLocaleDateString('en-US') : ''}"`,
+          `"${item.notes ?? ''}"`,
+          `"${item.user?.name ?? ''}"`
+        ].join(',');
+      }).join('\n');
+    
+      return headerRow + rows;
     };
+    // ...existing code...
 
     const handleSubmitCustomer = async () => {
         if (!supabase || !authUser) return;
@@ -1081,59 +1054,6 @@ export default function EnhancedCustomersPage() {
         }
     };
 
-    const handleSubmitHistory = async () => {
-        if (!supabase || !authUser) return;
-        if (!selectedVehicle || !selectedItem || !serviceDate) {
-            toast({ title: "Validation Error", description: "Vehicle, item, and service date are required.", variant: "destructive" });
-            return;
-        }
-
-        setIsHistoryLoading(true);
-
-        const historyData = {
-            vehicle_id: selectedVehicle,
-            item_id: selectedItem,
-            service_type: serviceType,
-            service_date: serviceDate,
-            mileage: mileage ? parseInt(mileage) : null,
-            notes: historyNotes || null,
-            created_by: authUser.user_id,
-        };
-
-        let error;
-        if (editingHistory) {
-            const { error: updateError } = await supabase
-                .from('tire_history')
-                .update(historyData)
-                .eq('history_id', editingHistory.history_id);
-            error = updateError;
-        } else {
-            const { error: insertError } = await supabase
-                .from('tire_history')
-                .insert([historyData]);
-            error = insertError;
-        }
-
-        setIsHistoryLoading(false);
-
-        if (error) {
-            toast({ title: "Save Error", description: `Could not save tire history: ${error.message}`, variant: "destructive" });
-        } else {
-            // Show success animation
-            setSuccessAnimation({
-                isVisible: true,
-                title: editingHistory ? "Service Record Updated!" : "Service Record Added!",
-                message: editingHistory 
-                    ? "Tire service record has been updated successfully."
-                    : "New tire service record has been created successfully.",
-                actionType: editingHistory ? 'edit' : 'add'
-            });
-            
-            setIsHistoryDialogOpen(false);
-            fetchTireHistory();
-        }
-    };
-
     const handleDelete = async () => {
         if (!deletingItem || !supabase) return;
         
@@ -1208,46 +1128,36 @@ export default function EnhancedCustomersPage() {
         return <span className="text-slate-700">{String(value)}</span>;
     };
 
+    // ✅ Render helper (if you use a custom renderer)
     const renderHistoryCell = (item: any, columnKey: string, value: any) => {
-    if (columnKey === 'plate_number') {
-        return <span className="font-medium text-slate-800">{item.vehicle?.plate_number || '—'}</span>;
-    }
-    if (columnKey === 'item_name') {
-        if (item.source === 'service_job') {
-        return (
-            <Badge className="bg-purple-100 text-purple-700 border-purple-200 font-poppins">
-            Service Job
-            </Badge>
-        );
+    if (columnKey === 'plate_number') return item.vehicle?.plate_number || '—';
+    if (columnKey === 'items') {
+        if (Array.isArray(item.items) && item.items.length) {
+        return item.items.map((it: any) => it.name).join(', ');
         }
         return item.inventory_item?.name || '—';
     }
     if (columnKey === 'service_type') {
-        if (item.source === 'service_job') {
         return (
-            <Badge className="bg-indigo-100 text-indigo-700 border-indigo-200 font-poppins">
-            General Service
-            </Badge>
-        );
-        }
-        const st = String(item.service_type ?? '').toLowerCase();
-        return (
-        <Badge className={`capitalize ${serviceTypeColors[st as keyof typeof serviceTypeColors] ?? ''} font-poppins`}>
-            {st || '—'}
-        </Badge>
+        <span className="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+            {item.service_type || '—'}
+        </span>
         );
     }
-    if (columnKey === 'service_date') {
-        return value ? new Date(value).toLocaleDateString('en-US') : '—';
-    }
-    if (columnKey === 'mileage') {
-        return value ? <span className="font-medium">{value.toLocaleString()} km</span> : <span className="text-slate-400">-</span>;
-    }
-    if (columnKey === 'notes') {
-        return value || <span className="text-slate-400">-</span>;
-    }
-    if (columnKey === 'created_by_name') {
-        return <span className="text-slate-700">{item.user?.name || '—'}</span>;
+    if (columnKey === 'service_date') return value ? new Date(value).toLocaleDateString('en-US') : '—';
+    if (columnKey === 'notes') return value || <span className="text-slate-400">-</span>;
+    if (columnKey === 'created_by_name') return item.user?.name || '—';
+    if (columnKey === 'actions') {
+        return (
+        <Button
+            variant="outline"
+            size="sm"
+            className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 font-poppins"
+            onClick={() => handleDeleteItem(item, 'history')}
+        >
+            Delete
+        </Button>
+        );
     }
     return String(value ?? '');
     };
@@ -1329,7 +1239,6 @@ export default function EnhancedCustomersPage() {
                 <QuickActions 
                     onAddCustomer={handleOpenCustomerDialog} 
                     onAddVehicle={handleOpenVehicleDialog}
-                    onAddHistory={handleOpenHistoryDialog}
                     onExportData={handleExportData}
                 />
 
@@ -1531,23 +1440,20 @@ export default function EnhancedCustomersPage() {
 
                     {/* History Tab */}
                     <TabsContent value="history" className="space-y-6 animate-in fade-in duration-500">
-                        <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
-                            <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-green-50/50 border-b border-slate-200/50">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div>
-                                        <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Tire Service History</CardTitle>
-                                        <CardDescription className="text-slate-600 font-poppins">
-                                            {filteredHistory.length} of {tireHistory.length} service record{filteredHistory.length !== 1 ? 's' : ''} shown
-                                        </CardDescription>
-                                    </div>
-                                    <Button 
-                                        onClick={handleOpenHistoryDialog}
-                                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-poppins"
-                                    >
-                                        <History className="h-4 w-4 mr-2" />
-                                        Add Record
-                                    </Button>
-                                </div>
+                    <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
+                        <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-green-50/50 border-b border-slate-200/50">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                            <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Tire Service History</CardTitle>
+                            <CardDescription className="text-slate-600 font-poppins">
+                                {filteredHistory.length} of {tireHistory.length} completed service record{filteredHistory.length !== 1 ? 's' : ''} shown
+                                <span className="block mt-1 text-xs text-slate-500">
+                                📝 Records are automatically created when service jobs are marked as complete
+                                </span>
+                            </CardDescription>
+                            </div>
+                            {/* ❌ Removed "Add Record" button */}
+                        </div>
 
                                 {/* Filter Bar */}
                                 <div className="flex flex-col sm:flex-row gap-4 mt-6 p-4 bg-white/60 rounded-xl border border-slate-200/50">
@@ -1604,29 +1510,27 @@ export default function EnhancedCustomersPage() {
                                 ) : filteredHistory.length === 0 ? (
                                     <EnhancedEmptyState 
                                         type="history"
-                                        onAddNew={handleOpenHistoryDialog}
+                                        onAddNew={() => {}}
                                         onClearFilters={clearHistoryFilters}
                                     />
                                 ) : (
-                                <DataTableWrapper
-                                title=""
-                                columns={historyColumns}
-                                data={filteredHistory.map(h => ({
-                                    ...h,
-                                    id: h.history_id,
-                                    plate_number: h.vehicle?.plate_number ?? '',
-                                    item_name: h.inventory_item?.name ?? '',
-                                    created_by_name: h.user?.name ?? '',
-                                }))}
-                                onAddNew={handleOpenHistoryDialog}
-                                onEdit={handleEditHistory}
-                                onDelete={(item) => handleDeleteItem(item, 'history')}
-                                renderCell={renderHistoryCell}
-                                searchTerm={historySearch}
-                                onSearchChange={setHistorySearch}
-                                enableStripes={true}
-                                rowClassName="hover:bg-green-50/50 transition-colors duration-200"
-                                />
+                                    <DataTableWrapper
+                                      title="Tire History"
+                                      columns={historyColumns}
+                                      data={filteredHistory.map((h, idx) => ({
+                                        ...h,
+                                        id: `${h.history_id}-${idx}`, // ✅ FIX: Use composite key with index to ensure uniqueness
+                                        plate_number: h.vehicle?.plate_number ?? '',
+                                        items: h.items ?? undefined,
+                                        created_by_name: h.user?.name ?? '',
+                                      }))}
+                                      onEdit={undefined}
+                                      onDelete={(item) => handleDeleteItem(item, 'history')}
+                                      renderCell={renderHistoryCell}
+                                      searchTerm={historySearch}
+                                      onSearchChange={setHistorySearch}
+                                      enableStripes={true}
+                                    />
                                 )}
                             </CardContent>
                         </Card>
@@ -1799,114 +1703,6 @@ export default function EnhancedCustomersPage() {
                             <Button onClick={handleSubmitVehicle} disabled={isVehicleLoading} className={buttonStyles.primary}>
                                 {isVehicleLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 {editingVehicle ? 'Save Changes' : 'Create Vehicle'}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-
-                {/* Enhanced History Dialog */}
-                <Dialog open={isHistoryDialogOpen} onOpenChange={(isOpen) => {
-                    if (!isOpen) {
-                        setIsHistoryDialogOpen(false);
-                        resetHistoryForm();
-                    }
-                }}>
-                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins animate-in zoom-in duration-300">
-                        <DialogHeader>
-                            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
-                                {editingHistory ? 'Edit Tire History' : 'Add Tire History'}
-                            </DialogTitle>
-                            <DialogDescription className="text-slate-600 font-poppins">
-                                {editingHistory ? `Update tire service record.` : 'Record a new tire service for a vehicle.'}
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="vehicle" className="text-slate-700 font-medium font-poppins">Vehicle *</Label>
-                                <Select value={selectedVehicle} onValueChange={setSelectedVehicle}>
-                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
-                                        <SelectValue placeholder="Select vehicle" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {vehicles.map(vehicle => (
-                                            <SelectItem key={vehicle.vehicle_id} value={vehicle.vehicle_id} className="font-poppins">
-                                                {vehicle.plate_number} - {vehicle.customer?.name || 'Unknown Customer'}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="item" className="text-slate-700 font-medium font-poppins">Tire/Item *</Label>
-                                <Select value={selectedItem} onValueChange={setSelectedItem}>
-                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
-                                        <SelectValue placeholder="Select tire/item" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {inventory.map(item => (
-                                            <SelectItem key={item.item_id} value={item.item_id} className="font-poppins">
-                                                {item.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="service-type" className="text-slate-700 font-medium font-poppins">Service Type *</Label>
-                                <Select value={serviceType} onValueChange={(value: any) => setServiceType(value)}>
-                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="repair" className="font-poppins">Repair</SelectItem>
-                                        <SelectItem value="replacement" className="font-poppins">Replacement</SelectItem>
-                                        <SelectItem value="rotation" className="font-poppins">Rotation</SelectItem>
-                                        <SelectItem value="balancing" className="font-poppins">Balancing</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="service-date" className="text-slate-700 font-medium font-poppins">Service Date *</Label>
-                                    <CustomDateInput
-                                        id="service-date"
-                                        value={serviceDate}
-                                        onChange={setServiceDate}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="mileage" className="text-slate-700 font-medium font-poppins">Mileage (km)</Label>
-                                    <Input 
-                                        id="mileage" 
-                                        type="number"
-                                        value={mileage} 
-                                        onChange={(e) => setMileage(e.target.value)} 
-                                        placeholder="50000 (km)"
-                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
-                                    />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="history-notes" className="text-slate-700 font-medium font-poppins">Notes</Label>
-                                <Textarea 
-                                    id="history-notes" 
-                                    value={historyNotes} 
-                                    onChange={(e) => setHistoryNotes(e.target.value)} 
-                                    placeholder="Additional notes about the service..."
-                                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
-                                />
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <DialogClose asChild>
-                                <Button type="button" variant="outline" className={buttonStyles.back}>
-                                    <ArrowLeft className="h-4 w-4 mr-2" />
-                                    Cancel
-                                </Button>
-                            </DialogClose>
-                            <Button onClick={handleSubmitHistory} disabled={isHistoryLoading} className={buttonStyles.primary}>
-                                {isHistoryLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {editingHistory ? 'Save Changes' : 'Create History'}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
