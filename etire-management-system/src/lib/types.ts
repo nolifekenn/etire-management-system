@@ -105,12 +105,12 @@ export interface DeliveryItem {
 
 // Customer & Vehicle Management
 export interface Customer {
-    customer_id: string;
-    name: string;
-    phone?: string;
-    vehicle_count?: number;
-    created_at?: string;
-    updated_at?: string;
+  customer_id: string;
+  name: string;
+  phone?: string;
+  vehicle_count?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Vehicle {
@@ -169,6 +169,9 @@ export interface AuditLog {
   ip_address?: string;
   user_agent?: string;
   created_at?: string;
+  user?: {
+    name: string;
+  };
 }
 
 // Enhanced Inventory with branch support

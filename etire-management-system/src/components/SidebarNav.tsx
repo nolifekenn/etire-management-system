@@ -59,7 +59,6 @@ const navItems = [
   { href: '/branches', label: 'Branches', icon: Building2, requiredRole: 1 },
   { href: '/purchasing', label: 'Purchasing', icon: Package, requiredRole: 1 },
   { href: '/customers', label: 'Customers', icon: Users, requiredRole: 1 },
-  { href: '/notifications', label: 'Notifications', icon: Bell, requiredRole: 1 },
   { href: '/reports', label: 'Reports', icon: BarChart, requiredRole: 1 },
   { href: '/backup', label: 'Backup', icon: Database, requiredRole: 1 },
 ];
