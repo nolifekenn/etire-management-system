@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -669,6 +669,110 @@ const categories = Object.entries(categoryVisuals)
   }));
 
 // ============================================
+// NEW PRODUCTS CELL COMPONENT (Dropdown for >2 items)
+// ============================================
+const ProductsCell: React.FC<{ items?: SaleItem[] }> = ({ items = [] }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Aggregate items by name and sum quantities
+  const aggregated = items
+    .filter(it => it.inventory_item?.name)
+    .reduce<Record<string, number>>((acc, it) => {
+      const name = it.inventory_item!.name;
+      acc[name] = (acc[name] || 0) + (it.quantity || 0);
+      return acc;
+    }, {});
+
+  const entries = Object.entries(aggregated); // [ [name, qty], ... ]
+
+  if (entries.length === 0) {
+    return <span className="text-slate-400 italic text-xs">No products listed</span>;
+  }
+
+  // If 2 or fewer distinct products, show them inline with qty on the right
+  if (entries.length <= 2) {
+    return (
+      <div className="flex flex-col gap-1">
+        {entries.map(([name, qty], idx) => (
+          <div key={idx} className="flex justify-between items-center gap-3 max-w-[220px]">
+            <span className="font-medium text-sm text-slate-700 truncate" title={name}>{name}</span>
+            <span className="text-xs text-slate-500 font-medium">x{qty}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // More than 2 distinct products -> show first 2 and a dropdown for the rest
+  const display = entries.slice(0, 2);
+  const remainingCount = entries.length - 2;
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <div className="flex flex-col gap-1">
+        {display.map(([name, qty], idx) => (
+          <div key={idx} className="flex justify-between items-center gap-3 max-w-[220px]">
+            <span className="font-medium text-sm text-slate-700 truncate" title={name}>{name}</span>
+            <span className="text-xs text-slate-500 font-medium">x{qty}</span>
+          </div>
+        ))}
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen(v => !v);
+          }}
+          className={`mt-1 inline-flex items-center gap-2 text-xs font-semibold px-2 py-1 rounded-md transition-all duration-200 border
+            ${isOpen ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900'}
+          `}
+          aria-expanded={isOpen}
+        >
+          <Plus className="h-3 w-3" />
+          {remainingCount} more
+          <ChevronRight className={`h-3 w-3 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} />
+        </button>
+      </div>
+
+      {isOpen && (
+        <div
+          className="absolute left-0 top-full mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="bg-slate-50 px-3 py-2 border-b border-slate-100">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Full Item List ({entries.length})
+            </span>
+          </div>
+          <div className="max-h-56 overflow-y-auto p-1">
+            {entries.map(([name, qty], idx) => (
+              <div
+                key={idx}
+                className="px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg transition-colors flex items-center justify-between"
+              >
+                <div className="truncate pr-4">{name}</div>
+                <div className="text-xs text-slate-500 font-medium">x{qty}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================
 // MAIN POS PAGE COMPONENT
 // ============================================
 export default function POSPage() {
@@ -691,6 +795,9 @@ export default function POSPage() {
   const [showSalesHistory, setShowSalesHistory] = useState(false);
   const [historySearchTerm, setHistorySearchTerm] = useState('');
   const [rowsPerPageSales, setRowsPerPageSales] = useState<number>(5);
+  // NEW: State for Receipt View Modal
+  const [viewReceiptModalOpen, setViewReceiptModalOpen] = useState(false);
+  const [viewReceiptHtml, setViewReceiptHtml] = useState('');
   
   // Sort State
   const [sortOption, setSortOption] = useState('date-desc');
@@ -1086,18 +1193,13 @@ export default function POSPage() {
     setInstallationFee(0);
   };
 
-  const handleDownloadReceipt = async (saleId: string) => {
-    if (!supabase || !authUser) {
-      toast({ title: 'Error', description: 'Client not ready or user not logged in.', variant: 'destructive' });
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
-    try {
-      const { data: saleData, error: saleError } = await supabase
-        .from('sale')
-        .select(`
+  // Helper to fetch data and generate HTML string (used by both View and Download)
+  const generateReceiptHtmlString = async (saleId: string) => {
+    if (!supabase || !authUser) throw new Error('Client not ready');
+
+    const { data: saleData, error: saleError } = await supabase
+      .from('sale')
+      .select(`
           *,
           customer (*),
           user (*),
@@ -1106,48 +1208,85 @@ export default function POSPage() {
             inventory_item (name)
           )
         `)
-        .eq('sale_id', saleId)
-        .single();
+      .eq('sale_id', saleId)
+      .single();
 
-      if (saleError) throw new Error(`Sale data fetch error: ${saleError.message}`);
-      if (!saleData) throw new Error('Sale not found.');
+    if (saleError) throw new Error(`Sale data fetch error: ${saleError.message}`);
+    if (!saleData) throw new Error('Sale not found.');
 
-      const businessInfo: BusinessInfo = {
-        storeName: 'Queen.R Tire Supply & Vulcanizing Shop',
-        address: '68, Sipocot, Camarines Sur',
-        phone: 'To be given',
-        taxInfo: 'To be given',
-        footerMessage: 'Thank You!',
-      };
+    const businessInfo: BusinessInfo = {
+      storeName: 'Queen.R Tire Supply & Vulcanizing Shop',
+      address: '68, Sipocot, Camarines Sur',
+      phone: 'To be given',
+      taxInfo: 'To be given',
+      footerMessage: 'Thank You!',
+    };
 
-      const receiptItems: ReceiptItem[] = saleData.sale_item.map((item: any) => ({
-        name: item.inventory_item?.name || 'Unknown Item',
-        quantity: item.quantity,
-        price: item.price_at_sale,
-      }));
+    const receiptItems: ReceiptItem[] = saleData.sale_item.map((item: any) => ({
+      name: item.inventory_item?.name || 'Unknown Item',
+      quantity: item.quantity,
+      price: item.price_at_sale,
+    }));
 
-      const receiptCustomer: ReceiptCustomer | undefined = saleData.customer
-        ? { name: saleData.customer.name, phone: saleData.customer.phone }
-        : undefined;
+    const receiptCustomer: ReceiptCustomer | undefined = saleData.customer
+      ? { name: saleData.customer.name, phone: saleData.customer.phone }
+      : undefined;
 
-      const receiptData: ReceiptData = {
-        sale: saleData,
-        items: receiptItems,
-        cashier: saleData.user as AppUser,
-        customer: receiptCustomer,
-        businessInfo: businessInfo,
-      };
+    const receiptData: ReceiptData = {
+      sale: saleData,
+      items: receiptItems,
+      cashier: saleData.user as AppUser,
+      customer: receiptCustomer,
+      businessInfo: businessInfo,
+    };
 
-      const html = generateHtmlReceipt(receiptData);
-      printReceipt(html);
+    return generateHtmlReceipt(receiptData);
+  };
 
-      setSuccessAnimation({
-        isVisible: true,
-        title: "Receipt Ready!",
-        message: "Opening print dialog for receipt.",
-        actionType: 'receipt'
+  // Handler 1: VIEW (Opens Modal)
+  const handleViewReceipt = async (saleId: string) => {
+    setIsSubmitting(true);
+    try {
+      const html = await generateReceiptHtmlString(saleId);
+      setViewReceiptHtml(html);
+      setViewReceiptModalOpen(true);
+    } catch (error: any) {
+      toast({
+        title: "View Failed",
+        description: error.message,
+        variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
+  // Handler 2: DOWNLOAD (Direct Download, No Preview)
+  const handleDownloadReceipt = async (saleId: string) => {
+    setIsSubmitting(true);
+    try {
+      const html = await generateReceiptHtmlString(saleId);
+      
+      // Create a Blob from the HTML string
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      
+      // Create temporary link and click it
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Receipt-${saleId}.html`; // Downloads as .html file
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Downloaded",
+        description: "Receipt saved to your device.",
+        className: "bg-green-600 text-white border-none"
+      });
     } catch (error: any) {
       toast({
         title: "Download Failed",
@@ -1381,16 +1520,19 @@ export default function POSPage() {
     setSearchTerm('');
   };
 
-  // ============================================
   // CLEANED SALES TABLE COLUMNS
-  // ============================================
   const salesColumns: Column[] = [
     {
       key: 'sale_id',
       label: 'Sale ID',
       sortable: true,
       render: (value: any) => (
-        <span className="font-mono text-sm font-medium text-indigo-600">{value}</span>
+        // tightened spacing and smaller text for compact Sale ID display
+        <div className="inline-block px-0 py-0">
+          <span className="font-mono text-xs font-medium text-indigo-600 tracking-tight">
+            {value}
+          </span>
+        </div>
       )
     },
     {
@@ -1417,33 +1559,13 @@ export default function POSPage() {
         </span>
       )
     },
+    // ✅ UPDATED COLUMN: Uses the new ProductsCell component
     {
       key: 'products',
       label: 'Products Sold',
       sortable: false,
       render: (_: any, row: any) => {
-        const saleItems = row.sale_item || [];
-        const productNames = saleItems.map((item: SaleItem) => 
-          item.inventory_item?.name || 'Unknown Product'
-        );
-        
-        if (productNames.length === 0) {
-          return <span className="text-slate-500 italic">No products</span>;
-        }
-
-        const displayText = productNames.slice(0, 2).join(', ');
-        const remainingCount = productNames.length - 2;
-        
-        return (
-          <div className="max-w-xs">
-            <span className="font-medium">{displayText}</span>
-            {remainingCount > 0 && (
-              <span className="text-slate-500 text-xs ml-1">
-                +{remainingCount} more
-              </span>
-            )}
-          </div>
-        );
+        return <ProductsCell items={row.sale_item || []} />;
       }
     },
     {
@@ -1473,22 +1595,34 @@ export default function POSPage() {
       key: 'actions',
       label: 'Actions',
       render: (_: any, row: any) => (
-        <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={(e) => {
-            e.stopPropagation();
-            alert(`View details for ${row.sale_id}`);
-          }}>
-            <Eye className="h-4 w-4 mr-1" />
-            View
-          </Button>
-          <Button variant="ghost" size="sm" onClick={ async (e) => {
-            e.stopPropagation();
-            handleDownloadReceipt(row.sale_id);
-          }} 
-          disabled={isSubmitting}
+        // reduced gap and compact button padding for tighter actions column
+        <div className="flex gap-1 items-center">
+          {/* VIEW BUTTON - Opens Modal */}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2 py-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleViewReceipt(row.sale_id);
+            }}
+            disabled={isSubmitting}
           >
-            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4 mr-1"/>}
-            Receipt
+            <Eye className="h-4 w-4" />
+          </Button>
+
+          {/* DOWNLOAD BUTTON - Direct Download */}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-green-600 hover:text-green-700 hover:bg-green-50 px-2 py-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDownloadReceipt(row.sale_id);
+            }} 
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
           </Button>
         </div>
       )
@@ -1570,7 +1704,6 @@ export default function POSPage() {
       label: 'Actions',
       render: (_: any, row: any) => (
         <div className="flex gap-2">
-          {/* Edit button removed per request */}
           <Button 
             variant="destructive" 
             size="sm" 
@@ -1622,7 +1755,7 @@ export default function POSPage() {
 
       <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
 
-        {/* Header Section - RESTORED original glassmorphism effect */}
+        {/* Header Section */}
         <div className={`mb-12 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
           <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
@@ -1744,6 +1877,55 @@ export default function POSPage() {
           </DialogContent>
         </Dialog>
 
+        {/* Receipt View Modal */}
+        <Dialog open={viewReceiptModalOpen} onOpenChange={setViewReceiptModalOpen}>
+          <DialogContent className="max-w-2xl h-[85vh] flex flex-col bg-white p-0 overflow-hidden font-poppins">
+            <DialogHeader className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+              <DialogTitle className="flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-indigo-600" />
+                Receipt Preview
+              </DialogTitle>
+              <DialogDescription>
+                Viewing receipt content.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="flex-1 w-full bg-slate-100 p-4 overflow-hidden">
+              <div className="w-full h-full bg-white shadow-sm rounded-lg overflow-hidden border border-slate-200">
+                {/* iframe allows us to render the full HTML receipt safely */}
+                <iframe 
+                  srcDoc={viewReceiptHtml} 
+                  className="w-full h-full border-none" 
+                  title="Receipt Preview" 
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="px-6 py-4 border-t border-slate-100 bg-white">
+              <Button variant="outline" onClick={() => setViewReceiptModalOpen(false)}>
+                Close
+              </Button>
+              <Button 
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white"
+                onClick={() => {
+                  // Allow downloading directly from the view modal if they want
+                  const blob = new Blob([viewReceiptHtml], { type: 'text/html' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `Receipt-Viewed.html`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download File
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Password Dialog for Void Management */}
         <Dialog open={showPasswordDialog} onOpenChange={(open) => {
           setShowPasswordDialog(open);
@@ -1797,9 +1979,9 @@ export default function POSPage() {
                 Cancel
               </Button>
               <Button
-                type="button"                    // ensure this doesn't act as a form submit
+                type="button"
                 className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins"
-                onClick={(e) => { e.preventDefault(); handlePasswordSubmit(); }} // prevent default + call
+                onClick={(e) => { e.preventDefault(); handlePasswordSubmit(); }} 
               >
                 Authenticate
               </Button>
@@ -2010,7 +2192,7 @@ export default function POSPage() {
                               }
                             `}
                           >
-                            <CategoryIcon category={category.value} className={`h-5 w-5 ${isSelected ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                            <CategoryIcon category={category.value} className="h-5 w-5" />
                             <span>{category.label}</span>
                           </button>
                         );
@@ -2083,14 +2265,15 @@ export default function POSPage() {
                         const currentStock = currentInventoryItem?.stock_quantity ?? item.stock_quantity;
                         const vehicleVisual = vehicleTypeVisuals[item.vehicle_type as keyof typeof vehicleTypeVisuals] || vehicleTypeVisuals.all;
                         const categoryVisual = categoryVisuals[item.category as keyof typeof categoryVisuals] || categoryVisuals.all;
-
+                        const VehicleIcon = vehicleVisual.icon;
+                        
                         return (
                           <div 
                             key={item.item_id}
                             className="group relative bg-white border border-slate-200 rounded-[20px] p-5 shadow-sm hover:border-indigo-100 transition-all duration-300 flex flex-col justify-between h-full"
                           >
                             {/* Hover Glow Effect */}
-                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 rounded-[20px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-purple-500/10 to-emerald-500/5 blur-2xl"></div>
 
                             <div className="relative z-10">
                               {/* Header: Icon + Title (same row/column, smaller sizes) */}
@@ -2105,12 +2288,12 @@ export default function POSPage() {
  
                               {/* Tags */}
                               <div className="flex flex-wrap gap-2 mb-6">
-                                <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold capitalize flex items-center gap-1.5 ${categoryVisual.badge}`}>
-                                  <span className={`w-1.5 h-1.5 rounded-full ${categoryVisual.dot}`} />
+                                <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold capitalize flex items-center gap-1 ${categoryVisual.badge}`}>
+                                  <span className={`h-2 w-2 rounded-full ${categoryVisual.dot}`} />
                                   {item.category}
                                 </span>
-                                <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold capitalize flex items-center gap-1.5 ${vehicleVisual.badge}`}>
-                                  <vehicleVisual.icon className="w-3 h-3" />
+                                <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold capitalize flex items-center gap-1 ${vehicleVisual.badge}`}>
+                                  <VehicleIcon className="w-3 h-3 mr-1" />
                                   {item.vehicle_type}
                                 </span>
                               </div>
@@ -2180,7 +2363,7 @@ export default function POSPage() {
               <Card className="bg-white/95 backdrop-blur-sm border-slate-200/80 shadow-[0_30px_50px_-28px_rgba(79,70,229,0.7)] rounded-3xl overflow-hidden border-0 sticky top-8 min-h-[720px] flex flex-col">
                 <CardHeader className="pb-5 bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-500 text-white border-b border-white/10 relative overflow-hidden">
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.25),_transparent_60%)]"></div>
-                  <div className="relative z-10">
+                  <div className="relative z-10 flex-1">
                     <CardTitle className="flex items-center text-2xl font-bold text-white font-poppins">
                       <ShoppingCart className="mr-3 h-6 w-6" />
                       Shopping Cart
@@ -2254,11 +2437,11 @@ export default function POSPage() {
                                     {/* FIXED: Changed badges to use capitalize and flex-wrap for long text */}
                                     <div className="flex flex-wrap items-center gap-2 text-[11px]">
                                       <Badge variant="outline" className={`capitalize tracking-wide flex items-center gap-1 ${categoryVisual.badge}`}>
-                                        <span className={`h-2 w-2 rounded-full ${categoryVisual.dot}`}></span>
+                                        <span className={`h-2 w-2 rounded-full ${categoryVisual.dot}`} />
                                         {categoryVisual.label}
                                       </Badge>
                                       <Badge variant="outline" className={`flex items-center gap-1 font-medium capitalize ${visual.badge}`}>
-                                        <VehicleIcon className="h-3 w-3" />
+                                        <VehicleIcon className="h-3 w-3 mr-1" />
                                         {visual.label}
                                       </Badge>
                                     </div>
@@ -2364,6 +2547,7 @@ export default function POSPage() {
         ) : (
           // Sales History View
           <div className="space-y-6">
+            
             {/* Summary Cards - Redesigned to match Service Management Dashboard */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-poppins">
               
@@ -2441,7 +2625,7 @@ export default function POSPage() {
 
             </div>
 
-            {/* ✅ Sales Table - Inventory Style Design */}
+            {/* Sales Table - Inventory Style Design */}
             <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-xl font-poppins">
               
               {/* 1. Gradient Header (Title + Total like Inventory page) */}
@@ -2481,7 +2665,7 @@ export default function POSPage() {
                 {/* Top row: Search + Controls */}
                 <div className="w-full flex flex-col sm:flex-row gap-4 justify-between items-center">
                   {/* Left: Search */}
-                  <div className="relative w-full flex-1"> {/* <--- NEW: Takes all available space */}
+                  <div className="relative w-full flex-1"> 
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                     <Input
                       placeholder="Search by ID or Customer Name..."
@@ -2534,7 +2718,7 @@ export default function POSPage() {
               <div className="p-0">
                 <DataTableWrapper
                   className="border-0 rounded-none"
-                  data={sortedSales} // Passing sorted data here
+                  data={sortedSales} 
                   columns={salesColumns}
                   searchKeys={['sale_id', 'customer.name']}
                   rowsPerPageOptions={[5, 10, 20, 50]}
