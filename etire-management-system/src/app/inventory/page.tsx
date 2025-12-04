@@ -6,7 +6,7 @@ import { DataTableWrapper } from '@/components/DataTableWrapper';
 import { 
   Archive, Coins, AlertTriangle, PlusCircle, PackageSearch, Loader2, Filter,
   TrendingUp, Clock, RefreshCw, Plus, Search, X, Download, SlidersHorizontal,
-  ArrowUpDown, Eye, Save, CheckCircle
+  ArrowUpDown, Eye, Save, CheckCircle, ListFilter
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -1773,7 +1773,7 @@ const handleExportExcel = () => {
         <div 
           className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
           style={{ 
-            backgroundImage: "url('/images/image5.png')",
+            backgroundImage: "url('/images/image2.jpg')",
             backgroundSize: "cover",
             backgroundPosition: "center 30%"
           }}
