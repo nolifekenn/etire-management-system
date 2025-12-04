@@ -1223,13 +1223,26 @@ const TabbedServiceForm = ({
               )}
               
               <div className="space-y-2">
-                <Label htmlFor="vehicle-type" className="text-slate-700 font-medium font-poppins">Vehicle Type</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="vehicle-type" className="text-slate-700 font-medium font-poppins">
+                    Vehicle Type
+                  </Label>
+                  {/* ✅ Show lock indicator when vehicle is selected */}
+                  {formData.vehicleId && (
+                    <Badge variant="secondary" className="text-xs font-poppins">
+                      <Car className="h-3 w-3 mr-1" />
+                      Auto-filled
+                    </Badge>
+                  )}
+                </div>
                 <Select 
                   value={formData.vehicleTypeId || undefined} 
                   onValueChange={(val) => onFormDataChange({ ...formData, vehicleTypeId: val })}
-                  disabled={isFieldsLocked}
+                  disabled={isFieldsLocked || !!formData.vehicleId} // ✅ Disable when vehicle is selected
                 >
-                  <SelectTrigger className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins ${isFieldsLocked ? 'bg-slate-100 cursor-not-allowed' : 'bg-white/80'}`}>
+                  <SelectTrigger className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins ${
+                    isFieldsLocked || formData.vehicleId ? 'bg-slate-100 cursor-not-allowed' : 'bg-white/80'
+                  }`}>
                     <SelectValue placeholder="Select vehicle type..."/>
                   </SelectTrigger>
                   <SelectContent>
@@ -1240,6 +1253,13 @@ const TabbedServiceForm = ({
                     ))}
                   </SelectContent>
                 </Select>
+                {/* ✅ Show helpful message when vehicle type is locked */}
+                {formData.vehicleId && (
+                  <p className="text-xs text-slate-500 mt-1 flex items-center gap-1 font-poppins">
+                    <AlertTriangle className="h-3 w-3" />
+                    Vehicle type is auto-filled from selected vehicle. Clear vehicle to change manually.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
