@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,7 +36,6 @@ import {
   Bike,
   Truck,
   Package,
-  Filter,
   RefreshCw,
   Clock,
   Receipt,
@@ -52,7 +52,9 @@ import {
   ArrowUpDown,
   Save,
   Archive,
-  Printer
+  Printer,
+  ListFilter,
+  AlertTriangle
 } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import {
@@ -72,7 +74,7 @@ import {
   type ReceiptData,
   type ReceiptCustomer,
 } from '@/lib/receiptGenerator';
-import type { Sale, User } from '@/lib/types';
+import type { Sale, User as AppUser } from '@/lib/types';
 
 // ============================================
 // INTERFACES & TYPES
@@ -104,21 +106,6 @@ interface EnhancedSale extends Sale {
 }
 
 const ANONYMOUS_CUSTOMER_ID = "anonymous_customer";
-
-// Design system from dashboard
-const buttonStyles = {
-  primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins",
-  secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 font-poppins",
-  glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins",
-  back: "flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-slate-300 hover:border-slate-400 font-poppins"
-};
-
-const microAnimations = {
-  cardHover: "transition-all duration-350 ease-spring hover:translate-y-[-6px] hover:shadow-2xl",
-  buttonHover: "transition-all duration-200 hover:scale-105 active:scale-95",
-  fadeIn: "animate-in fade-in duration-500",
-  iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
-};
 
 // ============================================
 // CUSTOM TIRE ICON COMPONENT
@@ -161,6 +148,12 @@ interface DataTableProps {
   searchKeys?: string[];
   rowsPerPageOptions?: number[];
   onRowClick?: (row: any) => void;
+  showHeader?: boolean;
+  rowsPerPage?: number;
+  onRowsPerPageChange?: (n: number) => void;
+  searchTerm?: string;
+  onSearchTermChange?: (term: string) => void;
+  className?: string;
 }
 
 function DataTableWrapper({
@@ -168,18 +161,33 @@ function DataTableWrapper({
   columns,
   searchKeys = [],
   rowsPerPageOptions = [5, 10, 25, 50],
-  onRowClick
+  onRowClick,
+  showHeader = true,
+  rowsPerPage: externalRowsPerPage,
+  onRowsPerPageChange,
+  searchTerm: externalSearchTerm,
+  onSearchTermChange,
+  className
 }: DataTableProps) {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [internalSearchTerm, setInternalSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(rowsPerPageOptions[0]);
+  const [internalRowsPerPage, setInternalRowsPerPage] = useState(rowsPerPageOptions[0]);
+  
+  // Use external props if provided, otherwise internal state
+  const rowsPerPage = typeof externalRowsPerPage === 'number' ? externalRowsPerPage : internalRowsPerPage;
+  const searchTerm = typeof externalSearchTerm === 'string' ? externalSearchTerm : internalSearchTerm;
+
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, rowsPerPage]);
 
   const filteredData = useMemo(() => {
     if (!searchTerm) return data;
     return data.filter(row => {
       return searchKeys.some(key => {
-        const value = row[key];
+        const value = key.split('.').reduce((acc: any, k) => acc?.[k], row);
         if (value === null || value === undefined) return false;
         return String(value).toLowerCase().includes(searchTerm.toLowerCase());
       });
@@ -200,14 +208,10 @@ function DataTableWrapper({
     return sorted;
   }, [filteredData, sortConfig]);
 
-  const totalPages = Math.ceil(sortedData.length / rowsPerPage);
+  const totalPages = Math.ceil(sortedData.length / rowsPerPage) || 1;
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
   const paginatedData = sortedData.slice(startIndex, endIndex);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, rowsPerPage]);
 
   const handleSort = (key: string) => {
     setSortConfig(current => {
@@ -218,36 +222,54 @@ function DataTableWrapper({
     });
   };
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-          <Input
-            placeholder="Search sales..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-600">Rows per page:</span>
-          <Select value={String(rowsPerPage)} onValueChange={(v) => setRowsPerPage(Number(v))}>
-            <SelectTrigger className="w-20">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {rowsPerPageOptions.map(option => (
-                <SelectItem key={option} value={String(option)}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+  const handleRowsPerPageChange = (n: number) => {
+    if (onRowsPerPageChange) {
+      onRowsPerPageChange(n);
+    } else {
+      setInternalRowsPerPage(n);
+    }
+  };
 
-      <div className="border rounded-lg overflow-hidden bg-white">
+  const handleSearchChange = (val: string) => {
+    if (onSearchTermChange) {
+      onSearchTermChange(val);
+    } else {
+      setInternalSearchTerm(val);
+    }
+  };
+
+  return (
+    <div className={`space-y-4 ${className || ''}`}>
+      {showHeader && (
+        <div className="flex items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+            <Input
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-600">Rows per page:</span>
+            <Select value={String(rowsPerPage)} onValueChange={(v) => handleRowsPerPageChange(Number(v))}>
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {rowsPerPageOptions.map(option => (
+                  <SelectItem key={option} value={String(option)}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+
+      <div className={`overflow-hidden bg-white ${showHeader ? 'border rounded-lg' : ''}`}>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b">
@@ -275,7 +297,7 @@ function DataTableWrapper({
               {paginatedData.length === 0 ? (
                 <tr>
                   <td colSpan={columns.length} className="px-6 py-8 text-center text-slate-500">
-                    No sales found
+                    No records found
                   </td>
                 </tr>
               ) : (
@@ -298,25 +320,26 @@ function DataTableWrapper({
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
+      {/* Footer Pager */}
+      <div className="flex items-center justify-between p-6 border-t">
         <div className="text-sm text-slate-600">
-          Showing {startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
+          Showing {totalPages === 0 ? 0 : startIndex + 1} to {Math.min(endIndex, sortedData.length)} of {sortedData.length} entries
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>
-            <ChevronsLeft className="h-4 w-4" />
+          <Button variant="outline" className="h-8 px-2 min-w-[36px]" onClick={() => { setCurrentPage(1); }} disabled={currentPage === 1}>
+            «
           </Button>
-          <Button variant="outline" size="icon" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
-            <ChevronLeft className="h-4 w-4" />
+          <Button variant="outline" className="h-8 px-2 min-w-[36px]" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+            ‹
           </Button>
-          <span className="text-sm text-slate-600 px-4">
+          <span className="text-sm text-slate-600 px-2 font-medium">
             Page {currentPage} of {totalPages || 1}
           </span>
-          <Button variant="outline" size="icon" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || totalPages === 0}>
-            <ChevronRight className="h-4 w-4" />
+          <Button variant="outline" className="h-8 px-2 min-w-[36px]" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || totalPages === 0}>
+            ›
           </Button>
-          <Button variant="outline" size="icon" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages || totalPages === 0}>
-            <ChevronsRight className="h-4 w-4" />
+          <Button variant="outline" className="h-8 px-2 min-w-[36px]" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages || totalPages === 0}>
+            »
           </Button>
         </div>
       </div>
@@ -444,7 +467,7 @@ const CustomerSearch = ({
 };
 
 // ============================================
-// SUCCESS ANIMATION COMPONENT
+// SUCCESS ANIMATION COMPONENT (PORTAL)
 // ============================================
 const SuccessAnimation = ({
   isVisible,
@@ -504,8 +527,8 @@ const SuccessAnimation = ({
 
   const { gradient, icon: ActionIcon } = getActionConfig();
 
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300">
+  const content = (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] animate-in fade-in duration-300">
       <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300">
         <div className={`w-20 h-20 bg-gradient-to-r ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500`}>
           <ActionIcon className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
@@ -531,6 +554,13 @@ const SuccessAnimation = ({
       </div>
     </div>
   );
+
+  // Portal to document.body so it overlays everything (guard for SSR)
+  if (typeof document !== 'undefined') {
+    return createPortal(content, document.body);
+  }
+
+  return null;
 };
 
 // ============================================
@@ -559,7 +589,6 @@ const CategoryIcon = ({ category, className = "h-4 w-4" }: { category: string; c
   }
 };
 
-// UPDATED: Fixed vehicle type visuals to use purple/blue color scheme but keep the original structure
 const vehicleTypeVisuals = {
   all: {
     label: 'All',
@@ -576,7 +605,7 @@ const vehicleTypeVisuals = {
     badge: 'bg-purple-50 text-purple-700 border-purple-200'
   },
   motor: {
-    label: 'Mtrcycle',
+    label: 'Motorcycle',
     icon: Bike,
     buttonActive: 'bg-gradient-to-r from-violet-500 to-cyan-500 text-white shadow-lg border-transparent',
     buttonInactive: 'bg-white text-slate-700 hover:text-violet-700 border-slate-200 hover:border-violet-300 hover:bg-violet-50/70',
@@ -591,13 +620,15 @@ const vehicleTypeVisuals = {
   }
 } as const;
 
-const vehicleTypes = Object.entries(vehicleTypeVisuals).map(([value, config]) => ({
-  value,
-  label: config.label,
-  icon: config.icon
-}));
+// ✅ UPDATED: Filter out 'all' so the button doesn't show up in the map
+const vehicleTypes = Object.entries(vehicleTypeVisuals)
+  .filter(([value]) => value !== 'all')
+  .map(([value, config]) => ({
+    value,
+    label: config.label,
+    icon: config.icon
+  }));
 
-// UPDATED: Fixed category visuals to use purple/blue color scheme but keep the original structure
 const categoryVisuals = {
   all: {
     label: 'All',
@@ -629,10 +660,13 @@ const categoryVisuals = {
   }
 } as const;
 
-const categories = Object.entries(categoryVisuals).map(([value, config]) => ({
-  value,
-  label: config.label
-}));
+// ✅ UPDATED: Filter out 'all' so the button doesn't show up in the map
+const categories = Object.entries(categoryVisuals)
+  .filter(([value]) => value !== 'all')
+  .map(([value, config]) => ({
+    value,
+    label: config.label
+  }));
 
 // ============================================
 // MAIN POS PAGE COMPONENT
@@ -655,6 +689,11 @@ export default function POSPage() {
   // State for Sales History
   const [sales, setSales] = useState<EnhancedSale[]>([]);
   const [showSalesHistory, setShowSalesHistory] = useState(false);
+  const [historySearchTerm, setHistorySearchTerm] = useState('');
+  const [rowsPerPageSales, setRowsPerPageSales] = useState<number>(5);
+  
+  // Sort State
+  const [sortOption, setSortOption] = useState('date-desc');
 
   // State for Success Animation
   const [successAnimation, setSuccessAnimation] = useState<{
@@ -675,6 +714,12 @@ export default function POSPage() {
   const [managerPassword, setManagerPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
+  const [voidSearchTerm, setVoidSearchTerm] = useState('');
+  const [rowsPerPageVoid, setRowsPerPageVoid] = useState(5);
+
+  // State for Void Confirmation Dialog
+  const [showVoidConfirm, setShowVoidConfirm] = useState(false);
+  const [saleToVoid, setSaleToVoid] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -749,8 +794,37 @@ export default function POSPage() {
     });
   }, [inventory, searchTerm, selectedVehicleType, selectedCategory]);
 
+  // Sorted Sales Logic
+  const sortedSales = useMemo(() => {
+    let sorted = [...sales];
+    switch (sortOption) {
+      case 'date-desc':
+        sorted.sort((a, b) => new Date(b.sale_date).getTime() - new Date(a.sale_date).getTime());
+        break;
+      case 'date-asc':
+        sorted.sort((a, b) => new Date(a.sale_date).getTime() - new Date(b.sale_date).getTime());
+        break;
+      case 'amount-desc':
+        sorted.sort((a, b) => (b.total_amount || 0) - (a.total_amount || 0));
+        break;
+      case 'amount-asc':
+        sorted.sort((a, b) => (a.total_amount || 0) - (b.total_amount || 0));
+        break;
+      case 'items-desc':
+        sorted.sort((a, b) => {
+          const aItems = a.sale_item?.reduce((acc, i) => acc + i.quantity, 0) || 0;
+          const bItems = b.sale_item?.reduce((acc, i) => acc + i.quantity, 0) || 0;
+          return bItems - aItems;
+        });
+        break;
+      default:
+        break;
+    }
+    return sorted;
+  }, [sales, sortOption]);
+
   const addToCart = (item: InventoryItem) => {
-    // ✅ Get the CURRENT stock from inventory state (not the passed item)
+    // Get the CURRENT stock from inventory state (not the passed item)
     const currentInventoryItem = inventory.find(inv => inv.item_id === item.item_id);
     const currentStock = currentInventoryItem?.stock_quantity ?? 0;
     
@@ -767,7 +841,7 @@ export default function POSPage() {
     const existingItem = cart.find(cartItem => cartItem.item_id === item.item_id);
     
     if (existingItem) {
-      // ✅ Item already in cart - check against CURRENT stock, not cart quantity
+      // Item already in cart - check against CURRENT stock, not cart quantity
       if (currentStock > 0) {
         setCart(prevCart =>
           prevCart.map(cartItem =>
@@ -960,7 +1034,7 @@ export default function POSPage() {
         const receiptData: ReceiptData = {
           sale: newSaleObject,
           items: receiptItems,
-          cashier: authUser as User,
+          cashier: authUser as AppUser,
           customer: receiptCustomer,
           businessInfo: businessInfo,
         };
@@ -1059,7 +1133,7 @@ export default function POSPage() {
       const receiptData: ReceiptData = {
         sale: saleData,
         items: receiptItems,
-        cashier: saleData.user as User,
+        cashier: saleData.user as AppUser,
         customer: receiptCustomer,
         businessInfo: businessInfo,
       };
@@ -1085,11 +1159,18 @@ export default function POSPage() {
     }
   };
 
-  const handleVoidClick = () => {
-    setShowPasswordDialog(true);
+  const handleVoidClick = (saleId: string) => {
+    setSaleToVoid(saleId);
+    setShowVoidConfirm(true);
   };
 
   const handlePasswordSubmit = async () => {
+    // QUICK GUARDS + helpful logs for debugging
+    if (!managerPassword || managerPassword.trim() === '') {
+      setPasswordError('Please enter the manager password.');
+      return;
+    }
+
     if (!supabase) {
       toast({
         title: "Error",
@@ -1098,69 +1179,30 @@ export default function POSPage() {
       });
       return;
     }
-  
+
     try {
-      // Check if it's the default admin password first
-      const BRANCH_MANAGER_PASSWORD = 'admin123';
-      
-      if (managerPassword === BRANCH_MANAGER_PASSWORD) {
-        setIsAuthenticated(true);
-        setShowVoidManagement(true);
-        setShowPasswordDialog(false);
-        setManagerPassword('');
-        setPasswordError(null);
-        
-        // Show success animation for access granted
-        setSuccessAnimation({
-          isVisible: true,
-          title: "Access Granted!",
-          message: "Admin access: You can now manage sales transactions.",
-          actionType: 'access'
-        });
-        return;
-      }
-  
-      // ✅ NEW: Fetch all users with role_id = 2 (exclude role 0 - Guest)
-      const { data: roleUsers, error } = await supabase
+      console.log('Attempting manager auth'); // debug
+      // Query Supabase directly for a user with role 2 (Manager) matching the entered password
+      const { data: matchedUser, error } = await supabase
         .from('user')
-        .select('user_id, name, password, role')
-        .eq('role', 2); // Only role 2 users
-  
+        .select('user_id, name')
+        .eq('role', 2)
+        .eq('password', managerPassword)
+        .maybeSingle();
+
       if (error) {
-        console.error('Error fetching role 2 users:', error);
-        setPasswordError('Failed to verify credentials. Please try again.');
-        toast({
-          title: "Error",
-          description: "Could not verify user credentials.",
-          variant: "destructive",
-        });
+        console.error('Database error verifying credentials:', error);
+        setPasswordError('System error verifying credentials.');
         return;
       }
-  
-      // Check if no role 2 users exist
-      if (!roleUsers || roleUsers.length === 0) {
-        setPasswordError('No authorized managers found in the system.');
-        setManagerPassword('');
-        toast({
-          title: "Access Denied",
-          description: "No authorized managers found.",
-          variant: "destructive",
-        });
-        return;
-      }
-  
-      // ✅ Check if entered password matches any role 2 user's password
-      const matchedUser = roleUsers.find(user => user.password === managerPassword);
-  
+
       if (matchedUser) {
-        // ✅ SUCCESS: User with role 2 authenticated
         setIsAuthenticated(true);
         setShowVoidManagement(true);
         setShowPasswordDialog(false);
         setManagerPassword('');
         setPasswordError(null);
-        
-        // Show success animation for access granted
+
         setSuccessAnimation({
           isVisible: true,
           title: "Access Granted!",
@@ -1168,7 +1210,6 @@ export default function POSPage() {
           actionType: 'access'
         });
       } else {
-        // ❌ FAILED: Password doesn't match any role 2 user
         setPasswordError('Invalid manager password. Access denied.');
         setManagerPassword('');
         toast({
@@ -1178,13 +1219,8 @@ export default function POSPage() {
         });
       }
     } catch (error: any) {
-      console.error('Password verification error:', error);
+      console.error('Unexpected auth error:', error);
       setPasswordError('An unexpected error occurred. Please try again.');
-      toast({
-        title: "Error",
-        description: "Failed to verify credentials.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -1268,12 +1304,11 @@ export default function POSPage() {
     });
   };
 
-  const handleVoidSale = async (saleId: string) => {
-    if (!supabase) return;
+  const executeVoidSale = async () => {
+    if (!supabase || !saleToVoid) return;
 
-    if (!confirm(`Are you sure you want to void sale ${saleId}? This will restore inventory and remove the sale record.`)) {
-      return;
-    }
+    // Close dialog immediately to prevent double clicks
+    setShowVoidConfirm(false); 
 
     try {
       setIsLoading(true);
@@ -1281,7 +1316,7 @@ export default function POSPage() {
       const { data: saleItems, error: fetchError } = await supabase
         .from('sale_item')
         .select('item_id, quantity')
-        .eq('sale_id', saleId);
+        .eq('sale_id', saleToVoid);
 
       if (fetchError) throw fetchError;
 
@@ -1292,6 +1327,7 @@ export default function POSPage() {
         });
 
         if (updateError) {
+          // Fallback if RPC fails
           const { data: currentItem } = await supabase
             .from('inventory_item')
             .select('stock_quantity')
@@ -1308,21 +1344,21 @@ export default function POSPage() {
       const { error: deleteItemsError } = await supabase
         .from('sale_item')
         .delete()
-        .eq('sale_id', saleId);
+        .eq('sale_id', saleToVoid);
 
       if (deleteItemsError) throw deleteItemsError;
 
       const { error: deleteSaleError } = await supabase
         .from('sale')
         .delete()
-        .eq('sale_id', saleId);
+        .eq('sale_id', saleToVoid);
 
       if (deleteSaleError) throw deleteSaleError;
 
       setSuccessAnimation({
         isVisible: true,
         title: "Sale Voided!",
-        message: `Sale ${saleId} has been voided and inventory has been restored.`,
+        message: `Sale ${saleToVoid} has been voided and inventory has been restored.`,
         actionType: 'void'
       });
 
@@ -1335,6 +1371,7 @@ export default function POSPage() {
       });
     } finally {
       setIsLoading(false);
+      setSaleToVoid(null); // Reset state
     }
   };
 
@@ -1423,23 +1460,6 @@ export default function POSPage() {
       }
     },
     {
-      key: 'payment_method',
-      label: 'Payment',
-      sortable: true,
-      render: (value: any) => (
-        <Badge
-          variant="outline"
-          className={
-            value === 'cash' ? 'bg-green-50 text-green-700 border-green-200' :
-            value === 'card' ? 'bg-purple-50 text-purple-700 border-purple-200' :
-            'bg-blue-50 text-blue-700 border-blue-200'
-          }
-        >
-          {String(value).toUpperCase()}
-        </Badge>
-      )
-    },
-    {
       key: 'total_amount',
       label: 'Total Amount',
       sortable: true,
@@ -1475,9 +1495,7 @@ export default function POSPage() {
     }
   ];
 
-  // ============================================
   // CLEANED VOID MANAGEMENT TABLE COLUMNS
-  // ============================================
   const voidManagementColumns: Column[] = [
     {
       key: 'sale_id',
@@ -1552,23 +1570,13 @@ export default function POSPage() {
       label: 'Actions',
       render: (_: any, row: any) => (
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={(e) => {
-              e.stopPropagation();
-              handleEditSale(row);
-            }}
-          >
-            <Edit className="h-4 w-4 mr-1" />
-            Edit
-          </Button>
+          {/* Edit button removed per request */}
           <Button 
             variant="destructive" 
             size="sm" 
             onClick={(e) => {
               e.stopPropagation();
-              handleVoidSale(row.sale_id);
+              handleVoidClick(row.sale_id);
             }}
           >
             <Ban className="h-4 w-4 mr-1" />
@@ -1605,7 +1613,7 @@ export default function POSPage() {
         <div
           className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
           style={{
-            backgroundImage: "url('/images/image4.png')",
+            backgroundImage: "url('/images/image2.jpg')",
             backgroundSize: "cover",
             backgroundPosition: "center 30%"
           }}
@@ -1661,13 +1669,6 @@ export default function POSPage() {
                 {showSalesHistory ? 'Show POS' : 'Sales History'}
               </Button>
               <Button
-                onClick={handleVoidClick}
-                className="bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins active:scale-95"
-              >
-                <Lock className="h-5 w-5 mr-2" />
-                Void Management
-              </Button>
-              <Button
                 onClick={fetchInitialData}
                 disabled={isLoading}
                 className="bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins active:scale-95"
@@ -1697,6 +1698,52 @@ export default function POSPage() {
           }}
         />
 
+        {/* Custom Void Confirmation Dialog */}
+        <Dialog open={showVoidConfirm} onOpenChange={setShowVoidConfirm}>
+          <DialogContent className="sm:max-w-md bg-white font-poppins border-0 shadow-2xl">
+            <DialogHeader>
+              <div className="mx-auto w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
+              <DialogTitle className="text-center text-xl font-bold text-slate-900">
+                Confirm Void Transaction
+              </DialogTitle>
+              <DialogDescription className="text-center text-slate-500 pt-2">
+                Are you sure you want to void this sale info?
+              </DialogDescription>
+            </DialogHeader>
+
+            {saleToVoid && (
+              <div className="bg-slate-50 rounded-xl p-4 my-2 border border-slate-100">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Sale ID</span>
+                  <span className="font-mono text-sm font-bold text-indigo-600">{saleToVoid}</span>
+                </div>
+                <div className="text-xs text-slate-400 text-center mt-2">
+                  This action cannot be undone. Inventory will be restored.
+                </div>
+              </div>
+            )}
+
+            <DialogFooter className="grid grid-cols-2 gap-3 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowVoidConfirm(false)}
+                className="w-full border-slate-200 hover:bg-slate-50 text-slate-700"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={executeVoidSale}
+                className="w-full bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30"
+              >
+                Confirm Void
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Password Dialog for Void Management */}
         <Dialog open={showPasswordDialog} onOpenChange={(open) => {
           setShowPasswordDialog(open);
@@ -1720,7 +1767,7 @@ export default function POSPage() {
                 value={managerPassword}
                 onChange={(e) => {
                   setManagerPassword(e.target.value);
-                  setPasswordError(null); // Clear error when user starts typing
+                  setPasswordError(null);
                 }}
                 placeholder="Enter password"
                 className={`text-lg ${passwordError ? 'border-red-500 focus:border-red-500' : ''}`}
@@ -1740,6 +1787,7 @@ export default function POSPage() {
             <DialogFooter className="gap-2">
               <Button
                 variant="outline"
+                type="button"
                 onClick={() => {
                   setShowPasswordDialog(false);
                   setPasswordError(null);
@@ -1749,8 +1797,9 @@ export default function POSPage() {
                 Cancel
               </Button>
               <Button
+                type="button"                    // ensure this doesn't act as a form submit
                 className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins"
-                onClick={handlePasswordSubmit}
+                onClick={(e) => { e.preventDefault(); handlePasswordSubmit(); }} // prevent default + call
               >
                 Authenticate
               </Button>
@@ -1758,53 +1807,97 @@ export default function POSPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Void Management Modal */}
+        {/* Void Management Modal - Redesigned */}
         {showVoidManagement && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-red-50/50">
-                <div>
-                  <h2 className="text-2xl font-bold text-slate-900 font-poppins">Void Management</h2>
-                  <p className="text-slate-600 mt-1 font-poppins">
-                    Edit or void sales transactions. Voiding will restore inventory and remove the sale record.
-                  </p>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-200">
+              
+              {/* 1. Custom Gradient Header */}
+              <div className="w-full bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 text-white p-5 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-xl shadow-inner border border-white/10">
+                    <Lock className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-xl font-bold tracking-tight font-poppins">Void Management</div>
+                    <div className="text-sm text-white/90 font-medium font-poppins opacity-90">
+                      Authorized Manager Access
+                    </div>
+                  </div>
                 </div>
+
                 <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="bg-red-50 text-red-700 font-poppins">
-                    Manager Access
-                  </Badge>
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => setShowVoidManagement(false)}
-                    className="h-8 w-8 text-slate-500 hover:text-slate-700"
+                    className="h-8 w-8 text-white hover:bg-white/20 hover:text-white rounded-full transition-colors"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-5 w-5" />
                   </Button>
                 </div>
               </div>
-              
-              <div className="flex-1 overflow-auto p-6">
+
+              {/* 2. Toolbar Section (Search & Sort) */}
+              <div className="bg-white border-b border-slate-100 p-4 flex flex-col gap-2 relative overflow-visible min-h-[72px] shrink-0">
+                <div className="w-full flex flex-col sm:flex-row gap-4 justify-between items-center">
+                  {/* Search */}
+                  <div className="relative w-full flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+                    <Input
+                      placeholder="Search voidable sales by ID or Customer..."
+                      value={voidSearchTerm}
+                      onChange={(e) => setVoidSearchTerm(e.target.value)}
+                      className="pl-10 h-10 border-slate-200 focus:border-red-500 focus:ring-red-200 bg-slate-50/50 w-full font-poppins transition-all"
+                    />
+                  </div>
+
+                  {/* Rows Control */}
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="flex items-center gap-2">
+                        <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block font-poppins">Rows</Label>
+                        <Select value={String(rowsPerPageVoid)} onValueChange={(v) => setRowsPerPageVoid(Number(v))}>
+                            <SelectTrigger className="h-10 w-[70px] border-slate-200 bg-white font-poppins">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="z-[60] font-poppins">
+                              {[5, 10, 20, 50].map(opt => (
+                                <SelectItem key={opt} value={String(opt)}>{opt}</SelectItem>
+                              ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Table Content */}
+              <div className="flex-1 overflow-auto bg-slate-50/30 p-0">
                 <DataTableWrapper
+                  className="border-0 rounded-none shadow-none"
                   data={sales}
                   columns={voidManagementColumns}
                   searchKeys={['sale_id', 'customer.name']}
+                  showHeader={false} // We built our own header above
+                  rowsPerPage={rowsPerPageVoid}
+                  onRowsPerPageChange={setRowsPerPageVoid}
+                  searchTerm={voidSearchTerm}
+                  onSearchTermChange={setVoidSearchTerm}
                   rowsPerPageOptions={[5, 10, 25, 50]}
                 />
               </div>
               
-              <div className="p-4 border-t border-slate-200 bg-slate-50">
-                <div className="flex justify-between items-center">
-                  <p className="text-sm text-slate-600 font-poppins">
-                    {sales.length} sales found
-                  </p>
-                  <Button
-                    onClick={() => setShowVoidManagement(false)}
-                    className="flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-slate-300 hover:border-slate-400 font-poppins"
-                  >
-                    Close Void Management
-                  </Button>
-                </div>
+              {/* Footer */}
+              <div className="p-4 border-t border-slate-200 bg-slate-50 shrink-0 flex justify-between items-center">
+                <p className="text-xs text-slate-500 font-poppins">
+                  * Voiding a sale is permanent and will immediately restore inventory stock.
+                </p>
+                <Button
+                  onClick={() => setShowVoidManagement(false)}
+                  className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-6 font-poppins"
+                >
+                  Close
+                </Button>
               </div>
             </div>
           </div>
@@ -1829,7 +1922,7 @@ export default function POSPage() {
                 onChange={(e) => setInstallationFee(Number(e.target.value) || 0)}
                 placeholder="0.00"
                 className="text-lg"
-              />
+                           />
             </div>
             <DialogFooter className="gap-2">
               <Button
@@ -1854,206 +1947,231 @@ export default function POSPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Product Selection - Left Side */}
             <div className="lg:col-span-2">
-              <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0 min-h-[720px] flex flex-col">
-                <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-purple-50/50 border-b border-slate-200/50">
-                  <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Available Products</CardTitle>
+              <Card className="bg-white border-slate-200 shadow-xl rounded-[20px] overflow-hidden flex flex-col font-poppins">
+                
+                {/* Header & Filters Section */}
+                <div className="p-6 pb-0 space-y-6">
+                  
+                  {/* Title */}
+                  <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+                    Available Products
+                  </h2>
 
-                  <div className="space-y-4 mt-4">
-                    {/* Vehicle Type Selection */}
-                    <div>
-                      <Label className="text-slate-700 text-sm font-medium mb-3 block font-poppins">Vehicle Type</Label>
-                      <div className="grid grid-cols-4 gap-2 w-full">
-                        {vehicleTypes.map((vehicle) => {
-                          const Icon = vehicle.icon;
-                          const isSelected = selectedVehicleType === vehicle.value;
-                          const visual = vehicleTypeVisuals[vehicle.value as keyof typeof vehicleTypeVisuals];
-                          return (
-                            <Button
-                              key={vehicle.value}
-                              variant="outline"
-                              className={`group relative overflow-hidden rounded-2xl border text-sm font-semibold transition-all duration-300 w-full font-poppins ${isSelected ? visual.buttonActive : visual.buttonInactive}`}
-                              onClick={() => setSelectedVehicleType(vehicle.value)}
-                            >
-                              <span className="relative z-10 flex items-center gap-2">
-                                <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700 group-hover:text-current'}`}>
-                                  <Icon className="h-4 w-4" />
-                                </span>
-                                {vehicle.label}
-                              </span>
-                            </Button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Category Selection */}
-                    <div>
-                      <Label className="text-slate-700 text-sm font-medium mb-3 block font-poppins">Category</Label>
-                      <div className="grid grid-cols-4 gap-2 w-full">
-                        {categories.map((category) => {
-                          const isSelected = selectedCategory === category.value;
-                          const visual = categoryVisuals[category.value as keyof typeof categoryVisuals];
-                          return (
-                            <Button
-                              key={category.value}
-                              variant="outline"
-                              className={`group relative overflow-hidden rounded-2xl border text-sm font-semibold transition-all duration-300 w-full font-poppins ${isSelected ? visual.buttonActive : visual.buttonInactive}`}
-                              onClick={() => setSelectedCategory(category.value)}
-                            >
-                              <span className="relative z-10 flex items-center gap-2">
-                                <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700 group-hover:text-current'}`}>
-                                  <CategoryIcon category={category.value} className={`h-4 w-4 ${isSelected ? 'text-white' : 'text-slate-600'}`} />
-                                </span>
-                                {category.label}
-                              </span>
-                            </Button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Search Bar */}
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                      <Input
-                        placeholder="Search products by name or category..."
-                        className="pl-10 border-slate-300 focus:border-indigo-400 transition-all duration-300 font-poppins"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                      {(selectedVehicleType !== 'all' || selectedCategory !== 'all' || searchTerm) && (
-                        <button
-                          onClick={clearFilters}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-all duration-300"
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Active Filters Display */}
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {selectedVehicleType !== 'all' && (
-                      <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 font-poppins capitalize">
-                        Vehicle: {vehicleTypes.find(v => v.value === selectedVehicleType)?.label}
-                      </Badge>
-                    )}
-                    {selectedCategory !== 'all' && (
-                      <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200 font-poppins capitalize">
-                        Category: {categories.find(c => c.value === selectedCategory)?.label}
-                      </Badge>
-                    )}
-                    {searchTerm && (
-                      <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200 font-poppins capitalize">
-                        Search: {searchTerm}
-                      </Badge>
-                    )}
-                  </div>
-                </CardHeader>
-
-                <CardContent className="p-0 flex-1 flex flex-col">
-                  {isLoading ? (
-                    <div className="flex justify-center items-center h-48">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-6 overflow-y-auto flex-1">
-                      {filteredInventory.map(item => {
-                        // ✅ Get the current stock from the inventory state (not the filtered item)
-                        const currentInventoryItem = inventory.find(inv => inv.item_id === item.item_id);
-                        const currentStock = currentInventoryItem?.stock_quantity ?? item.stock_quantity;
+                  {/* Vehicle Type Filter */}
+                  <div className="space-y-3">
+                    <Label className="text-slate-500 text-xs font-semibold uppercase tracking-wider ml-1">
+                      Vehicle Type
+                    </Label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {vehicleTypes.map((vehicle) => {
+                        const Icon = vehicle.icon;
+                        const isSelected = selectedVehicleType === vehicle.value;
+                        const visual = vehicleTypeVisuals[vehicle.value as keyof typeof vehicleTypeVisuals];
                         
                         return (
-                          <Card
-                            key={item.item_id}
-                            className={`relative overflow-hidden border border-slate-100/70 bg-white/90 shadow-sm hover:shadow-2xl transition-all duration-300 group rounded-2xl transition-all duration-350 ease-spring hover:translate-y-[-6px] hover:shadow-2xl font-poppins`}
+                          <button
+                            key={vehicle.value}
+                            onClick={() => setSelectedVehicleType(selectedVehicleType === vehicle.value ? 'all' : vehicle.value)}
+                            className={`
+                              relative group flex items-center justify-center gap-3 py-3 px-4 rounded-xl border text-sm font-semibold transition-all duration-300
+                              ${isSelected 
+                                ? `${visual.buttonActive} ring-2 ring-offset-2 ring-indigo-100 border-transparent` 
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                              }
+                            `}
                           >
-                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
-                              <div className="absolute -inset-8 bg-gradient-to-r from-indigo-500/10 via-transparent to-purple-500/20 blur-2xl animate-card-glow"></div>
-                            </div>
-                            <CardContent className="p-4 flex flex-col gap-3 relative z-10">
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <CategoryIcon category={item.category} className="h-4 w-4 text-indigo-600" />
-                                    <p className="font-semibold text-slate-800 group-hover:text-indigo-600 transition-colors truncate">
-                                      {item.name}
-                                    </p>
-                                  </div>
-                                  {/* FIXED: Changed badges to use capitalize and flex-wrap for long text */}
-                                  <div className="flex flex-wrap gap-2 mt-2">
-                                    {(() => {
-                                      const visual = categoryVisuals[item.category as keyof typeof categoryVisuals] || categoryVisuals.all;
-                                      return (
-                                        <Badge variant="outline" className={`text-[11px] capitalize tracking-wide flex items-center gap-1 ${visual.badge}`}>
-                                          <span className={`h-2 w-2 rounded-full ${visual.dot}`}></span>
-                                          {visual.label}
-                                        </Badge>
-                                      );
-                                    })()}
-                                    {(() => {
-                                      const visual = vehicleTypeVisuals[item.vehicle_type as keyof typeof vehicleTypeVisuals] || vehicleTypeVisuals.all;
-                                      const VehicleIcon = visual.icon;
-                                      return (
-                                        <Badge variant="outline" className={`text-[11px] font-medium capitalize flex items-center gap-1 ${visual.badge}`}>
-                                          <VehicleIcon className="h-3 w-3" />
-                                          {visual.label}
-                                        </Badge>
-                                      );
-                                    })()}
-                                  </div>
-                                </div>
-                                <Badge variant="outline" className="text-[10px] uppercase tracking-[0.3em] bg-white/80 text-slate-500 border-slate-200">
-                                  SKU
-                                </Badge>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <div>
-                                  <p className="text-lg font-bold text-green-600">₱{formatPrice(item.sale_price)}</p>
-                                  <p className={`text-xs ${
-                                    currentStock === 0 ? 'text-red-500' :
-                                    currentStock <= 2 ? 'text-red-500' :
-                                    currentStock <= 5 ? 'text-yellow-500' : 'text-green-500'
-                                  }`}>
-                                    {currentStock} in stock
-                                  </p>
-                                </div>
-                                <Button
-                                  size="sm"
-                                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 font-poppins"
-                                  disabled={currentStock <= 0}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    addToCart(item);
-                                  }}
-                                >
-                                  <Plus className="mr-1 h-4 w-4" />
-                                  Add
-                                </Button>
-                              </div>
-                            </CardContent>
-                          </Card>
+                            <Icon className={`h-5 w-5 ${isSelected ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                            <span>{vehicle.label}</span>
+                          </button>
                         );
                       })}
-                      {filteredInventory.length === 0 && (
-                        <div className="col-span-full text-center py-12">
-                          <Package className="h-16 w-16 text-slate-300 mx-auto mb-4" />
-                          <p className="text-slate-500 text-lg font-poppins">No products found</p>
-                          <p className="text-slate-400 text-sm font-poppins">Try adjusting your filters or search term</p>
-                          <Button
-                            variant="outline"
-                            className="mt-4 font-poppins"
-                            onClick={clearFilters}
+                    </div>
+                  </div>
+
+                  {/* Category Filter */}
+                  <div className="space-y-3">
+                    <Label className="text-slate-500 text-xs font-semibold uppercase tracking-wider ml-1">
+                      Category
+                    </Label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {categories.map((category) => {
+                        const isSelected = selectedCategory === category.value;
+                        const visual = categoryVisuals[category.value as keyof typeof categoryVisuals];
+                        
+                        return (
+                          <button
+                            key={category.value}
+                            onClick={() => setSelectedCategory(selectedCategory === category.value ? 'all' : category.value)}
+                            className={`
+                              relative group flex items-center justify-center gap-3 py-3 px-4 rounded-xl border text-sm font-semibold transition-all duration-300
+                              ${isSelected 
+                                ? `${visual.buttonActive} ring-2 ring-offset-2 ring-pink-100 border-transparent` 
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                              }
+                            `}
                           >
-                            Clear All Filters
+                            <CategoryIcon category={category.value} className={`h-5 w-5 ${isSelected ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                            <span>{category.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Search className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                    </div>
+                    <Input
+                      placeholder="Search products by name or category..."
+                      className="pl-10 pr-10 py-6 text-base bg-slate-50 border-slate-200 focus:bg-white focus:border-indigo-500 rounded-xl transition-all shadow-sm placeholder:text-slate-400"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm('')}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                      >
+                        <XCircle className="h-5 w-5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Active Filter Badges */}
+                  {(selectedVehicleType !== 'all' || selectedCategory !== 'all') && (
+                    <div className="flex items-center gap-2 pt-2 animate-in fade-in slide-in-from-top-2">
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-2">Filters:</span>
+                      
+                      {selectedVehicleType !== 'all' && (
+                        <Badge variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-100 px-3 py-1 text-xs gap-1">
+                          Vehicle: <span className="font-bold">{vehicleTypes.find(v => v.value === selectedVehicleType)?.label}</span>
+                        </Badge>
+                      )}
+
+                      {selectedCategory !== 'all' && (
+                        <Badge variant="secondary" className="bg-green-50 text-green-700 hover:bg-green-100 border-green-100 px-3 py-1 text-xs gap-1">
+                          Category: <span className="font-bold">{categories.find(c => c.value === selectedCategory)?.label}</span>
+                        </Badge>
+                      )}
+
+                      <button 
+                        onClick={clearFilters}
+                        className="text-xs text-slate-400 hover:text-red-500 ml-auto flex items-center gap-1 transition-colors"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Divider */}
+                  <div className="h-px bg-slate-200 w-full my-4"></div>
+                </div>
+
+                {/* Scrollable Product Grid */}
+                <div className="flex-1 overflow-y-auto p-6 pt-6">
+                  {isLoading ? (
+                    <div className="flex flex-col justify-center items-center h-64 text-slate-400 gap-4">
+                      <Loader2 className="h-10 w-10 animate-spin text-indigo-500" />
+                      <p>Loading inventory...</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 pb-6">
+                      {filteredInventory.map(item => {
+                        const currentInventoryItem = inventory.find(inv => inv.item_id === item.item_id);
+                        const currentStock = currentInventoryItem?.stock_quantity ?? item.stock_quantity;
+                        const vehicleVisual = vehicleTypeVisuals[item.vehicle_type as keyof typeof vehicleTypeVisuals] || vehicleTypeVisuals.all;
+                        const categoryVisual = categoryVisuals[item.category as keyof typeof categoryVisuals] || categoryVisuals.all;
+
+                        return (
+                          <div 
+                            key={item.item_id}
+                            className="group relative bg-white border border-slate-200 rounded-[20px] p-5 shadow-sm hover:border-indigo-100 transition-all duration-300 flex flex-col justify-between h-full"
+                          >
+                            {/* Hover Glow Effect */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 rounded-[20px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+
+                            <div className="relative z-10">
+                              {/* Header: Icon + Title (same row/column, smaller sizes) */}
+                              <div className="flex items-center gap-3 mb-3">
+                                <div className={`p-2 rounded-lg ${categoryVisual.buttonActive} bg-opacity-12 text-white shadow-sm flex items-center justify-center`}>
+                                  <CategoryIcon category={item.category} className="h-5 w-5" />
+                                </div>
+                                <h3 className="font-semibold text-slate-800 text-m line-clamp-3 leading-tight group-hover:text-indigo-600 transition-colors">
+                                  {item.name}
+                                </h3>
+                              </div>
+ 
+                              {/* Tags */}
+                              <div className="flex flex-wrap gap-2 mb-6">
+                                <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold capitalize flex items-center gap-1.5 ${categoryVisual.badge}`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${categoryVisual.dot}`} />
+                                  {item.category}
+                                </span>
+                                <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold capitalize flex items-center gap-1.5 ${vehicleVisual.badge}`}>
+                                  <vehicleVisual.icon className="w-3 h-3" />
+                                  {item.vehicle_type}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Footer: Price & Add Button */}
+                            <div className="relative z-10 flex items-end justify-between mt-auto pt-2">
+                              <div>
+                                <div className="text-xl font-bold text-green-600 tracking-tight">
+                                  ₱{formatPrice(item.sale_price)}
+                                </div>
+                                <div className={`text-xs font-semibold mt-1 flex items-center gap-1.5 ${
+                                  currentStock === 0 ? 'text-red-500' :
+                                  currentStock <= 5 ? 'text-amber-500' : 'text-green-600'
+                                }`}>
+                                  <div className={`w-1.5 h-1.5 rounded-full ${currentStock === 0 ? 'bg-red-500' : currentStock <= 5 ? 'bg-amber-500' : 'bg-green-500'}`} />
+                                  {currentStock === 0 ? 'Out of Stock' : `${currentStock} in stock`}
+                                </div>
+                              </div>
+
+                              <Button
+                                size="sm"
+                                disabled={currentStock <= 0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  addToCart(item);
+                                }}
+                                className={`
+                                  h-10 px-5 font-semibold shadow-lg shadow-indigo-500/20 transition-all duration-300
+                                  ${currentStock > 0 
+                                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:scale-105 hover:shadow-indigo-500/40 text-white' 
+                                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                  }
+                                `}
+                              >
+                                <Plus className="h-4 w-4 mr-1.5" />
+                                Add
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      {/* Empty State */}
+                      {filteredInventory.length === 0 && (
+                        <div className="col-span-full py-12 flex flex-col items-center justify-center text-center">
+                          <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                            <Package className="h-10 w-10 text-slate-300" />
+                          </div>
+                          <h3 className="text-lg font-semibold text-slate-900">No products found</h3>
+                          <p className="text-slate-500 max-w-xs mx-auto mt-2">
+                            We couldn't find anything matching your filters. Try adjusting your search.
+                          </p>
+                          <Button variant="outline" onClick={clearFilters} className="mt-6 border-dashed border-slate-300 text-slate-600">
+                            Clear Filters
                           </Button>
                         </div>
                       )}
                     </div>
                   )}
-                </CardContent>
+                </div>
               </Card>
             </div>
 
@@ -2246,72 +2364,189 @@ export default function POSPage() {
         ) : (
           // Sales History View
           <div className="space-y-6">
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="border-l-4 border-l-green-500 bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-xl rounded-2xl overflow-hidden border-0">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2 font-poppins">
-                    <DollarSign className="h-4 w-4" />
-                    Today's Revenue
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600 font-poppins">₱{formatPrice(todayRevenue)}</div>
-                  <p className="text-xs text-slate-500 mt-1 font-poppins">{todaySales.length} transactions today</p>
-                </CardContent>
-              </Card>
+            {/* Summary Cards - Redesigned to match Service Management Dashboard */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-poppins">
+              
+              {/* Card 1: Today's Sales (Purple/Pink Gradient) */}
+              <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-r from-purple-600 to-pink-600 p-6 shadow-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-purple-500/25 group">
+                {/* Abstract Background Shapes */}
+                <div className="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full bg-white/10 blur-2xl group-hover:bg-white/20 transition-all"></div>
+                <div className="absolute bottom-0 left-0 -mb-4 -ml-4 h-20 w-20 rounded-full bg-black/10 blur-2xl"></div>
 
-              <Card className="border-l-4 border-l-indigo-500 bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-xl rounded-2xl overflow-hidden border-0">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2 font-poppins">
-                    <TrendingUp className="h-4 w-4" />
-                    Total Sales
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-indigo-600 font-poppins">₱{formatPrice(totalSalesAmount)}</div>
-                  <p className="text-xs text-slate-500 mt-1 font-poppins">{sales.length} total transactions</p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-l-4 border-l-purple-500 bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-xl rounded-2xl overflow-hidden border-0">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2 font-poppins">
-                    <ShoppingCart className="h-4 w-4" />
-                    Average Order
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-purple-600 font-poppins">
-                    ₱{sales.length > 0 ? formatPrice(totalSalesAmount / sales.length) : '0.00'}
+                <div className="relative z-10 flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-white/80 tracking-wide">Today's Sales</p>
+                    <h3 className="text-3xl font-bold text-white mt-1">₱{formatPrice(todayRevenue)}</h3>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1 font-poppins">Per transaction</p>
-                </CardContent>
-              </Card>
+                  <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md border border-white/10 shadow-inner">
+                    <DollarSign className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+                
+                <div className="relative z-10 mt-6 flex items-center gap-2 text-white/80 text-sm">
+                  <span className="flex items-center justify-center bg-white/20 px-2.5 py-1 rounded-lg text-xs font-bold text-white backdrop-blur-sm border border-white/10">
+                    {todaySales.length}
+                  </span>
+                  <span className="text-xs font-medium opacity-80">Transactions today</span>
+                </div>
+              </div>
+
+              {/* Card 2: Total Sales (Blue/Cyan Gradient) */}
+              <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-r from-blue-600 to-cyan-500 p-6 shadow-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-blue-500/25 group">
+                <div className="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full bg-white/10 blur-2xl group-hover:bg-white/20 transition-all"></div>
+                <div className="absolute bottom-0 left-0 -mb-4 -ml-4 h-20 w-20 rounded-full bg-black/10 blur-2xl"></div>
+
+                <div className="relative z-10 flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-white/80 tracking-wide">Total Sales</p>
+                    <h3 className="text-3xl font-bold text-white mt-1">₱{formatPrice(totalSalesAmount)}</h3>
+                  </div>
+                  <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md border border-white/10 shadow-inner">
+                    <TrendingUp className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+
+                <div className="relative z-10 mt-6 flex items-center gap-2 text-white/80 text-sm">
+                  <div className="flex items-center text-xs font-medium opacity-80">
+                    <TrendingUp className="h-3 w-3 mr-1" />
+                    All time revenue
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Average Order (Teal/Emerald Gradient) */}
+              <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-r from-teal-500 to-emerald-500 p-6 shadow-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-teal-500/25 group">
+                <div className="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full bg-white/10 blur-2xl group-hover:bg-white/20 transition-all"></div>
+                <div className="absolute bottom-0 left-0 -mb-4 -ml-4 h-20 w-20 rounded-full bg-black/10 blur-2xl"></div>
+
+                <div className="relative z-10 flex justify-between items-start">
+                  <div>
+                    <p className="text-sm font-medium text-white/80 tracking-wide">Average Order</p>
+                    <h3 className="text-3xl font-bold text-white mt-1">
+                      ₱{sales.length > 0 ? formatPrice(totalSalesAmount / sales.length) : '0.00'}
+                    </h3>
+                  </div>
+                  <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md border border-white/10 shadow-inner">
+                    <ShoppingCart className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+
+                <div className="relative z-10 mt-6 flex items-center gap-2 text-white/80 text-sm">
+                  <span className="flex items-center justify-center bg-white/20 px-2.5 py-1 rounded-lg text-xs font-bold text-white backdrop-blur-sm border border-white/10">
+                    {sales.length}
+                  </span>
+                  <span className="text-xs font-medium opacity-80">Total orders processed</span>
+                </div>
+              </div>
+
             </div>
 
-            {/* Sales Table */}
-            <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
-              <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-blue-50/50 border-b border-slate-200/50">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Sales History</CardTitle>
-                  <Badge variant="outline" className="bg-indigo-50 text-indigo-700 font-poppins">
-                    {sales.length} total sales
-                  </Badge>
+            {/* ✅ Sales Table - Inventory Style Design */}
+            <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-xl font-poppins">
+              
+              {/* 1. Gradient Header (Title + Total like Inventory page) */}
+              <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-400 text-white p-5 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-xl shadow-inner">
+                    <Receipt className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-xl font-bold tracking-tight">Sales History</div>
+                    <div className="text-sm text-white/80 font-medium font-poppins">
+                      View and manage past transactions
+                    </div>
+
+                    {/* TOTAL moved here — same visual placement as Inventory header */}
+                    <div className="text-sm text-white/90 mt-1">
+                      Total: <strong className="font-semibold">{sales.length}</strong> sales
+                    </div>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent className="p-6">
+
+                {/* Right side: Void Management button (placed in header) */}
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={() => setShowPasswordDialog(true)} // open auth dialog — don't pass event into handleVoidClick
+                    className="bg-white text-slate-800 hover:bg-slate-100 px-4 py-2 rounded-lg font-medium transition-all duration-200 border border-slate-200"
+                    title="Void Management"
+                  >
+                    <Lock className="h-4 w-4 mr-2" />
+                    Void Management
+                  </Button>
+                </div>
+              </div>
+
+              {/* 2. New Toolbar Section (Search, Sort & Rows) */}
+              <div className="bg-white border-b border-slate-100 p-4 flex flex-col gap-2 relative overflow-visible min-h-[72px]">
+                {/* Top row: Search + Controls */}
+                <div className="w-full flex flex-col sm:flex-row gap-4 justify-between items-center">
+                  {/* Left: Search */}
+                  <div className="relative w-full flex-1"> {/* <--- NEW: Takes all available space */}
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+                    <Input
+                      placeholder="Search by ID or Customer Name..."
+                      value={historySearchTerm}
+                      onChange={(e) => setHistorySearchTerm(e.target.value)}
+                      className="pl-10 h-10 border-slate-200 focus:border-indigo-500 bg-slate-50/50 w-full"
+                    />
+                  </div>
+                  {/* Right: Sort & Rows Controls */}
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                      {/* Sort By Dropdown */}
+                      <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block font-poppins">Sort By</Label>
+                          <Select value={sortOption} onValueChange={setSortOption}>
+                              <SelectTrigger className="h-10 w-full sm:w-[220px] border-slate-200 bg-white">
+                                  <ListFilter className="w-4 h-4 mr-2 text-slate-500"/>
+                                  <SelectValue placeholder="Sort by" />
+                              </SelectTrigger>
+
+                              {/* Single SelectContent with z-index so dropdown doesn't push layout */}
+                              <SelectContent className="z-50">
+                                  <SelectItem value="date-desc">Date: Newest First</SelectItem>
+                                  <SelectItem value="date-asc">Date: Oldest First</SelectItem>
+                                  <SelectItem value="amount-desc">Amount: High to Low</SelectItem>
+                                  <SelectItem value="amount-asc">Amount: Low to High</SelectItem>
+                                  <SelectItem value="items-desc">Items: Most First</SelectItem>
+                              </SelectContent>
+                          </Select>
+                      </div>
+
+                      {/* Rows Per Page */}
+                      <div className="flex items-center gap-2">
+                          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block font-poppins">Rows</Label>
+                          <Select value={String(rowsPerPageSales)} onValueChange={(v) => setRowsPerPageSales(Number(v))}>
+                              <SelectTrigger className="h-10 w-[70px] border-slate-200 bg-white">
+                                  <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="z-50">
+                                {[5, 10, 20, 50].map(opt => (
+                                  <SelectItem key={opt} value={String(opt)}>{opt}</SelectItem>
+                                ))}
+                              </SelectContent>
+                          </Select>
+                      </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Table Wrapper */}
+              <div className="p-0">
                 <DataTableWrapper
-                  data={sales}
+                  className="border-0 rounded-none"
+                  data={sortedSales} // Passing sorted data here
                   columns={salesColumns}
-                  searchKeys={['sale_id', 'customer.name', 'payment_method']}
-                  rowsPerPageOptions={[5, 10, 25, 50]}
-                  onRowClick={(row) => {
-                    console.log('Clicked row:', row);
-                  }}
+                  searchKeys={['sale_id', 'customer.name']}
+                  rowsPerPageOptions={[5, 10, 20, 50]}
+                  // Hide default header since we built a custom one above
+                  showHeader={false}
+                  rowsPerPage={rowsPerPageSales}
+                  onRowsPerPageChange={setRowsPerPageSales}
+                  searchTerm={historySearchTerm}
+                  onSearchTermChange={setHistorySearchTerm}
                 />
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         )}
       </div>
