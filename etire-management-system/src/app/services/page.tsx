@@ -1046,7 +1046,14 @@ const TabbedServiceForm = ({
   onFormDataChange: (data: any) => void;
   isEdit?: boolean;
 }) => {
+
   const [activeTab, setActiveTab] = useState('basic');
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab('basic');
+    }
+  }, [isOpen]);
+
   const { customers, vehicleTypes, inventoryItems, customerVehicles } = formData;
   
   const calculateItemsTotal = useMemo(() => {
@@ -2276,6 +2283,7 @@ export default function EnhancedServiceManagementPage() {
 
     const handleOpenAddDialog = () => {
         resetForm();
+        setIsEditDialogOpen(false); // ✅ Ensure edit dialog is closed
         setIsAddDialogOpen(true);
     };
 
@@ -2325,6 +2333,7 @@ export default function EnhancedServiceManagementPage() {
           originalStatus: job.status
         });
         
+        setIsAddDialogOpen(false); // ✅ Ensure add dialog is closed
         setIsEditDialogOpen(true);
     };
 
@@ -2619,8 +2628,12 @@ export default function EnhancedServiceManagementPage() {
             : 'New service job has been created successfully.',
           actionType: editingJob ? 'edit' : 'add'
         });
-
+        
+        // ✅ Close dialogs first
+        setIsAddDialogOpen(false);
         setIsEditDialogOpen(false);
+        
+        // ✅ Reset form and fetch data
         resetForm();
         fetchJobs();
 
