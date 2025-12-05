@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation'; // Modified import
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import { CustomCheckbox } from '@/components/ui/custom-checkbox';
 import { registerAction } from "@/lib/auth-actions";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
-// ===== ENHANCED SUCCESS ANIMATION COMPONENT (Inspired by inventory page) =====
+// ===== ENHANCED SUCCESS ANIMATION COMPONENT =====
 const SuccessAnimation = ({
   isVisible,
   title,
@@ -40,7 +40,6 @@ const SuccessAnimation = ({
 }) => {
   if (!isVisible) return null;
 
-  // Different gradients based on action type
   const getActionConfig = () => {
     switch (actionType) {
       case 'register':
@@ -72,17 +71,13 @@ const SuccessAnimation = ({
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300">
       <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300">
-        {/* Animated Gradient Icon */}
         <div className={`relative w-20 h-20 bg-gradient-to-r ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500`}>
           <div className="absolute inset-0 rounded-full bg-gradient-to-r from-white/10 to-transparent animate-pulse"></div>
           <ActionIcon className="h-10 w-10 text-white relative z-10 animate-in scale-in duration-700 delay-300" />
-
-          {/* Success Rings */}
           <div className="absolute inset-0 border-2 border-white/30 rounded-full animate-ping"></div>
           <div className="absolute inset-0 border-4 border-transparent border-t-white/20 rounded-full animate-spin"></div>
         </div>
 
-        {/* Animated Checkmark */}
         <div className="relative mb-6">
           <div className="w-16 h-16 mx-auto">
             <svg className="w-full h-full" viewBox="0 0 24 24">
@@ -98,7 +93,6 @@ const SuccessAnimation = ({
           </div>
         </div>
 
-        {/* Title and Message */}
         <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins animate-in slide-in-from-top duration-500">
           {title}
         </h3>
@@ -107,7 +101,6 @@ const SuccessAnimation = ({
           {message}
         </p>
 
-        {/* User Details for Registration */}
         {actionType === 'register' && userData && (
           <div className="w-full bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-100 mb-6 animate-in slide-in-from-left duration-500 delay-300">
             <div className="text-left space-y-3">
@@ -115,12 +108,10 @@ const SuccessAnimation = ({
                 <span className="text-sm font-medium text-slate-700">Full Name:</span>
                 <span className="text-sm font-semibold text-slate-900">{userData.firstName} {userData.lastName}</span>
               </div>
-
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-slate-700">Username:</span>
                 <span className="text-sm font-semibold text-slate-900">{userData.username}</span>
               </div>
-
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-slate-700">Status:</span>
                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
@@ -132,7 +123,6 @@ const SuccessAnimation = ({
           </div>
         )}
 
-        {/* Welcome Features for Login */}
         {actionType === 'login' && (
           <div className="grid grid-cols-2 gap-3 mb-6 animate-in fade-in duration-500 delay-300">
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-3 rounded-lg border border-green-100">
@@ -152,7 +142,6 @@ const SuccessAnimation = ({
           </div>
         )}
 
-        {/* Action Buttons */}
         <div className="flex flex-col gap-3">
           <Button
             className={`bg-gradient-to-r ${buttonGradient} hover:scale-105 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins animate-in slide-in-from-bottom duration-500 delay-400`}
@@ -173,7 +162,6 @@ const SuccessAnimation = ({
           )}
         </div>
 
-        {/* Success Particles */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-2xl">
           {[...Array(8)].map((_, i) => (
             <div
@@ -193,7 +181,7 @@ const SuccessAnimation = ({
   );
 };
 
-// ===== ENHANCED LOADING ANIMATION WITH PROGRESS =====
+// ===== ENHANCED LOADING ANIMATION =====
 const EnhancedLoadingAnimation = ({
   isLoading,
   progress,
@@ -208,31 +196,21 @@ const EnhancedLoadingAnimation = ({
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300">
       <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300">
-        {/* Tire Animation Container */}
         <div className="relative w-32 h-32 mx-auto mb-8">
-          {/* Outer Ring - Animated Gradient */}
           <div className="absolute inset-0 border-[12px] border-gray-200 rounded-full"></div>
-
-          {/* Middle Ring - Rotating Gradient */}
           <div
             className="absolute inset-3 border-[10px] border-transparent rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 animate-spin"
             style={{ animationDuration: '2s' }}
           ></div>
-
-          {/* Inner Ring - Counter-rotating */}
           <div
             className="absolute inset-6 border-[8px] border-transparent rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 animate-spin"
             style={{ animationDuration: '1.5s', animationDirection: 'reverse' }}
           ></div>
-
-          {/* Center Hub with Icon */}
           <div className="absolute inset-10 bg-gradient-to-br from-white to-gray-100 rounded-full flex items-center justify-center shadow-inner">
             <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full flex items-center justify-center">
               <Car className="h-6 w-6 text-white" />
             </div>
           </div>
-
-          {/* Progress Ring */}
           <svg className="absolute inset-0 w-full h-full transform -rotate-90">
             <circle
               cx="64"
@@ -254,7 +232,6 @@ const EnhancedLoadingAnimation = ({
           </svg>
         </div>
 
-        {/* Progress Text and Bar */}
         <h3 className="text-2xl font-bold text-slate-800 mb-3 font-poppins">
           {message}
         </h3>
@@ -267,12 +244,10 @@ const EnhancedLoadingAnimation = ({
           {progress === 100 && "Ready!"}
         </p>
 
-        {/* Progress Percentage */}
         <div className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mb-4">
-          {progress}%
+          {Math.round(progress)}%
         </div>
 
-        {/* Progress Bar */}
         <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
           <div
             className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
@@ -280,7 +255,6 @@ const EnhancedLoadingAnimation = ({
           />
         </div>
 
-        {/* Progress Labels */}
         <div className="flex justify-between text-xs text-slate-500 mt-1">
           <span>0%</span>
           <span className="font-medium">Authenticating</span>
@@ -291,7 +265,7 @@ const EnhancedLoadingAnimation = ({
   );
 };
 
-// ===== ENHANCED PASSWORD STRENGTH INDICATOR =====
+// ===== PASSWORD STRENGTH =====
 const PasswordStrengthIndicator = ({ password }: { password: string }) => {
   const getStrength = (pass: string) => {
     let score = 0;
@@ -305,7 +279,6 @@ const PasswordStrengthIndicator = ({ password }: { password: string }) => {
 
   const strength = getStrength(password);
 
-  // Enhanced color mapping with gradients
   const getStrengthColor = (score: number) => {
     switch (score) {
       case 0: return 'from-red-500 to-red-400';
@@ -365,16 +338,12 @@ const PasswordStrengthIndicator = ({ password }: { password: string }) => {
           {getStrengthLabel(strength)}
         </span>
       </div>
-
-      {/* Enhanced Progress Bar */}
       <div className="w-full bg-gradient-to-r from-gray-100 to-gray-200 rounded-full h-2 overflow-hidden">
         <div
           className={`h-2 rounded-full bg-gradient-to-r ${getStrengthColor(strength)} transition-all duration-500`}
           style={{ width: `${(strength / 5) * 100}%` }}
         />
       </div>
-
-      {/* Requirements Grid */}
       <div className="grid grid-cols-2 gap-2">
         {requirements.map((req, index) => (
           <div key={index} className="flex items-center gap-2">
@@ -407,7 +376,6 @@ const StepProgress = ({ currentStep, totalSteps }: { currentStep: number; totalS
 
         return (
           <div key={index} className="flex items-center flex-1 last:flex-none">
-            {/* Step Circle */}
             <div className={`relative w-10 h-10 rounded-full border-2 flex items-center justify-center z-10 transition-all duration-300 ${isCompleted
                 ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border-transparent text-white shadow-lg'
                 : isCurrent
@@ -419,14 +387,10 @@ const StepProgress = ({ currentStep, totalSteps }: { currentStep: number; totalS
               ) : (
                 <span className="font-semibold text-sm">{index + 1}</span>
               )}
-
-              {/* Active Step Pulse */}
               {isCurrent && (
                 <div className="absolute inset-0 rounded-full bg-purple-500/20 animate-ping"></div>
               )}
             </div>
-
-            {/* Connection Line */}
             {index < totalSteps - 1 && (
               <div className={`flex-1 h-1 mx-2 transition-all duration-300 ${isCompleted
                   ? 'bg-gradient-to-r from-purple-600 to-indigo-600'
@@ -444,18 +408,17 @@ const StepProgress = ({ currentStep, totalSteps }: { currentStep: number; totalS
 export default function EnhancedLoginPage() {
   const { toast } = useToast();
   const router = useRouter();
-  const searchParams = useSearchParams(); // Get search params
+  const searchParams = useSearchParams();
   const { login } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  
   const [rememberMe, setRememberMe] = useState(false);
 
-  // Check for error params on mount
   useEffect(() => {
     const error = searchParams.get('error');
     if (error === 'missing_profile') {
-      // Delay toast slightly to ensure comp is mounted/ready
       setTimeout(() => {
         toast({
           title: 'Login Error',
@@ -464,30 +427,30 @@ export default function EnhancedLoginPage() {
           duration: 6000,
         });
       }, 500);
-      // Clean up URL
       router.replace('/login');
     }
   }, [searchParams, toast, router]);
 
-  // Multi-step registration state
+  useEffect(() => {
+    const savedPassword = localStorage.getItem('etire_saved_password');
+    if (savedPassword) {
+      setLoginPassword(savedPassword);
+      setRememberMe(true);
+    }
+  }, []);
+
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
-
-  // Enhanced loading state
   const [isLoading, setIsLoading] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [formLoading, setFormLoading] = useState(false);
-
-  // Success confirmation state
   const [showSuccess, setShowSuccess] = useState(false);
   const [successType, setSuccessType] = useState<'login' | 'register'>('login');
   const [successUserData, setSuccessUserData] = useState<{ firstName: string; lastName: string; username: string } | null>(null);
 
-  // Login State
   const { value: loginUsername, setValue: setLoginUsername } = useFormFieldPersistence('login-form', 'username', '');
-  const { value: loginPassword, setValue: setLoginPassword } = useFormFieldPersistence('login-form', 'password', '');
+  const [loginPassword, setLoginPassword] = useState('');
 
-  // Register State
   const { value: firstName, setValue: setFirstName } = useFormFieldPersistence('register-form', 'firstName', '');
   const { value: lastName, setValue: setLastName } = useFormFieldPersistence('register-form', 'lastName', '');
   const { value: email, setValue: setEmail } = useFormFieldPersistence('register-form', 'email', '');
@@ -499,30 +462,22 @@ export default function EnhancedLoginPage() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [registrationError, setRegistrationError] = useState<string | null>(null);
 
-  // Password visibility states
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // Form animation state
   const [formKey, setFormKey] = useState(0);
-
-  // Login progress interval ref
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Function to simulate loading progress
   const simulateProgress = (duration: number = 2000) => {
     setIsLoading(true);
     setLoadingProgress(0);
-
-    const interval = 50; // Update every 50ms
+    const interval = 50;
     const totalSteps = duration / interval;
     const increment = 100 / totalSteps;
-
     progressIntervalRef.current = setInterval(() => {
       setLoadingProgress(prev => {
         const next = prev + increment;
@@ -549,27 +504,21 @@ export default function EnhancedLoginPage() {
       setFormLoading(false);
       return;
     }
-
-    // Start progress animation
     simulateProgress(1500);
 
     try {
       const success = await login(loginUsername, loginPassword);
-
       if (success) {
-        // Complete progress
-        setLoadingProgress(100);
-
-        // Show success animation
-        setSuccessType('login');
-        setShowSuccess(true);
-
-        // Clear progress interval
-        if (progressIntervalRef.current) {
-          clearInterval(progressIntervalRef.current);
+        if (rememberMe) {
+          localStorage.setItem('etire_saved_password', loginPassword);
+        } else {
+          localStorage.removeItem('etire_saved_password');
         }
 
-        // Redirect after delay
+        setLoadingProgress(100);
+        setSuccessType('login');
+        setShowSuccess(true);
+        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         setTimeout(() => {
           router.push('/dashboard');
         }, 3000);
@@ -593,9 +542,7 @@ export default function EnhancedLoginPage() {
       setLoadingProgress(0);
     } finally {
       setFormLoading(false);
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     }
   };
 
@@ -611,7 +558,6 @@ export default function EnhancedLoginPage() {
       });
       return;
     }
-
     if (registerPassword !== confirmPassword) {
       toast({
         title: 'Password Mismatch',
@@ -620,7 +566,6 @@ export default function EnhancedLoginPage() {
       });
       return;
     }
-
     const strength = getPasswordStrength(registerPassword);
     if (strength < 3) {
       toast({
@@ -630,7 +575,6 @@ export default function EnhancedLoginPage() {
       });
       return;
     }
-
     if (!firstName || !lastName || !registerUsername || !registerPassword) {
       toast({
         title: 'Required Fields',
@@ -657,11 +601,18 @@ export default function EnhancedLoginPage() {
       if (!result.success) {
         throw new Error(result.message || "Registration failed");
       }
+      
+      // === FIX IMPLEMENTED HERE ===
+      setLoadingProgress(100);
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
 
-      // Store user data for success confirmation
-      setSuccessUserData({ firstName, lastName, username: registerUsername });
-      setSuccessType('register');
-      setShowSuccess(true);
+      // Short delay to show 100% then terminate loading screen
+      setTimeout(() => {
+        setIsLoading(false); // <--- Hides the loader
+        setSuccessUserData({ firstName, lastName, username: registerUsername });
+        setSuccessType('register');
+        setShowSuccess(true);
+      }, 500);
 
     } catch (error: any) {
       console.error("Registration error:", error);
@@ -670,19 +621,17 @@ export default function EnhancedLoginPage() {
         description: error.message,
         variant: "destructive",
       });
+      setIsLoading(false); // Make sure to hide loader on error too
+      setLoadingProgress(0);
     } finally {
       setFormLoading(false);
-      setLoadingProgress(100);
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-      }
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     }
   };
 
   const handleSuccessClose = () => {
     setShowSuccess(false);
     if (successType === 'register') {
-      // Reset and switch to login after successful registration
       setIsLogin(true);
       setCurrentStep(1);
       setFirstName("");
@@ -696,7 +645,6 @@ export default function EnhancedLoginPage() {
       setAcceptedTerms(false);
       setSuccessUserData(null);
     } else {
-      // For login, just proceed to dashboard
       router.push('/dashboard');
     }
   };
@@ -718,30 +666,20 @@ export default function EnhancedLoginPage() {
   };
 
   const nextStep = () => {
-    if (currentStep < totalSteps) {
-      setCurrentStep(currentStep + 1);
-    }
+    if (currentStep < totalSteps) setCurrentStep(currentStep + 1);
   };
 
   const prevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
+    if (currentStep > 1) setCurrentStep(currentStep - 1);
   };
 
-  // Step validation
   const validateStep = (step: number) => {
     switch (step) {
-      case 1:
-        return firstName.trim() && lastName.trim();
-      case 2:
-        return email.trim() && phone.trim();
-      case 3:
-        return registerUsername.trim() && registerPassword.trim() && confirmPassword.trim();
-      case 4:
-        return acceptedTerms;
-      default:
-        return false;
+      case 1: return firstName.trim() && lastName.trim();
+      case 2: return email.trim() && phone.trim();
+      case 3: return registerUsername.trim() && registerPassword.trim() && confirmPassword.trim();
+      case 4: return acceptedTerms;
+      default: return false;
     }
   };
 
@@ -757,7 +695,6 @@ export default function EnhancedLoginPage() {
               <h3 className="text-xl font-semibold text-slate-800">Personal Information</h3>
               <p className="text-slate-600">Tell us about yourself</p>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="first-name" className="text-sm font-semibold text-slate-700 flex items-center gap-1">
@@ -788,7 +725,6 @@ export default function EnhancedLoginPage() {
             </div>
           </div>
         );
-
       case 2:
         return (
           <div className="space-y-6 animate-in fade-in duration-500">
@@ -799,7 +735,6 @@ export default function EnhancedLoginPage() {
               <h3 className="text-xl font-semibold text-slate-800">Contact Details</h3>
               <p className="text-slate-600">How can we reach you?</p>
             </div>
-
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-semibold text-slate-700 flex items-center gap-1">
@@ -829,22 +764,9 @@ export default function EnhancedLoginPage() {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="address" className="text-sm font-semibold text-slate-700">
-                  Address (Optional)
-                </Label>
-                <Input
-                  id="address"
-                  placeholder="123 Main Street, City, Province"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="h-11 border-2 border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 rounded-xl"
-                />
-              </div>
             </div>
           </div>
         );
-
       case 3:
         return (
           <div className="space-y-6 animate-in fade-in duration-500">
@@ -855,7 +777,6 @@ export default function EnhancedLoginPage() {
               <h3 className="text-xl font-semibold text-slate-800">Account Security</h3>
               <p className="text-slate-600">Create your login credentials</p>
             </div>
-
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="register-username" className="text-sm font-semibold text-slate-700 flex items-center gap-1">
@@ -891,11 +812,7 @@ export default function EnhancedLoginPage() {
                     className="absolute right-0 top-0 h-full px-3 hover:bg-transparent text-slate-500 hover:text-purple-600 transition-colors"
                     onClick={() => setShowRegisterPassword(!showRegisterPassword)}
                   >
-                    {showRegisterPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
+                    {showRegisterPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </Button>
                 </div>
                 <PasswordStrengthIndicator password={registerPassword} />
@@ -921,11 +838,7 @@ export default function EnhancedLoginPage() {
                     className="absolute right-0 top-0 h-full px-3 hover:bg-transparent text-slate-500 hover:text-purple-600 transition-colors"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
+                    {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </Button>
                 </div>
                 {registerPassword && confirmPassword && registerPassword !== confirmPassword && (
@@ -938,7 +851,6 @@ export default function EnhancedLoginPage() {
             </div>
           </div>
         );
-
       case 4:
         return (
           <div className="space-y-6 animate-in fade-in duration-500">
@@ -949,7 +861,6 @@ export default function EnhancedLoginPage() {
               <h3 className="text-xl font-semibold text-slate-800">Review & Agreement</h3>
               <p className="text-slate-600">Almost done! Review your information</p>
             </div>
-
             <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-5 space-y-4 mb-4 border border-slate-200">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
@@ -970,7 +881,6 @@ export default function EnhancedLoginPage() {
                 </div>
               </div>
             </div>
-
             <div className="space-y-3">
               <div className="flex items-start space-x-3 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-100">
                 <CustomCheckbox
@@ -995,22 +905,17 @@ export default function EnhancedLoginPage() {
             </div>
           </div>
         );
-
-      default:
-        return null;
+      default: return null;
     }
   };
 
   return (
     <div className="min-h-screen flex relative overflow-hidden font-poppins bg-gradient-to-br from-white via-gray-50 to-slate-100">
-      {/* Enhanced Loading Animation */}
       <EnhancedLoadingAnimation
         isLoading={isLoading}
         progress={loadingProgress}
         message={successType === 'login' ? "Signing you in..." : "Creating your account..."}
       />
-
-      {/* Success Animation */}
       <SuccessAnimation
         isVisible={showSuccess}
         title={successType === 'register' ? 'Account Created Successfully!' : 'Welcome Back!'}
@@ -1028,71 +933,67 @@ export default function EnhancedLoginPage() {
         }}
       />
 
-      {/* Left Side - Hero Section */}
-      <div className="hidden lg:flex flex-1 flex-col items-center justify-center p-12 relative overflow-hidden">
-        {/* Background Elements */}
-        <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-br from-purple-500/5 to-indigo-500/5 rounded-b-full"></div>
-        <div className="absolute bottom-0 right-0 w-64 h-64 bg-gradient-to-tr from-blue-500/5 to-cyan-500/5 rounded-tl-full"></div>
 
-        {/* Content */}
-        <div className="relative z-10 max-w-lg">
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center">
-                <Car className="h-7 w-7 text-white" />
+      {/* Left Side - Hero Section (WIDER: 60% Width) */}
+      <div className="hidden lg:flex lg:w-[60%] shrink-0 relative overflow-hidden bg-slate-900">
+        <div
+          className="absolute inset-0 z-0"
+          style={{
+            backgroundImage: "url('/images/tire-platform-3d.png')",
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        ></div>
+
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/40 via-transparent to-blue-600/40 mix-blend-overlay z-[5]"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-slate-900/50 z-[5]"></div>
+
+        <div className="relative z-10 w-full h-full flex flex-col items-center justify-center p-16">
+          <div className="max-w-lg text-left">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/20 p-[2px]">
+                <div className="w-full h-full bg-slate-900 rounded-xl flex items-center justify-center">
+                  <Car className="h-8 w-8 text-white drop-shadow-[0_0_15px_rgba(168,85,247,0.5)]" />
+                </div>
               </div>
               <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                <h1 className="text-4xl font-bold text-white tracking-tight drop-shadow-sm">
                   eTire Manager
                 </h1>
-                <p className="text-slate-600">Professional Tire Inventory System</p>
+                <p className="text-lg text-purple-200/80 font-medium tracking-wide">
+                  Professional Tire Inventory System
+                </p>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 text-slate-700">
-                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                  <PackageSearch className="h-4 w-4 text-green-600" />
+            <div className="space-y-6 mt-12">
+              <div className="flex items-center gap-4 group">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center ring-1 ring-white/10 group-hover:ring-white/30 transition-all flex-shrink-0">
+                  <PackageSearch className="h-5 w-5 text-white" />
                 </div>
-                <span>Real-time inventory tracking</span>
+                <span className="text-lg text-white/90 font-medium">Real-time inventory tracking</span>
               </div>
-              <div className="flex items-center gap-3 text-slate-700">
-                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="h-4 w-4 text-blue-600" />
+              <div className="flex items-center gap-4 group">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center ring-1 ring-white/10 group-hover:ring-white/30 transition-all flex-shrink-0">
+                  <TrendingUp className="h-5 w-5 text-white" />
                 </div>
-                <span>Advanced analytics & insights</span>
+                <span className="text-lg text-white/90 font-medium">Advanced analytics & insights</span>
               </div>
-              <div className="flex items-center gap-3 text-slate-700">
-                <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <Clock className="h-4 w-4 text-purple-600" />
+              <div className="flex items-center gap-4 group">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center ring-1 ring-white/10 group-hover:ring-white/30 transition-all flex-shrink-0">
+                  <Clock className="h-5 w-5 text-white" />
                 </div>
-                <span>24/7 access from any device</span>
+                <span className="text-lg text-white/90 font-medium">24/7 access from any device</span>
               </div>
-            </div>
-          </div>
-
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-white/30 shadow-lg">
-            <h3 className="text-xl font-semibold text-slate-800 mb-3">Trusted by Queen.R Tire Supply</h3>
-            <p className="text-slate-600 mb-4">
-              Join hundreds of tire professionals who manage their inventory efficiently with our platform.
-            </p>
-            <div className="flex items-center gap-3">
-              <div className="flex -space-x-2">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="w-8 h-8 bg-gradient-to-r from-purple-400 to-indigo-400 rounded-full border-2 border-white"></div>
-                ))}
-              </div>
-              <span className="text-sm text-slate-600">100+ active users</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Right Side - Forms */}
+      {/* Right Side - Forms (Fills remaining space) */}
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
           {isLogin ? (
-            // Login Form
             <Card key={formKey} className="border-0 shadow-2xl bg-white/90 backdrop-blur-sm rounded-3xl overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600"></div>
 
@@ -1145,11 +1046,7 @@ export default function EnhancedLoginPage() {
                           className="absolute right-0 top-0 h-full px-3 hover:bg-transparent text-slate-500 hover:text-purple-600 transition-colors"
                           onClick={() => setShowLoginPassword(!showLoginPassword)}
                         >
-                          {showLoginPassword ? (
-                            <EyeOff className="h-5 w-5" />
-                          ) : (
-                            <Eye className="h-5 w-5" />
-                          )}
+                          {showLoginPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                         </Button>
                       </div>
                     </div>
@@ -1210,97 +1107,89 @@ export default function EnhancedLoginPage() {
               </form>
             </Card>
           ) : (
-            // Registration Form with Steps
+            // Registration Form
             <Card key={formKey} className="border-0 shadow-2xl bg-white/90 backdrop-blur-sm rounded-3xl overflow-hidden">
-              <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600"></div>
-
-              <form onSubmit={handleRegister}>
-                <CardHeader className="space-y-1 pb-4 pt-10 px-10">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="w-fit -ml-3 mb-2 text-slate-600 hover:text-purple-600 transition-colors animate-in fade-in duration-500"
-                    onClick={() => handleFormSwitch(true)}
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to login
-                  </Button>
-                  <CardTitle className="text-2xl font-bold text-slate-800 text-center">
-                    CREATE ACCOUNT
-                  </CardTitle>
-                  <CardDescription className="text-sm text-slate-600 text-center">
-                    Step {currentStep} of {totalSteps}
-                  </CardDescription>
-                </CardHeader>
-
-                <CardContent className="px-10 pb-10">
-                  {/* Step Progress */}
-                  <StepProgress currentStep={currentStep} totalSteps={totalSteps} />
-
-                  {registrationError && (
-                    <Alert variant="destructive" className="rounded-xl animate-in fade-in duration-500 mb-4">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        {registrationError}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  {/* Step Content */}
-                  {renderRegistrationStep()}
-
-                  {/* Navigation Buttons */}
-                  <div className={`flex gap-3 mt-8 ${currentStep === 1 ? 'justify-end' : 'justify-between'
-                    }`}>
-                    {currentStep > 1 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={prevStep}
-                        className="flex items-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50 rounded-xl px-6"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                        Previous
-                      </Button>
-                    )}
-
-                    {currentStep < totalSteps ? (
-                      <Button
-                        type="button"
-                        onClick={nextStep}
-                        disabled={!validateStep(currentStep)}
-                        className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-xl px-6 ml-auto"
-                      >
-                        Next
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <Button
-                        className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl px-6 ml-auto"
-                        type="submit"
-                        disabled={formLoading || !acceptedTerms}
-                      >
-                        {formLoading ? (
-                          <>
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                            CREATING ACCOUNT...
-                          </>
-                        ) : (
-                          <>
-                            <UserPlus className="h-5 w-5" />
-                            CREATE ACCOUNT
-                          </>
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </form>
-            </Card>
+  <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600"></div>
+  <form onSubmit={handleRegister}>
+    <CardHeader className="space-y-1 pb-4 pt-10 px-10">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="w-fit -ml-3 mb-2 text-slate-600 hover:text-purple-600 transition-colors animate-in fade-in duration-500"
+        onClick={() => handleFormSwitch(true)}
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back to login
+      </Button>
+      <CardTitle className="text-2xl font-bold text-slate-800 text-center">
+        CREATE ACCOUNT
+      </CardTitle>
+      <CardDescription className="text-sm text-slate-600 text-center">
+        Step {currentStep} of {totalSteps}
+      </CardDescription>
+    </CardHeader>
+    <CardContent className="px-10 pb-10">
+      <StepProgress currentStep={currentStep} totalSteps={totalSteps} />
+      {registrationError && (
+        <Alert variant="destructive" className="rounded-xl animate-in fade-in duration-500 mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {registrationError}
+          </AlertDescription>
+        </Alert>
+      )}
+      <div className={(currentStep === 3 || currentStep === 4) ? "max-h-[316px] overflow-y-auto -mr-10 pr-8 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent hover:scrollbar-thumb-slate-400 pb-4" : ""}>
+        {renderRegistrationStep()}
+      </div>
+      <div className={`flex gap-3 mt-8 ${currentStep === 1 ? 'justify-end' : 'justify-between'
+        }`}>
+        {currentStep > 1 && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={prevStep}
+            className="flex items-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50 rounded-xl px-6"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous
+          </Button>
+        )}
+        {currentStep < totalSteps ? (
+          <Button
+            type="button"
+            onClick={nextStep}
+            disabled={!validateStep(currentStep)}
+            className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-xl px-6 ml-auto"
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button
+            className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl px-6 ml-auto"
+            type="submit"
+            disabled={formLoading || !acceptedTerms}
+          >
+            {formLoading ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                CREATING ACCOUNT...
+              </>
+            ) : (
+              <>
+                <UserPlus className="h-5 w-5" />
+                CREATE ACCOUNT
+              </>
+            )}
+          </Button>
+        )}
+      </div>
+    </CardContent>
+  </form>
+</Card>
           )}
 
-          {/* Footer */}
           <div className="text-center mt-6">
             <p className="text-xs text-slate-600 mb-2">
               © 2025 eTire Manager. Designed for Queen.R Tire Supply.
@@ -1316,7 +1205,6 @@ export default function EnhancedLoginPage() {
         </div>
       </div>
 
-      {/* Terms Dialog */}
       <Dialog open={showTerms} onOpenChange={setShowTerms}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
           <div className="p-6">
