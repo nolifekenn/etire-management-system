@@ -1066,61 +1066,13 @@ const CriticalStockDetails = ({
             )}
           </div>
 
-          {/* Action Plan Section */}
-          <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 mt-8">
-            <h4 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <SlidersHorizontal className="h-4 w-4" />
-              Restocking Action Plan
-            </h4>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Priority Level</Label>
-                  <Select value={priority} onValueChange={setPriority}>
-                    <SelectTrigger className="bg-white border-slate-300">
-                      <SelectValue placeholder="Select priority..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="high" className="text-red-600 font-medium">High - Immediate Order</SelectItem>
-                      <SelectItem value="medium" className="text-orange-600 font-medium">Medium - Within 3 Days</SelectItem>
-                      <SelectItem value="low" className="text-blue-600 font-medium">Low - Add to next scheduled order</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Supplier Notes</Label>
-                  <Textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="E.g., Contact Supplier X for bulk discount..."
-                    className="min-h-[80px] bg-white border-slate-300 resize-none"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Action Description</Label>
-                <Textarea
-                  value={actionPlan}
-                  onChange={(e) => setActionPlan(e.target.value)}
-                  placeholder="Describe the plan to address these stock issues..."
-                  className="min-h-[155px] bg-white border-slate-300 resize-none"
-                />
-              </div>
-            </div>
-          </div>
+          {/* Action Plan Section Removed */}
         </div>
 
         {/* Footer */}
         <DialogFooter className="p-6 border-t border-slate-100 bg-slate-50/50 sticky bottom-0 z-20">
           <Button onClick={onClose} variant="outline" className="h-11 px-6 border-slate-300 hover:bg-slate-100">
-            Cancel
-          </Button>
-          <Button
-            onClick={() => { alert('Action plan saved!'); onClose(); }}
-            className="h-11 px-8 bg-slate-900 hover:bg-slate-800 text-white shadow-md"
-          >
-            Save Action Plan
+            Close
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1827,6 +1779,8 @@ export default function EnhancedInventoryPage() {
             </Button>
           </div>
         </div>
+
+
 
         {/* Stock Alerts */}
         <StockAlertsBar
