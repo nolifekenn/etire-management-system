@@ -2277,7 +2277,7 @@ export default function EnhancedPurchasingPage() {
         <div 
           className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
           style={{ 
-            backgroundImage: "url('/images/image7.png')",
+            backgroundImage: "url('/images/image2.jpg')",
             backgroundSize: "cover",
             backgroundPosition: "center 30%"
           }}
