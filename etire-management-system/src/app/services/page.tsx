@@ -2984,9 +2984,10 @@ export default function EnhancedServiceManagementPage() {
                     <div className="bg-white border-b border-slate-100 p-4">
                         
                         {/* Search and Dropdowns Row */}
-                        <div className="flex flex-col xl:flex-row gap-4 justify-between items-center">
+                        <div className="flex flex-col xl:flex-row gap-4 justify-between items-end">
                             {/* Search Bar */}
                             <div className="relative w-full flex-1">
+                                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Search</Label>
                                 <SearchInput 
                                     id="search-jobs"
                                     value={searchTerm}
@@ -2996,11 +2997,11 @@ export default function EnhancedServiceManagementPage() {
                             </div>
 
                             {/* Filters Group */}
-                            <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
+                            <div className="flex flex-col sm:flex-row items-end gap-3 w-full xl:w-auto">
                                 
                                 {/* Status Filter */}
-                                <div className="flex items-center gap-2 w-full sm:w-auto">
-                                    <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block">Status</Label>
+                                <div className="w-full sm:w-auto">
+                                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Status</Label>
                                     <Select value={statusFilter} onValueChange={setStatusFilter}>
                                         <SelectTrigger className="h-10 w-full sm:w-[180px] border-slate-200 bg-white focus:ring-indigo-500">
                                             <SelectValue placeholder="All Statuses" />
@@ -3016,8 +3017,8 @@ export default function EnhancedServiceManagementPage() {
                                 </div>
 
                                 {/* Vehicle Type Filter */}
-                                <div className="flex items-center gap-2 w-full sm:w-auto">
-                                    <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block">Type</Label>
+                                <div className="w-full sm:w-auto">
+                                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Type</Label>
                                     <Select value={vehicleTypeFilter} onValueChange={setVehicleTypeFilter}>
                                         <SelectTrigger className="h-10 w-full sm:w-[180px] border-slate-200 bg-white focus:ring-indigo-500">
                                             <SelectValue placeholder="All Types" />
@@ -3034,8 +3035,8 @@ export default function EnhancedServiceManagementPage() {
                                 </div>
 
                                 {/* NEW: Rows Per Page Filter */}
-                                <div className="flex items-center gap-2 w-full sm:w-auto">
-                                    <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block">Rows</Label>
+                                <div className="w-full sm:w-auto">
+                                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Rows</Label>
                                     <Select 
                                         value={String(rowsPerPage)} 
                                         onValueChange={(val) => {
@@ -3056,14 +3057,16 @@ export default function EnhancedServiceManagementPage() {
 
                                 {/* Clear Button */}
                                 {(searchTerm || statusFilter !== 'all' || vehicleTypeFilter !== 'all') && (
-                                    <Button 
-                                        onClick={clearFilters}
-                                        variant="outline" 
-                                        className="h-10 border-dashed border-slate-300 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
-                                    >
-                                        <X className="h-4 w-4 mr-2" />
-                                        Clear
-                                    </Button>
+                                    <div className="w-full sm:w-auto">
+                                        <Button 
+                                            onClick={clearFilters}
+                                            variant="outline" 
+                                            className="h-10 border-dashed border-slate-300 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors w-full"
+                                        >
+                                            <X className="h-4 w-4 mr-2" />
+                                            Clear
+                                        </Button>
+                                    </div>
                                 )}
                             </div>
                         </div>
