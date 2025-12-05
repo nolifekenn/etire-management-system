@@ -1,15 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation'; // Modified import
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  Loader2, UserPlus, LogIn, Eye, EyeOff, ArrowLeft, Car, Lock, CheckCircle, 
+import {
+  Loader2, UserPlus, LogIn, Eye, EyeOff, ArrowLeft, Car, Lock, CheckCircle,
   XCircle, AlertCircle, ChevronRight, ChevronLeft, User, Mail, Phone, MapPin,
   ArrowRight, Sparkles, Shield, PackageSearch, TrendingUp, Clock
 } from 'lucide-react';
@@ -44,21 +44,21 @@ const SuccessAnimation = ({
   const getActionConfig = () => {
     switch (actionType) {
       case 'register':
-        return { 
+        return {
           gradient: 'from-purple-600 via-indigo-600 to-blue-600',
           icon: UserPlus,
           iconBg: 'bg-gradient-to-r from-purple-500/20 to-blue-500/20',
           buttonGradient: 'from-purple-600 to-indigo-600'
         };
       case 'login':
-        return { 
+        return {
           gradient: 'from-green-500 via-emerald-600 to-teal-600',
           icon: LogIn,
           iconBg: 'bg-gradient-to-r from-green-500/20 to-emerald-500/20',
           buttonGradient: 'from-green-600 to-emerald-600'
         };
       default:
-        return { 
+        return {
           gradient: 'from-purple-600 to-indigo-600',
           icon: CheckCircle,
           iconBg: 'bg-gradient-to-r from-purple-500/20 to-indigo-500/20',
@@ -76,7 +76,7 @@ const SuccessAnimation = ({
         <div className={`relative w-20 h-20 bg-gradient-to-r ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500`}>
           <div className="absolute inset-0 rounded-full bg-gradient-to-r from-white/10 to-transparent animate-pulse"></div>
           <ActionIcon className="h-10 w-10 text-white relative z-10 animate-in scale-in duration-700 delay-300" />
-          
+
           {/* Success Rings */}
           <div className="absolute inset-0 border-2 border-white/30 rounded-full animate-ping"></div>
           <div className="absolute inset-0 border-4 border-transparent border-t-white/20 rounded-full animate-spin"></div>
@@ -115,12 +115,12 @@ const SuccessAnimation = ({
                 <span className="text-sm font-medium text-slate-700">Full Name:</span>
                 <span className="text-sm font-semibold text-slate-900">{userData.firstName} {userData.lastName}</span>
               </div>
-              
+
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-slate-700">Username:</span>
                 <span className="text-sm font-semibold text-slate-900">{userData.username}</span>
               </div>
-              
+
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-slate-700">Status:</span>
                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
@@ -161,7 +161,7 @@ const SuccessAnimation = ({
             <CheckCircle className="h-5 w-5 mr-2" />
             {actionType === 'register' ? 'Continue to Login' : 'Go to Dashboard'}
           </Button>
-          
+
           {actionType === 'register' && onAddAnother && (
             <Button
               onClick={onAddAnother}
@@ -194,13 +194,13 @@ const SuccessAnimation = ({
 };
 
 // ===== ENHANCED LOADING ANIMATION WITH PROGRESS =====
-const EnhancedLoadingAnimation = ({ 
-  isLoading, 
-  progress, 
-  message = "Signing you in" 
-}: { 
-  isLoading: boolean; 
-  progress: number; 
+const EnhancedLoadingAnimation = ({
+  isLoading,
+  progress,
+  message = "Signing you in"
+}: {
+  isLoading: boolean;
+  progress: number;
   message?: string;
 }) => {
   if (!isLoading) return null;
@@ -212,26 +212,26 @@ const EnhancedLoadingAnimation = ({
         <div className="relative w-32 h-32 mx-auto mb-8">
           {/* Outer Ring - Animated Gradient */}
           <div className="absolute inset-0 border-[12px] border-gray-200 rounded-full"></div>
-          
+
           {/* Middle Ring - Rotating Gradient */}
-          <div 
+          <div
             className="absolute inset-3 border-[10px] border-transparent rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 animate-spin"
             style={{ animationDuration: '2s' }}
           ></div>
-          
+
           {/* Inner Ring - Counter-rotating */}
-          <div 
+          <div
             className="absolute inset-6 border-[8px] border-transparent rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 animate-spin"
             style={{ animationDuration: '1.5s', animationDirection: 'reverse' }}
           ></div>
-          
+
           {/* Center Hub with Icon */}
           <div className="absolute inset-10 bg-gradient-to-br from-white to-gray-100 rounded-full flex items-center justify-center shadow-inner">
             <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full flex items-center justify-center">
               <Car className="h-6 w-6 text-white" />
             </div>
           </div>
-          
+
           {/* Progress Ring */}
           <svg className="absolute inset-0 w-full h-full transform -rotate-90">
             <circle
@@ -258,7 +258,7 @@ const EnhancedLoadingAnimation = ({
         <h3 className="text-2xl font-bold text-slate-800 mb-3 font-poppins">
           {message}
         </h3>
-        
+
         <p className="text-slate-600 mb-4 font-poppins animate-pulse">
           {progress < 25 && "Initializing session..."}
           {progress >= 25 && progress < 50 && "Verifying credentials..."}
@@ -274,7 +274,7 @@ const EnhancedLoadingAnimation = ({
 
         {/* Progress Bar */}
         <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
-          <div 
+          <div
             className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
             style={{ width: `${progress}%` }}
           />
@@ -357,12 +357,11 @@ const PasswordStrengthIndicator = ({ password }: { password: string }) => {
           {getStrengthIcon(strength)}
           <span className="text-sm font-medium text-gray-700">Password Strength</span>
         </div>
-        <span className={`text-sm font-semibold px-2 py-1 rounded-full ${
-          strength <= 1 ? 'bg-red-100 text-red-700' :
-          strength === 2 ? 'bg-orange-100 text-orange-700' :
-          strength === 3 ? 'bg-yellow-100 text-yellow-700' :
-          strength >= 4 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-        }`}>
+        <span className={`text-sm font-semibold px-2 py-1 rounded-full ${strength <= 1 ? 'bg-red-100 text-red-700' :
+            strength === 2 ? 'bg-orange-100 text-orange-700' :
+              strength === 3 ? 'bg-yellow-100 text-yellow-700' :
+                strength >= 4 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+          }`}>
           {getStrengthLabel(strength)}
         </span>
       </div>
@@ -405,36 +404,34 @@ const StepProgress = ({ currentStep, totalSteps }: { currentStep: number; totalS
       {Array.from({ length: totalSteps }).map((_, index) => {
         const isCompleted = index + 1 < currentStep;
         const isCurrent = index + 1 === currentStep;
-        
+
         return (
           <div key={index} className="flex items-center flex-1 last:flex-none">
             {/* Step Circle */}
-            <div className={`relative w-10 h-10 rounded-full border-2 flex items-center justify-center z-10 transition-all duration-300 ${
-              isCompleted 
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border-transparent text-white shadow-lg' 
+            <div className={`relative w-10 h-10 rounded-full border-2 flex items-center justify-center z-10 transition-all duration-300 ${isCompleted
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border-transparent text-white shadow-lg'
                 : isCurrent
-                ? 'bg-white border-2 border-purple-500 text-purple-600 shadow-lg'
-                : 'border-gray-300 bg-white text-gray-500'
-            }`}>
+                  ? 'bg-white border-2 border-purple-500 text-purple-600 shadow-lg'
+                  : 'border-gray-300 bg-white text-gray-500'
+              }`}>
               {isCompleted ? (
                 <CheckCircle className="h-5 w-5" />
               ) : (
                 <span className="font-semibold text-sm">{index + 1}</span>
               )}
-              
+
               {/* Active Step Pulse */}
               {isCurrent && (
                 <div className="absolute inset-0 rounded-full bg-purple-500/20 animate-ping"></div>
               )}
             </div>
-            
+
             {/* Connection Line */}
             {index < totalSteps - 1 && (
-              <div className={`flex-1 h-1 mx-2 transition-all duration-300 ${
-                isCompleted 
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600' 
+              <div className={`flex-1 h-1 mx-2 transition-all duration-300 ${isCompleted
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600'
                   : 'bg-gradient-to-r from-gray-200 to-gray-300'
-              }`} />
+                }`} />
             )}
           </div>
         );
@@ -447,11 +444,30 @@ const StepProgress = ({ currentStep, totalSteps }: { currentStep: number; totalS
 export default function EnhancedLoginPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams(); // Get search params
   const { login } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+
+  // Check for error params on mount
+  useEffect(() => {
+    const error = searchParams.get('error');
+    if (error === 'missing_profile') {
+      // Delay toast slightly to ensure comp is mounted/ready
+      setTimeout(() => {
+        toast({
+          title: 'Login Error',
+          description: 'Your account profile could not be found. Please contact support or try registering again.',
+          variant: 'destructive',
+          duration: 6000,
+        });
+      }, 500);
+      // Clean up URL
+      router.replace('/login');
+    }
+  }, [searchParams, toast, router]);
 
   // Multi-step registration state
   const [currentStep, setCurrentStep] = useState(1);
@@ -502,11 +518,11 @@ export default function EnhancedLoginPage() {
   const simulateProgress = (duration: number = 2000) => {
     setIsLoading(true);
     setLoadingProgress(0);
-    
+
     const interval = 50; // Update every 50ms
     const totalSteps = duration / interval;
     const increment = 100 / totalSteps;
-    
+
     progressIntervalRef.current = setInterval(() => {
       setLoadingProgress(prev => {
         const next = prev + increment;
@@ -525,10 +541,10 @@ export default function EnhancedLoginPage() {
     setRegistrationError(null);
 
     if (!loginUsername || !loginPassword) {
-      toast({ 
-        title: 'Missing Credentials', 
-        description: 'Username and password are required.', 
-        variant: 'destructive' 
+      toast({
+        title: 'Missing Credentials',
+        description: 'Username and password are required.',
+        variant: 'destructive'
       });
       setFormLoading(false);
       return;
@@ -543,7 +559,7 @@ export default function EnhancedLoginPage() {
       if (success) {
         // Complete progress
         setLoadingProgress(100);
-        
+
         // Show success animation
         setSuccessType('login');
         setShowSuccess(true);
@@ -558,20 +574,20 @@ export default function EnhancedLoginPage() {
           router.push('/dashboard');
         }, 3000);
       } else {
-        toast({ 
-          title: 'Login Failed', 
-          description: 'Invalid username or password.', 
-          variant: 'destructive' 
+        toast({
+          title: 'Login Failed',
+          description: 'Invalid username or password.',
+          variant: 'destructive'
         });
         setIsLoading(false);
         setLoadingProgress(0);
       }
     } catch (error: any) {
       console.error("Login error:", error);
-      toast({ 
-        title: 'Login Error', 
-        description: error.message || 'An unexpected error occurred.', 
-        variant: 'destructive' 
+      toast({
+        title: 'Login Error',
+        description: error.message || 'An unexpected error occurred.',
+        variant: 'destructive'
       });
       setIsLoading(false);
       setLoadingProgress(0);
@@ -588,38 +604,38 @@ export default function EnhancedLoginPage() {
     setRegistrationError(null);
 
     if (!acceptedTerms) {
-      toast({ 
-        title: 'Terms Required', 
-        description: 'You must accept the Terms and Conditions.', 
-        variant: 'destructive' 
+      toast({
+        title: 'Terms Required',
+        description: 'You must accept the Terms and Conditions.',
+        variant: 'destructive'
       });
       return;
     }
 
     if (registerPassword !== confirmPassword) {
-      toast({ 
-        title: 'Password Mismatch', 
-        description: 'Passwords do not match.', 
-        variant: 'destructive' 
+      toast({
+        title: 'Password Mismatch',
+        description: 'Passwords do not match.',
+        variant: 'destructive'
       });
       return;
     }
 
     const strength = getPasswordStrength(registerPassword);
     if (strength < 3) {
-      toast({ 
-        title: 'Weak Password', 
-        description: 'Please choose a stronger password.', 
-        variant: 'destructive' 
+      toast({
+        title: 'Weak Password',
+        description: 'Please choose a stronger password.',
+        variant: 'destructive'
       });
       return;
     }
 
     if (!firstName || !lastName || !registerUsername || !registerPassword) {
-      toast({ 
-        title: 'Required Fields', 
-        description: 'All fields marked with * are required.', 
-        variant: 'destructive' 
+      toast({
+        title: 'Required Fields',
+        description: 'All fields marked with * are required.',
+        variant: 'destructive'
       });
       return;
     }
@@ -988,8 +1004,8 @@ export default function EnhancedLoginPage() {
   return (
     <div className="min-h-screen flex relative overflow-hidden font-poppins bg-gradient-to-br from-white via-gray-50 to-slate-100">
       {/* Enhanced Loading Animation */}
-      <EnhancedLoadingAnimation 
-        isLoading={isLoading} 
+      <EnhancedLoadingAnimation
+        isLoading={isLoading}
         progress={loadingProgress}
         message={successType === 'login' ? "Signing you in..." : "Creating your account..."}
       />
@@ -998,8 +1014,8 @@ export default function EnhancedLoginPage() {
       <SuccessAnimation
         isVisible={showSuccess}
         title={successType === 'register' ? 'Account Created Successfully!' : 'Welcome Back!'}
-        message={successType === 'register' 
-          ? `Welcome to eTire Manager, ${successUserData?.firstName}! Your account is now active.` 
+        message={successType === 'register'
+          ? `Welcome to eTire Manager, ${successUserData?.firstName}! Your account is now active.`
           : 'You have successfully signed in to your eTire Manager account.'
         }
         actionType={successType}
@@ -1017,7 +1033,7 @@ export default function EnhancedLoginPage() {
         {/* Background Elements */}
         <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-br from-purple-500/5 to-indigo-500/5 rounded-b-full"></div>
         <div className="absolute bottom-0 right-0 w-64 h-64 bg-gradient-to-tr from-blue-500/5 to-cyan-500/5 rounded-tl-full"></div>
-        
+
         {/* Content */}
         <div className="relative z-10 max-w-lg">
           <div className="mb-8">
@@ -1032,7 +1048,7 @@ export default function EnhancedLoginPage() {
                 <p className="text-slate-600">Professional Tire Inventory System</p>
               </div>
             </div>
-            
+
             <div className="space-y-4">
               <div className="flex items-center gap-3 text-slate-700">
                 <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
@@ -1054,7 +1070,7 @@ export default function EnhancedLoginPage() {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-white/30 shadow-lg">
             <h3 className="text-xl font-semibold text-slate-800 mb-3">Trusted by Queen.R Tire Supply</h3>
             <p className="text-slate-600 mb-4">

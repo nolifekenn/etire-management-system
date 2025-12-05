@@ -20,8 +20,14 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   // Enable real-time notification toasts
   useNotificationListener();
 
+  // Debug log
+  useEffect(() => {
+    console.log("[AuthWrapper] State update:", { isLoading, hasUser: !!user, pathname });
+  }, [isLoading, user, pathname]);
+
   useEffect(() => {
     if (!isLoading && !user && pathname !== '/login') {
+      console.log("[AuthWrapper] Redirecting to /login");
       router.push('/login');
       return;
     }
@@ -65,6 +71,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="sr-only">Loading...</span>
       </div>
     );
   }

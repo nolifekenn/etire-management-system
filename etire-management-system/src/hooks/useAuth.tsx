@@ -31,10 +31,78 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase!.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth State Change:", event, session?.user?.email);
+    let mounted = true;
 
-      if (session?.user) {
+    // Safety timeout to prevent infinite loading (5 seconds)
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && isLoading) {
+        console.warn("[useAuth] Auth initialization timed out (5s). Forcing isLoading = false.");
+        setIsLoading(false);
+      }
+    }, 5000);
+
+    const initializeAuth = async () => {
+      console.log("[useAuth] initializeAuth started");
+      try {
+        // Get initial session
+        const { data: { session }, error: sessionError } = await supabase!.auth.getSession();
+
+        if (sessionError) {
+          console.error("[useAuth] getSession error:", sessionError);
+        }
+
+        if (session?.user && mounted) {
+          console.log("[useAuth] Initial session found:", session.user.email);
+          // Fetch user profile from public.user
+          const { data: profile, error } = await supabase!
+            .from("user")
+            .select("user_id, name, username, role")
+            .eq("uuid", session.user.id)
+            .single();
+
+          if (profile && !error && mounted) {
+            console.log("[useAuth] Profile found:", (profile as any).username);
+            setUser(profile as any);
+          } else if (mounted) {
+            console.error("[useAuth] Failed to fetch user profile:", JSON.stringify(error, null, 2));
+            // If profile is missing (likely PGRST116 or empty error from single()), logout to clear invalid session
+            if (!profile) {
+              console.warn("[useAuth] No user profile found for session. Logging out to prevent inconsistent state.");
+              await supabase!.auth.signOut();
+              setUser(null);
+              router.push("/login?error=missing_profile");
+            }
+          }
+        } else if (mounted) {
+          console.log("[useAuth] No initial session");
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("[useAuth] Error initializing auth:", error);
+      } finally {
+        if (mounted) {
+          console.log("[useAuth] initializeAuth finished, setting isLoading = false");
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    const { data: { subscription } } = supabase!.auth.onAuthStateChange(async (event, session) => {
+      console.log("[useAuth] Auth State Change:", event, session?.user?.email);
+
+      if (event === 'SIGNED_OUT') {
+        if (mounted) {
+          console.log("[useAuth] Handling SIGNED_OUT");
+          setUser(null);
+          setIsLoading(false);
+          router.push("/login");
+        }
+        return;
+      }
+
+      if (session?.user && mounted) {
         // Fetch user profile from public.user
         const { data: profile, error } = await supabase!
           .from("user")
@@ -42,25 +110,34 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .eq("uuid", session.user.id)
           .single();
 
-        if (profile && !error) {
-          setUser(profile);
-        } else {
-          console.error("Failed to fetch user profile:", error);
+        if (profile && !error && mounted) {
+          console.log("[useAuth] AuthStateChange: Profile found/updated");
+          setUser(profile as any);
+        } else if (mounted) {
+          console.error("[useAuth] AuthStateChange: Failed to fetch user profile:", error);
         }
-      } else {
+      } else if (mounted) {
+        console.log("[useAuth] AuthStateChange: No user in session");
         setUser(null);
       }
-      setIsLoading(false);
+
+      if (mounted) {
+        console.log("[useAuth] AuthStateChange: setting isLoading = false");
+        setIsLoading(false);
+      }
     });
 
     return () => {
+      mounted = false;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [router]);
 
   const login = async (username: string, password: string): Promise<boolean> => {
     console.log("useAuth: login called");
-    setIsLoading(true);
+    // Do NOT set global isLoading(true) here. Let the local login component handle the UI feedback.
+    // This prevents the global loader from masking the login success animation.
     try {
       // Use dummy email format as per project convention
       const email = `${username}@etire-system.local`;
@@ -80,17 +157,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (err) {
       console.error("Login Exception:", err);
       return false;
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const logout = async () => {
     setIsLoading(true);
-    await supabase!.auth.signOut();
-    setUser(null);
-    router.push("/login");
-    setIsLoading(false);
+    try {
+      await supabase!.auth.signOut();
+      // State updates and redirect are handled by onAuthStateChange ('SIGNED_OUT' event)
+    } catch (error) {
+      console.error("Logout Error:", error);
+      setIsLoading(false);
+    }
   };
 
   return (
