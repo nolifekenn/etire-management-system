@@ -2024,22 +2024,25 @@ export default function POSPage() {
 
               {/* 2. Toolbar Section (Search & Sort) */}
               <div className="bg-white border-b border-slate-100 p-4 flex flex-col gap-2 relative overflow-visible min-h-[72px] shrink-0">
-                <div className="w-full flex flex-col sm:flex-row gap-4 justify-between items-center">
+                <div className="w-full flex flex-col sm:flex-row gap-4 justify-between items-end">
                   {/* Search */}
                   <div className="relative w-full flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                    <Input
-                      placeholder="Search voidable sales by ID or Customer..."
-                      value={voidSearchTerm}
-                      onChange={(e) => setVoidSearchTerm(e.target.value)}
-                      className="pl-10 h-10 border-slate-200 focus:border-red-500 focus:ring-red-200 bg-slate-50/50 w-full font-poppins transition-all"
-                    />
+                    <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block font-poppins">Search</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+                      <Input
+                        placeholder="Search voidable sales by ID or Customer..."
+                        value={voidSearchTerm}
+                        onChange={(e) => setVoidSearchTerm(e.target.value)}
+                        className="pl-10 h-10 border-slate-200 focus:border-red-500 focus:ring-red-200 bg-slate-50/50 w-full font-poppins transition-all"
+                      />
+                    </div>
                   </div>
 
                   {/* Rows Control */}
                   <div className="flex items-center gap-3 w-full sm:w-auto">
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block font-poppins">Rows</Label>
+                    <div className="w-full sm:w-auto">
+                      <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block font-poppins">Rows</Label>
                       <Select value={String(rowsPerPageVoid)} onValueChange={(v) => setRowsPerPageVoid(Number(v))}>
                         <SelectTrigger className="h-10 w-[70px] border-slate-200 bg-white font-poppins">
                           <SelectValue />
@@ -2664,22 +2667,25 @@ export default function POSPage() {
               {/* 2. New Toolbar Section (Search, Sort & Rows) */}
               <div className="bg-white border-b border-slate-100 p-4 flex flex-col gap-2 relative overflow-visible min-h-[72px]">
                 {/* Top row: Search + Controls */}
-                <div className="w-full flex flex-col sm:flex-row gap-4 justify-between items-center">
+                <div className="w-full flex flex-col sm:flex-row gap-4 justify-between items-end">
                   {/* Left: Search */}
                   <div className="relative w-full flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                    <Input
-                      placeholder="Search by ID or Customer Name..."
-                      value={historySearchTerm}
-                      onChange={(e) => setHistorySearchTerm(e.target.value)}
-                      className="pl-10 h-10 border-slate-200 focus:border-indigo-500 bg-slate-50/50 w-full"
-                    />
+                    <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block font-poppins">Search</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+                      <Input
+                        placeholder="Search by ID or Customer Name..."
+                        value={historySearchTerm}
+                        onChange={(e) => setHistorySearchTerm(e.target.value)}
+                        className="pl-10 h-10 border-slate-200 focus:border-indigo-500 bg-slate-50/50 w-full"
+                      />
+                    </div>
                   </div>
                   {/* Right: Sort & Rows Controls */}
-                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className="flex items-end gap-3 w-full sm:w-auto">
                     {/* Sort By Dropdown */}
-                    <div className="flex items-center gap-2 flex-1 sm:flex-none">
-                      <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block font-poppins">Sort By</Label>
+                    <div className="w-full sm:w-auto">
+                      <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block font-poppins">Sort By</Label>
                       <Select value={sortOption} onValueChange={setSortOption}>
                         <SelectTrigger className="h-10 w-full sm:w-[220px] border-slate-200 bg-white">
                           <ListFilter className="w-4 h-4 mr-2 text-slate-500" />
@@ -2698,8 +2704,8 @@ export default function POSPage() {
                     </div>
 
                     {/* Rows Per Page */}
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block font-poppins">Rows</Label>
+                    <div className="w-full sm:w-auto">
+                      <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block font-poppins">Rows</Label>
                       <Select value={String(rowsPerPageSales)} onValueChange={(v) => setRowsPerPageSales(Number(v))}>
                         <SelectTrigger className="h-10 w-[70px] border-slate-200 bg-white">
                           <SelectValue />
