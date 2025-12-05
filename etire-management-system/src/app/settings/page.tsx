@@ -12,8 +12,9 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, AlertTriangle, Settings as SettingsIcon, Shield, History, DollarSign, Bell, RefreshCw, CheckCircle, XCircle, Info, Palette, Globe } from 'lucide-react';
+import { Loader2, AlertTriangle, Settings as SettingsIcon, Shield, History, DollarSign, Bell, RefreshCw, CheckCircle, XCircle, Info, Palette, Globe, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { SystemSetting, AuditLog, Notification } from '@/lib/types';
 
@@ -30,6 +31,93 @@ const microAnimations = {
   cardHover: "transition-all duration-300 ease-out hover:translate-y-[-2px] hover:shadow-md",
 };
 
+// ===== PASSWORD STRENGTH INDICATOR =====
+const PasswordStrengthIndicator = ({ password }: { password: string }) => {
+  const getStrength = (pass: string) => {
+    let score = 0;
+    if (pass.length >= 8) score++;
+    if (/[A-Z]/.test(pass)) score++;
+    if (/[a-z]/.test(pass)) score++;
+    if (/[0-9]/.test(pass)) score++;
+    if (/[^A-Za-z0-9]/.test(pass)) score++;
+    return score;
+  };
+
+  const strength = getStrength(password);
+
+  const getStrengthColor = (score: number) => {
+    switch (score) {
+      case 0: return 'from-red-500 to-red-400';
+      case 1: return 'from-red-500 to-orange-400';
+      case 2: return 'from-orange-500 to-yellow-400';
+      case 3: return 'from-yellow-500 to-green-400';
+      case 4: return 'from-green-500 to-emerald-400';
+      case 5: return 'from-emerald-500 to-teal-400';
+      default: return 'from-red-500 to-red-400';
+    }
+  };
+
+  const getStrengthLabel = (score: number) => {
+    switch (score) {
+      case 0: return 'Very Weak';
+      case 1: return 'Weak';
+      case 2: return 'Fair';
+      case 3: return 'Good';
+      case 4: return 'Strong';
+      case 5: return 'Very Strong';
+      default: return 'Very Weak';
+    }
+  };
+
+  const requirements = [
+    { met: password.length >= 8, text: 'At least 8 characters' },
+    { met: /[A-Z]/.test(password), text: 'Uppercase letter' },
+    { met: /[a-z]/.test(password), text: 'Lowercase letter' },
+    { met: /[0-9]/.test(password), text: 'Number' },
+    { met: /[^A-Za-z0-9]/.test(password), text: 'Special character' },
+  ];
+
+  return (
+    <div className="space-y-4 mt-3">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          {strength < 2 ? <AlertCircle className="h-4 w-4 text-red-500" /> : <CheckCircle className="h-4 w-4 text-green-500" />}
+          <span className="text-sm font-medium text-gray-700">Password Strength</span>
+        </div>
+        <span className={`text-sm font-semibold px-2 py-1 rounded-full ${strength <= 1 ? 'bg-red-100 text-red-700' :
+          strength === 2 ? 'bg-orange-100 text-orange-700' :
+            strength === 3 ? 'bg-yellow-100 text-yellow-700' :
+              strength >= 4 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+          }`}>
+          {getStrengthLabel(strength)}
+        </span>
+      </div>
+
+      <div className="w-full bg-gradient-to-r from-gray-100 to-gray-200 rounded-full h-2 overflow-hidden">
+        <div
+          className={`h-2 rounded-full bg-gradient-to-r ${getStrengthColor(strength)} transition-all duration-500`}
+          style={{ width: `${(strength / 5) * 100}%` }}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        {requirements.map((req, index) => (
+          <div key={index} className="flex items-center gap-2">
+            {req.met ? (
+              <CheckCircle className="h-3 w-3 text-green-500" />
+            ) : (
+              <XCircle className="h-3 w-3 text-gray-400" />
+            )}
+            <span className={`text-xs ${req.met ? 'text-green-600 font-medium' : 'text-gray-500'}`}>
+              {req.text}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export default function SettingsPage() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const { toast } = useToast();
@@ -42,6 +130,14 @@ export default function SettingsPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Password Verification State
+  const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+
 
   // System settings state
   const [systemSettings, setSystemSettings] = useState<SystemSetting[]>([]);
@@ -162,20 +258,38 @@ export default function SettingsPage() {
       toast({ title: "Error", description: "You must be logged in to change settings.", variant: "destructive" });
       return;
     }
-    if (password && password !== confirmPassword) {
-      toast({ title: "Error", description: "New passwords do not match.", variant: "destructive" });
+
+    // Password validation logic
+    if (password) {
+      if (password !== confirmPassword) {
+        toast({ title: "Error", description: "New passwords do not match.", variant: "destructive" });
+        return;
+      }
+
+      // Check strength
+      let score = 0;
+      if (password.length >= 8) score++;
+      if (/[A-Z]/.test(password)) score++;
+      if (/[a-z]/.test(password)) score++;
+      if (/[0-9]/.test(password)) score++;
+      if (/[^A-Za-z0-9]/.test(password)) score++;
+
+      if (score < 3) {
+        toast({ title: "Weak Password", description: "Please choose a stronger password (at least 'Fair' strength).", variant: "destructive" });
+        return;
+      }
+
+      // Open verification dialog
+      setIsVerifyDialogOpen(true);
       return;
     }
 
+    // Direct save for non-password changes
     setIsSaving(true);
-    const updateData: { name: string; username: string; password?: string } = {
+    const updateData: { name: string; username: string } = {
       name,
       username,
     };
-
-    if (password) {
-      updateData.password = password;
-    }
 
     const { error } = await (supabase
       .from('user') as any)
@@ -185,11 +299,89 @@ export default function SettingsPage() {
     if (error) {
       toast({ title: "Save Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Success", description: "Your settings have been updated. Changes will be reflected on next login." });
-      setPassword('');
-      setConfirmPassword('');
+      toast({ title: "Success", description: "Profile updated successfully." });
     }
     setIsSaving(false);
+  };
+
+  const handleVerifyAndSave = async () => {
+    if (!user || !supabase || !oldPassword) return;
+    setIsVerifying(true);
+    console.log("[Settings] Starting password verification...");
+
+    // Helper to timeout promises
+    const withTimeout = (promise: Promise<any>, ms: number = 20000) => {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`Operation timed out after ${ms}ms`)), ms))
+      ]);
+    };
+
+    try {
+      // 1. Verify old password by attempting to sign in
+      const email = `${user.username}@etire-system.local`;
+
+      const { data: signInData, error: signInError } = await withTimeout(
+        supabase.auth.signInWithPassword({
+          email,
+          password: oldPassword,
+        })
+      );
+
+      if (signInError) {
+        console.error("[Settings] Verification failed:", signInError);
+        toast({ title: "Verification Failed", description: "Incorrect old password.", variant: "destructive" });
+        setIsVerifying(false);
+        return;
+      }
+
+      console.log("[Settings] Verification successful");
+
+      // 2. If verified, proceed with password update
+      setIsSaving(true);
+
+      // Update Auth Password
+      const { error: authError } = await withTimeout(
+        supabase.auth.updateUser({ password: password })
+      );
+
+      if (authError) {
+        throw new Error(`Auth Update Failed: ${authError.message}`);
+      }
+
+      // Update Public User Profile
+      const updateData: { name: string; username: string; password?: string } = {
+        name,
+        username,
+        password: password
+      };
+
+      const { error: dbError } = await (supabase.from('user') as any)
+        .update(updateData)
+        .eq('user_id', user.user_id);
+
+      if (dbError) {
+        // Note: If auth succeeded but this failed, user is in weird state, but password IS changed.
+        console.error("Profile update error", dbError);
+        // We won't throw here to avoid telling user it failed when password actually changed
+        toast({ title: "Warning", description: "Password changed but profile details may not have updated.", variant: "default" });
+      } else {
+        toast({ title: "Success", description: "Password and profile updated successfully." });
+      }
+
+      // Cleanup
+      setPassword('');
+      setConfirmPassword('');
+      setOldPassword('');
+      setIsVerifyDialogOpen(false);
+
+    } catch (error: any) {
+      console.error("[Settings] Handle verify error:", error);
+      toast({ title: "Update Error", description: error.message, variant: "destructive" });
+    } finally {
+      setIsVerifying(false);
+      setIsSaving(false);
+    }
   };
 
   const handleSaveSystemSettings = async () => {
@@ -381,25 +573,49 @@ export default function SettingsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <Label htmlFor="new-password" className="text-slate-700 font-medium">New Password</Label>
-                      <Input
-                        id="new-password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Leave blank to keep current password"
-                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
-                      />
+                      <div className="relative">
+                        <Input
+                          id="new-password"
+                          type={showPassword ? "text" : "password"}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Leave blank to keep current password"
+                          className="border-slate-300 focus:border-indigo-400 transition-all duration-300 pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition-colors"
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      {password && <PasswordStrengthIndicator password={password} />}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="confirm-password" className="text-slate-700 font-medium">Confirm New Password</Label>
-                      <Input
-                        id="confirm-password"
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Confirm your new password"
-                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
-                      />
+                      <div className="relative">
+                        <Input
+                          id="confirm-password"
+                          type={showConfirmPassword ? "text" : "password"}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Confirm your new password"
+                          className={`border-slate-300 focus:border-indigo-400 transition-all duration-300 pr-10 ${confirmPassword && password !== confirmPassword ? 'border-red-300 focus:border-red-400' : ''}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition-colors"
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      {confirmPassword && password !== confirmPassword && (
+                        <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                          <XCircle className="h-3 w-3" /> Passwords do not match
+                        </p>
+                      )}
                     </div>
                   </div>
 
