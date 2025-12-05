@@ -63,6 +63,74 @@ const microAnimations = {
   iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
 };
 
+// ===== REUSABLE PAGINATION COMPONENT =====
+const PaginationControls = ({ 
+  currentPage, 
+  totalPages, 
+  onPageChange, 
+  totalItems, 
+  rowsPerPage 
+}: { 
+  currentPage: number; 
+  totalPages: number; 
+  onPageChange: (page: number) => void; 
+  totalItems: number; 
+  rowsPerPage: number; 
+}) => {
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
+
+  return (
+    <div className="flex items-center justify-between p-6 border-t border-slate-200 bg-white">
+      {/* Left Side: Showing text */}
+      <div className="text-sm text-slate-600 font-poppins">
+        Showing {totalItems === 0 ? 0 : startIndex + 1} to {endIndex} of {totalItems} entries
+      </div>
+
+      {/* Right Side: Simple Pager Controls */}
+      <div className="flex items-center gap-2">
+        <Button 
+          variant="outline" 
+          className="h-8 px-2 min-w-[36px] bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900" 
+          onClick={() => onPageChange(1)} 
+          disabled={currentPage === 1}
+        >
+          «
+        </Button>
+        <Button 
+          variant="outline" 
+          className="h-8 px-2 min-w-[36px] bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900" 
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))} 
+          disabled={currentPage === 1}
+        >
+          ‹
+        </Button>
+        
+        <span className="text-sm text-slate-600 px-2 font-medium font-poppins min-w-[80px] text-center">
+          Page {currentPage} of {totalPages || 1}
+        </span>
+        
+        <Button 
+          variant="outline" 
+          className="h-8 px-2 min-w-[36px] bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900" 
+          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))} 
+          disabled={currentPage === totalPages || totalPages === 0}
+        >
+          ›
+        </Button>
+        <Button 
+          variant="outline" 
+          className="h-8 px-2 min-w-[36px] bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900" 
+          onClick={() => onPageChange(totalPages)} 
+          disabled={currentPage === totalPages || totalPages === 0}
+        >
+          »
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 // ===== SUCCESS ANIMATION COMPONENT =====
 const SuccessAnimation = ({
   isVisible,
@@ -200,17 +268,22 @@ interface HistoryFilterState {
 const CustomerAdvancedFilters = ({
   filters,
   onFiltersChange,
-  onClearFilters
+  onClearFilters,
+  rowsPerPage,
+  onRowsPerPageChange
 }: {
   filters: CustomerFilterState;
   onFiltersChange: (filters: CustomerFilterState) => void;
   onClearFilters: () => void;
+  rowsPerPage: number;
+  onRowsPerPageChange: (val: number) => void;
 }) => {
   const hasActiveFilters = filters.search;
 
   return (
     <div className="bg-white p-5 border-b border-slate-200">
-      <div className="flex flex-col lg:flex-row lg:items-end gap-4 mb-5">
+      {/* Removed mb-5 to reduce spacing */}
+      <div className="flex flex-col lg:flex-row lg:items-end gap-4">
         <div className="flex-1 relative">
           <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Search Customers</Label>
           <div className="relative group">
@@ -232,7 +305,7 @@ const CustomerAdvancedFilters = ({
           </div>
         </div>
 
-        <div className="flex gap-2 w-full lg:w-auto">
+        <div className="flex gap-2 w-full lg:w-auto items-end">
           <div className="w-1/2 lg:w-40">
             <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Sort By</Label>
             <Select
@@ -266,8 +339,26 @@ const CustomerAdvancedFilters = ({
             </Select>
           </div>
 
+           {/* Moved Rows Per Page Here */}
+           <div className="w-1/2 lg:w-20">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Rows</Label>
+            <Select
+              value={String(rowsPerPage)}
+              onValueChange={(v) => onRowsPerPageChange(Number(v))}
+            >
+              <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
+                <SelectValue placeholder="Rows" />
+              </SelectTrigger>
+              <SelectContent>
+                {[5, 10, 25, 50].map((opt) => (
+                  <SelectItem key={opt} value={String(opt)}>{opt}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {hasActiveFilters && (
-            <div className="hidden lg:flex items-end pb-0.5">
+            <div className="hidden lg:flex items-end">
               <Button
                 variant="outline"
                 onClick={onClearFilters}
@@ -301,19 +392,24 @@ const VehicleAdvancedFilters = ({
   onFiltersChange,
   onClearFilters,
   customers,
-  vehicleTypes
+  vehicleTypes,
+  rowsPerPage,
+  onRowsPerPageChange
 }: {
   filters: VehicleFilterState;
   onFiltersChange: (filters: VehicleFilterState) => void;
   onClearFilters: () => void;
   customers: any[];
   vehicleTypes: any[];
+  rowsPerPage: number;
+  onRowsPerPageChange: (val: number) => void;
 }) => {
   const hasActiveFilters = filters.search || filters.customer !== 'all' || filters.vehicleType !== 'all';
 
   return (
     <div className="bg-white p-5 border-b border-slate-200">
-      <div className="flex flex-col lg:flex-row lg:items-end gap-4 mb-5">
+      {/* Removed mb-5 to reduce spacing */}
+      <div className="flex flex-col lg:flex-row lg:items-end gap-4">
         <div className="flex-1 relative">
           <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Search Vehicles</Label>
           <div className="relative group">
@@ -335,7 +431,7 @@ const VehicleAdvancedFilters = ({
           </div>
         </div>
 
-        <div className="flex gap-2 w-full lg:w-auto">
+        <div className="flex gap-2 w-full lg:w-auto items-end">
           <div className="w-1/2 lg:w-48">
             <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Customer</Label>
             <Select
@@ -411,8 +507,26 @@ const VehicleAdvancedFilters = ({
             </Select>
           </div>
 
+           {/* Moved Rows Per Page Here */}
+           <div className="w-1/2 lg:w-20">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Rows</Label>
+            <Select
+              value={String(rowsPerPage)}
+              onValueChange={(v) => onRowsPerPageChange(Number(v))}
+            >
+              <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
+                <SelectValue placeholder="Rows" />
+              </SelectTrigger>
+              <SelectContent>
+                {[5, 10, 25, 50].map((opt) => (
+                  <SelectItem key={opt} value={String(opt)}>{opt}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {hasActiveFilters && (
-            <div className="hidden lg:flex items-end pb-0.5">
+            <div className="hidden lg:flex items-end">
               <Button
                 variant="outline"
                 onClick={onClearFilters}
@@ -444,17 +558,22 @@ const VehicleAdvancedFilters = ({
 const HistoryAdvancedFilters = ({
   filters,
   onFiltersChange,
-  onClearFilters
+  onClearFilters,
+  rowsPerPage,
+  onRowsPerPageChange
 }: {
   filters: HistoryFilterState;
   onFiltersChange: (filters: HistoryFilterState) => void;
   onClearFilters: () => void;
+  rowsPerPage: number;
+  onRowsPerPageChange: (val: number) => void;
 }) => {
   const hasActiveFilters = filters.search || filters.serviceType !== 'all';
 
   return (
     <div className="bg-white p-5 border-b border-slate-200">
-      <div className="flex flex-col lg:flex-row lg:items-end gap-4 mb-5">
+      {/* Removed mb-5 to reduce spacing */}
+      <div className="flex flex-col lg:flex-row lg:items-end gap-4">
         <div className="flex-1 relative">
           <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Search History</Label>
           <div className="relative group">
@@ -476,7 +595,7 @@ const HistoryAdvancedFilters = ({
           </div>
         </div>
 
-        <div className="flex gap-2 w-full lg:w-auto">
+        <div className="flex gap-2 w-full lg:w-auto items-end">
           <div className="w-1/2 lg:w-48">
             <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Service Type</Label>
             <Select
@@ -529,8 +648,26 @@ const HistoryAdvancedFilters = ({
             </Select>
           </div>
 
+           {/* Moved Rows Per Page Here */}
+           <div className="w-1/2 lg:w-20">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Rows</Label>
+            <Select
+              value={String(rowsPerPage)}
+              onValueChange={(v) => onRowsPerPageChange(Number(v))}
+            >
+              <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
+                <SelectValue placeholder="Rows" />
+              </SelectTrigger>
+              <SelectContent>
+                {[5, 10, 25, 50].map((opt) => (
+                  <SelectItem key={opt} value={String(opt)}>{opt}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {hasActiveFilters && (
-            <div className="hidden lg:flex items-end pb-0.5">
+            <div className="hidden lg:flex items-end">
               <Button
                 variant="outline"
                 onClick={onClearFilters}
@@ -618,7 +755,7 @@ const CustomDataTable = ({ columns, data, onEdit, onDelete, className = '' }: Da
           {data.length === 0 ? (
             <TableRow>
               <TableCell 
-                colSpan={columns.length + (onEdit || onDelete ? 1 : 0)}
+                colSpan={columns.length + (onEdit || onDelete ? 1 : 0)} 
                 className="h-24 text-center text-slate-500"
               >
                 No data found.
@@ -797,12 +934,12 @@ const historyColumns: Column[] = [
 
 // Enhanced Empty State Component
 const EnhancedEmptyState = ({ 
-  type,
-  onAddNew,
+  type, 
+  onAddNew, 
   onClearFilters
 }: { 
-  type: 'customers' | 'vehicles' | 'history';
-  onAddNew: () => void;
+  type: 'customers' | 'vehicles' | 'history'; 
+  onAddNew: () => void; 
   onClearFilters?: () => void;
 }) => {
   const config = {
@@ -863,8 +1000,9 @@ const EnhancedEmptyState = ({
   );
 };
 
-// ===== COMPLETELY REDESIGNED StatsOverview Component =====
+// ===== StatsOverview Component =====
 const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[], vehicles: any[], tireHistory: any[] }) => {
+    // ... (keep your calculation logic here: totalCustomers, totalVehicles etc.) ...
     const totalCustomers = customers.length;
     const totalVehicles = vehicles.length;
     const recentServices = tireHistory.filter(history => 
@@ -876,40 +1014,15 @@ const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[],
     )].length;
 
     const stats = [
-      {
-        label: "Customers",
-        value: totalCustomers,
-        icon: Users,
-        gradient: "from-purple-500 to-purple-600",
-        description: "Total registered customers"
-      },
-      {
-        label: "Vehicles",
-        value: totalVehicles,
-        icon: Car,
-        gradient: "from-blue-500 to-cyan-500",
-        description: "Active vehicles in system"
-      },
-      {
-        label: "Monthly Services",
-        value: recentServices,
-        icon: Wrench,
-        gradient: "from-indigo-500 to-blue-500",
-        description: "Services this month"
-      },
-      {
-        label: "Serviced Vehicles",
-        value: vehiclesWithRecentService,
-        icon: CheckCircle,
-        gradient: "from-cyan-500 to-blue-500",
-        description: "Vehicles serviced this month"
-      }
+      { label: "Customers", value: totalCustomers, icon: Users, gradient: "from-purple-500 to-purple-600", description: "Total registered customers" },
+      { label: "Vehicles", value: totalVehicles, icon: Car, gradient: "from-blue-500 to-cyan-500", description: "Active vehicles in system" },
+      { label: "Monthly Services", value: recentServices, icon: Wrench, gradient: "from-indigo-500 to-blue-500", description: "Services this month" },
+      { label: "Serviced Vehicles", value: vehiclesWithRecentService, icon: CheckCircle, gradient: "from-cyan-500 to-blue-500", description: "Vehicles serviced this month" }
     ];
 
     return (
-      <div className="mb-8">
+      <div className="mb-8"> {/* Main wrapper with margin bottom */}
         <div className="relative rounded-2xl bg-gradient-to-br from-white to-slate-50 border border-slate-200/70 shadow-lg overflow-hidden">
-          {/* Subtle background pattern */}
           <div className="absolute inset-0 opacity-5">
             <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-purple-400 to-transparent rounded-full -mr-16 -mt-16"></div>
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-cyan-400 to-transparent rounded-full -ml-12 -mb-12"></div>
@@ -929,33 +1042,21 @@ const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[],
               {stats.map((stat, index) => {
                 const Icon = stat.icon;
                 return (
-                  <div 
-                    key={stat.label}
-                    className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 hover:translate-y-[-2px] group cursor-default"
-                  >
+                  <div key={stat.label} className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 hover:translate-y-[-2px] group cursor-default">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <div className={`p-2 bg-gradient-to-r ${stat.gradient} rounded-lg shadow-sm group-hover:scale-110 transition-transform duration-300`}>
                           <Icon className="h-5 w-5 text-white" />
                         </div>
                         <div>
-                          <p className="text-2xl font-bold text-slate-900 font-poppins tracking-tight">
-                            {stat.value.toLocaleString()}
-                          </p>
-                          <p className="text-sm font-medium text-slate-700 font-poppins mt-0.5">
-                            {stat.label}
-                          </p>
+                          <p className="text-2xl font-bold text-slate-900 font-poppins tracking-tight">{stat.value.toLocaleString()}</p>
+                          <p className="text-sm font-medium text-slate-700 font-poppins mt-0.5">{stat.label}</p>
                         </div>
                       </div>
                     </div>
-                    <p className="text-xs text-slate-500 mt-3 font-poppins">
-                      {stat.description}
-                    </p>
+                    <p className="text-xs text-slate-500 mt-3 font-poppins">{stat.description}</p>
                     <div className="mt-4 h-1 w-full bg-gradient-to-r from-slate-100 to-slate-100 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full bg-gradient-to-r ${stat.gradient} transition-all duration-700 ease-out`}
-                        style={{ width: '100%' }}
-                      />
+                      <div className={`h-full bg-gradient-to-r ${stat.gradient} transition-all duration-700 ease-out`} style={{ width: '100%' }} />
                     </div>
                   </div>
                 );
@@ -1250,7 +1351,7 @@ export default function EnhancedCustomersPage() {
       // Apply search filter
       if (customerFilters.search) {
         const searchLower = customerFilters.search.toLowerCase();
-        result = result.filter(customer =>
+        result = result.filter(customer => 
           customer.name.toLowerCase().includes(searchLower) ||
           customer.phone?.toLowerCase().includes(searchLower)
         );
@@ -1293,7 +1394,7 @@ export default function EnhancedCustomersPage() {
         // Apply search filter
         if (vehicleFilters.search) {
             const searchLower = vehicleFilters.search.toLowerCase();
-            result = result.filter(v =>
+            result = result.filter(v => 
                 v.plate_number?.toLowerCase().includes(searchLower) ||
                 v.customer?.name?.toLowerCase().includes(searchLower) ||
                 v.vehicle_type?.name?.toLowerCase().includes(searchLower) ||
@@ -1359,8 +1460,8 @@ export default function EnhancedCustomersPage() {
         if (historyFilters.search) {
             const searchLower = historyFilters.search.toLowerCase();
             result = result.filter(history => {
-                const itemNames = Array.isArray(history.items)
-                    ? history.items.map((it: any) => it.name?.toLowerCase()).filter(Boolean)
+                const itemNames = Array.isArray(history.items) 
+                    ? history.items.map((it: any) => it.name?.toLowerCase()).filter(Boolean) 
                     : [];
 
                 return (
@@ -1718,9 +1819,9 @@ export default function EnhancedCustomersPage() {
         if (!deletingItem || !supabase) return;
         
         const tableName = deletingItem.type === 'customer' ? 'customer' : 
-                         deletingItem.type === 'vehicle' ? 'vehicle' : 'tire_history';
+                          deletingItem.type === 'vehicle' ? 'vehicle' : 'tire_history';
         const idField = deletingItem.type === 'customer' ? 'customer_id' : 
-                       deletingItem.type === 'vehicle' ? 'vehicle_id' : 'history_id';
+                        deletingItem.type === 'vehicle' ? 'vehicle_id' : 'history_id';
         
         const { error } = await supabase
             .from(tableName)
@@ -1752,686 +1853,386 @@ export default function EnhancedCustomersPage() {
         }
     };
 
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white text-slate-800 font-poppins relative">
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white text-slate-800 font-poppins relative overflow-hidden">
+      
+      {/* Background Sections */}
+      <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
+        <div 
+          className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
+          style={{ 
+            backgroundImage: "url('/images/image2.jpg')",
+            backgroundSize: "cover",
+            backgroundPosition: "center 30%"
+          }}
+        ></div>
+        <div className="absolute top-0 left-0 w-32 h-32 bg-purple-300/20 rounded-br-full"></div>
+        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-300/20 rounded-bl-full"></div>
+      </div>
+
+      <div className="absolute top-64 left-0 w-full bottom-0 bg-indigo-50/10">
+        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-indigo-100/15 to-indigo-50/10"></div>
+      </div>
+
+      <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
+        
+        {/* Header Section */}
+        <div className={`mb-12 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+          <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
             
-            {/* Background Sections */}
-            <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
-                <div 
-                    className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
-                    style={{ 
-                        backgroundImage: "url('/images/image2.jpg')",
-                        backgroundSize: "cover",
-                        backgroundPosition: "center 30%"
-                    }}
-                ></div>
-                <div className="absolute top-0 left-0 w-32 h-32 bg-purple-300/20 rounded-br-full"></div>
-                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-300/20 rounded-bl-full"></div>
-            </div>
-
-            <div className="absolute top-64 left-0 w-full h-full bg-indigo-50/10">
-                <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-indigo-100/15 to-indigo-50/10"></div>
-            </div>
-
-            <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-                
-                {/* Header Section - UNCHANGED as requested */}
-                <div className={`mb-8 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
-                    <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
-                        
-                        <div className="relative z-10 flex-1">
-                            <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
-                                Customer & Vehicle Management
-                            </h1>
-                            <div className="flex items-center gap-6 text-white/90">
-                                <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium font-poppins">
-                                    <Users className="h-6 w-6 opacity-90" />
-                                    Manage customers, vehicles, and tire service history
-                                </p>
-                                <div className="flex items-center gap-4 text-lg">
-                                    {lastUpdated && (
-                                        <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
-                                            <Clock className="w-5 h-5" />
-                                            Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                                        </div>
-                                    )}
-                                    {/* ✅ KEPT: Live data indicator stays ONLY in header */}
-                                    <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
-                                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                                        Live data
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <Button 
-                            onClick={handleRefresh}
-                            disabled={isCustomerLoading || isVehicleLoading || isHistoryLoading}
-                            className={buttonStyles.glass + " active:scale-95 font-poppins"}
-                        >
-                            <RefreshCw className={`h-6 w-6 mr-3 ${isCustomerLoading || isVehicleLoading || isHistoryLoading ? 'animate-spin' : ''}`} />
-                            Refresh Data
-                        </Button>
+            <div className="relative z-10 flex-1">
+              <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
+                Customer & Vehicle Management
+              </h1>
+              <div className="flex items-center gap-6 text-white/90">
+                <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium font-poppins">
+                  <Users className="h-6 w-6 opacity-90" />
+                  Manage customers, vehicles, and tire service history
+                </p>
+                <div className="flex items-center gap-4 text-lg hidden sm:flex">
+                  {lastUpdated && (
+                    <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
+                      <Clock className="w-5 h-5" />
+                      Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                     </div>
+                  )}
+                  <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    Live data
+                  </div>
                 </div>
-
-                {/* Stats Overview - REMOVED live data badge from here */}
-                <StatsOverview customers={customers} vehicles={vehicles} tireHistory={tireHistory} />
-
-                {/* ✅ UPDATED: QuickActions with Inventory-style gradient cards */}
-                <QuickActions 
-                    onAddCustomer={handleOpenCustomerDialog} 
-                    onAddVehicle={handleOpenVehicleDialog}
-                    onExportData={handleExportData}
-                />
-
-                {/* Enhanced Tabs with Improved Spacing */}
-                <div className="mb-12">
-                  <EnhancedTabs value={activeTab} onValueChange={handleTabChange}>
-                      {/* ===== CUSTOMERS TAB with Inventory-style pagination ===== */}
-                      <TabsContent value="customers" className="space-y-6 animate-in fade-in duration-500">
-                          {isCustomerLoading ? (
-                              <div className="flex flex-col justify-center items-center h-64 space-y-4">
-                                  <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
-                                  <p className="text-slate-500 font-poppins">Loading customers...</p>
-                              </div>
-                          ) : (
-                              <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
-                                  {/* Gradient Header with Rows Per Page */}
-                                  <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 text-white p-4 flex items-center justify-between gap-4">
-                                      <div className="flex items-center gap-4">
-                                          <div className="p-2 bg-white/20 rounded-lg">
-                                              <Users className="h-6 w-6 text-white" />
-                                          </div>
-                                          <div>
-                                              <div className="text-xl font-bold font-poppins">Customer Management</div>
-                                              <div className="text-sm opacity-90">Manage customer information and their vehicles</div>
-                                              {/* Total / Filtered count */}
-                                              <div className="text-sm text-white/90 mt-1">
-                                                  {customerFilters.search ? (
-                                                      <>Filtered: <strong>{filteredCustomers.length}</strong> of <strong>{customers.length}</strong> customers</>
-                                                  ) : (
-                                                      <>Total: <strong>{customers.length}</strong> customers</>
-                                                  )}
-                                              </div>
-                                          </div>
-                                      </div>
-
-                                      {/* Rows per page selector */}
-                                      <div className="flex items-center gap-3">
-                                          <div className="text-sm text-white/90 mr-2">Rows per page:</div>
-                                          <div className="w-28">
-                                              <Select value={String(customerRowsPerPage)} onValueChange={(v) => setCustomerRowsPerPage(Number(v))}>
-                                                  <SelectTrigger className="w-full border-transparent bg-white text-black">
-                                                      <SelectValue />
-                                                  </SelectTrigger>
-                                                  <SelectContent>
-                                                      {rowsPerPageOptions.map(option => (
-                                                          <SelectItem key={option} value={String(option)}>{option}</SelectItem>
-                                                      ))}
-                                                  </SelectContent>
-                                              </Select>
-                                          </div>
-                                      </div>
-                                  </div>
-
-                                  {/* Advanced Filters */}
-                                  <CustomerAdvancedFilters
-                                      filters={customerFilters}
-                                      onFiltersChange={setCustomerFilters}
-                                      onClearFilters={clearCustomerFilters}
-                                  />
-
-                                  {/* Data Table */}
-                                  {filteredCustomers.length === 0 ? (
-                                      <EnhancedEmptyState 
-                                          type="customers"
-                                          onAddNew={handleOpenCustomerDialog}
-                                          onClearFilters={clearCustomerFilters}
-                                      />
-                                  ) : (
-                                      <>
-                                          <CustomDataTable
-                                              className="w-full"
-                                              columns={customerColumns}
-                                              data={displayedCustomers.map(customer => ({ 
-                                                  ...customer, 
-                                                  id: customer.customer_id 
-                                              }))}
-                                              onEdit={handleEditCustomer}
-                                              onDelete={(item) => handleDeleteItem(item, 'customer')}
-                                          />
-
-                                          {/* Pagination Footer */}
-                                          <div className="px-6 py-3 border-t border-slate-100 bg-white flex items-center justify-between">
-                                              <div className="text-sm text-slate-600">
-                                                  Showing {filteredCustomers.length === 0 ? 0 : ((customerCurrentPage - 1) * customerRowsPerPage + 1)} to {Math.min(customerCurrentPage * customerRowsPerPage, filteredCustomers.length)} of {filteredCustomers.length} entries
-                                              </div>
-                                              <div className="flex items-center gap-2">
-                                                  <Button
-                                                      variant="outline"
-                                                      onClick={() => setCustomerCurrentPage(p => Math.max(1, p - 1))}
-                                                      disabled={customerCurrentPage === 1}
-                                                      className="min-w-[36px] h-8 px-2 py-1"
-                                                  >
-                                                      «
-                                                  </Button>
-                                                  <div className="text-sm text-slate-700 px-3">Page {customerCurrentPage} of {Math.max(1, Math.ceil(filteredCustomers.length / customerRowsPerPage))}</div>
-                                                  <Button
-                                                      variant="outline"
-                                                      onClick={() => setCustomerCurrentPage(p => Math.min(Math.ceil(filteredCustomers.length / customerRowsPerPage) || 1, p + 1))}
-                                                      disabled={customerCurrentPage >= Math.ceil(filteredCustomers.length / customerRowsPerPage)}
-                                                      className="min-w-[36px] h-8 px-2 py-1"
-                                                  >
-                                                      »
-                                                  </Button>
-                                              </div>
-                                          </div>
-                                      </>
-                                  )}
-                              </div>
-                          )}
-                      </TabsContent>
-
-                      {/* ===== VEHICLES TAB with Inventory-style pagination ===== */}
-                      <TabsContent value="vehicles" className="space-y-6 animate-in fade-in duration-500">
-                          {isVehicleLoading ? (
-                              <div className="flex flex-col justify-center items-center h-64 space-y-4">
-                                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                                  <p className="text-slate-500 font-poppins">Loading vehicles...</p>
-                              </div>
-                          ) : (
-                              <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
-                                  {/* Gradient Header with Rows Per Page */}
-                                  <div className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white p-4 flex items-center justify-between gap-4">
-                                      <div className="flex items-center gap-4">
-                                          <div className="p-2 bg-white/20 rounded-lg">
-                                              <Car className="h-6 w-6 text-white" />
-                                          </div>
-                                          <div>
-                                              <div className="text-xl font-bold font-poppins">Vehicle Management</div>
-                                              <div className="text-sm opacity-90">Manage vehicle information and service history</div>
-                                              {/* Total / Filtered count */}
-                                              <div className="text-sm text-white/90 mt-1">
-                                                  {vehicleFilters.search || vehicleFilters.customer !== 'all' || vehicleFilters.vehicleType !== 'all' ? (
-                                                      <>Filtered: <strong>{filteredVehicles.length}</strong> of <strong>{vehicles.length}</strong> vehicles</>
-                                                  ) : (
-                                                      <>Total: <strong>{vehicles.length}</strong> vehicles</>
-                                                  )}
-                                              </div>
-                                          </div>
-                                      </div>
-
-                                      {/* Rows per page selector */}
-                                      <div className="flex items-center gap-3">
-                                          <div className="text-sm text-white/90 mr-2">Rows per page:</div>
-                                          <div className="w-28">
-                                              <Select value={String(vehicleRowsPerPage)} onValueChange={(v) => setVehicleRowsPerPage(Number(v))}>
-                                                  <SelectTrigger className="w-full border-transparent bg-white text-black">
-                                                      <SelectValue />
-                                                  </SelectTrigger>
-                                                  <SelectContent>
-                                                      {rowsPerPageOptions.map(option => (
-                                                          <SelectItem key={option} value={String(option)}>{option}</SelectItem>
-                                                      ))}
-                                                  </SelectContent>
-                                              </Select>
-                                          </div>
-                                      </div>
-                                  </div>
-
-                                  {/* Advanced Filters */}
-                                  <VehicleAdvancedFilters
-                                      filters={vehicleFilters}
-                                      onFiltersChange={setVehicleFilters}
-                                      onClearFilters={clearVehicleFilters}
-                                      customers={customers}
-                                      vehicleTypes={vehicleTypes}
-                                  />
-
-                                  {/* Data Table */}
-                                  {filteredVehicles.length === 0 ? (
-                                      <EnhancedEmptyState 
-                                          type="vehicles"
-                                          onAddNew={handleOpenVehicleDialog}
-                                          onClearFilters={clearVehicleFilters}
-                                      />
-                                  ) : (
-                                      <>
-                                          <CustomDataTable
-                                              className="w-full"
-                                              columns={vehicleColumns}
-                                              data={displayedVehicles.map(vehicle => ({ 
-                                                  ...vehicle, 
-                                                  id: vehicle.vehicle_id 
-                                              }))}
-                                              onEdit={handleEditVehicle}
-                                              onDelete={(item) => handleDeleteItem(item, 'vehicle')}
-                                          />
-
-                                          {/* Pagination Footer */}
-                                          <div className="px-6 py-3 border-t border-slate-100 bg-white flex items-center justify-between">
-                                              <div className="text-sm text-slate-600">
-                                                  Showing {filteredVehicles.length === 0 ? 0 : ((vehicleCurrentPage - 1) * vehicleRowsPerPage + 1)} to {Math.min(vehicleCurrentPage * vehicleRowsPerPage, filteredVehicles.length)} of {filteredVehicles.length} entries
-                                              </div>
-                                              <div className="flex items-center gap-2">
-                                                  <Button
-                                                      variant="outline"
-                                                      onClick={() => setVehicleCurrentPage(p => Math.max(1, p - 1))}
-                                                      disabled={vehicleCurrentPage === 1}
-                                                      className="min-w-[36px] h-8 px-2 py-1"
-                                                  >
-                                                      «
-                                                  </Button>
-                                                  <div className="text-sm text-slate-700 px-3">Page {vehicleCurrentPage} of {Math.max(1, Math.ceil(filteredVehicles.length / vehicleRowsPerPage))}</div>
-                                                  <Button
-                                                      variant="outline"
-                                                      onClick={() => setVehicleCurrentPage(p => Math.min(Math.ceil(filteredVehicles.length / vehicleRowsPerPage) || 1, p + 1))}
-                                                      disabled={vehicleCurrentPage >= Math.ceil(filteredVehicles.length / vehicleRowsPerPage)}
-                                                      className="min-w-[36px] h-8 px-2 py-1"
-                                                  >
-                                                      »
-                                                  </Button>
-                                              </div>
-                                          </div>
-                                      </>
-                                  )}
-                              </div>
-                          )}
-                      </TabsContent>
-
-                      {/* ===== HISTORY TAB with Inventory-style pagination ===== */}
-                      <TabsContent value="history" className="space-y-6 animate-in fade-in duration-500">
-                          {isHistoryLoading ? (
-                              <div className="flex flex-col justify-center items-center h-64 space-y-4">
-                                  <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-                                  <p className="text-slate-500 font-poppins">Loading service history...</p>
-                              </div>
-                          ) : (
-                              <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
-                                  {/* Gradient Header with Rows Per Page */}
-                                  <div className="w-full bg-gradient-to-r from-green-600 via-cyan-600 to-blue-600 text-white p-4 flex items-center justify-between gap-4">
-                                      <div className="flex items-center gap-4">
-                                          <div className="p-2 bg-white/20 rounded-lg">
-                                              <History className="h-6 w-6 text-white" />
-                                          </div>
-                                          <div>
-                                              <div className="text-xl font-bold font-poppins">Tire Service History</div>
-                                              <div className="text-sm opacity-90">Track tire services and maintenance records</div>
-                                              {/* Total / Filtered count */}
-                                              <div className="text-sm text-white/90 mt-1">
-                                                  {historyFilters.search || historyFilters.serviceType !== 'all' ? (
-                                                      <>Filtered: <strong>{filteredHistory.length}</strong> of <strong>{tireHistory.length}</strong> service records</>
-                                                  ) : (
-                                                      <>Total: <strong>{tireHistory.length}</strong> service records</>
-                                                  )}
-                                              </div>
-                                          </div>
-                                      </div>
-
-                                      {/* Rows per page selector */}
-                                      <div className="flex items-center gap-3">
-                                          <div className="text-sm text-white/90 mr-2">Rows per page:</div>
-                                          <div className="w-28">
-                                              <Select value={String(historyRowsPerPage)} onValueChange={(v) => setHistoryRowsPerPage(Number(v))}>
-                                                  <SelectTrigger className="w-full border-transparent bg-white text-black">
-                                                      <SelectValue />
-                                                  </SelectTrigger>
-                                                  <SelectContent>
-                                                      {rowsPerPageOptions.map(option => (
-                                                          <SelectItem key={option} value={String(option)}>{option}</SelectItem>
-                                                      ))}
-                                                  </SelectContent>
-                                              </Select>
-                                          </div>
-                                      </div>
-                                  </div>
-
-                                  {/* Advanced Filters */}
-                                  <HistoryAdvancedFilters
-                                      filters={historyFilters}
-                                      onFiltersChange={setHistoryFilters}
-                                      onClearFilters={clearHistoryFilters}
-                                  />
-
-                                  {/* Data Table */}
-                                  {filteredHistory.length === 0 ? (
-                                      <EnhancedEmptyState 
-                                          type="history"
-                                          onAddNew={() => {}}
-                                          onClearFilters={clearHistoryFilters}
-                                      />
-                                  ) : (
-                                      <>
-                                          <CustomDataTable
-                                              className="w-full"
-                                              columns={historyColumns}
-                                              data={displayedHistory.map((h, idx) => ({
-                                                  ...h,
-                                                  id: `${h.history_id}-${idx}`, // ✅ FIX: Use composite key with index to ensure uniqueness
-                                                  plate_number: h.vehicle?.plate_number ?? '',
-                                                  items: h.items ?? undefined,
-                                                  created_by_name: h.user?.name ?? '',
-                                              }))}
-                                              onDelete={(item) => handleDeleteItem(item, 'history')}
-                                          />
-
-                                          {/* Pagination Footer */}
-                                          <div className="px-6 py-3 border-t border-slate-100 bg-white flex items-center justify-between">
-                                              <div className="text-sm text-slate-600">
-                                                  Showing {filteredHistory.length === 0 ? 0 : ((historyCurrentPage - 1) * historyRowsPerPage + 1)} to {Math.min(historyCurrentPage * historyRowsPerPage, filteredHistory.length)} of {filteredHistory.length} entries
-                                              </div>
-                                              <div className="flex items-center gap-2">
-                                                  <Button
-                                                      variant="outline"
-                                                      onClick={() => setHistoryCurrentPage(p => Math.max(1, p - 1))}
-                                                      disabled={historyCurrentPage === 1}
-                                                      className="min-w-[36px] h-8 px-2 py-1"
-                                                  >
-                                                      «
-                                                  </Button>
-                                                  <div className="text-sm text-slate-700 px-3">Page {historyCurrentPage} of {Math.max(1, Math.ceil(filteredHistory.length / historyRowsPerPage))}</div>
-                                                  <Button
-                                                      variant="outline"
-                                                      onClick={() => setHistoryCurrentPage(p => Math.min(Math.ceil(filteredHistory.length / historyRowsPerPage) || 1, p + 1))}
-                                                      disabled={historyCurrentPage >= Math.ceil(filteredHistory.length / historyRowsPerPage)}
-                                                      className="min-w-[36px] h-8 px-2 py-1"
-                                                  >
-                                                      »
-                                                  </Button>
-                                              </div>
-                                          </div>
-                                      </>
-                                  )}
-                              </div>
-                          )}
-                      </TabsContent>
-                  </EnhancedTabs>
-                </div>
-
-                {/* Success Animation for All Actions */}
-                <SuccessAnimation
-                    isVisible={successAnimation.isVisible}
-                    title={successAnimation.title}
-                    message={successAnimation.message}
-                    actionType={successAnimation.actionType}
-                    onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))}
-                />
-
-                {/* Enhanced Customer Dialog - STYLING ENHANCEMENT */}
-                <Dialog open={isCustomerDialogOpen} onOpenChange={(isOpen) => {
-                    if (!isOpen) {
-                        setIsCustomerDialogOpen(false);
-                        resetCustomerForm();
-                    }
-                }}>
-                    <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300">
-                        <DialogHeader>
-                            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
-                                {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
-                            </DialogTitle>
-                            <DialogDescription className="text-slate-600 font-poppins">
-                                {editingCustomer ? `Update details for ${editingCustomer.name}.` : 'Enter the details for the new customer.'}
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="customer-name" className="text-slate-700 font-medium font-poppins">Customer Name *</Label>
-                                <Input 
-                                    id="customer-name" 
-                                    value={customerName} 
-                                    onChange={(e) => setCustomerName(e.target.value)} 
-                                    placeholder="John Doe"
-                                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
-                                />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="customer-phone" className="text-slate-700 font-medium font-poppins">Phone</Label>
-                                    <Input 
-                                        id="customer-phone" 
-                                        value={customerPhone} 
-                                        onChange={(e) => setCustomerPhone(e.target.value)} 
-                                        placeholder="+1-555-0101"
-                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <DialogClose asChild>
-                                <Button type="button" variant="outline" className={buttonStyles.back}>
-                                    <ArrowLeft className="h-4 w-4 mr-2" />
-                                    Cancel
-                                </Button>
-                            </DialogClose>
-                            <Button onClick={handleSubmitCustomer} disabled={isCustomerLoading} className={buttonStyles.primary}>
-                                {isCustomerLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {editingCustomer ? 'Save Changes' : 'Create Customer'}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-
-                {/* Enhanced Vehicle Dialog - STYLING ENHANCEMENT */}
-                <Dialog open={isVehicleDialogOpen} onOpenChange={(isOpen) => {
-                    if (!isOpen) {
-                        setIsVehicleDialogOpen(false);
-                        resetVehicleForm();
-                    }
-                }}>
-                    <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300">
-                        <DialogHeader>
-                            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
-                                {editingVehicle ? 'Edit Vehicle' : 'Add New Vehicle'}
-                            </DialogTitle>
-                            <DialogDescription className="text-slate-600 font-poppins">
-                                {editingVehicle ? `Update details for ${editingVehicle.plate_number}.` : 'Enter the details for the new vehicle.'}
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="customer" className="text-slate-700 font-medium font-poppins">Customer *</Label>
-                                <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins">
-                                        <SelectValue placeholder="Select customer" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {customers.map(customer => (
-                                            <SelectItem key={customer.customer_id} value={customer.customer_id} className="font-poppins">
-                                                {customer.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="plate-number" className="text-slate-700 font-medium font-poppins">Plate Number *</Label>
-                                <Input 
-                                    id="plate-number" 
-                                    value={plateNumber} 
-                                    onChange={(e) => setPlateNumber(e.target.value)} 
-                                    placeholder="ABC-1234"
-                                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="vehicle-type" className="text-slate-700 font-medium font-poppins">Vehicle Type</Label>
-                                <Select value={selectedVehicleType} onValueChange={setSelectedVehicleType}>
-                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins">
-                                        <SelectValue placeholder="Select vehicle type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {vehicleTypes.map(vt => (
-                                            <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id} className="font-poppins">
-                                                {vt.name.charAt(0).toUpperCase() + vt.name.slice(1)}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="make" className="text-slate-700 font-medium font-poppins">Make</Label>
-                                    <Input 
-                                        id="make" 
-                                        value={make} 
-                                        onChange={(e) => setMake(e.target.value)} 
-                                        placeholder="Toyota"
-                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="model" className="text-slate-700 font-medium font-poppins">Model</Label>
-                                    <Input 
-                                        id="model" 
-                                        value={model} 
-                                        onChange={(e) => setModel(e.target.value)} 
-                                        placeholder="Camry"
-                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="color" className="text-slate-700 font-medium font-poppins">Color</Label>
-                                    <Input 
-                                        id="color" 
-                                        value={color} 
-                                        onChange={(e) => setColor(e.target.value)} 
-                                        placeholder="White"
-                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <DialogClose asChild>
-                                <Button type="button" variant="outline" className={buttonStyles.back}>
-                                    <ArrowLeft className="h-4 w-4 mr-2" />
-                                    Cancel
-                                </Button>
-                            </DialogClose>
-                            <Button onClick={handleSubmitVehicle} disabled={isVehicleLoading} className={buttonStyles.primary}>
-                                {isVehicleLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {editingVehicle ? 'Save Changes' : 'Create Vehicle'}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-
-                {/* Enhanced Delete Confirmation Dialog - STYLING ENHANCEMENT */}
-                <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                    <AlertDialogContent className="bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300">
-                        <AlertDialogHeader>
-                            <AlertDialogTitle className="text-slate-900 font-poppins">Confirm Deletion</AlertDialogTitle>
-                            <AlertDialogDescription className="text-slate-600 font-poppins">
-                                Are you sure you want to delete this {deletingItem?.type}? This action cannot be undone.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel className={buttonStyles.back}>
-                                <ArrowLeft className="h-4 w-4 mr-2" />
-                                Cancel
-                            </AlertDialogCancel>
-                            <AlertDialogAction 
-                                onClick={handleDelete} 
-                                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-red-600 active:scale-95 font-poppins shadow-md"
-                            >
-                                Delete
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+              </div>
             </div>
-
-            <style jsx global>{`
-                @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
-                
-                .font-poppins {
-                    font-family: 'Poppins', sans-serif;
-                }
-
-                .ease-spring {
-                    transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
-                }
-
-                @keyframes pulse {
-                    0%, 100% { opacity: 1; }
-                    50% { opacity: 0.5; }
-                }
-                
-                .animate-pulse {
-                    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-                }
-
-                /* Custom date input styling */
-                .custom-date-input::-webkit-calendar-picker-indicator {
-                    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%236b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>');
-                    cursor: pointer;
-                    padding: 4px;
-                    border-radius: 4px;
-                }
-
-                .custom-date-input::-webkit-calendar-picker-indicator:hover {
-                    background-color: #f3f4f6;
-                }
-
-                /* Improved focus styles for all inputs */
-                input:focus, textarea:focus, select:focus {
-                    outline: none;
-                    ring: 2px;
-                }
-
-                /* Smooth transitions for all interactive elements */
-                button, input, select, textarea {
-                    transition: all 0.3s ease;
-                }
-
-                /* Enhanced table row styling */
-                .table-row-striped:nth-child(even) {
-                    background-color: rgba(241, 245, 249, 0.3);
-                }
-
-                /* Better hover effects */
-                .btn-hover-effect:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-                }
-
-                /* Mobile optimizations */
-                @media (max-width: 640px) {
-                    .mobile-stack {
-                        flex-direction: column !important;
-                        gap: 1rem !important;
-                    }
-                    
-                    .mobile-full {
-                        width: 100% !important;
-                    }
-                    
-                    .mobile-text-center {
-                        text-align: center !important;
-                    }
-                    
-                    .mobile-p-4 {
-                        padding: 1rem !important;
-                    }
-                }
-
-                /* Loading animation */
-                @keyframes shimmer {
-                    0% { background-position: -200% 0; }
-                    100% { background-position: 200% 0; }
-                }
-
-                .animate-shimmer {
-                    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-                    background-size: 200% 100%;
-                    animation: shimmer 1.5s infinite;
-                }
-            `}</style>
+            
+            <Button 
+              onClick={handleRefresh}
+              disabled={isCustomerLoading || isVehicleLoading || isHistoryLoading}
+              className={buttonStyles.glass + " active:scale-95 font-poppins hidden sm:flex"}
+            >
+              <RefreshCw className={`h-6 w-6 mr-3 ${isCustomerLoading || isVehicleLoading || isHistoryLoading ? 'animate-spin' : ''}`} />
+              Refresh Data
+            </Button>
+          </div>
         </div>
-    );
+
+        {/* Stats Overview */}
+        <StatsOverview customers={customers} vehicles={vehicles} tireHistory={tireHistory} />
+
+        {/* QuickActions */}
+        <QuickActions 
+          onAddCustomer={handleOpenCustomerDialog} 
+          onAddVehicle={handleOpenVehicleDialog}
+          onExportData={handleExportData}
+        />
+
+        <div className="mb-4">
+          <EnhancedTabs value={activeTab} onValueChange={handleTabChange}>
+              
+              {/* ===== CUSTOMERS TAB ===== */}
+              <TabsContent value="customers" className="space-y-6 animate-in fade-in duration-500">
+                  {isCustomerLoading ? (
+                      <div className="flex flex-col justify-center items-center h-64 space-y-4">
+                          <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                          <p className="text-slate-500 font-poppins">Loading customers...</p>
+                      </div>
+                  ) : (
+                      <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
+                          <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 text-white p-4 flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-4">
+                                  <div className="p-2 bg-white/20 rounded-lg">
+                                      <Users className="h-6 w-6 text-white" />
+                                  </div>
+                                  <div>
+                                      <div className="text-xl font-bold font-poppins">Customer Management</div>
+                                      <div className="text-sm opacity-90 hidden sm:block">Manage customer information and their vehicles</div>
+                                      <div className="text-sm text-white/90 mt-1">
+                                          {customerFilters.search ? (
+                                              <>Filtered: <strong>{filteredCustomers.length}</strong> of <strong>{customers.length}</strong> customers</>
+                                          ) : (
+                                              <>Total: <strong>{customers.length}</strong> customers</>
+                                          )}
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+
+                          <CustomerAdvancedFilters
+                              filters={customerFilters}
+                              onFiltersChange={setCustomerFilters}
+                              onClearFilters={clearCustomerFilters}
+                              rowsPerPage={customerRowsPerPage}
+                              onRowsPerPageChange={setCustomerRowsPerPage}
+                          />
+
+                          {filteredCustomers.length === 0 ? (
+                              <EnhancedEmptyState 
+                                  type="customers"
+                                  onAddNew={handleOpenCustomerDialog}
+                                  onClearFilters={clearCustomerFilters}
+                              />
+                          ) : (
+                              <>
+                                  <CustomDataTable
+                                      className="w-full"
+                                      columns={customerColumns}
+                                      data={displayedCustomers.map(customer => ({ 
+                                          ...customer, 
+                                          id: customer.customer_id 
+                                      }))}
+                                      onEdit={handleEditCustomer}
+                                      onDelete={(item) => handleDeleteItem(item, 'customer')}
+                                  />
+
+                                  {/* NEW PAGINATION CONTROLS */}
+                                  <PaginationControls 
+                                      currentPage={customerCurrentPage}
+                                      totalPages={Math.ceil(filteredCustomers.length / customerRowsPerPage)}
+                                      onPageChange={setCustomerCurrentPage}
+                                      totalItems={filteredCustomers.length}
+                                      rowsPerPage={customerRowsPerPage}
+                                  />
+                              </>
+                          )}
+                      </div>
+                  )}
+              </TabsContent>
+
+              {/* ===== VEHICLES TAB ===== */}
+              <TabsContent value="vehicles" className="space-y-6 animate-in fade-in duration-500">
+                  {isVehicleLoading ? (
+                      <div className="flex flex-col justify-center items-center h-64 space-y-4">
+                          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                          <p className="text-slate-500 font-poppins">Loading vehicles...</p>
+                      </div>
+                  ) : (
+                      <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
+                          <div className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white p-4 flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-4">
+                                  <div className="p-2 bg-white/20 rounded-lg">
+                                      <Car className="h-6 w-6 text-white" />
+                                  </div>
+                                  <div>
+                                      <div className="text-xl font-bold font-poppins">Vehicle Management</div>
+                                      <div className="text-sm opacity-90 hidden sm:block">Manage vehicle information and service history</div>
+                                      <div className="text-sm text-white/90 mt-1">
+                                          {vehicleFilters.search || vehicleFilters.customer !== 'all' || vehicleFilters.vehicleType !== 'all' ? (
+                                              <>Filtered: <strong>{filteredVehicles.length}</strong> of <strong>{vehicles.length}</strong> vehicles</>
+                                          ) : (
+                                              <>Total: <strong>{vehicles.length}</strong> vehicles</>
+                                          )}
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+
+                          <VehicleAdvancedFilters
+                              filters={vehicleFilters}
+                              onFiltersChange={setVehicleFilters}
+                              onClearFilters={clearVehicleFilters}
+                              customers={customers}
+                              vehicleTypes={vehicleTypes}
+                              rowsPerPage={vehicleRowsPerPage}
+                              onRowsPerPageChange={setVehicleRowsPerPage}
+                          />
+
+                          {filteredVehicles.length === 0 ? (
+                              <EnhancedEmptyState 
+                                  type="vehicles"
+                                  onAddNew={handleOpenVehicleDialog}
+                                  onClearFilters={clearVehicleFilters}
+                              />
+                          ) : (
+                              <>
+                                  <CustomDataTable
+                                      className="w-full"
+                                      columns={vehicleColumns}
+                                      data={displayedVehicles.map(vehicle => ({ 
+                                          ...vehicle, 
+                                          id: vehicle.vehicle_id 
+                                      }))}
+                                      onEdit={handleEditVehicle}
+                                      onDelete={(item) => handleDeleteItem(item, 'vehicle')}
+                                  />
+
+                                  {/* NEW PAGINATION CONTROLS */}
+                                  <PaginationControls 
+                                      currentPage={vehicleCurrentPage}
+                                      totalPages={Math.ceil(filteredVehicles.length / vehicleRowsPerPage)}
+                                      onPageChange={setVehicleCurrentPage}
+                                      totalItems={filteredVehicles.length}
+                                      rowsPerPage={vehicleRowsPerPage}
+                                  />
+                              </>
+                          )}
+                      </div>
+                  )}
+              </TabsContent>
+
+              {/* ===== HISTORY TAB ===== */}
+              <TabsContent value="history" className="space-y-6 animate-in fade-in duration-500">
+                  {isHistoryLoading ? (
+                      <div className="flex flex-col justify-center items-center h-64 space-y-4">
+                          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+                          <p className="text-slate-500 font-poppins">Loading service history...</p>
+                      </div>
+                  ) : (
+                      <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
+                          <div className="w-full bg-gradient-to-r from-green-600 via-cyan-600 to-blue-600 text-white p-4 flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-4">
+                                  <div className="p-2 bg-white/20 rounded-lg">
+                                      <History className="h-6 w-6 text-white" />
+                                  </div>
+                                  <div>
+                                      <div className="text-xl font-bold font-poppins">Tire Service History</div>
+                                      <div className="text-sm opacity-90 hidden sm:block">Track tire services and maintenance records</div>
+                                      <div className="text-sm text-white/90 mt-1">
+                                          {historyFilters.search || historyFilters.serviceType !== 'all' ? (
+                                              <>Filtered: <strong>{filteredHistory.length}</strong> of <strong>{tireHistory.length}</strong> service records</>
+                                          ) : (
+                                              <>Total: <strong>{tireHistory.length}</strong> service records</>
+                                          )}
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+
+                          <HistoryAdvancedFilters
+                              filters={historyFilters}
+                              onFiltersChange={setHistoryFilters}
+                              onClearFilters={clearHistoryFilters}
+                              rowsPerPage={historyRowsPerPage}
+                              onRowsPerPageChange={setHistoryRowsPerPage}
+                          />
+
+                          {filteredHistory.length === 0 ? (
+                              <EnhancedEmptyState 
+                                  type="history"
+                                  onAddNew={() => {}}
+                                  onClearFilters={clearHistoryFilters}
+                              />
+                          ) : (
+                              <>
+                                  <CustomDataTable
+                                      className="w-full"
+                                      columns={historyColumns}
+                                      data={displayedHistory.map((h, idx) => ({
+                                          ...h,
+                                          id: `${h.history_id}-${idx}`, 
+                                          plate_number: h.vehicle?.plate_number ?? '',
+                                          items: h.items ?? undefined,
+                                          created_by_name: h.user?.name ?? '',
+                                      }))}
+                                      onDelete={(item) => handleDeleteItem(item, 'history')}
+                                  />
+
+                                  {/* NEW PAGINATION CONTROLS */}
+                                  <PaginationControls 
+                                      currentPage={historyCurrentPage}
+                                      totalPages={Math.ceil(filteredHistory.length / historyRowsPerPage)}
+                                      onPageChange={setHistoryCurrentPage}
+                                      totalItems={filteredHistory.length}
+                                      rowsPerPage={historyRowsPerPage}
+                                  />
+                              </>
+                          )}
+                      </div>
+                  )}
+              </TabsContent>
+          </EnhancedTabs>
+        </div>
+
+        {/* ... (Modals/Dialogs remain the same) ... */}
+        <SuccessAnimation isVisible={successAnimation.isVisible} title={successAnimation.title} message={successAnimation.message} actionType={successAnimation.actionType} onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))} />
+        <Dialog open={isCustomerDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) { setIsCustomerDialogOpen(false); resetCustomerForm(); } }}> <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300"> <DialogHeader> <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins"> {editingCustomer ? 'Edit Customer' : 'Add New Customer'} </DialogTitle> <DialogDescription className="text-slate-600 font-poppins"> {editingCustomer ? `Update details for ${editingCustomer.name}.` : 'Enter the details for the new customer.'} </DialogDescription> </DialogHeader> <div className="space-y-4 py-4"> <div className="space-y-2"> <Label htmlFor="customer-name" className="text-slate-700 font-medium font-poppins">Customer Name *</Label> <Input id="customer-name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="John Doe" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" /> </div> <div className="grid grid-cols-2 gap-4"> <div className="space-y-2"> <Label htmlFor="customer-phone" className="text-slate-700 font-medium font-poppins">Phone</Label> <Input id="customer-phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="+1-555-0101" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" /> </div> </div> </div> <DialogFooter> <DialogClose asChild> <Button type="button" variant="outline" className={buttonStyles.back}> <ArrowLeft className="h-4 w-4 mr-2" /> Cancel </Button> </DialogClose> <Button onClick={handleSubmitCustomer} disabled={isCustomerLoading} className={buttonStyles.primary}> {isCustomerLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {editingCustomer ? 'Save Changes' : 'Create Customer'} </Button> </DialogFooter> </DialogContent> </Dialog> <Dialog open={isVehicleDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) { setIsVehicleDialogOpen(false); resetVehicleForm(); } }}> <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300"> <DialogHeader> <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins"> {editingVehicle ? 'Edit Vehicle' : 'Add New Vehicle'} </DialogTitle> <DialogDescription className="text-slate-600 font-poppins"> {editingVehicle ? `Update details for ${editingVehicle.plate_number}.` : 'Enter the details for the new vehicle.'} </DialogDescription> </DialogHeader> <div className="space-y-4 py-4"> <div className="space-y-2"> <Label htmlFor="customer" className="text-slate-700 font-medium font-poppins">Customer *</Label> <Select value={selectedCustomer} onValueChange={setSelectedCustomer}> <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"> <SelectValue placeholder="Select customer" /> </SelectTrigger> <SelectContent> {customers.map(customer => ( <SelectItem key={customer.customer_id} value={customer.customer_id} className="font-poppins"> {customer.name} </SelectItem> ))} </SelectContent> </Select> </div> <div className="space-y-2"> <Label htmlFor="plate-number" className="text-slate-700 font-medium font-poppins">Plate Number *</Label> <Input id="plate-number" value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} placeholder="ABC-1234" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" /> </div> <div className="space-y-2"> <Label htmlFor="vehicle-type" className="text-slate-700 font-medium font-poppins">Vehicle Type</Label> <Select value={selectedVehicleType} onValueChange={setSelectedVehicleType}> <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"> <SelectValue placeholder="Select vehicle type" /> </SelectTrigger> <SelectContent> {vehicleTypes.map(vt => ( <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id} className="font-poppins"> {vt.name.charAt(0).toUpperCase() + vt.name.slice(1)} </SelectItem> ))} </SelectContent> </Select> </div> <div className="grid grid-cols-2 gap-4"> <div className="space-y-2"> <Label htmlFor="make" className="text-slate-700 font-medium font-poppins">Make</Label> <Input id="make" value={make} onChange={(e) => setMake(e.target.value)} placeholder="Toyota" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" /> </div> <div className="space-y-2"> <Label htmlFor="model" className="text-slate-700 font-medium font-poppins">Model</Label> <Input id="model" value={model} onChange={(e) => setModel(e.target.value)} placeholder="Camry" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" /> </div> </div> <div className="grid grid-cols-2 gap-4"> <div className="space-y-2"> <Label htmlFor="color" className="text-slate-700 font-medium font-poppins">Color</Label> <Input id="color" value={color} onChange={(e) => setColor(e.target.value)} placeholder="White" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" /> </div> </div> </div> <DialogFooter> <DialogClose asChild> <Button type="button" variant="outline" className={buttonStyles.back}> <ArrowLeft className="h-4 w-4 mr-2" /> Cancel </Button> </DialogClose> <Button onClick={handleSubmitVehicle} disabled={isVehicleLoading} className={buttonStyles.primary}> {isVehicleLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {editingVehicle ? 'Save Changes' : 'Create Vehicle'} </Button> </DialogFooter> </DialogContent> </Dialog> <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}> <AlertDialogContent className="bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300"> <AlertDialogHeader> <AlertDialogTitle className="text-slate-900 font-poppins">Confirm Deletion</AlertDialogTitle> <AlertDialogDescription className="text-slate-600 font-poppins"> Are you sure you want to delete this {deletingItem?.type}? This action cannot be undone. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel className={buttonStyles.back}> <ArrowLeft className="h-4 w-4 mr-2" /> Cancel </AlertDialogCancel> <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-red-600 active:scale-95 font-poppins shadow-md"> Delete </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent> </AlertDialog>
+      </div>
+
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+        
+        .font-poppins {
+          font-family: 'Poppins', sans-serif;
+        }
+
+        .ease-spring {
+          transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+        
+        .animate-pulse {
+          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        /* Custom date input styling */
+        .custom-date-input::-webkit-calendar-picker-indicator {
+          background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%236b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>');
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 4px;
+        }
+
+        .custom-date-input::-webkit-calendar-picker-indicator:hover {
+          background-color: #f3f4f6;
+        }
+
+        /* Improved focus styles for all inputs */
+        input:focus, textarea:focus, select:focus {
+          outline: none;
+          ring: 2px;
+        }
+
+        /* Smooth transitions for all interactive elements */
+        button, input, select, textarea {
+          transition: all 0.3s ease;
+        }
+
+        /* Enhanced table row styling */
+        .table-row-striped:nth-child(even) {
+          background-color: rgba(241, 245, 249, 0.3);
+        }
+
+        /* Better hover effects */
+        .btn-hover-effect:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Mobile optimizations */
+        @media (max-width: 640px) {
+          .mobile-stack {
+            flex-direction: column !important;
+            gap: 1rem !important;
+          }
+          
+          .mobile-full {
+            width: 100% !important;
+          }
+          
+          .mobile-text-center {
+            text-align: center !important;
+          }
+          
+          .mobile-p-4 {
+            padding: 1rem !important;
+          }
+        }
+
+        /* Loading animation */
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+
+        .animate-shimmer {
+          background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.5s infinite;
+        }
+      `}</style>
+    </div>
+  );
 }
