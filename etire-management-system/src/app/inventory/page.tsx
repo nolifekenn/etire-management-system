@@ -6,7 +6,7 @@ import { DataTableWrapper } from '@/components/DataTableWrapper';
 import {
   Archive, Coins, AlertTriangle, PlusCircle, PackageSearch, Loader2, Filter,
   TrendingUp, Clock, RefreshCw, Plus, Search, X, Download, SlidersHorizontal,
-  ArrowUpDown, Eye, Save, CheckCircle, ListFilter
+  ArrowUpDown, Eye, Save, CheckCircle, ListFilter, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,7 +39,6 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 // Update the InventoryItem interface
-// ✅ UPDATED: InventoryItem interface with calculated fields (around line 51)
 export interface InventoryItem {
   item_id: string;
   name: string;
@@ -52,14 +51,14 @@ export interface InventoryItem {
   created_at?: string;
   updated_at?: string;
 
-  // ✅ ADD: Calculated fields from RPC function
-  profit_margin?: number;          // Calculated: ((sale_price - cost_price) / cost_price) * 100
-  total_value?: number;            // Calculated: stock_quantity * cost_price
-  potential_profit?: number;       // Calculated: stock_quantity * (sale_price - cost_price)
+  // Calculated fields
+  profit_margin?: number;
+  total_value?: number;
+  potential_profit?: number;
   stock_status?: 'in_stock' | 'low_stock' | 'critical' | 'out_of_stock';
-  days_since_update?: number;      // Days since last update
+  days_since_update?: number;
 
-  // ✅ ADD: Joined data
+  // Joined data
   supplier?: {
     supplier_id: string;
     name: string;
@@ -96,7 +95,7 @@ const quickFilters = [
   { label: "Truck Items", value: "truck", icon: PackageSearch }
 ];
 
-// Vehicle type configuration - FIXED: Ensure all vehicle types are properly defined
+// Vehicle type configuration
 const vehicleTypeConfig: Record<'car' | 'motor' | 'truck', { label: string; color: string }> = {
   car: { label: 'Car', color: 'bg-blue-100 text-blue-700 border-blue-200' },
   motor: { label: 'Motorcycle', color: 'bg-green-100 text-green-700 border-green-200' },
@@ -166,9 +165,8 @@ const StockLevelIndicator = ({ quantity, reorderLevel = 5 }: { quantity: number;
   );
 };
 
-// Vehicle Type Badge Component - FIXED: Added proper type checking and fallback
+// Vehicle Type Badge Component
 const VehicleTypeBadge = ({ type }: { type: 'car' | 'motor' | 'truck' }) => {
-  // Use the config if it exists, otherwise use a default fallback
   const config = vehicleTypeConfig[type] || { label: type, color: 'bg-gray-100 text-gray-700 border-gray-200' };
 
   return (
@@ -196,39 +194,14 @@ const SuccessAnimation = ({
 }) => {
   if (!isVisible) return null;
 
-  // Different icons and colors based on action type
   const getActionConfig = () => {
     switch (actionType) {
-      case 'add':
-        return {
-          gradient: 'from-green-500 to-emerald-600',
-          icon: PlusCircle
-        };
-      case 'edit':
-        return {
-          gradient: 'from-blue-500 to-cyan-600',
-          icon: Save
-        };
-      case 'delete':
-        return {
-          gradient: 'from-red-500 to-orange-600',
-          icon: Archive
-        };
-      case 'export':
-        return {
-          gradient: 'from-purple-500 to-indigo-600',
-          icon: Download
-        };
-      case 'adjust':
-        return {
-          gradient: 'from-amber-500 to-yellow-600',
-          icon: ArrowUpDown
-        };
-      default:
-        return {
-          gradient: 'from-purple-500 to-indigo-600',
-          icon: CheckCircle
-        };
+      case 'add': return { gradient: 'from-green-500 to-emerald-600', icon: PlusCircle };
+      case 'edit': return { gradient: 'from-blue-500 to-cyan-600', icon: Save };
+      case 'delete': return { gradient: 'from-red-500 to-orange-600', icon: Archive };
+      case 'export': return { gradient: 'from-purple-500 to-indigo-600', icon: Download };
+      case 'adjust': return { gradient: 'from-amber-500 to-yellow-600', icon: ArrowUpDown };
+      default: return { gradient: 'from-purple-500 to-indigo-600', icon: CheckCircle };
     }
   };
 
@@ -240,15 +213,8 @@ const SuccessAnimation = ({
         <div className={`w-20 h-20 bg-gradient-to-r ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500`}>
           <ActionIcon className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
         </div>
-
-        <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins">
-          {title}
-        </h3>
-
-        <p className="text-slate-600 mb-6 font-poppins">
-          {message}
-        </p>
-
+        <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins">{title}</h3>
+        <p className="text-slate-600 mb-6 font-poppins">{message}</p>
         <div className="flex gap-3 justify-center">
           <Button
             className={`bg-gradient-to-r ${gradient} hover:scale-105 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins`}
@@ -263,7 +229,7 @@ const SuccessAnimation = ({
   );
 };
 
-// Success Confirmation Component
+// Success Confirmation Component (Simple)
 const SuccessConfirmation = ({
   item,
   isOpen,
@@ -275,88 +241,29 @@ const SuccessConfirmation = ({
   onClose: () => void;
   onAddAnother: () => void;
 }) => {
-  // Guard against undefined/null item (prevents errors like accessing item.name)
   if (!item) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w bg-white border border-green-200 shadow-2xl">
         <div className="flex flex-col items-center text-center p-6">
-          {/* Success Icon */}
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
             <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+              <CheckCircle className="w-6 h-6 text-white" />
             </div>
           </div>
-
-          {/* Success Message */}
-          <DialogTitle className="text-xl font-bold text-green-800 mb-2">
-            Item Added Successfully!
-          </DialogTitle>
-
-          <DialogDescription className="text-slate-600 mb-6">
-            Your new inventory item has been added to the system.
-          </DialogDescription>
-
-          {/* Item Details */}
-          <div className="w-full flex justify-center mb-6">
-            <div className="w-full sm:max-w-md bg-green-50 rounded-lg p-4 border border-green-200">
-              <div className="text-left space-y-5">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-700">Product Name:</span>
-                  <span className="text-sm font-semibold text-slate-900">{item.name}</span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-700">Category:</span>
-                  <Badge variant="outline" className="capitalize bg-slate-100 text-slate-700 border-slate-300">
-                    {item.category}
-                  </Badge>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-700">Vehicle Type:</span>
-                  <VehicleTypeBadge type={item.vehicle_type} />
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-700">Stock Quantity:</span>
-                  <span className="text-sm font-semibold text-slate-900">{item.stock_quantity}</span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-700">Cost Price:</span>
-                  <span className="text-sm font-semibold text-slate-900">₱{item.cost_price.toFixed(2)}</span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-700">Sale Price:</span>
-                  <span className="text-sm font-semibold text-slate-900">₱{item.sale_price.toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
+          <DialogTitle className="text-xl font-bold text-green-800 mb-2">Item Added Successfully!</DialogTitle>
+          <DialogDescription className="text-slate-600 mb-6">Your new inventory item has been added.</DialogDescription>
+          
+          {/* Simple Item Details for Context */}
+          <div className="w-full bg-slate-50 p-4 rounded-lg mb-6 text-left border border-slate-200">
+             <p className="text-sm font-semibold text-slate-800">{item.name}</p>
+             <p className="text-xs text-slate-500 mt-1 capitalize">{item.category} • {item.vehicle_type}</p>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex gap-3 w-full">
-            <Button
-              onClick={onClose}
-              className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white border-0"
-            >
-              Continue Managing Inventory
-            </Button>
-            <Button
-              onClick={() => {
-                onClose();
-                onAddAnother();
-              }}
-              variant="outline"
-              className="flex-1 border-slate-300"
-            >
-              Add Another Item
-            </Button>
+            <Button onClick={onClose} className="flex-1 bg-green-600 hover:bg-green-700 text-white">Continue</Button>
+            <Button onClick={() => { onClose(); onAddAnother(); }} variant="outline" className="flex-1">Add Another</Button>
           </div>
         </div>
       </DialogContent>
@@ -368,11 +275,15 @@ const SuccessConfirmation = ({
 const AdvancedFilters = ({
   filters,
   onFiltersChange,
-  onClearFilters
+  onClearFilters,
+  rowsPerPage,
+  onRowsPerPageChange
 }: {
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
   onClearFilters: () => void;
+  rowsPerPage: number;
+  onRowsPerPageChange: (val: number) => void;
 }) => {
 
   const handleFilterToggle = (category: 'stockStatus' | 'category' | 'vehicleType', value: string) => {
@@ -424,7 +335,7 @@ const AdvancedFilters = ({
   return (
     <div className="bg-white p-5 border-b border-slate-200">
 
-      {/* Top Section: Search and Sort */}
+      {/* Top Section: Search, Sort, Order, and Rows */}
       <div className="flex flex-col lg:flex-row lg:items-end gap-4 mb-5">
         <div className="flex-1 relative">
           <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Search</Label>
@@ -447,8 +358,8 @@ const AdvancedFilters = ({
           </div>
         </div>
 
-        <div className="flex gap-2 w-full lg:w-auto">
-          <div className="w-1/2 lg:w-40">
+        <div className="flex gap-2 w-full lg:w-auto items-end">
+          <div className="w-1/2 lg:w-32">
             <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Sort By</Label>
             <Select
               value={filters.sortBy}
@@ -466,7 +377,7 @@ const AdvancedFilters = ({
             </Select>
           </div>
 
-          <div className="w-1/2 lg:w-32">
+          <div className="w-1/2 lg:w-28">
             <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Order</Label>
             <Select
               value={filters.sortOrder}
@@ -482,8 +393,26 @@ const AdvancedFilters = ({
             </Select>
           </div>
 
+          {/* Moved Rows Per Page Here */}
+          <div className="w-1/2 lg:w-20">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Rows</Label>
+            <Select
+              value={String(rowsPerPage)}
+              onValueChange={(v) => onRowsPerPageChange(Number(v))}
+            >
+              <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
+                <SelectValue placeholder="Rows" />
+              </SelectTrigger>
+              <SelectContent>
+                {[5, 10, 25, 50].map((opt) => (
+                  <SelectItem key={opt} value={String(opt)}>{opt}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {hasActiveFilters && (
-            <div className="hidden lg:flex items-end pb-0.5">
+            <div className="hidden lg:flex items-end">
               <Button
                 variant="outline"
                 onClick={onClearFilters}
@@ -499,7 +428,6 @@ const AdvancedFilters = ({
 
       {/* FILTER BOX CONTAINER */}
       <div className="flex flex-col lg:flex-row border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
-
         {filterGroups.map((group, index) => (
           <div
             key={group.id}
@@ -516,7 +444,6 @@ const AdvancedFilters = ({
               </span>
             </div>
 
-            {/* Added w-full to container to ensure buttons stretch */}
             <div className="flex flex-wrap gap-2 w-full">
               {group.options.map((option) => {
                 const isActive = filters[group.id] === option.value;
@@ -526,14 +453,12 @@ const AdvancedFilters = ({
                     key={option.value}
                     onClick={() => handleFilterToggle(group.id, option.value)}
                     className={`
-                      /* Added flex-1 to make buttons grow to fill space */
-                      flex-1 
-                      min-w-[80px] /* Prevents them from getting too squished on mobile */
-                      px-3 py-1.5 text-xs font-medium rounded-md border transition-all duration-200
+                      flex-1 min-w-[80px]
+                      px-3 py-1.5 text-xs font-medium rounded-md border transition-all duration-300
                       flex items-center justify-center whitespace-nowrap
                       ${isActive
-                        ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
-                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-white hover:shadow-sm'
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-transparent shadow-md transform scale-[1.02]'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm'
                       }
                     `}
                   >
@@ -544,7 +469,6 @@ const AdvancedFilters = ({
             </div>
           </div>
         ))}
-
       </div>
 
       {hasActiveFilters && (
@@ -615,7 +539,6 @@ const EnhancedEmptyState = ({
 };
 
 // Stock Alerts Component
-// Redesigned Stock Alerts Component
 const StockAlertsBar = ({
   criticalCount,
   warningCount,
@@ -636,9 +559,9 @@ const StockAlertsBar = ({
 
   // Dynamic styles based on severity
   const colors = {
-    red: { border: 'border-l-red-500', icon: 'text-red-600', bg: 'bg-red-50', badge: 'bg-red-100 text-red-700' },
-    orange: { border: 'border-l-orange-500', icon: 'text-orange-600', bg: 'bg-orange-50', badge: 'bg-orange-100 text-orange-700' },
-    yellow: { border: 'border-l-yellow-500', icon: 'text-yellow-600', bg: 'bg-yellow-50', badge: 'bg-yellow-100 text-yellow-700' }
+    red: { icon: 'text-red-600', bg: 'bg-red-50', badge: 'bg-red-100 text-red-700' },
+    orange: { icon: 'text-orange-600', bg: 'bg-orange-50', badge: 'bg-orange-100 text-orange-700' },
+    yellow: { icon: 'text-yellow-600', bg: 'bg-yellow-50', badge: 'bg-yellow-100 text-yellow-700' }
   }[severityColor];
 
   // Calculate percentages
@@ -648,7 +571,7 @@ const StockAlertsBar = ({
 
   return (
     <div
-      className={`mb-8 bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 border-l-4 ${colors.border}`}
+      className={`mb-8 bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300`}
     >
       <div className="p-5 sm:p-6">
         <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-center">
@@ -877,8 +800,7 @@ const StockAdjustmentForm = ({
   );
 };
 
-//Critical Stock Details
-// Enhanced Critical Stock Details - Updated Labels
+// Enhanced Critical Stock Details
 const CriticalStockDetails = ({
   items,
   isOpen,
@@ -888,12 +810,17 @@ const CriticalStockDetails = ({
   isOpen: boolean;
   onClose: () => void;
 }) => {
-  const [notes, setNotes] = useState('');
-  const [priority, setPriority] = useState('high');
-  const [actionPlan, setActionPlan] = useState('');
-
   const [filterType, setFilterType] = useState<'all' | 'out' | 'critical' | 'low'>('all');
   const [sortType, setSortType] = useState<'severity' | 'name' | 'vehicle'>('severity');
+
+  // Added pagination state
+  const [page, setPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [filterType, sortType, rowsPerPage]);
 
   // 1. Get all relevant alert items first
   const allAlertItems = useMemo(() => {
@@ -901,7 +828,7 @@ const CriticalStockDetails = ({
   }, [items]);
 
   // 2. Apply Filters and Sorting
-  const displayedItems = useMemo(() => {
+  const filteredAndSortedItems = useMemo(() => {
     let result = [...allAlertItems];
 
     // Filter
@@ -925,6 +852,14 @@ const CriticalStockDetails = ({
 
     return result;
   }, [allAlertItems, filterType, sortType]);
+
+  // 3. Apply Pagination
+  const paginatedItems = useMemo(() => {
+    const start = (page - 1) * rowsPerPage;
+    return filteredAndSortedItems.slice(start, start + rowsPerPage);
+  }, [filteredAndSortedItems, page, rowsPerPage]);
+
+  const totalPages = Math.ceil(filteredAndSortedItems.length / rowsPerPage);
 
   const getVariant = (qty: number): 'out' | 'critical' | 'low' => {
     if (qty === 0) return 'out';
@@ -984,7 +919,6 @@ const CriticalStockDetails = ({
             <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Cost</div>
             <div className="text-sm font-medium">₱{item.cost_price?.toFixed(2) || '0.00'}</div>
           </div>
-          {/* ✅ UPDATED BADGE LABELS HERE */}
           <Badge variant="outline" className={`px-3 py-1 font-semibold ${styles.badge}`}>
             {variant === 'out' ? 'Out of Stock' : variant === 'critical' ? 'Critical Stock' : 'Low Stock'}
           </Badge>
@@ -997,90 +931,143 @@ const CriticalStockDetails = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl p-0 gap-0">
 
-        {/* Header */}
-        <div className="p-6 border-b border-slate-100 bg-white sticky top-0 z-20">
+        {/* Gradient Header with X Close Button */}
+        <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 sticky top-0 z-20 text-white relative">
+          
+          {/* X Close Button */}
+          <button 
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+
           <DialogHeader className="mb-4">
-            <DialogTitle className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <AlertTriangle className="h-6 w-6 text-red-600" />
+            <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm border border-white/10">
+                <AlertTriangle className="h-6 w-6 text-white" />
               </div>
               Stock Attention Required
             </DialogTitle>
-            <DialogDescription className="text-slate-500 ml-12">
+            <DialogDescription className="text-white/90 font-medium ml-0 sm:ml-14 text-base">
               Review {allAlertItems.length} items below safety stock levels.
             </DialogDescription>
           </DialogHeader>
 
           {/* Filter & Sort Toolbar */}
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200 ml-12">
+          <div className="flex flex-col sm:flex-row gap-4 justify-between items-end bg-white p-4 rounded-xl border border-slate-200 shadow-lg mt-2 text-slate-800">
 
-            {/* ✅ UPDATED FILTER TABS HERE */}
-            <div className="flex gap-1 p-1 bg-white rounded-md border border-slate-200 shadow-sm">
-              {[
-                { id: 'all', label: 'All Alerts' },
-                { id: 'out', label: 'Out of Stock' },     // Changed from 'Empty'
-                { id: 'critical', label: 'Critical Stock' }, // Changed from 'Critical'
-                { id: 'low', label: 'Low Stock' }
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setFilterType(tab.id as any)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${filterType === tab.id
-                    ? 'bg-slate-800 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            {/* Flexed Filter Tabs */}
+            <div className="flex flex-col w-full sm:w-auto flex-1 gap-2">
+              <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Filter Alerts</Label>
+              <div className="flex w-full gap-1 p-1 bg-slate-100 rounded-lg border border-slate-200">
+                {[
+                  { id: 'all', label: 'All Alerts' },
+                  { id: 'out', label: 'Out of Stock' },
+                  { id: 'critical', label: 'Critical' },
+                  { id: 'low', label: 'Low Stock' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setFilterType(tab.id as any)}
+                    className={`flex-1 px-2 py-1.5 text-xs font-bold rounded-md transition-all text-center whitespace-nowrap ${filterType === tab.id
+                      ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                      }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Sort Dropdown */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-slate-500">Sort by:</span>
-              <Select value={sortType} onValueChange={(v: any) => setSortType(v)}>
-                <SelectTrigger className="h-8 w-[140px] text-xs bg-white border-slate-300">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="severity">Severity (Default)</SelectItem>
-                  <SelectItem value="vehicle">Vehicle Type</SelectItem>
-                  <SelectItem value="name">Product Name</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Right Side Controls: Sort & Rows */}
+            <div className="flex gap-3 w-full sm:w-auto">
+              <div className="flex flex-col gap-1.5 flex-1 sm:flex-none">
+                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sort By</Label>
+                <Select value={sortType} onValueChange={(v: any) => setSortType(v)}>
+                  <SelectTrigger className="h-9 min-w-[140px] text-xs font-medium bg-white border-slate-200">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="severity">Severity (Default)</SelectItem>
+                    <SelectItem value="vehicle">Vehicle Type</SelectItem>
+                    <SelectItem value="name">Product Name</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex flex-col gap-1.5 w-20">
+                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Rows</Label>
+                <Select value={String(rowsPerPage)} onValueChange={(v) => setRowsPerPage(Number(v))}>
+                  <SelectTrigger className="h-9 text-xs font-medium bg-white border-slate-200">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[5, 10, 20].map(opt => (
+                      <SelectItem key={opt} value={String(opt)}>{opt}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Scrollable Content Area */}
-        <div className="p-6 space-y-8">
-          <div className="space-y-3 min-h-[200px]">
-            {displayedItems.length > 0 ? (
-              displayedItems.map(item => (
+        <div className="p-6 space-y-8 bg-slate-50/30 min-h-[400px]">
+          <div className="space-y-3">
+            {paginatedItems.length > 0 ? (
+              paginatedItems.map(item => (
                 <StockItemRow key={item.item_id} item={item} />
               ))
             ) : (
-              <div className="text-center py-10 text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-300">
-                No items match this filter.
+              <div className="text-center py-16 text-slate-500 bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center">
+                <div className="p-4 bg-slate-50 rounded-full mb-3">
+                  <CheckCircle className="h-8 w-8 text-slate-300" />
+                </div>
+                <p className="font-medium">No items match this filter.</p>
               </div>
             )}
           </div>
-
-          {/* Action Plan Section Removed */}
         </div>
 
-        {/* Footer */}
-        <DialogFooter className="p-6 border-t border-slate-100 bg-slate-50/50 sticky bottom-0 z-20">
-          <Button onClick={onClose} variant="outline" className="h-11 px-6 border-slate-300 hover:bg-slate-100">
-            Close
-          </Button>
-        </DialogFooter>
+        {/* Footer with Pagination on the Right */}
+        <div className="p-4 border-t border-slate-200 bg-white sticky bottom-0 z-20 flex flex-row justify-between items-center">
+          <div className="text-xs text-slate-500 font-medium">
+            Showing {filteredAndSortedItems.length === 0 ? 0 : ((page - 1) * rowsPerPage + 1)} to {Math.min(page * rowsPerPage, filteredAndSortedItems.length)} of {filteredAndSortedItems.length} issues
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="h-8 w-8 p-0"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-xs font-medium text-slate-700 px-2">
+              Page {page} of {totalPages || 1}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="h-8 w-8 p-0"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
 };
 
-// View More Dialog Component with Table View
+// View More Dialog Component
 const ViewMoreDialog = ({
   items,
   isOpen,
@@ -1175,7 +1162,6 @@ export default function EnhancedInventoryPage() {
   const [mounted, setMounted] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Add this state near your other useState declarations
   const [successAnimation, setSuccessAnimation] = useState<{
     isVisible: boolean;
     title: string;
@@ -1226,7 +1212,6 @@ export default function EnhancedInventoryPage() {
     setMounted(true);
   }, []);
 
-  // ✅ OPTIMIZED: Replace fetchProducts function (around line 765)
   const fetchProducts = useCallback(async () => {
     if (!supabase) {
       setFetchError("Supabase client is not available. Please check your environment variables.");
@@ -1237,7 +1222,6 @@ export default function EnhancedInventoryPage() {
     setIsLoading(true);
 
     try {
-      // 🔥 Single optimized RPC call with all calculations and joins!
       const { data, error } = await supabase
         .rpc('get_inventory_complete');
 
@@ -1267,24 +1251,20 @@ export default function EnhancedInventoryPage() {
   const processedItems = useMemo(() => {
     let filtered = [...items];
 
-    // Apply search filter
     if (filters.search) {
       filtered = filtered.filter(item =>
         item.name.toLowerCase().includes(filters.search.toLowerCase())
       );
     }
 
-    // Apply category filter
     if (filters.category !== 'all') {
       filtered = filtered.filter(item => item.category === filters.category);
     }
 
-    // Apply vehicle type filter
     if (filters.vehicleType !== 'all') {
       filtered = filtered.filter(item => item.vehicle_type === filters.vehicleType);
     }
 
-    // Apply stock status filter
     if (filters.stockStatus !== 'all') {
       switch (filters.stockStatus) {
         case 'inStock':
@@ -1302,7 +1282,6 @@ export default function EnhancedInventoryPage() {
       }
     }
 
-    // Apply sorting
     filtered.sort((a, b) => {
       let aValue: any, bValue: any;
 
@@ -1341,13 +1320,11 @@ export default function EnhancedInventoryPage() {
     return filtered;
   }, [items, filters]);
 
-  // derive the currently visible slice for the table
   const displayedItems = useMemo(() => {
     const start = (currentPage - 1) * rowsPerPage;
     return processedItems.slice(start, start + rowsPerPage);
   }, [processedItems, currentPage, rowsPerPage]);
 
-  // reset page when filters or page size change
   useEffect(() => {
     setCurrentPage(1);
   }, [filters.search, filters.category, filters.vehicleType, filters.stockStatus, rowsPerPage, processedItems.length]);
@@ -1357,13 +1334,9 @@ export default function EnhancedInventoryPage() {
     return ((item.sale_price - item.cost_price) / item.cost_price) * 100;
   }
 
-  // Enhanced columns for DataTableWrapper with search functionality
+  // Enhanced columns for DataTableWrapper
   const enhancedColumns = [
-    {
-      key: 'name',
-      header: 'Product Name',
-      sortable: true
-    },
+    { key: 'name', header: 'Product Name', sortable: true },
     {
       key: 'category',
       header: 'Category',
@@ -1432,13 +1405,11 @@ export default function EnhancedInventoryPage() {
     },
   ];
 
-  // Calculate stats
   const totalStockValue = processedItems.reduce((acc, p) => acc + (p.sale_price * p.stock_quantity), 0);
   const lowStockCount = items.filter(p => p.stock_quantity > 2 && p.stock_quantity <= 5).length;
   const outOfStockCount = items.filter(p => p.stock_quantity === 0).length;
   const criticalStockCount = items.filter(p => p.stock_quantity > 0 && p.stock_quantity <= 2).length;
 
-  // Add this state for tracking validation errors
   const [formErrors, setFormErrors] = useState({
     name: false,
     category: false,
@@ -1448,7 +1419,6 @@ export default function EnhancedInventoryPage() {
     stock: false
   });
 
-  // Update the resetForm function to clear errors
   const resetForm = () => {
     setItemName('');
     setItemCategory('');
@@ -1500,7 +1470,6 @@ export default function EnhancedInventoryPage() {
   const handleSubmit = async () => {
     if (!supabase) return;
 
-    // Validate required fields and negative values
     const stockQuantity = parseInt(itemStockQuantity || '0');
     const costPrice = parseFloat(itemCostPrice || '0');
     const salePrice = parseFloat(itemSalePrice || '0');
@@ -1516,7 +1485,6 @@ export default function EnhancedInventoryPage() {
 
     setFormErrors(errors);
 
-    // Check if any errors exist
     if (Object.values(errors).some(error => error)) {
       toast({
         title: "Validation Error",
@@ -1565,7 +1533,6 @@ export default function EnhancedInventoryPage() {
       console.error('Error saving item:', error);
       toast({ title: "Save Error", description: `Could not save item: ${error.message}`, variant: "destructive" });
     } else {
-      // Show success animation based on action type
       if (editingItem) {
         setSuccessAnimation({
           isVisible: true,
@@ -1611,12 +1578,10 @@ export default function EnhancedInventoryPage() {
 
     setIsLoading(false);
 
-    // In handleStockAdjustment function, replace the success handling with:
     if (error) {
       console.error('Error adjusting stock:', error);
       toast({ title: "Adjustment Error", description: `Could not adjust stock: ${error.message}`, variant: "destructive" });
     } else {
-      // Show success animation for stock adjustment
       setSuccessAnimation({
         isVisible: true,
         title: "Stock Adjusted Successfully!",
@@ -1639,12 +1604,10 @@ export default function EnhancedInventoryPage() {
       .eq('item_id', deletingItem.item_id);
     setIsLoading(false);
 
-    // In handleDeleteItem function, replace the success handling with:
     if (error) {
       console.error('Error deleting item:', error);
       toast({ title: "Delete Error", description: `Could not delete item: ${error.message}`, variant: "destructive" });
     } else {
-      // Show success animation for deletion
       setSuccessAnimation({
         isVisible: true,
         title: "Item Deleted Successfully!",
@@ -1673,7 +1636,6 @@ export default function EnhancedInventoryPage() {
     });
   };
 
-  // Enhanced Excel Export with better formatting
   const handleExportExcel = () => {
     const headers = ['Product Name', 'Category', 'Vehicle Type', 'Stock Level', 'Cost Price (₱)', 'Sale Price (₱)', 'Margin %', 'Status'];
 
@@ -1708,7 +1670,6 @@ export default function EnhancedInventoryPage() {
     link.click();
     document.body.removeChild(link);
 
-    // Show success animation for export
     setSuccessAnimation({
       isVisible: true,
       title: "Export Successful!",
@@ -1780,13 +1741,11 @@ export default function EnhancedInventoryPage() {
           </div>
         </div>
 
-
-
         {/* Stock Alerts */}
         <StockAlertsBar
           criticalCount={criticalStockCount}
           warningCount={lowStockCount}
-          outOfStockCount={outOfStockCount} // NEW: Add out of stock count
+          outOfStockCount={outOfStockCount}
           onShowDetails={() => setIsCriticalDetailsOpen(true)}
         />
 
@@ -1842,7 +1801,6 @@ export default function EnhancedInventoryPage() {
 
         {/* Enhanced Inventory Table using DataTableWrapper */}
         <section aria-labelledby="inventory-list-heading">
-          {/* Using DataTableWrapper instead of custom table card */}
           {isLoading && items.length === 0 && !fetchError ? (
             <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl border border-slate-200 p-8">
               <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-4" />
@@ -1866,7 +1824,6 @@ export default function EnhancedInventoryPage() {
                     <div>
                       <div className="text-xl font-bold font-poppins">Inventory Items</div>
                       <div className="text-sm opacity-90">Track products, stock levels and pricing</div>
-                      {/* Total / Filtered count moved here (left, below title/subtitle) */}
                       <div className="text-sm text-white/90 mt-1">
                         {filters.search || filters.category !== 'all' || filters.stockStatus !== 'all' || filters.vehicleType !== 'all' ? (
                           <>Filtered: <strong>{processedItems.length}</strong> of <strong>{items.length}</strong> items</>
@@ -1874,24 +1831,6 @@ export default function EnhancedInventoryPage() {
                           <>Total: <strong>{items.length}</strong> items</>
                         )}
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Rows per page relocated to the header (right side) */}
-                  <div className="flex items-center gap-3">
-                    <div className="text-sm text-white/90 mr-2">Rows per page:</div>
-                    <div className="w-28">
-                      <Select value={String(rowsPerPage)} onValueChange={(v) => setRowsPerPage(Number(v))}>
-                        <SelectTrigger className="w-full border-transparent bg-white text-black">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {rowsPerPageOptions.map(option => (
-
-                            <SelectItem key={option} value={String(option)}>{option}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                     </div>
                   </div>
                 </div>
@@ -1902,6 +1841,8 @@ export default function EnhancedInventoryPage() {
                     filters={filters}
                     onFiltersChange={setFilters}
                     onClearFilters={handleClearFilters}
+                    rowsPerPage={rowsPerPage}
+                    onRowsPerPageChange={setRowsPerPage}
                   />
                 </div>
 
@@ -1913,12 +1854,12 @@ export default function EnhancedInventoryPage() {
                   onEdit={handleOpenEditDialog}
                   onDelete={handleOpenDeleteDialog}
                 />
-                {/* footer: rows-per-page + showing X of Y + simple pager */}
+                
+                {/* Footer: Showing X of Y + Pager */}
                 <div className="px-6 py-3 border-t border-slate-100 bg-white flex items-center justify-between">
                   <div className="text-sm text-slate-600">
                     Showing {processedItems.length === 0 ? 0 : ((currentPage - 1) * rowsPerPage + 1)} to {Math.min(currentPage * rowsPerPage, processedItems.length)} of {processedItems.length} entries
                   </div>
-                  {/* Pager only (rows-per-page moved to header) */}
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
