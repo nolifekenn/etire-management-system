@@ -100,7 +100,7 @@ const BranchForm = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-8 font-poppins">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl font-poppins fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] gap-4 z-50">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
             {isEdit ? 'Edit Branch' : 'Create New Branch'}
@@ -433,6 +433,74 @@ const BranchSuccessAnimation = ({
   );
 };
 
+// ===== PAGINATION COMPONENT =====
+const PaginationControls = ({ 
+  currentPage, 
+  totalPages, 
+  onPageChange,
+  totalItems,
+  rowsPerPage
+}: { 
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  totalItems: number;
+  rowsPerPage: number;
+}) => {
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
+
+  return (
+    <div className="flex items-center justify-between p-6 border-t border-slate-200 bg-white">
+      {/* Left Side: Showing text */}
+      <div className="text-sm text-slate-600 font-poppins">
+        Showing {totalItems === 0 ? 0 : startIndex + 1} to {endIndex} of {totalItems} entries
+      </div>
+
+      {/* Right Side: Simple Pager Controls */}
+      <div className="flex items-center gap-2">
+        <Button 
+          variant="outline" 
+          className="h-8 px-2 min-w-[36px] bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900" 
+          onClick={() => onPageChange(1)} 
+          disabled={currentPage === 1}
+        >
+          «
+        </Button>
+        <Button 
+          variant="outline" 
+          className="h-8 px-2 min-w-[36px] bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900" 
+          onClick={() => onPageChange(currentPage - 1)} 
+          disabled={currentPage === 1}
+        >
+          ‹
+        </Button>
+        
+        <span className="text-sm text-slate-600 px-2 font-medium font-poppins min-w-[80px] text-center">
+          Page {currentPage} of {totalPages || 1}
+        </span>
+        
+        <Button 
+          variant="outline" 
+          className="h-8 px-2 min-w-[36px] bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900" 
+          onClick={() => onPageChange(currentPage + 1)} 
+          disabled={currentPage === totalPages || totalPages === 0}
+        >
+          ›
+        </Button>
+        <Button 
+          variant="outline" 
+          className="h-8 px-2 min-w-[36px] bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900" 
+          onClick={() => onPageChange(totalPages)} 
+          disabled={currentPage === totalPages || totalPages === 0}
+        >
+          »
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 // ===== MAIN BRANCHES PAGE =====
 export default function EnhancedBranchesPage() {
     const { toast } = useToast();
@@ -482,9 +550,18 @@ export default function EnhancedBranchesPage() {
     const [statusFilter, setStatusFilter] = useState('all');
     const [managerFilter, setManagerFilter] = useState('all');
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const rowsPerPage = 5;
+
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Reset pagination when filters change
+    useEffect(() => {
+      setCurrentPage(1);
+    }, [searchTerm, statusFilter, managerFilter]);
 
     const fetchBranches = useCallback(async () => {
         if (!supabase) return;
@@ -551,6 +628,17 @@ export default function EnhancedBranchesPage() {
             return matchesSearch && matchesStatus && matchesManager;
         });
     }, [branches, searchTerm, statusFilter, managerFilter]);
+
+    // Pagination Logic
+    const totalItems = filteredBranches.length;
+    const totalPages = Math.ceil(totalItems / rowsPerPage);
+    
+    const currentBranches = useMemo(() => {
+        const firstPageIndex = (currentPage - 1) * rowsPerPage;
+        const lastPageIndex = firstPageIndex + rowsPerPage;
+        return filteredBranches.slice(firstPageIndex, lastPageIndex);
+    }, [currentPage, filteredBranches, rowsPerPage]);
+
 
     const resetForm = () => {
         setFormData({
@@ -1039,7 +1127,8 @@ export default function EnhancedBranchesPage() {
 
                                 {/* Filter Section */}
                                 <div className="bg-white p-5 border-b border-slate-200">
-                                    <div className="flex flex-col lg:flex-row lg:items-end gap-4 mb-5">
+                                    {/* Removed 'mb-5' from the classList below to eliminate space below filters */}
+                                    <div className="flex flex-col lg:flex-row lg:items-end gap-4">
                                         <div className="flex-1 relative">
                                             <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Search</Label>
                                             <div className="relative group">
@@ -1064,8 +1153,8 @@ export default function EnhancedBranchesPage() {
                                         <div className="flex gap-2 w-full lg:w-auto">
                                             <div className="w-1/2 lg:w-48">
                                                 <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Status</Label>
-                                                <Select
-                                                    value={statusFilter}
+                                                <Select 
+                                                    value={statusFilter} 
                                                     onValueChange={setStatusFilter}
                                                 >
                                                     <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
@@ -1081,8 +1170,8 @@ export default function EnhancedBranchesPage() {
 
                                             <div className="w-1/2 lg:w-48">
                                                 <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Manager</Label>
-                                                <Select
-                                                    value={managerFilter}
+                                                <Select 
+                                                    value={managerFilter} 
                                                     onValueChange={setManagerFilter}
                                                 >
                                                     <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
@@ -1100,7 +1189,7 @@ export default function EnhancedBranchesPage() {
                                             </div>
 
                                             {(searchTerm || statusFilter !== 'all' || managerFilter !== 'all') && (
-                                                <div className="hidden lg:flex items-end pb-0.5">
+                                                <div className="hidden lg:flex items-end">
                                                     <Button
                                                         variant="outline"
                                                         onClick={clearFilters}
@@ -1128,7 +1217,7 @@ export default function EnhancedBranchesPage() {
   </tr>
 </thead>
                                         <tbody>
-                                            {filteredBranches.map((branch, index) => (
+                                            {currentBranches.map((branch, index) => (
                                                 <tr 
                                                     key={branch.branch_id} 
                                                     className="border-t border-slate-100 hover:bg-slate-50 transition-colors"
@@ -1154,20 +1243,22 @@ export default function EnhancedBranchesPage() {
                                     </table>
                                 </div>
 
-                                {/* Footer */}
-                                <div className="px-6 py-3 border-t border-slate-100 bg-white flex items-center justify-between">
-                                    <div className="text-sm text-slate-600">
-                                        Showing {filteredBranches.length === 0 ? 0 : 1} to {filteredBranches.length} of {filteredBranches.length} entries
-                                    </div>
-                                </div>
+                                {/* Pagination Controls */}
+                                <PaginationControls 
+                                    currentPage={currentPage}
+                                    totalPages={totalPages}
+                                    onPageChange={setCurrentPage}
+                                    totalItems={totalItems}
+                                    rowsPerPage={rowsPerPage}
+                                />
                             </div>
                         </>
                     )}
                 </section>
 
                 {/* Branch Form (Edit/Add) - ADDED BACK */}
-                <BranchForm
-                    isOpen={isAddDialogOpen || isEditDialogOpen}
+                <BranchForm 
+                    isOpen={isAddDialogOpen || isEditDialogOpen} 
                     onClose={() => {
                         setIsAddDialogOpen(false);
                         setIsEditDialogOpen(false);
@@ -1188,9 +1279,9 @@ export default function EnhancedBranchesPage() {
                         <div className="p-6 h-full overflow-y-auto">
                             <div className="flex items-center justify-between mb-6">
                                 <h3 className="text-xl font-bold text-slate-900 font-poppins">Branch Details</h3>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
                                     onClick={() => setQuickViewBranch(null)}
                                     className="h-8 w-8 p-0"
                                 >
@@ -1206,8 +1297,8 @@ export default function EnhancedBranchesPage() {
                                     <div>
                                         <h4 className="font-bold text-lg text-slate-900 font-poppins">{quickViewBranch.name}</h4>
                                         <Badge className={`mt-2 font-poppins ${
-                                            quickViewBranch.is_active
-                                                ? "bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border-green-200"
+                                            quickViewBranch.is_active 
+                                                ? "bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border-green-200" 
                                                 : "bg-gradient-to-r from-red-50 to-rose-50 text-red-700 border-red-200"
                                         }`}>
                                             {quickViewBranch.is_active ? 'Active' : 'Inactive'}
@@ -1268,7 +1359,7 @@ export default function EnhancedBranchesPage() {
 
                                 <div className="pt-6 border-t border-slate-200">
                                     <div className="flex gap-2">
-                                        <Button
+                                        <Button 
                                             onClick={() => {
                                                 handleOpenEditDialog(quickViewBranch);
                                                 setQuickViewBranch(null);
@@ -1278,8 +1369,8 @@ export default function EnhancedBranchesPage() {
                                             <Edit className="h-4 w-4 mr-2" />
                                             Edit Branch
                                         </Button>
-                                        <Button
-                                            variant="outline"
+                                        <Button 
+                                            variant="outline" 
                                             onClick={() => {
                                                 handleOpenDeleteDialog(quickViewBranch);
                                                 setQuickViewBranch(null);
@@ -1330,11 +1421,11 @@ export default function EnhancedBranchesPage() {
                                                     <td className="border border-slate-200 p-3">{branch.email || 'N/A'}</td>
                                                     <td className="border border-slate-200 p-3">{managerName || 'No Manager'}</td>
                                                     <td className="border border-slate-200 p-3">
-                                                        <Badge
+                                                        <Badge 
                                                             variant={branch.is_active ? "default" : "outline"}
                                                             className={
-                                                                branch.is_active
-                                                                    ? 'bg-green-100 text-green-700 border-green-200'
+                                                                branch.is_active 
+                                                                    ? 'bg-green-100 text-green-700 border-green-200' 
                                                                     : 'bg-red-100 text-red-700 border-red-200'
                                                             }
                                                         >
