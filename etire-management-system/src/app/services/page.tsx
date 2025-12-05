@@ -758,7 +758,7 @@ const ServiceStats = ({ serviceJobs }: { serviceJobs: ServiceJob[] }) => {
 // Quick Actions Component
 const QuickActions = ({ 
   onAddJob, 
-  onExportData, 
+  onExportData,
   onViewCalendar 
 }: { 
   onAddJob: () => void, 
@@ -1063,7 +1063,7 @@ const TabbedServiceForm = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins">
+      <DialogContent className="sm:max-w-2xl bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl font-poppins fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] z-50 gap-4 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
             {isEdit ? 'Edit Service Job' : 'Create Service Job'}
@@ -1583,7 +1583,7 @@ const TabbedServiceForm = ({
 const ExpandableRow = ({ 
   job, 
   isExpanded, 
-  onToggle,
+  onToggle, 
   inventoryItems,
   onEdit,
   onDelete,
@@ -2172,7 +2172,7 @@ export default function EnhancedServiceManagementPage() {
     // Filter jobs with quick filters
     const filteredJobs = useMemo(() => {
       let filtered = serviceJobs.filter(job => {
-        const matchesSearch =
+        const matchesSearch = 
           job.job_description.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (job.remarks || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
           (job.customer?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
@@ -2253,7 +2253,6 @@ export default function EnhancedServiceManagementPage() {
           jobStatus: 'pending',
           serviceFee: '0',
           vehicleTypeId: '',
-          mileage: '',
           selectedItems: [],
           originalStatus: null
         });
@@ -3135,15 +3134,15 @@ export default function EnhancedServiceManagementPage() {
                                 onPageChange={setCurrentPage}
                                 totalItems={filteredJobs.length}
                                 rowsPerPage={rowsPerPage}
-                                onRowsPerPageChange={setRowsPerPage}
+                                onRowsPerPageChange={setRowsPerPage} // This prop was missing in PaginationControls
                             />
                         )}
                     </div>
                 </div>
 
                 {/* Tabbed Add/Edit Dialog */}
-                <TabbedServiceForm
-                    isOpen={isAddDialogOpen || isEditDialogOpen}
+                <TabbedServiceForm 
+                    isOpen={isAddDialogOpen || isEditDialogOpen} 
                     onClose={() => {
                         setIsAddDialogOpen(false);
                         setIsEditDialogOpen(false);
@@ -3178,7 +3177,7 @@ export default function EnhancedServiceManagementPage() {
                             </AlertDialogCancel>
                             <AlertDialogAction 
                                 onClick={handleDelete} 
-                                disabled={isLoading}
+                                disabled={isLoading} 
                                 className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-red-600 active:scale-95 font-poppins"
                             >
                                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Delete'}
