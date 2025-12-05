@@ -34,12 +34,19 @@ import {
   Eye, TrendingUp, CheckCircle, UserPlus, Calendar, Wrench,
   Save, ArrowUpDown, Archive, PackageSearch
 } from 'lucide-react';
-import { DataTableWrapper } from '@/components/DataTableWrapper';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
 import { Customer, Vehicle, TireHistory, InventoryItem, User } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 // ===== DESIGN SYSTEM =====
 const buttonStyles = {
@@ -72,7 +79,6 @@ const SuccessAnimation = ({
 }) => {
   if (!isVisible) return null;
 
-  // Different icons and colors based on action type
   const getActionConfig = () => {
     switch (actionType) {
       case 'add':
@@ -168,59 +174,601 @@ interface VehicleType {
     name: string;
 }
 
+// ===== ENHANCED FILTERING SYSTEM (Similar to Inventory) =====
+interface CustomerFilterState {
+  search: string;
+  sortBy: 'name' | 'phone' | 'vehicle_count';
+  sortOrder: 'asc' | 'desc';
+}
+
+interface VehicleFilterState {
+  search: string;
+  customer: string;
+  vehicleType: string;
+  sortBy: 'plate_number' | 'customer' | 'vehicle_type' | 'make' | 'model';
+  sortOrder: 'asc' | 'desc';
+}
+
+interface HistoryFilterState {
+  search: string;
+  serviceType: string;
+  sortBy: 'plate_number' | 'service_date' | 'service_type';
+  sortOrder: 'asc' | 'desc';
+}
+
+// ===== ADVANCED FILTERS COMPONENT (Similar to Inventory) =====
+const CustomerAdvancedFilters = ({
+  filters,
+  onFiltersChange,
+  onClearFilters
+}: {
+  filters: CustomerFilterState;
+  onFiltersChange: (filters: CustomerFilterState) => void;
+  onClearFilters: () => void;
+}) => {
+  const hasActiveFilters = filters.search;
+
+  return (
+    <div className="bg-white p-5 border-b border-slate-200">
+      <div className="flex flex-col lg:flex-row lg:items-end gap-4 mb-5">
+        <div className="flex-1 relative">
+          <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Search Customers</Label>
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4 group-focus-within:text-indigo-500 transition-colors" />
+            <Input
+              placeholder="Search by name or phone..."
+              value={filters.search}
+              onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
+              className="pl-10 h-10 bg-slate-50 border-slate-200 focus:bg-white focus:border-indigo-500 transition-all rounded-md"
+            />
+            {filters.search && (
+              <button
+                onClick={() => onFiltersChange({ ...filters, search: '' })}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex gap-2 w-full lg:w-auto">
+          <div className="w-1/2 lg:w-40">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Sort By</Label>
+            <Select
+              value={filters.sortBy}
+              onValueChange={(value) => onFiltersChange({ ...filters, sortBy: value as any })}
+            >
+              <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
+                <SelectValue placeholder="Sort..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="phone">Phone</SelectItem>
+                <SelectItem value="vehicle_count">Vehicle Count</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="w-1/2 lg:w-32">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Order</Label>
+            <Select
+              value={filters.sortOrder}
+              onValueChange={(value) => onFiltersChange({ ...filters, sortOrder: value as any })}
+            >
+              <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
+                <SelectValue placeholder="Order" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">Ascending</SelectItem>
+                <SelectItem value="desc">Descending</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {hasActiveFilters && (
+            <div className="hidden lg:flex items-end pb-0.5">
+              <Button
+                variant="outline"
+                onClick={onClearFilters}
+                className="h-10 px-3 text-slate-500 border-slate-200 hover:bg-slate-50 rounded-md"
+                title="Clear all filters"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {hasActiveFilters && (
+        <div className="mt-4 lg:hidden">
+          <Button
+            variant="outline"
+            onClick={onClearFilters}
+            className="w-full h-9 text-slate-500 border-slate-200"
+          >
+            Clear All Filters
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const VehicleAdvancedFilters = ({
+  filters,
+  onFiltersChange,
+  onClearFilters,
+  customers,
+  vehicleTypes
+}: {
+  filters: VehicleFilterState;
+  onFiltersChange: (filters: VehicleFilterState) => void;
+  onClearFilters: () => void;
+  customers: any[];
+  vehicleTypes: any[];
+}) => {
+  const hasActiveFilters = filters.search || filters.customer !== 'all' || filters.vehicleType !== 'all';
+
+  return (
+    <div className="bg-white p-5 border-b border-slate-200">
+      <div className="flex flex-col lg:flex-row lg:items-end gap-4 mb-5">
+        <div className="flex-1 relative">
+          <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Search Vehicles</Label>
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4 group-focus-within:text-indigo-500 transition-colors" />
+            <Input
+              placeholder="Search by plate, make, model, or customer..."
+              value={filters.search}
+              onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
+              className="pl-10 h-10 bg-slate-50 border-slate-200 focus:bg-white focus:border-indigo-500 transition-all rounded-md"
+            />
+            {filters.search && (
+              <button
+                onClick={() => onFiltersChange({ ...filters, search: '' })}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex gap-2 w-full lg:w-auto">
+          <div className="w-1/2 lg:w-48">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Customer</Label>
+            <Select
+              value={filters.customer}
+              onValueChange={(value) => onFiltersChange({ ...filters, customer: value })}
+            >
+              <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
+                <SelectValue placeholder="All customers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Customers</SelectItem>
+                {customers.map(customer => (
+                  <SelectItem key={customer.customer_id} value={customer.customer_id}>
+                    {customer.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="w-1/2 lg:w-48">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Vehicle Type</Label>
+            <Select
+              value={filters.vehicleType}
+              onValueChange={(value) => onFiltersChange({ ...filters, vehicleType: value })}
+            >
+              <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
+                <SelectValue placeholder="All types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {vehicleTypes.map(type => (
+                  <SelectItem key={type.vehicle_type_id} value={type.vehicle_type_id}>
+                    {type.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="w-1/2 lg:w-40">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Sort By</Label>
+            <Select
+              value={filters.sortBy}
+              onValueChange={(value) => onFiltersChange({ ...filters, sortBy: value as any })}
+            >
+              <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
+                <SelectValue placeholder="Sort..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="plate_number">Plate Number</SelectItem>
+                <SelectItem value="customer">Customer</SelectItem>
+                <SelectItem value="vehicle_type">Vehicle Type</SelectItem>
+                <SelectItem value="make">Make</SelectItem>
+                <SelectItem value="model">Model</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="w-1/2 lg:w-32">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Order</Label>
+            <Select
+              value={filters.sortOrder}
+              onValueChange={(value) => onFiltersChange({ ...filters, sortOrder: value as any })}
+            >
+              <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
+                <SelectValue placeholder="Order" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">Ascending</SelectItem>
+                <SelectItem value="desc">Descending</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {hasActiveFilters && (
+            <div className="hidden lg:flex items-end pb-0.5">
+              <Button
+                variant="outline"
+                onClick={onClearFilters}
+                className="h-10 px-3 text-slate-500 border-slate-200 hover:bg-slate-50 rounded-md"
+                title="Clear all filters"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {hasActiveFilters && (
+        <div className="mt-4 lg:hidden">
+          <Button
+            variant="outline"
+            onClick={onClearFilters}
+            className="w-full h-9 text-slate-500 border-slate-200"
+          >
+            Clear All Filters
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const HistoryAdvancedFilters = ({
+  filters,
+  onFiltersChange,
+  onClearFilters
+}: {
+  filters: HistoryFilterState;
+  onFiltersChange: (filters: HistoryFilterState) => void;
+  onClearFilters: () => void;
+}) => {
+  const hasActiveFilters = filters.search || filters.serviceType !== 'all';
+
+  return (
+    <div className="bg-white p-5 border-b border-slate-200">
+      <div className="flex flex-col lg:flex-row lg:items-end gap-4 mb-5">
+        <div className="flex-1 relative">
+          <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Search History</Label>
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4 group-focus-within:text-indigo-500 transition-colors" />
+            <Input
+              placeholder="Search by plate number, item, or customer..."
+              value={filters.search}
+              onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
+              className="pl-10 h-10 bg-slate-50 border-slate-200 focus:bg-white focus:border-indigo-500 transition-all rounded-md"
+            />
+            {filters.search && (
+              <button
+                onClick={() => onFiltersChange({ ...filters, search: '' })}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex gap-2 w-full lg:w-auto">
+          <div className="w-1/2 lg:w-48">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Service Type</Label>
+            <Select
+              value={filters.serviceType}
+              onValueChange={(value) => onFiltersChange({ ...filters, serviceType: value })}
+            >
+              <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
+                <SelectValue placeholder="All services" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Services</SelectItem>
+                <SelectItem value="repair">Repair</SelectItem>
+                <SelectItem value="replacement">Replacement</SelectItem>
+                <SelectItem value="rotation">Rotation</SelectItem>
+                <SelectItem value="balancing">Balancing</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="w-1/2 lg:w-40">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Sort By</Label>
+            <Select
+              value={filters.sortBy}
+              onValueChange={(value) => onFiltersChange({ ...filters, sortBy: value as any })}
+            >
+              <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
+                <SelectValue placeholder="Sort..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="plate_number">Vehicle</SelectItem>
+                <SelectItem value="service_date">Date</SelectItem>
+                <SelectItem value="service_type">Service Type</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="w-1/2 lg:w-32">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Order</Label>
+            <Select
+              value={filters.sortOrder}
+              onValueChange={(value) => onFiltersChange({ ...filters, sortOrder: value as any })}
+            >
+              <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
+                <SelectValue placeholder="Order" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">Ascending</SelectItem>
+                <SelectItem value="desc">Descending</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {hasActiveFilters && (
+            <div className="hidden lg:flex items-end pb-0.5">
+              <Button
+                variant="outline"
+                onClick={onClearFilters}
+                className="h-10 px-3 text-slate-500 border-slate-200 hover:bg-slate-50 rounded-md"
+                title="Clear all filters"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {hasActiveFilters && (
+        <div className="mt-4 lg:hidden">
+          <Button
+            variant="outline"
+            onClick={onClearFilters}
+            className="w-full h-9 text-slate-500 border-slate-200"
+          >
+            Clear All Filters
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ===== CUSTOM TABLE COMPONENTS =====
+interface Column {
+  key: string;
+  header: string;
+  sortable?: boolean;
+  render?: (value: any, item: any) => React.ReactNode;
+}
+
+interface DataTableProps {
+  columns: Column[];
+  data: any[];
+  onEdit?: (item: any) => void;
+  onDelete?: (item: any) => void;
+  className?: string;
+}
+
+const CustomDataTable = ({ columns, data, onEdit, onDelete, className = '' }: DataTableProps) => {
+  const renderCell = (item: any, column: Column) => {
+    const value = item[column.key];
+    
+    if (column.render) {
+      return column.render(value, item);
+    }
+    
+    if (value === null || value === undefined) {
+      return <span className="text-slate-400">-</span>;
+    }
+    
+    if (typeof value === 'boolean') {
+      return value ? 'Yes' : 'No';
+    }
+    
+    return String(value);
+  };
+
+  return (
+    <div className={`w-full overflow-auto ${className}`}>
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-slate-50 hover:bg-slate-50">
+            {columns.map((column) => (
+              <TableHead 
+                key={column.key}
+                className="font-semibold text-slate-700 whitespace-nowrap"
+              >
+                {column.header}
+              </TableHead>
+            ))}
+            {(onEdit || onDelete) && (
+              <TableHead className="font-semibold text-slate-700 text-right">
+                Actions
+              </TableHead>
+            )}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {data.length === 0 ? (
+            <TableRow>
+              <TableCell 
+                colSpan={columns.length + (onEdit || onDelete ? 1 : 0)}
+                className="h-24 text-center text-slate-500"
+              >
+                No data found.
+              </TableCell>
+            </TableRow>
+          ) : (
+            data.map((item, rowIndex) => (
+              <TableRow 
+                key={item.id || rowIndex}
+                className="hover:bg-slate-50/50 transition-colors"
+              >
+                {columns.map((column) => (
+                  <TableCell key={`${rowIndex}-${column.key}`}>
+                    {renderCell(item, column)}
+                  </TableCell>
+                ))}
+                {(onEdit || onDelete) && (
+                  <TableCell className="text-right space-x-2">
+                    {onEdit && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onEdit(item)}
+                        className="h-8 w-8 p-0 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                        title="Edit"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {onDelete && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onDelete(item)}
+                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </TableCell>
+                )}
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+};
+
 // Column definitions
-const customerColumns = [
-  { key: 'name', header: 'Customer Name', sortable: true },
-  { key: 'phone', header: 'Phone', sortable: true },
-  { key: 'vehicle_count', header: 'Vehicles', sortable: true },
+const customerColumns: Column[] = [
+  { 
+    key: 'name', 
+    header: 'Customer Name', 
+    sortable: true,
+    render: (value, item) => value || <span className="text-slate-400">-</span>
+  },
+  { 
+    key: 'phone', 
+    header: 'Phone', 
+    sortable: true,
+    render: (value) => value || <span className="text-slate-400">-</span>
+  },
+  { 
+    key: 'vehicle_count', 
+    header: 'Vehicles', 
+    sortable: true,
+    render: (value) => (
+      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+        {value || 0} vehicles
+      </Badge>
+    ),
+  },
 ];
 
-const vehicleColumns = [
-  { key: 'plate_number', header: 'Plate Number', sortable: true },
+const vehicleColumns: Column[] = [
+  { 
+    key: 'plate_number', 
+    header: 'Plate Number', 
+    sortable: true,
+    render: (value) => value || <span className="text-slate-400">-</span>
+  },
   {
     key: 'customer',
     header: 'Customer',
     sortable: true,
-    render: (value: any) => <span className="capitalize">{value?.name || '—'}</span>,
+    render: (value) => <span className="capitalize">{value?.name || '—'}</span>,
   },
   {
     key: 'vehicle_type',
     header: 'Type',
     sortable: true,
-    render: (value: any) => <span className="capitalize">{value?.name || '—'}</span>,
+    render: (value) => {
+      if (!value) return <Badge variant="outline">N/A</Badge>;
+      const vehicleName = value.name;
+      const VehicleIcon = getVehicleIcon(vehicleName);
+      return (
+        <Badge variant="outline" className="flex items-center gap-1 bg-slate-100 text-slate-700 border-slate-300 capitalize font-poppins">
+          <VehicleIcon className="h-3 w-3" />
+          {vehicleName}
+        </Badge>
+      );
+    },
   },
-  { key: 'make', header: 'Make', sortable: true },
-  { key: 'model', header: 'Model', sortable: true },
-  { key: 'color', header: 'Color', sortable: true },
+  { 
+    key: 'make', 
+    header: 'Make', 
+    sortable: true,
+    render: (value) => value || <span className="text-slate-400">-</span>
+  },
+  { 
+    key: 'model', 
+    header: 'Model', 
+    sortable: true,
+    render: (value) => value || <span className="text-slate-400">-</span>
+  },
+  { 
+    key: 'color', 
+    header: 'Color', 
+    sortable: true,
+    render: (value) => value || <span className="text-slate-400">-</span>
+  },
 ];
 
-// ✅ Tire History columns per your spec
-const historyColumns = [
+const historyColumns: Column[] = [
   {
     key: 'plate_number',
     header: 'Vehicle',
     render: (_value: any, item: any) => item.vehicle?.plate_number || '—',
   },
-{
+  {
     key: 'items',
     header: 'Item(s)',
     render: (_value: any, item: any) => {
-        // Now items is always an array
-        if (Array.isArray(item.items) && item.items.length > 0) {
+      if (Array.isArray(item.items) && item.items.length > 0) {
         return (
-            <div className="space-y-1">
+          <div className="space-y-1">
             {item.items.map((it: any, idx: number) => (
-                <div key={idx} className="text-xs">
+              <div key={idx} className="text-xs">
                 {it.name} {it.quantity > 1 ? `(×${it.quantity})` : ''}
-                </div>
+              </div>
             ))}
-            </div>
+          </div>
         );
-        }
-        return '—';
+      }
+      return '—';
     },
-},
-
+  },
   {
     key: 'service_type',
     header: 'Type',
@@ -282,15 +830,20 @@ const EnhancedEmptyState = ({
 
   return (
     <div className="text-center py-12 px-6 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50 animate-in fade-in duration-500">
-      <Icon className="h-16 w-16 text-slate-400 mx-auto mb-4" />
-      <h3 className="text-lg font-semibold text-slate-700 mb-2">{title}</h3>
-      <p className="text-slate-500 mb-4">
+      <div className="relative inline-flex mb-6">
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-200 to-cyan-200 blur-lg rounded-full opacity-70"></div>
+        <div className="relative p-4 bg-white rounded-full shadow-lg border border-slate-100">
+          <Icon className="h-16 w-16 text-purple-600" />
+        </div>
+      </div>
+      <h3 className="text-xl font-semibold text-slate-800 mb-3 font-poppins">{title}</h3>
+      <p className="text-slate-600 mb-6 max-w-md mx-auto font-poppins">
         {description}
       </p>
       <div className="flex gap-3 justify-center">
         <Button 
           onClick={onAddNew}
-          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 hover:scale-105"
+          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 hover:scale-105 shadow-md font-poppins"
         >
           <PlusCircle className="h-4 w-4 mr-2" />
           {buttonText}
@@ -299,7 +852,7 @@ const EnhancedEmptyState = ({
           <Button 
             onClick={onClearFilters}
             variant="outline"
-            className="flex items-center gap-2 transition-all duration-300 hover:scale-105"
+            className="flex items-center gap-2 transition-all duration-300 hover:scale-105 border-slate-300 font-poppins"
           >
             <X className="h-4 w-4" />
             Clear Filters
@@ -310,83 +863,7 @@ const EnhancedEmptyState = ({
   );
 };
 
-// Custom Date Input Component
-const CustomDateInput = ({ value, onChange, id, className = "" }: { value: string; onChange: (value: string) => void; id: string; className?: string }) => {
-  return (
-    <div className="relative">
-      <Input
-        id={id}
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={`${className} border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins custom-date-input`}
-      />
-    </div>
-  );
-};
-
-// Optimized Search Input Component
-const SearchInput = ({ 
-  value, 
-  onChange, 
-  placeholder, 
-  id 
-}: { 
-  value: string; 
-  onChange: (value: string) => void; 
-  placeholder: string; 
-  id: string;
-}) => {
-  const [localValue, setLocalValue] = useState(value);
-  const timeoutRef = useRef<NodeJS.Timeout>();
-
-  useEffect(() => {
-    setLocalValue(value);
-  }, [value]);
-
-  const handleChange = (newValue: string) => {
-    setLocalValue(newValue);
-    
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    
-    timeoutRef.current = setTimeout(() => {
-      onChange(newValue);
-    }, 150);
-  };
-
-  const handleClear = () => {
-    setLocalValue('');
-    onChange('');
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-  };
-
-  return (
-    <div className="relative">
-      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-      <Input 
-        id={id}
-        placeholder={placeholder} 
-        value={localValue}
-        onChange={(e) => handleChange(e.target.value)}
-        className="pl-10 pr-4 py-2 border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
-      />
-      {localValue && (
-        <button 
-          onClick={handleClear}
-          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors duration-200"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      )}
-    </div>
-  );
-};
-
-// Modern Widget Components - Solid Color StatsOverview
+// ===== COMPLETELY REDESIGNED StatsOverview Component =====
 const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[], vehicles: any[], tireHistory: any[] }) => {
     const totalCustomers = customers.length;
     const totalVehicles = vehicles.length;
@@ -398,89 +875,91 @@ const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[],
       .map(history => history.vehicle_id)
     )].length;
 
+    const stats = [
+      {
+        label: "Customers",
+        value: totalCustomers,
+        icon: Users,
+        gradient: "from-purple-500 to-purple-600",
+        description: "Total registered customers"
+      },
+      {
+        label: "Vehicles",
+        value: totalVehicles,
+        icon: Car,
+        gradient: "from-blue-500 to-cyan-500",
+        description: "Active vehicles in system"
+      },
+      {
+        label: "Monthly Services",
+        value: recentServices,
+        icon: Wrench,
+        gradient: "from-indigo-500 to-blue-500",
+        description: "Services this month"
+      },
+      {
+        label: "Serviced Vehicles",
+        value: vehiclesWithRecentService,
+        icon: CheckCircle,
+        gradient: "from-cyan-500 to-blue-500",
+        description: "Vehicles serviced this month"
+      }
+    ];
+
     return (
-      <div className="mb-6">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 border border-white/20 shadow-xl">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px, rgba(255,255,255,0.15) 1px, transparent 0)] bg-[length:20px_20px]"></div>
+      <div className="mb-8">
+        <div className="relative rounded-2xl bg-gradient-to-br from-white to-slate-50 border border-slate-200/70 shadow-lg overflow-hidden">
+          {/* Subtle background pattern */}
+          <div className="absolute inset-0 opacity-5">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-purple-400 to-transparent rounded-full -mr-16 -mt-16"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-cyan-400 to-transparent rounded-full -ml-12 -mb-12"></div>
+          </div>
           
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
+          <div className="relative p-6 md:p-8">
+            <div className="space-y-2 mb-6">
+              <h2 className="text-2xl font-bold text-slate-900 font-poppins tracking-tight">
+                Business Overview
+              </h2>
+              <p className="text-slate-600 text-sm font-poppins max-w-lg">
+                Real-time insights for your tire management operations
+              </p>
+            </div>
 
-          <div className="relative p-6">
-            <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-              <div className="flex-1 space-y-4">
-                <div className="space-y-2">
-                  <h2 className="text-xl font-bold text-white font-poppins drop-shadow-lg">
-                    Business Overview
-                  </h2>
-                  <p className="text-white/90 text-sm font-poppins">
-                    Real-time insights for your tire management
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div className="bg-white/20 rounded-xl p-3 border border-white/30 hover:bg-white/25 transition-all duration-300 group">
-                    <div className="flex items-center justify-between">
-                      <div className="p-1.5 bg-white/30 rounded-lg group-hover:scale-110 transition-transform duration-300">
-                        <Users className="h-4 w-4 text-white" />
-                      </div>
-                      <div className="text-right">
-                        <p className="text-white/90 text-xs font-poppins mb-1">Customers</p>
-                        <p className="text-lg font-bold text-white font-poppins">{totalCustomers}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {stats.map((stat, index) => {
+                const Icon = stat.icon;
+                return (
+                  <div 
+                    key={stat.label}
+                    className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 hover:translate-y-[-2px] group cursor-default"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 bg-gradient-to-r ${stat.gradient} rounded-lg shadow-sm group-hover:scale-110 transition-transform duration-300`}>
+                          <Icon className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-slate-900 font-poppins tracking-tight">
+                            {stat.value.toLocaleString()}
+                          </p>
+                          <p className="text-sm font-medium text-slate-700 font-poppins mt-0.5">
+                            {stat.label}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="bg-white/20 rounded-xl p-3 border border-white/30 hover:bg-white/25 transition-all duration-300 group">
-                    <div className="flex items-center justify-between">
-                      <div className="p-1.5 bg-white/30 rounded-lg group-hover:scale-110 transition-transform duration-300">
-                        <Car className="h-4 w-4 text-white" />
-                      </div>
-                      <div className="text-right">
-                        <p className="text-white/90 text-xs font-poppins mb-1">Vehicles</p>
-                        <p className="text-lg font-bold text-white font-poppins">{totalVehicles}</p>
-                      </div>
+                    <p className="text-xs text-slate-500 mt-3 font-poppins">
+                      {stat.description}
+                    </p>
+                    <div className="mt-4 h-1 w-full bg-gradient-to-r from-slate-100 to-slate-100 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full bg-gradient-to-r ${stat.gradient} transition-all duration-700 ease-out`}
+                        style={{ width: '100%' }}
+                      />
                     </div>
                   </div>
-
-                  <div className="bg-white/20 rounded-xl p-3 border border-white/30 hover:bg-white/25 transition-all duration-300 group">
-                    <div className="flex items-center justify-between">
-                      <div className="p-1.5 bg-white/30 rounded-lg group-hover:scale-110 transition-transform duration-300">
-                        <CheckCircle className="h-4 w-4 text-white" />
-                      </div>
-                      <div className="text-right">
-                        <p className="text-white/90 text-xs font-poppins mb-1">Services</p>
-                        <p className="text-lg font-bold text-white font-poppins">{recentServices}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white/20 rounded-xl p-3 border border-white/30 hover:bg-white/25 transition-all duration-300 group">
-                    <div className="flex items-center justify-between">
-                      <div className="p-1.5 bg-white/30 rounded-lg group-hover:scale-110 transition-transform duration-300">
-                        <Wrench className="h-4 w-4 text-white" />
-                      </div>
-                      <div className="text-right">
-                        <p className="text-white/90 text-xs font-poppins mb-1">Serviced</p>
-                        <p className="text-lg font-bold text-white font-poppins">{vehiclesWithRecentService}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex-shrink-0">
-                <div className="relative">
-                  <div className="bg-white/20 rounded-xl p-3 border border-white/30 shadow-lg">
-                    <img 
-                      src="/images/car.gif" 
-                      alt="Car Animation" 
-                      className="w-full h-auto max-w-[120px] md:max-w-[140px] rounded-lg"
-                      style={{ imageRendering: 'auto' }}
-                    />
-                  </div>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -488,7 +967,7 @@ const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[],
     );
 };
 
-// Update QuickActions to remove "Add Service Record" button
+// ===== UPDATED QuickActions Component - Matching Inventory Page Design =====
 const QuickActions = ({ onAddCustomer, onAddVehicle, onExportData }: { 
   onAddCustomer: () => void, 
   onAddVehicle: () => void,
@@ -496,44 +975,44 @@ const QuickActions = ({ onAddCustomer, onAddVehicle, onExportData }: {
 }) => {
   const actions = [
     {
-      label: "New Customer",
-      description: "Add customer",
+      label: "Add Customer",
+      description: "Create new customer",
       icon: UserPlus,
       onClick: onAddCustomer,
-      gradient: "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+      gradient: "linear-gradient(90deg,#7c3aed 0%,#4f46e5 100%)"
     },
     {
       label: "Add Vehicle",
       description: "Register vehicle",
       icon: Car,
       onClick: onAddVehicle,
-      gradient: "bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+      gradient: "linear-gradient(90deg,#0ea5e9 0%,#0284c7 100%)"
     },
     {
       label: "Export Data",
-      description: "Export to Excel",
+      description: "Download to Excel",
       icon: Download,
       onClick: onExportData,
-      gradient: "bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700"
+      gradient: "linear-gradient(90deg,#10b981 0%,#06b6d4 100%)"
     }
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-8">
+    <div className="flex flex-col sm:flex-row gap-4 mb-8">
       {actions.map((action, index) => (
         <button
           key={action.label}
+          type="button"
           onClick={action.onClick}
-          className={`${action.gradient} rounded-xl p-4 text-white text-left border border-white/20 shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 group font-poppins`}
+          className="min-w-[220px] flex-1 sm:flex-auto flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1 font-poppins"
+          style={{ background: action.gradient }}
         >
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="font-semibold text-white text-sm">{action.label}</p>
-              <p className="text-white/90 text-xs mt-0.5">{action.description}</p>
-            </div>
-            <div className="p-2 bg-white/20 rounded-lg group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-              <action.icon className="h-4 w-4 text-white" />
-            </div>
+          <div className="text-left">
+            <div className="text-lg font-semibold">{action.label}</div>
+            <div className="text-sm opacity-90">{action.description}</div>
+          </div>
+          <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
+            <action.icon className="h-5 w-5 text-white" />
           </div>
         </button>
       ))}
@@ -620,15 +1099,39 @@ export default function EnhancedCustomersPage() {
     const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
     const [deletingItem, setDeletingItem] = useState<any>(null);
 
-    // Separate search terms for each tab
-    const [customerSearch, setCustomerSearch] = useState('');
-    const [vehicleSearch, setVehicleSearch] = useState('');
-    const [historySearch, setHistorySearch] = useState('');
+    // ===== NEW: PAGINATION STATES =====
+    const [customerRowsPerPage, setCustomerRowsPerPage] = useState(5);
+    const [customerCurrentPage, setCustomerCurrentPage] = useState(1);
     
-    // Filters
-    const [customerFilter, setCustomerFilter] = useState('all');
-    const [vehicleTypeFilter, setVehicleTypeFilter] = useState('all');
-    const [serviceTypeFilter, setServiceTypeFilter] = useState('all');
+    const [vehicleRowsPerPage, setVehicleRowsPerPage] = useState(5);
+    const [vehicleCurrentPage, setVehicleCurrentPage] = useState(1);
+    
+    const [historyRowsPerPage, setHistoryRowsPerPage] = useState(5);
+    const [historyCurrentPage, setHistoryCurrentPage] = useState(1);
+
+    const rowsPerPageOptions = [5, 10, 25, 50];
+
+    // ===== NEW: FILTER STATES =====
+    const [customerFilters, setCustomerFilters] = useState<CustomerFilterState>({
+      search: '',
+      sortBy: 'name',
+      sortOrder: 'asc'
+    });
+
+    const [vehicleFilters, setVehicleFilters] = useState<VehicleFilterState>({
+      search: '',
+      customer: 'all',
+      vehicleType: 'all',
+      sortBy: 'plate_number',
+      sortOrder: 'asc'
+    });
+
+    const [historyFilters, setHistoryFilters] = useState<HistoryFilterState>({
+      search: '',
+      serviceType: 'all',
+      sortBy: 'service_date',
+      sortOrder: 'desc'
+    });
 
     // Form states
     const [customerName, setCustomerName] = useState('');
@@ -647,9 +1150,13 @@ export default function EnhancedCustomersPage() {
 
     const handleTabChange = (tab: string) => {
         setActiveTab(tab);
-        setCustomerSearch('');
-        setVehicleSearch('');
-        setHistorySearch('');
+        // Reset pagination and filters when changing tabs
+        setCustomerCurrentPage(1);
+        setVehicleCurrentPage(1);
+        setHistoryCurrentPage(1);
+        setCustomerFilters({ search: '', sortBy: 'name', sortOrder: 'asc' });
+        setVehicleFilters({ search: '', customer: 'all', vehicleType: 'all', sortBy: 'plate_number', sortOrder: 'asc' });
+        setHistoryFilters({ search: '', serviceType: 'all', sortBy: 'service_date', sortOrder: 'desc' });
     };
 
     const fetchData = async () => {
@@ -736,65 +1243,220 @@ export default function EnhancedCustomersPage() {
         if (usersRes.data) setUsers(usersRes.data as User[]);
     };
 
+    // ===== ENHANCED FILTERING LOGIC =====
     const filteredCustomers = useMemo(() => {
-      return customers.filter(customer => {
-        if (!customerSearch) return true;
-        const searchLower = customerSearch.toLowerCase();
-        return (
+      let result = [...customers];
+
+      // Apply search filter
+      if (customerFilters.search) {
+        const searchLower = customerFilters.search.toLowerCase();
+        result = result.filter(customer =>
           customer.name.toLowerCase().includes(searchLower) ||
           customer.phone?.toLowerCase().includes(searchLower)
         );
+      }
+
+      // Apply sorting
+      result.sort((a, b) => {
+        let aValue: any, bValue: any;
+
+        switch (customerFilters.sortBy) {
+          case 'name':
+            aValue = a.name.toLowerCase();
+            bValue = b.name.toLowerCase();
+            break;
+          case 'phone':
+            aValue = a.phone || '';
+            bValue = b.phone || '';
+            break;
+          case 'vehicle_count':
+            aValue = a.vehicle_count || 0;
+            bValue = b.vehicle_count || 0;
+            break;
+          default:
+            return 0;
+        }
+
+        if (customerFilters.sortOrder === 'asc') {
+          return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+        } else {
+          return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+        }
       });
-    }, [customers, customerSearch]);
+
+      return result;
+    }, [customers, customerFilters]);
     
     const filteredVehicles = useMemo(() => {
-        const q = vehicleSearch.trim().toLowerCase();
-        if (!q) return vehicles;
-        return vehicles.filter(v =>
-            v.plate_number?.toLowerCase().includes(q) ||
-            v.customer?.name?.toLowerCase().includes(q) ||
-            v.vehicle_type?.name?.toLowerCase().includes(q) ||
-            v.make?.toLowerCase().includes(q) ||
-            v.model?.toLowerCase().includes(q) ||
-            v.color?.toLowerCase().includes(q)
-        );
-    }, [vehicles, vehicleSearch]);
-        
-    // ...existing code...
-    const filteredHistory = useMemo(() => {
-        return tireHistory.filter(history => {
-            const searchLower = historySearch.toLowerCase();
-    
-            const itemNames = Array.isArray(history.items)
-              ? history.items.map((it: any) => it.name?.toLowerCase()).filter(Boolean)
-              : [];
-    
-            const matchesSearch = !historySearch || 
-                history.vehicle?.plate_number?.toLowerCase().includes(searchLower) ||
-                itemNames.some((n: string) => n.includes(searchLower)) ||
-                history.vehicle?.customer?.name?.toLowerCase().includes(searchLower);
-    
-            const matchesService = serviceTypeFilter === 'all' || 
-                                 history.service_type === serviceTypeFilter;
-    
-            return matchesSearch && matchesService;
+        let result = [...vehicles];
+
+        // Apply search filter
+        if (vehicleFilters.search) {
+            const searchLower = vehicleFilters.search.toLowerCase();
+            result = result.filter(v =>
+                v.plate_number?.toLowerCase().includes(searchLower) ||
+                v.customer?.name?.toLowerCase().includes(searchLower) ||
+                v.vehicle_type?.name?.toLowerCase().includes(searchLower) ||
+                v.make?.toLowerCase().includes(searchLower) ||
+                v.model?.toLowerCase().includes(searchLower) ||
+                v.color?.toLowerCase().includes(searchLower)
+            );
+        }
+
+        // Apply customer filter
+        if (vehicleFilters.customer !== 'all') {
+            result = result.filter(v => v.customer_id === vehicleFilters.customer);
+        }
+
+        // Apply vehicle type filter
+        if (vehicleFilters.vehicleType !== 'all') {
+            result = result.filter(v => v.vehicle_type_id === vehicleFilters.vehicleType);
+        }
+
+        // Apply sorting
+        result.sort((a, b) => {
+            let aValue: any, bValue: any;
+
+            switch (vehicleFilters.sortBy) {
+                case 'plate_number':
+                    aValue = a.plate_number?.toLowerCase() || '';
+                    bValue = b.plate_number?.toLowerCase() || '';
+                    break;
+                case 'customer':
+                    aValue = a.customer?.name?.toLowerCase() || '';
+                    bValue = b.customer?.name?.toLowerCase() || '';
+                    break;
+                case 'vehicle_type':
+                    aValue = a.vehicle_type?.name?.toLowerCase() || '';
+                    bValue = b.vehicle_type?.name?.toLowerCase() || '';
+                    break;
+                case 'make':
+                    aValue = a.make?.toLowerCase() || '';
+                    bValue = b.make?.toLowerCase() || '';
+                    break;
+                case 'model':
+                    aValue = a.model?.toLowerCase() || '';
+                    bValue = b.model?.toLowerCase() || '';
+                    break;
+                default:
+                    return 0;
+            }
+
+            if (vehicleFilters.sortOrder === 'asc') {
+                return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+            } else {
+                return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+            }
         });
-    }, [tireHistory, historySearch, serviceTypeFilter]);
-    // ...existing code...
+
+        return result;
+    }, [vehicles, vehicleFilters]);
+        
+    const filteredHistory = useMemo(() => {
+        let result = [...tireHistory];
+
+        // Apply search filter
+        if (historyFilters.search) {
+            const searchLower = historyFilters.search.toLowerCase();
+            result = result.filter(history => {
+                const itemNames = Array.isArray(history.items)
+                    ? history.items.map((it: any) => it.name?.toLowerCase()).filter(Boolean)
+                    : [];
+
+                return (
+                    history.vehicle?.plate_number?.toLowerCase().includes(searchLower) ||
+                    itemNames.some((n: string) => n.includes(searchLower)) ||
+                    history.vehicle?.customer?.name?.toLowerCase().includes(searchLower)
+                );
+            });
+        }
+
+        // Apply service type filter
+        if (historyFilters.serviceType !== 'all') {
+            result = result.filter(history => history.service_type === historyFilters.serviceType);
+        }
+
+        // Apply sorting
+        result.sort((a, b) => {
+            let aValue: any, bValue: any;
+
+            switch (historyFilters.sortBy) {
+                case 'plate_number':
+                    aValue = a.vehicle?.plate_number?.toLowerCase() || '';
+                    bValue = b.vehicle?.plate_number?.toLowerCase() || '';
+                    break;
+                case 'service_date':
+                    aValue = new Date(a.service_date || '');
+                    bValue = new Date(b.service_date || '');
+                    break;
+                case 'service_type':
+                    aValue = a.service_type?.toLowerCase() || '';
+                    bValue = b.service_type?.toLowerCase() || '';
+                    break;
+                default:
+                    return 0;
+            }
+
+            if (historyFilters.sortOrder === 'asc') {
+                return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+            } else {
+                return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
+            }
+        });
+
+        return result;
+    }, [tireHistory, historyFilters]);
+
+    // ===== PAGINATED DATA =====
+    const displayedCustomers = useMemo(() => {
+        const start = (customerCurrentPage - 1) * customerRowsPerPage;
+        return filteredCustomers.slice(start, start + customerRowsPerPage);
+    }, [filteredCustomers, customerCurrentPage, customerRowsPerPage]);
+
+    const displayedVehicles = useMemo(() => {
+        const start = (vehicleCurrentPage - 1) * vehicleRowsPerPage;
+        return filteredVehicles.slice(start, start + vehicleRowsPerPage);
+    }, [filteredVehicles, vehicleCurrentPage, vehicleRowsPerPage]);
+
+    const displayedHistory = useMemo(() => {
+        const start = (historyCurrentPage - 1) * historyRowsPerPage;
+        return filteredHistory.slice(start, start + historyRowsPerPage);
+    }, [filteredHistory, historyCurrentPage, historyRowsPerPage]);
+
+    // Reset page when filters change
+    useEffect(() => {
+        setCustomerCurrentPage(1);
+    }, [customerFilters.search]);
+
+    useEffect(() => {
+        setVehicleCurrentPage(1);
+    }, [vehicleFilters.search, vehicleFilters.customer, vehicleFilters.vehicleType]);
+
+    useEffect(() => {
+        setHistoryCurrentPage(1);
+    }, [historyFilters.search, historyFilters.serviceType]);
 
     const clearCustomerFilters = () => {
-        setCustomerSearch('');
+        setCustomerFilters({ search: '', sortBy: 'name', sortOrder: 'asc' });
     };
 
     const clearVehicleFilters = () => {
-        setVehicleSearch('');
-        setCustomerFilter('all');
-        setVehicleTypeFilter('all');
+        setVehicleFilters({ 
+            search: '', 
+            customer: 'all', 
+            vehicleType: 'all', 
+            sortBy: 'plate_number', 
+            sortOrder: 'asc' 
+        });
     };
 
     const clearHistoryFilters = () => {
-        setHistorySearch('');
-        setServiceTypeFilter('all');
+        setHistoryFilters({ 
+            search: '', 
+            serviceType: 'all', 
+            sortBy: 'service_date', 
+            sortOrder: 'desc' 
+        });
     };
 
     const resetCustomerForm = () => {
@@ -879,8 +1541,55 @@ export default function EnhancedCustomersPage() {
             return;
         }
 
+        const convertToCSV = (data: any[], headers: string[], type: 'customers' | 'vehicles' | 'history') => {
+            const headerRow = headers.join(',') + '\n';
+        
+            const toTitle = (str: string) => str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : '';
+        
+            const rows = data.map((item) => {
+            if (type === 'customers') {
+                return [
+                `"${item.name ?? ''}"`,
+                `"${item.phone ?? ''}"`,
+                `"${item.vehicle_count ?? 0}"`
+                ].join(',');
+            }
+        
+            if (type === 'vehicles') {
+                return [
+                `"${item.plate_number ?? ''}"`,
+                `"${item.customer?.name ?? ''}"`,
+                `"${item.vehicle_type?.name ?? ''}"`,
+                `"${item.make ?? ''}"`,
+                `"${item.model ?? ''}"`,
+                `"${item.color ?? ''}"`
+                ].join(',');
+            }
+        
+            // history (aggregated items array)
+            const itemsList = Array.isArray(item.items) && item.items.length
+                ? item.items.map((it: any) => {
+                    const name = it?.name ?? '';
+                    const qty = it?.quantity && it.quantity > 1 ? ` (×${it.quantity})` : '';
+                    return `${name}${qty}`;
+                }).join('; ')
+                : '';
+        
+            return [
+                `"${item.vehicle?.plate_number ?? ''}"`,
+                `"${itemsList}"`,
+                `"${toTitle(item.service_type ?? '')}"`,
+                `"${item.service_date ? new Date(item.service_date).toLocaleDateString('en-US') : ''}"`,
+                `"${item.notes ?? ''}"`,
+                `"${item.user?.name ?? ''}"`
+            ].join(',');
+            }).join('\n');
+        
+            return headerRow + rows;
+        };
+
         // Convert data to CSV format
-        const csvContent = convertToCSV(dataToExport, headers, activeTab);
+        const csvContent = convertToCSV(dataToExport, headers, activeTab as any);
         
         // Create and download the file
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -903,55 +1612,6 @@ export default function EnhancedCustomersPage() {
             actionType: 'export'
         });
     };
-
-    // ...existing code...
-    const convertToCSV = (data: any[], headers: string[], type: 'customers' | 'vehicles' | 'history') => {
-      const headerRow = headers.join(',') + '\n';
-    
-      const toTitle = (str: string) => str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : '';
-    
-      const rows = data.map((item) => {
-        if (type === 'customers') {
-          return [
-            `"${item.name ?? ''}"`,
-            `"${item.phone ?? ''}"`,
-            `"${item.vehicle_count ?? 0}"`
-          ].join(',');
-        }
-    
-        if (type === 'vehicles') {
-          return [
-            `"${item.plate_number ?? ''}"`,
-            `"${item.customer?.name ?? ''}"`,
-            `"${item.vehicle_type?.name ?? ''}"`,
-            `"${item.make ?? ''}"`,
-            `"${item.model ?? ''}"`,
-            `"${item.color ?? ''}"`
-          ].join(',');
-        }
-    
-        // history (aggregated items array)
-        const itemsList = Array.isArray(item.items) && item.items.length
-          ? item.items.map((it: any) => {
-              const name = it?.name ?? '';
-              const qty = it?.quantity && it.quantity > 1 ? ` (×${it.quantity})` : '';
-              return `${name}${qty}`;
-            }).join('; ')
-          : '';
-    
-        return [
-          `"${item.vehicle?.plate_number ?? ''}"`,
-          `"${itemsList}"`,
-          `"${toTitle(item.service_type ?? '')}"`,
-          `"${item.service_date ? new Date(item.service_date).toLocaleDateString('en-US') : ''}"`,
-          `"${item.notes ?? ''}"`,
-          `"${item.user?.name ?? ''}"`
-        ].join(',');
-      }).join('\n');
-    
-      return headerRow + rows;
-    };
-    // ...existing code...
 
     const handleSubmitCustomer = async () => {
         if (!supabase || !authUser) return;
@@ -1092,83 +1752,8 @@ export default function EnhancedCustomersPage() {
         }
     };
 
-    // Custom cell renderers
-    const renderCustomerCell = (item: any, columnKey: string, value: any) => {
-        if (columnKey === 'vehicle_count') {
-            return (
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                    {item.vehicle_count || 0} vehicles
-                </Badge>
-            );
-        }
-        if (columnKey === 'phone' && !value) {
-            return <span className="text-slate-400">-</span>;
-        }
-        return String(value || '');
-    };
-
-    const renderVehicleCell = (item: any, columnKey: string, value: any) => {
-        if (columnKey === 'customer_name') {
-            return <span className="font-medium text-slate-800">{item.customer?.name || 'Unknown Customer'}</span>;
-        }
-        if (columnKey === 'vehicle_type') {
-            if (!item.vehicle_type) return <Badge variant="outline">N/A</Badge>;
-            const vehicleName = item.vehicle_type.name;
-            const VehicleIcon = getVehicleIcon(vehicleName);
-            return (
-                <Badge variant="outline" className="flex items-center gap-1 bg-slate-100 text-slate-700 border-slate-300 capitalize font-poppins">
-                    <VehicleIcon className="h-3 w-3" />
-                    {vehicleName}
-                </Badge>
-            );
-        }
-        if (!value) {
-            return <span className="text-slate-400">-</span>;
-        }
-        return <span className="text-slate-700">{String(value)}</span>;
-    };
-
-    // ✅ Render helper (if you use a custom renderer)
-    const renderHistoryCell = (item: any, columnKey: string, value: any) => {
-    if (columnKey === 'plate_number') return item.vehicle?.plate_number || '—';
-    if (columnKey === 'items') {
-        if (Array.isArray(item.items) && item.items.length) {
-        return item.items.map((it: any) => it.name).join(', ');
-        }
-        return item.inventory_item?.name || '—';
-    }
-    if (columnKey === 'service_type') {
-        return (
-        <span className="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
-            {item.service_type || '—'}
-        </span>
-        );
-    }
-    if (columnKey === 'service_date') return value ? new Date(value).toLocaleDateString('en-US') : '—';
-    if (columnKey === 'notes') return value || <span className="text-slate-400">-</span>;
-    if (columnKey === 'created_by_name') return item.user?.name || '—';
-    if (columnKey === 'actions') {
-        return (
-        <Button
-            variant="outline"
-            size="sm"
-            className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 font-poppins"
-            onClick={() => handleDeleteItem(item, 'history')}
-        >
-            Delete
-        </Button>
-        );
-    }
-    return String(value ?? '');
-    };
-
-    // Helper function to convert to title case
-    const toTitle = (str: string) => {
-        return str?.charAt(0).toUpperCase() + str?.slice(1).toLowerCase() || '';
-    };
-
     return (
-        <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white text-slate-800 font-poppins relative">
             
             {/* Background Sections */}
             <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
@@ -1190,7 +1775,7 @@ export default function EnhancedCustomersPage() {
 
             <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
                 
-                {/* Header Section */}
+                {/* Header Section - UNCHANGED as requested */}
                 <div className={`mb-8 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
                     <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
@@ -1211,6 +1796,7 @@ export default function EnhancedCustomersPage() {
                                             Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                                         </div>
                                     )}
+                                    {/* ✅ KEPT: Live data indicator stays ONLY in header */}
                                     <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
                                         <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                                         Live data
@@ -1230,312 +1816,339 @@ export default function EnhancedCustomersPage() {
                     </div>
                 </div>
 
-                <div className="mt-12"></div>
-                
-                {/* Stats Overview */}
+                {/* Stats Overview - REMOVED live data badge from here */}
                 <StatsOverview customers={customers} vehicles={vehicles} tireHistory={tireHistory} />
 
-                {/* Quick Actions */}
+                {/* ✅ UPDATED: QuickActions with Inventory-style gradient cards */}
                 <QuickActions 
                     onAddCustomer={handleOpenCustomerDialog} 
                     onAddVehicle={handleOpenVehicleDialog}
                     onExportData={handleExportData}
                 />
 
-                <EnhancedTabs value={activeTab} onValueChange={handleTabChange}>
-                    {/* Customers Tab */}
-                    <TabsContent value="customers" className="space-y-6 animate-in fade-in duration-500">
-                        <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
-                            <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-purple-50/50 border-b border-slate-200/50">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div>
-                                        <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Customer Management</CardTitle>
-                                        <CardDescription className="text-slate-600 font-poppins">
-                                            {filteredCustomers.length} of {customers.length} customer{filteredCustomers.length !== 1 ? 's' : ''} shown
-                                        </CardDescription>
-                                    </div>
-                                    <Button 
-                                        onClick={handleOpenCustomerDialog}
-                                        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-poppins"
-                                    >
-                                        <UserPlus className="h-4 w-4 mr-2" />
-                                        Add Customer
-                                    </Button>
-                                </div>
+                {/* Enhanced Tabs with Improved Spacing */}
+                <div className="mb-12">
+                  <EnhancedTabs value={activeTab} onValueChange={handleTabChange}>
+                      {/* ===== CUSTOMERS TAB with Inventory-style pagination ===== */}
+                      <TabsContent value="customers" className="space-y-6 animate-in fade-in duration-500">
+                          {isCustomerLoading ? (
+                              <div className="flex flex-col justify-center items-center h-64 space-y-4">
+                                  <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                                  <p className="text-slate-500 font-poppins">Loading customers...</p>
+                              </div>
+                          ) : (
+                              <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
+                                  {/* Gradient Header with Rows Per Page */}
+                                  <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 text-white p-4 flex items-center justify-between gap-4">
+                                      <div className="flex items-center gap-4">
+                                          <div className="p-2 bg-white/20 rounded-lg">
+                                              <Users className="h-6 w-6 text-white" />
+                                          </div>
+                                          <div>
+                                              <div className="text-xl font-bold font-poppins">Customer Management</div>
+                                              <div className="text-sm opacity-90">Manage customer information and their vehicles</div>
+                                              {/* Total / Filtered count */}
+                                              <div className="text-sm text-white/90 mt-1">
+                                                  {customerFilters.search ? (
+                                                      <>Filtered: <strong>{filteredCustomers.length}</strong> of <strong>{customers.length}</strong> customers</>
+                                                  ) : (
+                                                      <>Total: <strong>{customers.length}</strong> customers</>
+                                                  )}
+                                              </div>
+                                          </div>
+                                      </div>
 
-                                {/* Filter Bar */}
-                                <div className="flex flex-col sm:flex-row gap-4 mt-6 p-4 bg-white/60 rounded-xl border border-slate-200/50">
-                                    <div className="flex-1">
-                                        <Label htmlFor="search-customers" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Search Customers</Label>
-                                        <SearchInput 
-                                            id="search-customers"
-                                            value={customerSearch}
-                                            onChange={setCustomerSearch}
-                                            placeholder="Search by name or phone..."
-                                        />
-                                    </div>
-                                    {customerSearch && (
-                                        <div className="flex items-end">
-                                            <Button onClick={clearCustomerFilters} variant="outline" className="h-10 border-slate-300 text-slate-600 hover:text-slate-700 font-poppins">
-                                                <X className="h-4 w-4 mr-2" />
-                                                Clear
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                            </CardHeader>
-                            
-                            <CardContent className="p-6">
-                                {customerError && (
-                                    <Alert variant="destructive" className="mb-6 font-poppins">
-                                        <AlertTriangle className="h-4 w-4" />
-                                        <AlertTitle>Error</AlertTitle>
-                                        <AlertDescription>{customerError}</AlertDescription>
-                                    </Alert>
-                                )}
+                                      {/* Rows per page selector */}
+                                      <div className="flex items-center gap-3">
+                                          <div className="text-sm text-white/90 mr-2">Rows per page:</div>
+                                          <div className="w-28">
+                                              <Select value={String(customerRowsPerPage)} onValueChange={(v) => setCustomerRowsPerPage(Number(v))}>
+                                                  <SelectTrigger className="w-full border-transparent bg-white text-black">
+                                                      <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                      {rowsPerPageOptions.map(option => (
+                                                          <SelectItem key={option} value={String(option)}>{option}</SelectItem>
+                                                      ))}
+                                                  </SelectContent>
+                                              </Select>
+                                          </div>
+                                      </div>
+                                  </div>
 
-                                {isCustomerLoading ? (
-                                    <div className="flex justify-center items-center h-64">
-                                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                                    </div>
-                                ) : filteredCustomers.length === 0 ? (
-                                    <EnhancedEmptyState 
-                                        type="customers"
-                                        onAddNew={handleOpenCustomerDialog}
-                                        onClearFilters={clearCustomerFilters}
-                                    />
-                                ) : (
-                                    <DataTableWrapper
-                                        title=""
-                                        columns={customerColumns}
-                                        data={filteredCustomers.map(customer => ({ ...customer, id: customer.customer_id }))}
-                                        onEdit={handleEditCustomer}
-                                        onDelete={(item) => handleDeleteItem(item, 'customer')}
-                                        renderCell={renderCustomerCell}
-                                        onAddNew={handleOpenCustomerDialog}
-                                        searchTerm={customerSearch}
-                                        onSearchChange={setCustomerSearch}
-                                        enableStripes={true}
-                                        rowClassName="hover:bg-purple-50/50 transition-colors duration-200"
-                                    />
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
+                                  {/* Advanced Filters */}
+                                  <CustomerAdvancedFilters
+                                      filters={customerFilters}
+                                      onFiltersChange={setCustomerFilters}
+                                      onClearFilters={clearCustomerFilters}
+                                  />
 
-                    {/* Vehicles Tab */}
-                    <TabsContent value="vehicles" className="space-y-6 animate-in fade-in duration-500">
-                        <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
-                            <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-blue-50/50 border-b border-slate-200/50">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div>
-                                        <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Vehicle Management</CardTitle>
-                                        <CardDescription className="text-slate-600 font-poppins">
-                                            {filteredVehicles.length} of {vehicles.length} vehicle{filteredVehicles.length !== 1 ? 's' : ''} shown
-                                        </CardDescription>
-                                    </div>
-                                    <Button 
-                                        onClick={handleOpenVehicleDialog}
-                                        className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-poppins"
-                                    >
-                                        <Car className="h-4 w-4 mr-2" />
-                                        Add Vehicle
-                                    </Button>
-                                </div>
+                                  {/* Data Table */}
+                                  {filteredCustomers.length === 0 ? (
+                                      <EnhancedEmptyState 
+                                          type="customers"
+                                          onAddNew={handleOpenCustomerDialog}
+                                          onClearFilters={clearCustomerFilters}
+                                      />
+                                  ) : (
+                                      <>
+                                          <CustomDataTable
+                                              className="w-full"
+                                              columns={customerColumns}
+                                              data={displayedCustomers.map(customer => ({ 
+                                                  ...customer, 
+                                                  id: customer.customer_id 
+                                              }))}
+                                              onEdit={handleEditCustomer}
+                                              onDelete={(item) => handleDeleteItem(item, 'customer')}
+                                          />
 
-                                {/* Filter Bar */}
-                                <div className="flex flex-col sm:flex-row gap-4 mt-6 p-4 bg-white/60 rounded-xl border border-slate-200/50">
-                                    <div className="flex-1">
-                                        <Label htmlFor="search-vehicles" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Search Vehicles</Label>
-                                        <SearchInput 
-                                            id="search-vehicles"
-                                            value={vehicleSearch}
-                                            onChange={setVehicleSearch}
-                                            placeholder="Search by plate, make, model, or customer..."
-                                        />
-                                    </div>
-                                    
-                                    <div className="sm:w-48">
-                                        <Label htmlFor="customer-filter" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Customer</Label>
-                                        <Select value={customerFilter} onValueChange={setCustomerFilter}>
-                                            <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
-                                                <SelectValue placeholder="All customers" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all" className="font-poppins">All Customers</SelectItem>
-                                                {customers.map(customer => (
-                                                    <SelectItem key={customer.customer_id} value={customer.customer_id} className="font-poppins">
-                                                        {customer.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                          {/* Pagination Footer */}
+                                          <div className="px-6 py-3 border-t border-slate-100 bg-white flex items-center justify-between">
+                                              <div className="text-sm text-slate-600">
+                                                  Showing {filteredCustomers.length === 0 ? 0 : ((customerCurrentPage - 1) * customerRowsPerPage + 1)} to {Math.min(customerCurrentPage * customerRowsPerPage, filteredCustomers.length)} of {filteredCustomers.length} entries
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                  <Button
+                                                      variant="outline"
+                                                      onClick={() => setCustomerCurrentPage(p => Math.max(1, p - 1))}
+                                                      disabled={customerCurrentPage === 1}
+                                                      className="min-w-[36px] h-8 px-2 py-1"
+                                                  >
+                                                      «
+                                                  </Button>
+                                                  <div className="text-sm text-slate-700 px-3">Page {customerCurrentPage} of {Math.max(1, Math.ceil(filteredCustomers.length / customerRowsPerPage))}</div>
+                                                  <Button
+                                                      variant="outline"
+                                                      onClick={() => setCustomerCurrentPage(p => Math.min(Math.ceil(filteredCustomers.length / customerRowsPerPage) || 1, p + 1))}
+                                                      disabled={customerCurrentPage >= Math.ceil(filteredCustomers.length / customerRowsPerPage)}
+                                                      className="min-w-[36px] h-8 px-2 py-1"
+                                                  >
+                                                      »
+                                                  </Button>
+                                              </div>
+                                          </div>
+                                      </>
+                                  )}
+                              </div>
+                          )}
+                      </TabsContent>
 
-                                    <div className="sm:w-48">
-                                        <Label htmlFor="vehicle-type-filter" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Vehicle Type</Label>
-                                        <Select value={vehicleTypeFilter} onValueChange={setVehicleTypeFilter}>
-                                            <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
-                                                <SelectValue placeholder="All types" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all" className="font-poppins">All Types</SelectItem>
-                                                {vehicleTypes.map(type => (
-                                                    <SelectItem key={type.vehicle_type_id} value={type.vehicle_type_id} className="font-poppins">
-                                                        {type.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                      {/* ===== VEHICLES TAB with Inventory-style pagination ===== */}
+                      <TabsContent value="vehicles" className="space-y-6 animate-in fade-in duration-500">
+                          {isVehicleLoading ? (
+                              <div className="flex flex-col justify-center items-center h-64 space-y-4">
+                                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                                  <p className="text-slate-500 font-poppins">Loading vehicles...</p>
+                              </div>
+                          ) : (
+                              <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
+                                  {/* Gradient Header with Rows Per Page */}
+                                  <div className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white p-4 flex items-center justify-between gap-4">
+                                      <div className="flex items-center gap-4">
+                                          <div className="p-2 bg-white/20 rounded-lg">
+                                              <Car className="h-6 w-6 text-white" />
+                                          </div>
+                                          <div>
+                                              <div className="text-xl font-bold font-poppins">Vehicle Management</div>
+                                              <div className="text-sm opacity-90">Manage vehicle information and service history</div>
+                                              {/* Total / Filtered count */}
+                                              <div className="text-sm text-white/90 mt-1">
+                                                  {vehicleFilters.search || vehicleFilters.customer !== 'all' || vehicleFilters.vehicleType !== 'all' ? (
+                                                      <>Filtered: <strong>{filteredVehicles.length}</strong> of <strong>{vehicles.length}</strong> vehicles</>
+                                                  ) : (
+                                                      <>Total: <strong>{vehicles.length}</strong> vehicles</>
+                                                  )}
+                                              </div>
+                                          </div>
+                                      </div>
 
-                                    {(vehicleSearch || customerFilter !== 'all' || vehicleTypeFilter !== 'all') && (
-                                        <div className="flex items-end">
-                                            <Button onClick={clearVehicleFilters} variant="outline" className="h-10 border-slate-300 text-slate-600 hover:text-slate-700 font-poppins">
-                                                <X className="h-4 w-4 mr-2" />
-                                                Clear
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                            </CardHeader>
-                            
-                            <CardContent className="p-6">
-                                {vehicleError && (
-                                    <Alert variant="destructive" className="mb-6 font-poppins">
-                                        <AlertTriangle className="h-4 w-4" />
-                                        <AlertTitle>Error</AlertTitle>
-                                        <AlertDescription>{vehicleError}</AlertDescription>
-                                    </Alert>
-                                )}
+                                      {/* Rows per page selector */}
+                                      <div className="flex items-center gap-3">
+                                          <div className="text-sm text-white/90 mr-2">Rows per page:</div>
+                                          <div className="w-28">
+                                              <Select value={String(vehicleRowsPerPage)} onValueChange={(v) => setVehicleRowsPerPage(Number(v))}>
+                                                  <SelectTrigger className="w-full border-transparent bg-white text-black">
+                                                      <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                      {rowsPerPageOptions.map(option => (
+                                                          <SelectItem key={option} value={String(option)}>{option}</SelectItem>
+                                                      ))}
+                                                  </SelectContent>
+                                              </Select>
+                                          </div>
+                                      </div>
+                                  </div>
 
-                                {isVehicleLoading ? (
-                                    <div className="flex justify-center items-center h-64">
-                                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                                    </div>
-                                ) : filteredVehicles.length === 0 ? (
-                                    <EnhancedEmptyState 
-                                        type="vehicles"
-                                        onAddNew={handleOpenVehicleDialog}
-                                        onClearFilters={clearVehicleFilters}
-                                    />
-                                ) : (
-                                    <DataTableWrapper
-                                        title=""
-                                        columns={vehicleColumns}
-                                        data={filteredVehicles.map(vehicle => ({ ...vehicle, id: vehicle.vehicle_id }))}
-                                        onAddNew={handleOpenVehicleDialog}
-                                        onEdit={handleEditVehicle}
-                                        onDelete={(item) => handleDeleteItem(item, 'vehicle')}
-                                        renderCell={renderVehicleCell}
-                                        searchTerm={vehicleSearch}
-                                        onSearchChange={setVehicleSearch}
-                                        enableStripes={true}
-                                        rowClassName="hover:bg-blue-50/50 transition-colors duration-200"
-                                    />
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
+                                  {/* Advanced Filters */}
+                                  <VehicleAdvancedFilters
+                                      filters={vehicleFilters}
+                                      onFiltersChange={setVehicleFilters}
+                                      onClearFilters={clearVehicleFilters}
+                                      customers={customers}
+                                      vehicleTypes={vehicleTypes}
+                                  />
 
-                    {/* History Tab */}
-                    <TabsContent value="history" className="space-y-6 animate-in fade-in duration-500">
-                    <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
-                        <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-green-50/50 border-b border-slate-200/50">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div>
-                            <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Tire Service History</CardTitle>
-                            <CardDescription className="text-slate-600 font-poppins">
-                                {filteredHistory.length} of {tireHistory.length} completed service record{filteredHistory.length !== 1 ? 's' : ''} shown
-                                <span className="block mt-1 text-xs text-slate-500">
-                                📝 Records are automatically created when service jobs are marked as complete
-                                </span>
-                            </CardDescription>
-                            </div>
-                            {/* ❌ Removed "Add Record" button */}
-                        </div>
+                                  {/* Data Table */}
+                                  {filteredVehicles.length === 0 ? (
+                                      <EnhancedEmptyState 
+                                          type="vehicles"
+                                          onAddNew={handleOpenVehicleDialog}
+                                          onClearFilters={clearVehicleFilters}
+                                      />
+                                  ) : (
+                                      <>
+                                          <CustomDataTable
+                                              className="w-full"
+                                              columns={vehicleColumns}
+                                              data={displayedVehicles.map(vehicle => ({ 
+                                                  ...vehicle, 
+                                                  id: vehicle.vehicle_id 
+                                              }))}
+                                              onEdit={handleEditVehicle}
+                                              onDelete={(item) => handleDeleteItem(item, 'vehicle')}
+                                          />
 
-                                {/* Filter Bar */}
-                                <div className="flex flex-col sm:flex-row gap-4 mt-6 p-4 bg-white/60 rounded-xl border border-slate-200/50">
-                                    <div className="flex-1">
-                                        <Label htmlFor="search-history" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Search History</Label>
-                                        <SearchInput 
-                                            id="search-history"
-                                            value={historySearch}
-                                            onChange={setHistorySearch}
-                                            placeholder="Search by plate number, item, or customer..."
-                                        />
-                                    </div>
-                                    
-                                    <div className="sm:w-48">
-                                        <Label htmlFor="service-type-filter" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Service Type</Label>
-                                        <Select value={serviceTypeFilter} onValueChange={setServiceTypeFilter}>
-                                            <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
-                                                <SelectValue placeholder="All services" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all" className="font-poppins">All Services</SelectItem>
-                                                <SelectItem value="repair" className="font-poppins">Repair</SelectItem>
-                                                <SelectItem value="replacement" className="font-poppins">Replacement</SelectItem>
-                                                <SelectItem value="rotation" className="font-poppins">Rotation</SelectItem>
-                                                <SelectItem value="balancing" className="font-poppins">Balancing</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                          {/* Pagination Footer */}
+                                          <div className="px-6 py-3 border-t border-slate-100 bg-white flex items-center justify-between">
+                                              <div className="text-sm text-slate-600">
+                                                  Showing {filteredVehicles.length === 0 ? 0 : ((vehicleCurrentPage - 1) * vehicleRowsPerPage + 1)} to {Math.min(vehicleCurrentPage * vehicleRowsPerPage, filteredVehicles.length)} of {filteredVehicles.length} entries
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                  <Button
+                                                      variant="outline"
+                                                      onClick={() => setVehicleCurrentPage(p => Math.max(1, p - 1))}
+                                                      disabled={vehicleCurrentPage === 1}
+                                                      className="min-w-[36px] h-8 px-2 py-1"
+                                                  >
+                                                      «
+                                                  </Button>
+                                                  <div className="text-sm text-slate-700 px-3">Page {vehicleCurrentPage} of {Math.max(1, Math.ceil(filteredVehicles.length / vehicleRowsPerPage))}</div>
+                                                  <Button
+                                                      variant="outline"
+                                                      onClick={() => setVehicleCurrentPage(p => Math.min(Math.ceil(filteredVehicles.length / vehicleRowsPerPage) || 1, p + 1))}
+                                                      disabled={vehicleCurrentPage >= Math.ceil(filteredVehicles.length / vehicleRowsPerPage)}
+                                                      className="min-w-[36px] h-8 px-2 py-1"
+                                                  >
+                                                      »
+                                                  </Button>
+                                              </div>
+                                          </div>
+                                      </>
+                                  )}
+                              </div>
+                          )}
+                      </TabsContent>
 
-                                    {(historySearch || serviceTypeFilter !== 'all') && (
-                                        <div className="flex items-end">
-                                            <Button onClick={clearHistoryFilters} variant="outline" className="h-10 border-slate-300 text-slate-600 hover:text-slate-700 font-poppins">
-                                                <X className="h-4 w-4 mr-2" />
-                                                Clear
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                            </CardHeader>
-                            
-                            <CardContent className="p-6">
-                                {historyError && (
-                                    <Alert variant="destructive" className="mb-6 font-poppins">
-                                        <AlertTriangle className="h-4 w-4" />
-                                        <AlertTitle>Error</AlertTitle>
-                                        <AlertDescription>{historyError}</AlertDescription>
-                                    </Alert>
-                                )}
+                      {/* ===== HISTORY TAB with Inventory-style pagination ===== */}
+                      <TabsContent value="history" className="space-y-6 animate-in fade-in duration-500">
+                          {isHistoryLoading ? (
+                              <div className="flex flex-col justify-center items-center h-64 space-y-4">
+                                  <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+                                  <p className="text-slate-500 font-poppins">Loading service history...</p>
+                              </div>
+                          ) : (
+                              <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
+                                  {/* Gradient Header with Rows Per Page */}
+                                  <div className="w-full bg-gradient-to-r from-green-600 via-cyan-600 to-blue-600 text-white p-4 flex items-center justify-between gap-4">
+                                      <div className="flex items-center gap-4">
+                                          <div className="p-2 bg-white/20 rounded-lg">
+                                              <History className="h-6 w-6 text-white" />
+                                          </div>
+                                          <div>
+                                              <div className="text-xl font-bold font-poppins">Tire Service History</div>
+                                              <div className="text-sm opacity-90">Track tire services and maintenance records</div>
+                                              {/* Total / Filtered count */}
+                                              <div className="text-sm text-white/90 mt-1">
+                                                  {historyFilters.search || historyFilters.serviceType !== 'all' ? (
+                                                      <>Filtered: <strong>{filteredHistory.length}</strong> of <strong>{tireHistory.length}</strong> service records</>
+                                                  ) : (
+                                                      <>Total: <strong>{tireHistory.length}</strong> service records</>
+                                                  )}
+                                              </div>
+                                          </div>
+                                      </div>
 
-                                {isHistoryLoading ? (
-                                    <div className="flex justify-center items-center h-64">
-                                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                                    </div>
-                                ) : filteredHistory.length === 0 ? (
-                                    <EnhancedEmptyState 
-                                        type="history"
-                                        onAddNew={() => {}}
-                                        onClearFilters={clearHistoryFilters}
-                                    />
-                                ) : (
-                                    <DataTableWrapper
-                                      title="Tire History"
-                                      columns={historyColumns}
-                                      data={filteredHistory.map((h, idx) => ({
-                                        ...h,
-                                        id: `${h.history_id}-${idx}`, // ✅ FIX: Use composite key with index to ensure uniqueness
-                                        plate_number: h.vehicle?.plate_number ?? '',
-                                        items: h.items ?? undefined,
-                                        created_by_name: h.user?.name ?? '',
-                                      }))}
-                                      onEdit={undefined}
-                                      onDelete={(item) => handleDeleteItem(item, 'history')}
-                                      renderCell={renderHistoryCell}
-                                      searchTerm={historySearch}
-                                      onSearchChange={setHistorySearch}
-                                      enableStripes={true}
-                                    />
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                </EnhancedTabs>
+                                      {/* Rows per page selector */}
+                                      <div className="flex items-center gap-3">
+                                          <div className="text-sm text-white/90 mr-2">Rows per page:</div>
+                                          <div className="w-28">
+                                              <Select value={String(historyRowsPerPage)} onValueChange={(v) => setHistoryRowsPerPage(Number(v))}>
+                                                  <SelectTrigger className="w-full border-transparent bg-white text-black">
+                                                      <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                      {rowsPerPageOptions.map(option => (
+                                                          <SelectItem key={option} value={String(option)}>{option}</SelectItem>
+                                                      ))}
+                                                  </SelectContent>
+                                              </Select>
+                                          </div>
+                                      </div>
+                                  </div>
+
+                                  {/* Advanced Filters */}
+                                  <HistoryAdvancedFilters
+                                      filters={historyFilters}
+                                      onFiltersChange={setHistoryFilters}
+                                      onClearFilters={clearHistoryFilters}
+                                  />
+
+                                  {/* Data Table */}
+                                  {filteredHistory.length === 0 ? (
+                                      <EnhancedEmptyState 
+                                          type="history"
+                                          onAddNew={() => {}}
+                                          onClearFilters={clearHistoryFilters}
+                                      />
+                                  ) : (
+                                      <>
+                                          <CustomDataTable
+                                              className="w-full"
+                                              columns={historyColumns}
+                                              data={displayedHistory.map((h, idx) => ({
+                                                  ...h,
+                                                  id: `${h.history_id}-${idx}`, // ✅ FIX: Use composite key with index to ensure uniqueness
+                                                  plate_number: h.vehicle?.plate_number ?? '',
+                                                  items: h.items ?? undefined,
+                                                  created_by_name: h.user?.name ?? '',
+                                              }))}
+                                              onDelete={(item) => handleDeleteItem(item, 'history')}
+                                          />
+
+                                          {/* Pagination Footer */}
+                                          <div className="px-6 py-3 border-t border-slate-100 bg-white flex items-center justify-between">
+                                              <div className="text-sm text-slate-600">
+                                                  Showing {filteredHistory.length === 0 ? 0 : ((historyCurrentPage - 1) * historyRowsPerPage + 1)} to {Math.min(historyCurrentPage * historyRowsPerPage, filteredHistory.length)} of {filteredHistory.length} entries
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                  <Button
+                                                      variant="outline"
+                                                      onClick={() => setHistoryCurrentPage(p => Math.max(1, p - 1))}
+                                                      disabled={historyCurrentPage === 1}
+                                                      className="min-w-[36px] h-8 px-2 py-1"
+                                                  >
+                                                      «
+                                                  </Button>
+                                                  <div className="text-sm text-slate-700 px-3">Page {historyCurrentPage} of {Math.max(1, Math.ceil(filteredHistory.length / historyRowsPerPage))}</div>
+                                                  <Button
+                                                      variant="outline"
+                                                      onClick={() => setHistoryCurrentPage(p => Math.min(Math.ceil(filteredHistory.length / historyRowsPerPage) || 1, p + 1))}
+                                                      disabled={historyCurrentPage >= Math.ceil(filteredHistory.length / historyRowsPerPage)}
+                                                      className="min-w-[36px] h-8 px-2 py-1"
+                                                  >
+                                                      »
+                                                  </Button>
+                                              </div>
+                                          </div>
+                                      </>
+                                  )}
+                              </div>
+                          )}
+                      </TabsContent>
+                  </EnhancedTabs>
+                </div>
 
                 {/* Success Animation for All Actions */}
                 <SuccessAnimation
@@ -1546,14 +2159,14 @@ export default function EnhancedCustomersPage() {
                     onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))}
                 />
 
-                {/* Enhanced Customer Dialog */}
+                {/* Enhanced Customer Dialog - STYLING ENHANCEMENT */}
                 <Dialog open={isCustomerDialogOpen} onOpenChange={(isOpen) => {
                     if (!isOpen) {
                         setIsCustomerDialogOpen(false);
                         resetCustomerForm();
                     }
                 }}>
-                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins animate-in zoom-in duration-300">
+                    <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300">
                         <DialogHeader>
                             <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
                                 {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
@@ -1570,7 +2183,7 @@ export default function EnhancedCustomersPage() {
                                     value={customerName} 
                                     onChange={(e) => setCustomerName(e.target.value)} 
                                     placeholder="John Doe"
-                                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
+                                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
@@ -1581,7 +2194,7 @@ export default function EnhancedCustomersPage() {
                                         value={customerPhone} 
                                         onChange={(e) => setCustomerPhone(e.target.value)} 
                                         placeholder="+1-555-0101"
-                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
+                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                                     />
                                 </div>
                             </div>
@@ -1601,14 +2214,14 @@ export default function EnhancedCustomersPage() {
                     </DialogContent>
                 </Dialog>
 
-                {/* Enhanced Vehicle Dialog */}
+                {/* Enhanced Vehicle Dialog - STYLING ENHANCEMENT */}
                 <Dialog open={isVehicleDialogOpen} onOpenChange={(isOpen) => {
                     if (!isOpen) {
                         setIsVehicleDialogOpen(false);
                         resetVehicleForm();
                     }
                 }}>
-                    <DialogContent className="sm:max-w-lg bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins animate-in zoom-in duration-300">
+                    <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300">
                         <DialogHeader>
                             <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
                                 {editingVehicle ? 'Edit Vehicle' : 'Add New Vehicle'}
@@ -1621,7 +2234,7 @@ export default function EnhancedCustomersPage() {
                             <div className="space-y-2">
                                 <Label htmlFor="customer" className="text-slate-700 font-medium font-poppins">Customer *</Label>
                                 <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
+                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins">
                                         <SelectValue placeholder="Select customer" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -1640,13 +2253,13 @@ export default function EnhancedCustomersPage() {
                                     value={plateNumber} 
                                     onChange={(e) => setPlateNumber(e.target.value)} 
                                     placeholder="ABC-1234"
-                                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
+                                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                                 />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="vehicle-type" className="text-slate-700 font-medium font-poppins">Vehicle Type</Label>
                                 <Select value={selectedVehicleType} onValueChange={setSelectedVehicleType}>
-                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
+                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins">
                                         <SelectValue placeholder="Select vehicle type" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -1666,7 +2279,7 @@ export default function EnhancedCustomersPage() {
                                         value={make} 
                                         onChange={(e) => setMake(e.target.value)} 
                                         placeholder="Toyota"
-                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
+                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -1676,7 +2289,7 @@ export default function EnhancedCustomersPage() {
                                         value={model} 
                                         onChange={(e) => setModel(e.target.value)} 
                                         placeholder="Camry"
-                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
+                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                                     />
                                 </div>
                             </div>
@@ -1688,7 +2301,7 @@ export default function EnhancedCustomersPage() {
                                         value={color} 
                                         onChange={(e) => setColor(e.target.value)} 
                                         placeholder="White"
-                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins"
+                                        className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                                     />
                                 </div>
                             </div>
@@ -1708,9 +2321,9 @@ export default function EnhancedCustomersPage() {
                     </DialogContent>
                 </Dialog>
 
-                {/* Enhanced Delete Confirmation Dialog */}
+                {/* Enhanced Delete Confirmation Dialog - STYLING ENHANCEMENT */}
                 <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                    <AlertDialogContent className="bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins animate-in zoom-in duration-300">
+                    <AlertDialogContent className="bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300">
                         <AlertDialogHeader>
                             <AlertDialogTitle className="text-slate-900 font-poppins">Confirm Deletion</AlertDialogTitle>
                             <AlertDialogDescription className="text-slate-600 font-poppins">
@@ -1724,7 +2337,7 @@ export default function EnhancedCustomersPage() {
                             </AlertDialogCancel>
                             <AlertDialogAction 
                                 onClick={handleDelete} 
-                                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-red-600 active:scale-95 font-poppins"
+                                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-red-600 active:scale-95 font-poppins shadow-md"
                             >
                                 Delete
                             </AlertDialogAction>

@@ -157,6 +157,53 @@ const microAnimations = {
   iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
 };
 
+// ===== NOTES DIALOG COMPONENT =====
+const NotesDialog = ({ 
+  isOpen, 
+  onClose, 
+  notes 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  notes: string;
+}) => {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-2xl bg-white border-0 shadow-2xl mt-10 font-poppins">
+        <DialogHeader className="pb-4">
+          <DialogTitle className="text-2xl font-bold text-slate-900 font-poppins flex items-center gap-2">
+            <FileText className="h-6 w-6" />
+            Order Notes
+          </DialogTitle>
+          <DialogDescription className="text-slate-600 font-poppins">
+            Full notes for this purchase order
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+            <Label className="text-slate-700 font-medium font-poppins mb-2 block">
+              Notes Content
+            </Label>
+            <div className="text-slate-800 whitespace-pre-wrap font-poppins min-h-[200px] p-3 bg-white border border-slate-300 rounded-lg">
+              {notes || 'No notes available for this order.'}
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter className="pt-4">
+          <DialogClose asChild>
+            <Button type="button" variant="outline" className="flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-slate-300 hover:border-slate-400 font-poppins">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Close
+            </Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 // ===== ENHANCED STATUS COMPONENTS =====
 
 // Simple Delivery Status Badge with smaller font
@@ -675,29 +722,28 @@ const EnhancedPOForm = ({
   const dueDate = calculateDueDate();
 
   // Auto-cancel handler - UPDATED FOR CLICKABLE DELIVERY
-const handleStatusChange = (field: 'deliveryStatus' | 'paymentStatus', value: string) => {
-  onFormChange(field, value);
-  
-  // Auto-cancel the other status when one is cancelled
-  if (value === 'cancelled') {
-    if (field === 'deliveryStatus') {
-      onFormChange('paymentStatus', 'cancelled');
-    } else if (field === 'paymentStatus') {
-      onFormChange('deliveryStatus', 'cancelled');
+  const handleStatusChange = (field: 'deliveryStatus' | 'paymentStatus', value: string) => {
+    onFormChange(field, value);
+    
+    // Auto-cancel the other status when one is cancelled
+    if (value === 'cancelled') {
+      if (field === 'deliveryStatus') {
+        onFormChange('paymentStatus', 'cancelled');
+      } else if (field === 'paymentStatus') {
+        onFormChange('deliveryStatus', 'cancelled');
+      }
     }
-  }
 
-  // Auto-set payment status to paid when delivered and payment method is cash
-  if (field === 'deliveryStatus' && value === 'delivered' && formData.paymentMethod === 'cash') {
-    onFormChange('paymentStatus', 'paid');
-  }
-  
-  // Show success toast when delivery status changes
-  if (field === 'deliveryStatus') {
-    // You can add a toast notification here if needed
-    console.log(`Delivery status changed to: ${value}`);
-  }
-};
+    // Auto-set payment status to paid when delivered and payment method is cash
+    if (field === 'deliveryStatus' && value === 'delivered' && formData.paymentMethod === 'cash') {
+      onFormChange('paymentStatus', 'paid');
+    }
+    
+    // Show success toast when delivery status changes
+    if (field === 'deliveryStatus') {
+      console.log(`Delivery status changed to: ${value}`);
+    }
+  };
 
   // Payment method change handler
   const handlePaymentMethodChange = (value: 'cash' | 'credit') => {
@@ -712,7 +758,7 @@ const handleStatusChange = (field: 'deliveryStatus' | 'paymentStatus', value: st
   };
 
   return (
-    <div className="space-y-4 py-2 max-h-[70vh] overflow-y-auto pr-2">
+    <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-2">
       <div className="grid grid-cols-2 gap-4">
         {/* Left Column */}
         <div className="space-y-4">
@@ -994,18 +1040,17 @@ const EnhancedTableRow = ({
       </div>
       
       {/* Delivery Status - Updated for better visual feedback */}
-<div>
-  <div 
-    className="cursor-pointer transform hover:scale-105 transition-transform duration-200"
-    onClick={(e) => {
-      e.stopPropagation();
-      // You can add direct status change here if needed, or keep it opening the edit dialog
-      onRowClick(item);
-    }}
-  >
-    <SimpleDeliveryStatus status={item.status || 'ordered'} />
-  </div>
-</div>
+      <div>
+        <div 
+          className="cursor-pointer transform hover:scale-105 transition-transform duration-200"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRowClick(item);
+          }}
+        >
+          <SimpleDeliveryStatus status={item.status || 'ordered'} />
+        </div>
+      </div>
       
       {/* Payment Status */}
       <div>
@@ -1047,7 +1092,7 @@ const EnhancedTableRow = ({
   );
 };
 
-// Enhanced Filter Component for Purchase Orders
+// Enhanced Filter Component for Purchase Orders with Order Date Filter
 const POFilter = ({ 
   statusFilter, 
   onStatusFilterChange,
@@ -1056,7 +1101,11 @@ const POFilter = ({
   selectedBranch,
   onBranchChange,
   branches,
-  showBranchFilter = true
+  showBranchFilter = true,
+  orderDateFrom,
+  orderDateTo,
+  onOrderDateFromChange,
+  onOrderDateToChange
 }: {
   statusFilter: string;
   onStatusFilterChange: (status: string) => void;
@@ -1066,6 +1115,10 @@ const POFilter = ({
   onBranchChange?: (branch: string) => void;
   branches?: any[];
   showBranchFilter?: boolean;
+  orderDateFrom?: string;
+  orderDateTo?: string;
+  onOrderDateFromChange?: (date: string) => void;
+  onOrderDateToChange?: (date: string) => void;
 }) => {
   return (
     <div className="space-y-4 p-4 bg-white/60 rounded-xl border border-slate-200/50">
@@ -1107,15 +1160,16 @@ const POFilter = ({
               <SelectItem value="all" className="font-poppins text-sm">All Statuses</SelectItem>
               <SelectItem value="ordered" className="font-poppins text-sm">📦 Ordered</SelectItem>
               <SelectItem value="delivered" className="font-poppins text-sm">🚚 Delivered</SelectItem>
+              <SelectItem value="cancelled" className="font-poppins text-sm">❌ Cancelled</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {/* Branch Filter */}
-      {showBranchFilter && (
-        <div className="pt-2 border-t border-slate-200/50">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Branch Filter and Date Range */}
+      <div className="pt-2 border-t border-slate-200/50">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {showBranchFilter && (
             <div>
               <Label htmlFor="branch-filter" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
                 Filter by Branch
@@ -1134,9 +1188,55 @@ const POFilter = ({
                 </SelectContent>
               </Select>
             </div>
+          )}
+          
+          {/* Order Date From Filter */}
+          <div>
+            <Label htmlFor="order-date-from" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
+              Order Date From
+            </Label>
+            <Input 
+              id="order-date-from"
+              type="date"
+              value={orderDateFrom || ''}
+              onChange={(e) => onOrderDateFromChange?.(e.target.value)}
+              className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm"
+            />
+          </div>
+          
+          {/* Order Date To Filter */}
+          <div>
+            <Label htmlFor="order-date-to" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
+              Order Date To
+            </Label>
+            <Input 
+              id="order-date-to"
+              type="date"
+              value={orderDateTo || ''}
+              onChange={(e) => onOrderDateToChange?.(e.target.value)}
+              className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm"
+            />
+          </div>
+          
+          {/* Clear Date Filters Button */}
+          <div className="flex items-end">
+            {(orderDateFrom || orderDateTo) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  onOrderDateFromChange?.('');
+                  onOrderDateToChange?.('');
+                }}
+                className="h-10 w-full"
+              >
+                <X className="h-3 w-3 mr-2" />
+                Clear Date Filters
+              </Button>
+            )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
@@ -1457,6 +1557,10 @@ export default function EnhancedPurchasingPage() {
     actionType: 'add'
   });
   
+  // Notes Dialog State
+  const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
+  const [selectedNotes, setSelectedNotes] = useState<string>('');
+  
   // State management
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isSupplierLoading, setIsSupplierLoading] = useState(true);
@@ -1485,6 +1589,10 @@ export default function EnhancedPurchasingPage() {
   const [poSearchTerm, setPOSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
+  
+  // Order Date Filter states
+  const [orderDateFrom, setOrderDateFrom] = useState<string>('');
+  const [orderDateTo, setOrderDateTo] = useState<string>('');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -1499,7 +1607,7 @@ export default function EnhancedPurchasingPage() {
     poNotes: '',
     paymentMethod: 'cash' as 'cash' | 'credit',
     paymentStatus: 'pending' as 'pending' | 'paid' | 'partial' | 'overdue' | 'cancelled',
-    deliveryStatus: 'ordered' as 'ordered' | 'delivered' | 'cancelled', // Changed from pending to ordered
+    deliveryStatus: 'ordered' as 'ordered' | 'delivered' | 'cancelled',
     cancellationReason: ''
   });
 
@@ -1622,13 +1730,31 @@ export default function EnhancedPurchasingPage() {
       const matchesStatus = statusFilter === 'all' || po.status === statusFilter;
       const matchesBranch = branchFilter === 'all' || po.branch_id === branchFilter;
       
+      // Order date filter
+      let matchesDate = true;
+      if (orderDateFrom || orderDateTo) {
+        const poDate = po.order_date ? new Date(po.order_date) : null;
+        if (poDate) {
+          if (orderDateFrom) {
+            const fromDate = new Date(orderDateFrom);
+            fromDate.setHours(0, 0, 0, 0);
+            matchesDate = matchesDate && poDate >= fromDate;
+          }
+          if (orderDateTo) {
+            const toDate = new Date(orderDateTo);
+            toDate.setHours(23, 59, 59, 999);
+            matchesDate = matchesDate && poDate <= toDate;
+          }
+        }
+      }
+      
       // For purchase orders tab, only show active orders (not delivered or cancelled)
       const isActiveOrder = po.status !== 'delivered' && po.status !== 'cancelled';
       
-      return matchesSearch && matchesStatus && matchesBranch &&
+      return matchesSearch && matchesStatus && matchesBranch && matchesDate &&
              (activeTab === 'purchase-orders' ? isActiveOrder : true);
     });
-  }, [purchaseOrders, poSearchTerm, statusFilter, branchFilter, activeTab]);
+  }, [purchaseOrders, poSearchTerm, statusFilter, branchFilter, orderDateFrom, orderDateTo, activeTab]);
 
   // Transaction History (Delivered and Cancelled orders only)
   const transactionHistory = useMemo(() => {
@@ -1657,7 +1783,7 @@ export default function EnhancedPurchasingPage() {
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [poSearchTerm, statusFilter, branchFilter]);
+  }, [poSearchTerm, statusFilter, branchFilter, orderDateFrom, orderDateTo]);
 
   const handleRefresh = () => {
     fetchSuppliers();
@@ -1691,6 +1817,12 @@ export default function EnhancedPurchasingPage() {
     handleEditPO(po);
   }, [handleEditPO]);
 
+  // Handle notes icon click in transaction history
+  const handleNotesClick = useCallback((notes: string) => {
+    setSelectedNotes(notes);
+    setIsNotesDialogOpen(true);
+  }, []);
+
   // Enhanced PO Form Handlers
   const handlePOFormChange = (field: string, value: any) => {
     setPOFormData(prev => ({ ...prev, [field]: value }));
@@ -1705,7 +1837,7 @@ export default function EnhancedPurchasingPage() {
       poNotes: '',
       paymentMethod: 'cash',
       paymentStatus: 'pending',
-      deliveryStatus: 'ordered', // Changed from pending to ordered
+      deliveryStatus: 'ordered',
       cancellationReason: ''
     });
     setEditingPO(null);
@@ -1976,7 +2108,7 @@ export default function EnhancedPurchasingPage() {
       user_id: authUser.user_id,
       expected_delivery_date: poFormData.expectedDelivery || null,
       notes: poFormData.poNotes || null,
-      status: editingPO ? poFormData.deliveryStatus : 'ordered', // Use form data for both new and edited POs
+      status: editingPO ? poFormData.deliveryStatus : 'ordered',
       payment_status: poFormData.paymentStatus,
       payment_method: poFormData.paymentMethod,
       cancellation_reason: (poFormData.deliveryStatus === 'cancelled' || poFormData.paymentStatus === 'cancelled') 
@@ -1992,7 +2124,7 @@ export default function EnhancedPurchasingPage() {
           .from('purchase_order')
           .update({
             ...poData,
-            status: poFormData.deliveryStatus // Use form data for edits
+            status: poFormData.deliveryStatus
           })
           .eq('po_id', editingPO.po_id);
         error = updateError;
@@ -2078,7 +2210,7 @@ export default function EnhancedPurchasingPage() {
   };
 
   const handlePaymentRecorded = () => {
-    fetchPurchaseOrders(); // Refresh data after payment is recorded
+    fetchPurchaseOrders();
     
     // Show success animation for payment
     setSuccessAnimation({
@@ -2179,14 +2311,11 @@ export default function EnhancedPurchasingPage() {
             <div className="text-center">
               {po.notes ? (
                 <button 
-                  className="text-slate-600 hover:text-purple-600" 
-                  title={po.notes}
+                  className="p-1.5 text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors border border-transparent hover:border-purple-200"
+                  title="View Notes"
                   onClick={(e) => {
                     e.stopPropagation();
-                    toast({
-                      title: "Order Notes",
-                      description: po.notes,
-                    })
+                    handleNotesClick(po.notes);
                   }}
                 >
                   <FileText className="h-4 w-4" />
@@ -2270,6 +2399,13 @@ export default function EnhancedPurchasingPage() {
         message={successAnimation.message}
         actionType={successAnimation.actionType}
         onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))}
+      />
+      
+      {/* Notes Dialog */}
+      <NotesDialog
+        isOpen={isNotesDialogOpen}
+        onClose={() => setIsNotesDialogOpen(false)}
+        notes={selectedNotes}
       />
       
       {/* Background Sections */}
@@ -2409,7 +2545,6 @@ export default function EnhancedPurchasingPage() {
                     title=""
                     columns={supplierColumns}
                     data={filteredSuppliers.map(supplier => ({ ...supplier, id: supplier.supplier_id }))}
-                    onAddNew={handleOpenSupplierDialog}
                     onEdit={handleEditSupplier}
                     onDelete={handleDeleteSupplier}
                     renderCell={renderSupplierCell}
@@ -2435,7 +2570,7 @@ export default function EnhancedPurchasingPage() {
                   </div>
                 </div>
 
-                {/* Enhanced Filter Bar */}
+                {/* Enhanced Filter Bar with Order Date Filter */}
                 <POFilter
                   statusFilter={statusFilter}
                   onStatusFilterChange={setStatusFilter}
@@ -2445,6 +2580,10 @@ export default function EnhancedPurchasingPage() {
                   onBranchChange={setBranchFilter}
                   branches={branches}
                   showBranchFilter={true}
+                  orderDateFrom={orderDateFrom}
+                  orderDateTo={orderDateTo}
+                  onOrderDateFromChange={setOrderDateFrom}
+                  onOrderDateToChange={setOrderDateTo}
                 />
               </CardHeader>
               
@@ -2528,6 +2667,10 @@ export default function EnhancedPurchasingPage() {
                   onBranchChange={setBranchFilter}
                   branches={branches}
                   showBranchFilter={true}
+                  orderDateFrom={orderDateFrom}
+                  orderDateTo={orderDateTo}
+                  onOrderDateFromChange={setOrderDateFrom}
+                  onOrderDateToChange={setOrderDateTo}
                 />
               </CardHeader>
               
@@ -2706,14 +2849,14 @@ export default function EnhancedPurchasingPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Enhanced Purchase Order Dialog - Better Layout */}
+        {/* Enhanced Purchase Order Dialog - Scrollable Form */}
         <Dialog open={isPODialogOpen} onOpenChange={(isOpen) => {
           if (!isOpen) {
             setIsPODialogOpen(false);
             resetPOForm();
           }
         }}>
-          <DialogContent className="sm:max-w-4xl bg-white border-0 shadow-2xl mt-10 font-poppins max-h-[85vh] overflow-hidden">
+          <DialogContent className="sm:max-w-4xl bg-white border-0 shadow-2xl mt-10 font-poppins max-h-[85vh] overflow-hidden flex flex-col">
             <DialogHeader className="pb-4">
               <DialogTitle className="text-2xl font-bold text-slate-900 font-poppins">
                 {editingPO ? 'Edit Purchase Order' : 'Create Purchase Order'}
@@ -2723,15 +2866,18 @@ export default function EnhancedPurchasingPage() {
               </DialogDescription>
             </DialogHeader>
             
-            <EnhancedPOForm
-              editingPO={editingPO}
-              formData={poFormData}
-              onFormChange={handlePOFormChange}
-              suppliers={suppliers}
-              branches={branches}
-              isEditing={!!editingPO}
-              onPaymentRecorded={handlePaymentRecorded}
-            />
+            {/* Scrollable form area */}
+            <div className="flex-1 overflow-y-auto pr-2">
+              <EnhancedPOForm
+                editingPO={editingPO}
+                formData={poFormData}
+                onFormChange={handlePOFormChange}
+                suppliers={suppliers}
+                branches={branches}
+                isEditing={!!editingPO}
+                onPaymentRecorded={handlePaymentRecorded}
+              />
+            </div>
 
             <DialogFooter className="pt-4">
               <DialogClose asChild>
@@ -2802,29 +2948,6 @@ export default function EnhancedPurchasingPage() {
         
         .animate-pulse {
           animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-
-        /* Custom date input styling */
-        .custom-date-input::-webkit-calendar-picker-indicator {
-          background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%236b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>');
-          cursor: pointer;
-          padding: 4px;
-          border-radius: 4px;
-        }
-
-        .custom-date-input::-webkit-calendar-picker-indicator:hover {
-          background-color: #f3f4f6;
-        }
-
-        /* Improved focus styles for all inputs */
-        input:focus, textarea:focus, select:focus {
-          outline: none;
-          ring: 2px;
-        }
-
-        /* Smooth transitions for all interactive elements */
-        button, input, select, textarea {
-          transition: all 0.3s ease;
         }
 
         /* Custom scrollbar for dialogs */
