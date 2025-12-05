@@ -925,103 +925,62 @@ const PaginationControls = ({
   totalPages, 
   onPageChange,
   totalItems,
-  rowsPerPage,
-  onRowsPerPageChange
+  rowsPerPage
 }: { 
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
   totalItems: number;
   rowsPerPage: number;
-  onRowsPerPageChange: (rows: number) => void;
 }) => {
-  const pageNumbers = [];
-  const maxVisiblePages = 5;
-  
-  let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-  let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-  
-  if (endPage - startPage + 1 < maxVisiblePages) {
-    startPage = Math.max(1, endPage - maxVisiblePages + 1);
-  }
-
-  for (let i = startPage; i <= endPage; i++) {
-    pageNumbers.push(i);
-  }
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = Math.min(startIndex + rowsPerPage, totalItems);
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-slate-50 border-t border-slate-200">
-      <div className="flex items-center gap-4">
-        <span className="text-sm text-slate-600 font-poppins">Rows per page:</span>
-        <Select value={rowsPerPage.toString()} onValueChange={(value) => onRowsPerPageChange(Number(value))}>
-          <SelectTrigger className="w-20 h-8">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="5">5</SelectItem>
-            <SelectItem value="10">10</SelectItem>
-            <SelectItem value="15">15</SelectItem>
-            <SelectItem value="20">20</SelectItem>
-            <SelectItem value="50">50</SelectItem>
-          </SelectContent>
-        </Select>
-        
-        <span className="text-sm text-slate-600 font-poppins">
-          Showing {((currentPage - 1) * rowsPerPage) + 1} to {Math.min(currentPage * rowsPerPage, totalItems)} of {totalItems} entries
-        </span>
+    <div className="flex items-center justify-between p-6 border-t border-slate-200 bg-white">
+      {/* Left Side: Showing text */}
+      <div className="text-sm text-slate-600 font-poppins">
+        Showing {totalItems === 0 ? 0 : startIndex + 1} to {endIndex} of {totalItems} entries
       </div>
 
-      <div className="flex items-center gap-1">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onPageChange(1)}
+      {/* Right Side: Simple Pager Controls */}
+      <div className="flex items-center gap-2">
+        <Button 
+          variant="outline" 
+          className="h-8 px-2 min-w-[36px] bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900" 
+          onClick={() => onPageChange(1)} 
           disabled={currentPage === 1}
-          className="h-8 w-8 p-0"
         >
-          <ChevronFirst className="h-4 w-4" />
+          «
+        </Button>
+        <Button 
+          variant="outline" 
+          className="h-8 px-2 min-w-[36px] bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900" 
+          onClick={() => onPageChange(currentPage - 1)} 
+          disabled={currentPage === 1}
+        >
+          ‹
         </Button>
         
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          className="h-8 w-8 p-0"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-
-        {pageNumbers.map(page => (
-          <Button
-            key={page}
-            variant={currentPage === page ? "default" : "outline"}
-            size="sm"
-            onClick={() => onPageChange(page)}
-            className={`h-8 w-8 p-0 ${currentPage === page ? 'bg-purple-600 text-white' : ''}`}
-          >
-            {page}
-          </Button>
-        ))}
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-          className="h-8 w-8 p-0"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
+        <span className="text-sm text-slate-600 px-2 font-medium font-poppins min-w-[80px] text-center">
+          Page {currentPage} of {totalPages || 1}
+        </span>
         
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onPageChange(totalPages)}
-          disabled={currentPage === totalPages}
-          className="h-8 w-8 p-0"
+        <Button 
+          variant="outline" 
+          className="h-8 px-2 min-w-[36px] bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900" 
+          onClick={() => onPageChange(currentPage + 1)} 
+          disabled={currentPage === totalPages || totalPages === 0}
         >
-          <ChevronLast className="h-4 w-4" />
+          ›
+        </Button>
+        <Button 
+          variant="outline" 
+          className="h-8 px-2 min-w-[36px] bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900" 
+          onClick={() => onPageChange(totalPages)} 
+          disabled={currentPage === totalPages || totalPages === 0}
+        >
+          »
         </Button>
       </div>
     </div>
@@ -3001,152 +2960,186 @@ export default function EnhancedServiceManagementPage() {
                     onViewCalendar={() => setIsCalendarOpen(true)}
                 />
 
-                {/* Main Table Card */}
-                <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
-                    <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-purple-50/50 border-b border-slate-200/50">
-                        <div className="flex items-center justify-between">
+                {/* Main Table Section */}
+                <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-xl font-poppins">
+                    
+                    {/* 1. Gradient Header */}
+                    <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-400 text-white p-5 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-xl shadow-inner">
+                                <Wrench className="h-6 w-6 text-white" />
+                            </div>
                             <div>
-                                <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Service Jobs</CardTitle>
-                                <CardDescription className="text-slate-600 font-poppins">
-                                    {filteredJobs.length} of {serviceJobs.length} job{filteredJobs.length !== 1 ? 's' : ''} shown
-                                </CardDescription>
+                                <div className="text-xl font-bold tracking-tight">Service Jobs</div>
+                                <div className="text-sm text-white/80 font-medium font-poppins">
+                                    Manage vehicle service records
+                                </div>
+                                <div className="text-sm text-white/90 mt-1">
+                                    Total: <strong className="font-semibold">{filteredJobs.length}</strong> jobs found
+                                </div>
                             </div>
                         </div>
+                    </div>
 
-                        {/* Quick Filter Chips */}
-                        <QuickFilterChips 
-                            serviceJobs={serviceJobs}
-                            activeFilters={quickFilters}
-                            onFilterChange={setQuickFilters}
-                        />
-
-                        {/* Filter Bar */}
-                        <div className="flex flex-col sm:flex-row gap-4 mt-4 p-4 bg-white/60 rounded-xl border border-slate-200/50">
-                            <div className="flex-1">
-                                <Label htmlFor="search-jobs" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Search Jobs</Label>
+                    {/* 2. Toolbar Section (Search & Dropdowns Only) */}
+                    <div className="bg-white border-b border-slate-100 p-4">
+                        
+                        {/* Search and Dropdowns Row */}
+                        <div className="flex flex-col xl:flex-row gap-4 justify-between items-center">
+                            {/* Search Bar */}
+                            <div className="relative w-full flex-1">
                                 <SearchInput 
                                     id="search-jobs"
                                     value={searchTerm}
                                     onChange={setSearchTerm}
-                                    placeholder="Search by description, remarks, or employee..."
+                                    placeholder="Search by description, customer, or remarks..."
                                 />
                             </div>
-                            
-                            <div className="sm:w-48">
-                                <Label htmlFor="status-filter" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Status</Label>
-                                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
-                                        <SelectValue placeholder="All statuses" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all" className="font-poppins">All Statuses</SelectItem>
-                                        <SelectItem value="pending" className="font-poppins">Pending</SelectItem>
-                                        <SelectItem value="in-progress" className="font-poppins">In Progress</SelectItem>
-                                        <SelectItem value="completed" className="font-poppins">Completed</SelectItem>
-                                        <SelectItem value="cancelled" className="font-poppins">Cancelled</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
 
-                            <div className="sm:w-48">
-                                <Label htmlFor="vehicle-type-filter" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Vehicle Type</Label>
-                                <Select value={vehicleTypeFilter} onValueChange={setVehicleTypeFilter}>
-                                    <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white/80 font-poppins">
-                                        <SelectValue placeholder="All types" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all" className="font-poppins">All Types</SelectItem>
-                                        {vehicleTypes.map(type => (
-                                            <SelectItem key={type.vehicle_type_id} value={type.vehicle_type_id} className="font-poppins">
-                                                {type.name.charAt(0).toUpperCase() + type.name.slice(1)}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                            {/* Filters Group */}
+                            <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
+                                
+                                {/* Status Filter */}
+                                <div className="flex items-center gap-2 w-full sm:w-auto">
+                                    <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block">Status</Label>
+                                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                        <SelectTrigger className="h-10 w-full sm:w-[180px] border-slate-200 bg-white focus:ring-indigo-500">
+                                            <SelectValue placeholder="All Statuses" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Statuses</SelectItem>
+                                            <SelectItem value="pending">Pending</SelectItem>
+                                            <SelectItem value="in-progress">In Progress</SelectItem>
+                                            <SelectItem value="completed">Completed</SelectItem>
+                                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
 
-                            {(searchTerm || statusFilter !== 'all' || vehicleTypeFilter !== 'all' || Object.values(quickFilters).some(Boolean)) && (
-                                <div className="flex items-end">
+                                {/* Vehicle Type Filter */}
+                                <div className="flex items-center gap-2 w-full sm:w-auto">
+                                    <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block">Type</Label>
+                                    <Select value={vehicleTypeFilter} onValueChange={setVehicleTypeFilter}>
+                                        <SelectTrigger className="h-10 w-full sm:w-[180px] border-slate-200 bg-white focus:ring-indigo-500">
+                                            <SelectValue placeholder="All Types" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Types</SelectItem>
+                                            {vehicleTypes.map(type => (
+                                                <SelectItem key={type.vehicle_type_id} value={type.vehicle_type_id}>
+                                                    {type.name.charAt(0).toUpperCase() + type.name.slice(1)}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* NEW: Rows Per Page Filter */}
+                                <div className="flex items-center gap-2 w-full sm:w-auto">
+                                    <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block">Rows</Label>
+                                    <Select 
+                                        value={String(rowsPerPage)} 
+                                        onValueChange={(val) => {
+                                            setRowsPerPage(Number(val));
+                                            setCurrentPage(1); // Reset to page 1
+                                        }}
+                                    >
+                                        <SelectTrigger className="h-10 w-full sm:w-[80px] border-slate-200 bg-white focus:ring-indigo-500">
+                                            <SelectValue placeholder={String(rowsPerPage)} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {[5, 10, 15, 20, 50].map(opt => (
+                                                <SelectItem key={opt} value={String(opt)}>{opt}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* Clear Button */}
+                                {(searchTerm || statusFilter !== 'all' || vehicleTypeFilter !== 'all') && (
                                     <Button 
                                         onClick={clearFilters}
                                         variant="outline" 
-                                        className="h-10 border-slate-300 text-slate-600 hover:text-slate-700 font-poppins"
+                                        className="h-10 border-dashed border-slate-300 text-slate-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors"
                                     >
                                         <X className="h-4 w-4 mr-2" />
                                         Clear
                                     </Button>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
-                    </CardHeader>
+                    </div>
                     
-                    <CardContent className="p-0">
-    {fetchError && !fetchError.includes('infinite recursion') && (
-      <Alert variant="destructive" className="m-6 font-poppins">
-        <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>Error</AlertTitle>
-        <AlertDescription>{fetchError}</AlertDescription>
-      </Alert>
-    )}
+                    {/* 3. Table Content Container */}
+                    <div className="p-0">
+                        {fetchError && !fetchError.includes('infinite recursion') && (
+                            <Alert variant="destructive" className="m-6 font-poppins">
+                                <AlertTriangle className="h-4 w-4" />
+                                <AlertTitle>Error</AlertTitle>
+                                <AlertDescription>{fetchError}</AlertDescription>
+                            </Alert>
+                        )}
 
-    {(isLoading && serviceJobs.length === 0) ? (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    ) : (
-      <div className="overflow-hidden">
-        {/* Table Header */}
-        <div className="grid grid-cols-11 gap-4 p-4 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold rounded-t-xl font-poppins">
-          <div className="col-span-4">Job Details</div>
-          <div className="col-span-2">Vehicle Type</div>
-          <div className="col-span-2">Employee</div>
-          <div className="col-span-2">Date & Fee</div>
-          <div className="col-span-1">Status</div>
-        </div>
+                        {(isLoading && serviceJobs.length === 0) ? (
+                            <div className="flex justify-center items-center h-64">
+                                <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+                            </div>
+                        ) : (
+                            <div className="overflow-hidden">
+                                {/* Table Column Headers */}
+                                <div className="grid grid-cols-11 gap-4 px-6 py-3 bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider font-poppins">
+                                    <div className="col-span-4 pl-2">Job Details</div>
+                                    <div className="col-span-2">Vehicle Type</div>
+                                    <div className="col-span-2">Employee</div>
+                                    <div className="col-span-2">Date & Fee</div>
+                                    <div className="col-span-1">Status</div>
+                                </div>
 
-        {/* Table Body */}
-        <div className="divide-y divide-slate-200/50">
-          {filteredJobs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-slate-500 font-poppins">
-              <Wrench className="h-12 w-12 mb-4 text-slate-300" />
-              <p className="text-lg font-medium">No service jobs found</p>
-              <p className="text-sm mt-1">
-                {serviceJobs.length === 0 ? 'No service jobs created yet' : 'Try adjusting your filters'}
-              </p>
-            </div>
-          ) : (
-            paginatedJobs.map((job) => (
-              <ExpandableRow
-                key={job.job_id}
-                job={job}
-                isExpanded={expandedRows.has(job.job_id)}
-                onToggle={() => toggleRowExpansion(job.job_id)}
-                inventoryItems={inventoryItems}
-                onEdit={handleOpenEditDialog}
-                onDelete={handleOpenDeleteDialog}
-                onStatusUpdate={handleStatusUpdate}
-              />
-            ))
-          )}
-        </div>
-      </div>
-    )}
+                                {/* Table Body Rows */}
+                                <div className="divide-y divide-slate-100">
+                                    {filteredJobs.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-16 text-slate-500 font-poppins bg-white">
+                                            <div className="h-20 w-20 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                                                <Search className="h-10 w-10 text-slate-300" />
+                                            </div>
+                                            <p className="text-lg font-medium text-slate-900">No service jobs found</p>
+                                            <p className="text-sm mt-1 text-slate-500">
+                                                {serviceJobs.length === 0 ? 'No service jobs created yet' : 'Try adjusting your filters or search terms'}
+                                            </p>
+                                            <Button variant="outline" onClick={clearFilters} className="mt-4">
+                                                Clear All Filters
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        paginatedJobs.map((job) => (
+                                            <ExpandableRow
+                                                key={job.job_id}
+                                                job={job}
+                                                isExpanded={expandedRows.has(job.job_id)}
+                                                onToggle={() => toggleRowExpansion(job.job_id)}
+                                                inventoryItems={inventoryItems}
+                                                onEdit={handleOpenEditDialog}
+                                                onDelete={handleOpenDeleteDialog}
+                                                onStatusUpdate={handleStatusUpdate}
+                                            />
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
-    {filteredJobs.length > 0 && (
-      <PaginationControls
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-        totalItems={filteredJobs.length}
-        rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={(rows) => {
-          setRowsPerPage(rows);
-          setCurrentPage(1);
-        }}
-      />
-    )}
-  </CardContent>
-                </Card>
+                        {filteredJobs.length > 0 && (
+                            <PaginationControls
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={setCurrentPage}
+                                totalItems={filteredJobs.length}
+                                rowsPerPage={rowsPerPage}
+                                onRowsPerPageChange={setRowsPerPage}
+                            />
+                        )}
+                    </div>
+                </div>
 
                 {/* Tabbed Add/Edit Dialog */}
                 <TabbedServiceForm
