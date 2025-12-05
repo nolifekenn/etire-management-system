@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { DataTableWrapper } from '@/components/DataTableWrapper';
-import { 
+import {
   Archive, Coins, AlertTriangle, PlusCircle, PackageSearch, Loader2, Filter,
   TrendingUp, Clock, RefreshCw, Plus, Search, X, Download, SlidersHorizontal,
   ArrowUpDown, Eye, Save, CheckCircle, ListFilter
@@ -39,39 +39,39 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 // Update the InventoryItem interface
-  // ✅ UPDATED: InventoryItem interface with calculated fields (around line 51)
-  export interface InventoryItem {
-    item_id: string;
+// ✅ UPDATED: InventoryItem interface with calculated fields (around line 51)
+export interface InventoryItem {
+  item_id: string;
+  name: string;
+  category: 'tire' | 'tool' | 'accessory';
+  vehicle_type: 'car' | 'motor' | 'truck';
+  stock_quantity: number;
+  cost_price: number;
+  sale_price: number;
+  reorder_level?: number;
+  created_at?: string;
+  updated_at?: string;
+
+  // ✅ ADD: Calculated fields from RPC function
+  profit_margin?: number;          // Calculated: ((sale_price - cost_price) / cost_price) * 100
+  total_value?: number;            // Calculated: stock_quantity * cost_price
+  potential_profit?: number;       // Calculated: stock_quantity * (sale_price - cost_price)
+  stock_status?: 'in_stock' | 'low_stock' | 'critical' | 'out_of_stock';
+  days_since_update?: number;      // Days since last update
+
+  // ✅ ADD: Joined data
+  supplier?: {
+    supplier_id: string;
     name: string;
-    category: 'tire' | 'tool' | 'accessory';
-    vehicle_type: 'car' | 'motor' | 'truck';  
-    stock_quantity: number;
-    cost_price: number;
-    sale_price: number;
-    reorder_level?: number;
-    created_at?: string;
-    updated_at?: string;
-    
-    // ✅ ADD: Calculated fields from RPC function
-    profit_margin?: number;          // Calculated: ((sale_price - cost_price) / cost_price) * 100
-    total_value?: number;            // Calculated: stock_quantity * cost_price
-    potential_profit?: number;       // Calculated: stock_quantity * (sale_price - cost_price)
-    stock_status?: 'in_stock' | 'low_stock' | 'critical' | 'out_of_stock';
-    days_since_update?: number;      // Days since last update
-    
-    // ✅ ADD: Joined data
-    supplier?: {
-      supplier_id: string;
-      name: string;
-      contact_person?: string;
-      phone?: string;
-    };
-    branch?: {
-      branch_id: string;
-      name: string;
-      address?: string;
-    };
-  }
+    contact_person?: string;
+    phone?: string;
+  };
+  branch?: {
+    branch_id: string;
+    name: string;
+    address?: string;
+  };
+}
 
 // ===== ENHANCED FILTERING SYSTEM =====
 interface FilterState {
@@ -120,43 +120,42 @@ const microAnimations = {
 // Stock Level Indicator Component
 const StockLevelIndicator = ({ quantity, reorderLevel = 5 }: { quantity: number; reorderLevel?: number }) => {
   const getStockLevel = (qty: number) => {
-    if (qty === 0) return { 
-      level: 'out', 
-      color: 'bg-gray-500', 
-      text: 'Out of Stock', 
-      badgeColor: 'bg-gray-100 text-gray-800 border-gray-200' 
+    if (qty === 0) return {
+      level: 'out',
+      color: 'bg-gray-500',
+      text: 'Out of Stock',
+      badgeColor: 'bg-gray-100 text-gray-800 border-gray-200'
     };
-    if (qty <= 2) return { 
-      level: 'critical', 
-      color: 'bg-red-500', 
-      text: 'Critical', 
-      badgeColor: 'bg-red-100 text-red-800 border-red-200' 
+    if (qty <= 2) return {
+      level: 'critical',
+      color: 'bg-red-500',
+      text: 'Critical',
+      badgeColor: 'bg-red-100 text-red-800 border-red-200'
     };
-    if (qty <= reorderLevel) return { 
-      level: 'low', 
-      color: 'bg-yellow-500', 
-      text: 'Low Stock', 
-      badgeColor: 'bg-yellow-100 text-yellow-800 border-yellow-200' 
+    if (qty <= reorderLevel) return {
+      level: 'low',
+      color: 'bg-yellow-500',
+      text: 'Low Stock',
+      badgeColor: 'bg-yellow-100 text-yellow-800 border-yellow-200'
     };
-    return { 
-      level: 'good', 
-      color: 'bg-green-500', 
-      text: 'In Stock', 
-      badgeColor: 'bg-green-100 text-green-800 border-green-200' 
+    return {
+      level: 'good',
+      color: 'bg-green-500',
+      text: 'In Stock',
+      badgeColor: 'bg-green-100 text-green-800 border-green-200'
     };
   };
 
   const stock = getStockLevel(quantity);
-  
+
   return (
     <div className="flex items-center gap-3">
       <div className="flex items-center gap-2">
         <div className={`w-3 h-3 rounded-full ${stock.color}`} />
-        <span className={`text-sm font-medium ${
-          stock.level === 'out' ? 'text-gray-600' :
+        <span className={`text-sm font-medium ${stock.level === 'out' ? 'text-gray-600' :
           stock.level === 'critical' ? 'text-red-600' :
-          stock.level === 'low' ? 'text-yellow-600' : 'text-green-600'
-        }`}>
+            stock.level === 'low' ? 'text-yellow-600' : 'text-green-600'
+          }`}>
           {quantity}
         </span>
       </div>
@@ -171,7 +170,7 @@ const StockLevelIndicator = ({ quantity, reorderLevel = 5 }: { quantity: number;
 const VehicleTypeBadge = ({ type }: { type: 'car' | 'motor' | 'truck' }) => {
   // Use the config if it exists, otherwise use a default fallback
   const config = vehicleTypeConfig[type] || { label: type, color: 'bg-gray-100 text-gray-700 border-gray-200' };
-  
+
   return (
     <Badge variant="outline" className={`capitalize ${config.color}`}>
       {config.label}
@@ -201,34 +200,34 @@ const SuccessAnimation = ({
   const getActionConfig = () => {
     switch (actionType) {
       case 'add':
-        return { 
+        return {
           gradient: 'from-green-500 to-emerald-600',
-          icon: PlusCircle 
+          icon: PlusCircle
         };
       case 'edit':
-        return { 
+        return {
           gradient: 'from-blue-500 to-cyan-600',
-          icon: Save 
+          icon: Save
         };
       case 'delete':
-        return { 
+        return {
           gradient: 'from-red-500 to-orange-600',
-          icon: Archive 
+          icon: Archive
         };
       case 'export':
-        return { 
+        return {
           gradient: 'from-purple-500 to-indigo-600',
-          icon: Download 
+          icon: Download
         };
       case 'adjust':
-        return { 
+        return {
           gradient: 'from-amber-500 to-yellow-600',
-          icon: ArrowUpDown 
+          icon: ArrowUpDown
         };
       default:
-        return { 
+        return {
           gradient: 'from-purple-500 to-indigo-600',
-          icon: CheckCircle 
+          icon: CheckCircle
         };
     }
   };
@@ -265,14 +264,14 @@ const SuccessAnimation = ({
 };
 
 // Success Confirmation Component
-const SuccessConfirmation = ({ 
-  item, 
-  isOpen, 
+const SuccessConfirmation = ({
+  item,
+  isOpen,
   onClose,
   onAddAnother
-}: { 
-  item?: InventoryItem | null; 
-  isOpen: boolean; 
+}: {
+  item?: InventoryItem | null;
+  isOpen: boolean;
   onClose: () => void;
   onAddAnother: () => void;
 }) => {
@@ -291,12 +290,12 @@ const SuccessConfirmation = ({
               </svg>
             </div>
           </div>
-          
+
           {/* Success Message */}
           <DialogTitle className="text-xl font-bold text-green-800 mb-2">
             Item Added Successfully!
           </DialogTitle>
-          
+
           <DialogDescription className="text-slate-600 mb-6">
             Your new inventory item has been added to the system.
           </DialogDescription>
@@ -309,29 +308,29 @@ const SuccessConfirmation = ({
                   <span className="text-sm font-medium text-slate-700">Product Name:</span>
                   <span className="text-sm font-semibold text-slate-900">{item.name}</span>
                 </div>
-                
+
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-slate-700">Category:</span>
                   <Badge variant="outline" className="capitalize bg-slate-100 text-slate-700 border-slate-300">
                     {item.category}
                   </Badge>
                 </div>
-                
+
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-slate-700">Vehicle Type:</span>
                   <VehicleTypeBadge type={item.vehicle_type} />
                 </div>
-                
+
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-slate-700">Stock Quantity:</span>
                   <span className="text-sm font-semibold text-slate-900">{item.stock_quantity}</span>
                 </div>
-                
+
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-slate-700">Cost Price:</span>
                   <span className="text-sm font-semibold text-slate-900">₱{item.cost_price.toFixed(2)}</span>
                 </div>
-                
+
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium text-slate-700">Sale Price:</span>
                   <span className="text-sm font-semibold text-slate-900">₱{item.sale_price.toFixed(2)}</span>
@@ -366,16 +365,16 @@ const SuccessConfirmation = ({
 };
 
 // Filter Component
-const AdvancedFilters = ({ 
-  filters, 
+const AdvancedFilters = ({
+  filters,
   onFiltersChange,
-  onClearFilters 
-}: { 
+  onClearFilters
+}: {
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
   onClearFilters: () => void;
 }) => {
-  
+
   const handleFilterToggle = (category: 'stockStatus' | 'category' | 'vehicleType', value: string) => {
     if (filters[category] === value) {
       onFiltersChange({ ...filters, [category]: 'all' });
@@ -417,14 +416,14 @@ const AdvancedFilters = ({
     }
   ];
 
-  const hasActiveFilters = filters.search || 
-                          filters.category !== 'all' || 
-                          filters.stockStatus !== 'all' || 
-                          filters.vehicleType !== 'all';
+  const hasActiveFilters = filters.search ||
+    filters.category !== 'all' ||
+    filters.stockStatus !== 'all' ||
+    filters.vehicleType !== 'all';
 
   return (
     <div className="bg-white p-5 border-b border-slate-200">
-      
+
       {/* Top Section: Search and Sort */}
       <div className="flex flex-col lg:flex-row lg:items-end gap-4 mb-5">
         <div className="flex-1 relative">
@@ -482,7 +481,7 @@ const AdvancedFilters = ({
               </SelectContent>
             </Select>
           </div>
-          
+
           {hasActiveFilters && (
             <div className="hidden lg:flex items-end pb-0.5">
               <Button
@@ -500,10 +499,10 @@ const AdvancedFilters = ({
 
       {/* FILTER BOX CONTAINER */}
       <div className="flex flex-col lg:flex-row border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
-        
+
         {filterGroups.map((group, index) => (
-          <div 
-            key={group.id} 
+          <div
+            key={group.id}
             className={`
               flex-1 p-4 
               ${index !== filterGroups.length - 1 ? 'border-b lg:border-b-0 lg:border-r border-slate-200' : ''}
@@ -521,7 +520,7 @@ const AdvancedFilters = ({
             <div className="flex flex-wrap gap-2 w-full">
               {group.options.map((option) => {
                 const isActive = filters[group.id] === option.value;
-                
+
                 return (
                   <button
                     key={option.value}
@@ -532,8 +531,8 @@ const AdvancedFilters = ({
                       min-w-[80px] /* Prevents them from getting too squished on mobile */
                       px-3 py-1.5 text-xs font-medium rounded-md border transition-all duration-200
                       flex items-center justify-center whitespace-nowrap
-                      ${isActive 
-                        ? 'bg-slate-800 text-white border-slate-800 shadow-sm' 
+                      ${isActive
+                        ? 'bg-slate-800 text-white border-slate-800 shadow-sm'
                         : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-white hover:shadow-sm'
                       }
                     `}
@@ -564,11 +563,11 @@ const AdvancedFilters = ({
 };
 
 // Enhanced Empty State
-const EnhancedEmptyState = ({ 
-  filters, 
-  onClearFilters, 
-  onAddItem 
-}: { 
+const EnhancedEmptyState = ({
+  filters,
+  onClearFilters,
+  onAddItem
+}: {
   filters: FilterState;
   onClearFilters: () => void;
   onAddItem: () => void;
@@ -584,7 +583,7 @@ const EnhancedEmptyState = ({
           Try adjusting your search criteria or clear filters to see all items.
         </p>
         <div className="flex gap-3 justify-center">
-          <Button 
+          <Button
             onClick={onClearFilters}
             variant="outline"
             className="flex items-center gap-2 transition-all duration-300 hover:scale-105"
@@ -604,7 +603,7 @@ const EnhancedEmptyState = ({
       <p className="text-slate-500 mb-4">
         Get started by adding your first inventory item to track stock levels and pricing.
       </p>
-      <Button 
+      <Button
         onClick={onAddItem}
         className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 hover:scale-105"
       >
@@ -617,24 +616,24 @@ const EnhancedEmptyState = ({
 
 // Stock Alerts Component
 // Redesigned Stock Alerts Component
-const StockAlertsBar = ({ 
-  criticalCount, 
+const StockAlertsBar = ({
+  criticalCount,
   warningCount,
   outOfStockCount,
-  onShowDetails 
-}: { 
-  criticalCount: number; 
+  onShowDetails
+}: {
+  criticalCount: number;
   warningCount: number;
   outOfStockCount: number;
   onShowDetails: () => void;
 }) => {
   const totalAlerts = criticalCount + warningCount + outOfStockCount;
-  
+
   if (totalAlerts === 0) return null;
 
   // Determine the primary severity color for the card accent
   const severityColor = outOfStockCount > 0 ? 'red' : criticalCount > 0 ? 'orange' : 'yellow';
-  
+
   // Dynamic styles based on severity
   const colors = {
     red: { border: 'border-l-red-500', icon: 'text-red-600', bg: 'bg-red-50', badge: 'bg-red-100 text-red-700' },
@@ -648,12 +647,12 @@ const StockAlertsBar = ({
   const warningPercent = (warningCount / totalAlerts) * 100;
 
   return (
-    <div 
+    <div
       className={`mb-8 bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 border-l-4 ${colors.border}`}
     >
       <div className="p-5 sm:p-6">
         <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-center">
-          
+
           {/* Section 1: Icon & Main Message */}
           <div className="flex items-start gap-4 flex-1">
             <div className={`p-3 rounded-full shrink-0 ${colors.bg}`}>
@@ -674,7 +673,7 @@ const StockAlertsBar = ({
 
           {/* Section 2: Visual Breakdown (The Bar) */}
           <div className="w-full lg:w-1/3 flex flex-col justify-center px-4 border-l border-r border-slate-100 mx-4">
-             <div className="flex h-2.5 w-full rounded-full overflow-hidden bg-slate-100">
+            <div className="flex h-2.5 w-full rounded-full overflow-hidden bg-slate-100">
               {outOfStockCount > 0 && (
                 <div style={{ width: `${outOfStockPercent}%` }} className="bg-slate-700" title="Out of Stock" />
               )}
@@ -685,7 +684,7 @@ const StockAlertsBar = ({
                 <div style={{ width: `${warningPercent}%` }} className="bg-amber-400" title="Low Stock" />
               )}
             </div>
-            
+
             <div className="flex justify-between items-center mt-2 text-xs text-slate-500">
               <div className="flex gap-3">
                 {outOfStockCount > 0 && (
@@ -695,7 +694,7 @@ const StockAlertsBar = ({
                   <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500"></span>Critical ({criticalCount})</div>
                 )}
                 {warningCount > 0 && (
-                   <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400"></span>Low ({warningCount})</div>
+                  <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400"></span>Low ({warningCount})</div>
                 )}
               </div>
             </div>
@@ -703,7 +702,7 @@ const StockAlertsBar = ({
 
           {/* Section 3: Action Button */}
           <div className="w-full lg:w-auto flex justify-end">
-            <Button 
+            <Button
               onClick={onShowDetails}
               variant="outline"
               className="group border-slate-300 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-300 w-full sm:w-auto"
@@ -719,12 +718,12 @@ const StockAlertsBar = ({
 };
 
 // Stock Adjustment Form Component
-const StockAdjustmentForm = ({ 
-  item, 
-  onSave, 
-  onCancel 
-}: { 
-  item: InventoryItem; 
+const StockAdjustmentForm = ({
+  item,
+  onSave,
+  onCancel
+}: {
+  item: InventoryItem;
   onSave: (adjustment: number, reason: string) => void;
   onCancel: () => void;
 }) => {
@@ -766,11 +765,10 @@ const StockAdjustmentForm = ({
         </div>
         <div>
           <Label className="text-sm font-medium text-slate-700 mb-2 block">New Stock</Label>
-          <div className={`text-2xl font-bold ${
-            newQuantity < 0 ? 'text-red-600' : 
-            newQuantity === 0 ? 'text-yellow-600' : 
-            'text-green-600'
-          }`}>
+          <div className={`text-2xl font-bold ${newQuantity < 0 ? 'text-red-600' :
+            newQuantity === 0 ? 'text-yellow-600' :
+              'text-green-600'
+            }`}>
             {newQuantity}
           </div>
         </div>
@@ -782,7 +780,7 @@ const StockAdjustmentForm = ({
         <p className="text-xs text-slate-500 mb-3">
           Use negative numbers to decrease stock, positive to increase
         </p>
-        
+
         {/* New full-width input with +/- buttons - matching Add New Item design */}
         <div className="flex items-center border border-slate-300 rounded-md bg-white focus-within:border-indigo-400 overflow-hidden h-9 w-full">
           <button
@@ -881,19 +879,19 @@ const StockAdjustmentForm = ({
 
 //Critical Stock Details
 // Enhanced Critical Stock Details - Updated Labels
-const CriticalStockDetails = ({ 
-  items, 
-  isOpen, 
-  onClose 
-}: { 
-  items: InventoryItem[]; 
-  isOpen: boolean; 
+const CriticalStockDetails = ({
+  items,
+  isOpen,
+  onClose
+}: {
+  items: InventoryItem[];
+  isOpen: boolean;
   onClose: () => void;
 }) => {
   const [notes, setNotes] = useState('');
   const [priority, setPriority] = useState('high');
   const [actionPlan, setActionPlan] = useState('');
-  
+
   const [filterType, setFilterType] = useState<'all' | 'out' | 'critical' | 'low'>('all');
   const [sortType, setSortType] = useState<'severity' | 'name' | 'vehicle'>('severity');
 
@@ -914,13 +912,13 @@ const CriticalStockDetails = ({
     // Sort
     result.sort((a, b) => {
       if (sortType === 'name') return a.name.localeCompare(b.name);
-      
+
       if (sortType === 'vehicle') {
-        const vA = a.vehicle_type || ''; 
+        const vA = a.vehicle_type || '';
         const vB = b.vehicle_type || '';
         return vA.localeCompare(vB);
       }
-      
+
       // Default: Severity (Out -> Critical -> Low)
       return a.stock_quantity - b.stock_quantity;
     });
@@ -937,7 +935,7 @@ const CriticalStockDetails = ({
   // Row Component
   const StockItemRow = ({ item }: { item: InventoryItem }) => {
     const variant = getVariant(item.stock_quantity);
-    
+
     const styles = {
       out: {
         border: 'border-l-slate-600',
@@ -962,7 +960,7 @@ const CriticalStockDetails = ({
       }
     }[variant];
 
-    const vehicleLabel = item.vehicle_type 
+    const vehicleLabel = item.vehicle_type
       ? (item.vehicle_type === 'motor' ? 'Motorcycle' : item.vehicle_type.charAt(0).toUpperCase() + item.vehicle_type.slice(1))
       : 'Unknown';
 
@@ -998,7 +996,7 @@ const CriticalStockDetails = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl p-0 gap-0">
-        
+
         {/* Header */}
         <div className="p-6 border-b border-slate-100 bg-white sticky top-0 z-20">
           <DialogHeader className="mb-4">
@@ -1015,7 +1013,7 @@ const CriticalStockDetails = ({
 
           {/* Filter & Sort Toolbar */}
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200 ml-12">
-            
+
             {/* ✅ UPDATED FILTER TABS HERE */}
             <div className="flex gap-1 p-1 bg-white rounded-md border border-slate-200 shadow-sm">
               {[
@@ -1027,11 +1025,10 @@ const CriticalStockDetails = ({
                 <button
                   key={tab.id}
                   onClick={() => setFilterType(tab.id as any)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-                    filterType === tab.id 
-                      ? 'bg-slate-800 text-white shadow-sm' 
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${filterType === tab.id
+                    ? 'bg-slate-800 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-100'
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -1075,7 +1072,7 @@ const CriticalStockDetails = ({
               <SlidersHorizontal className="h-4 w-4" />
               Restocking Action Plan
             </h4>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div>
@@ -1119,7 +1116,7 @@ const CriticalStockDetails = ({
           <Button onClick={onClose} variant="outline" className="h-11 px-6 border-slate-300 hover:bg-slate-100">
             Cancel
           </Button>
-          <Button 
+          <Button
             onClick={() => { alert('Action plan saved!'); onClose(); }}
             className="h-11 px-8 bg-slate-900 hover:bg-slate-800 text-white shadow-md"
           >
@@ -1188,12 +1185,12 @@ const ViewMoreDialog = ({
                       <td className="border border-slate-200 p-3">₱{item.cost_price.toFixed(2)}</td>
                       <td className="border border-slate-200 p-3">₱{item.sale_price.toFixed(2)}</td>
                       <td className="border border-slate-200 p-3">
-                        <Badge 
+                        <Badge
                           variant={margin >= 30 ? "default" : "outline"}
                           className={
                             margin >= 30 ? 'bg-green-100 text-green-700 border-green-200' :
-                            margin >= 15 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-                            'bg-red-100 text-red-700 border-red-200'
+                              margin >= 15 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                                'bg-red-100 text-red-700 border-red-200'
                           }
                         >
                           {margin.toFixed(1)}%
@@ -1227,17 +1224,17 @@ export default function EnhancedInventoryPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Add this state near your other useState declarations
-const [successAnimation, setSuccessAnimation] = useState<{
-  isVisible: boolean;
-  title: string;
-  message: string;
-  actionType: 'add' | 'edit' | 'delete' | 'export' | 'adjust';
-}>({
-  isVisible: false,
-  title: '',
-  message: '',
-  actionType: 'add'
-});
+  const [successAnimation, setSuccessAnimation] = useState<{
+    isVisible: boolean;
+    title: string;
+    message: string;
+    actionType: 'add' | 'edit' | 'delete' | 'export' | 'adjust';
+  }>({
+    isVisible: false,
+    title: '',
+    message: '',
+    actionType: 'add'
+  });
 
   // Pagination / rows-per-page state
   const [rowsPerPage, setRowsPerPage] = useState<number>(5);
@@ -1267,8 +1264,8 @@ const [successAnimation, setSuccessAnimation] = useState<{
 
   // Form state for Add/Edit dialog
   const [itemName, setItemName] = useState('');
-  const [itemCategory, setItemCategory] = useState<InventoryItem['category']>('');
-  const [itemVehicleType, setItemVehicleType] = useState<InventoryItem['vehicle_type']>('');
+  const [itemCategory, setItemCategory] = useState<InventoryItem['category'] | ''>('');
+  const [itemVehicleType, setItemVehicleType] = useState<InventoryItem['vehicle_type'] | ''>('');
   const [itemCostPrice, setItemCostPrice] = useState('');
   const [itemSalePrice, setItemSalePrice] = useState('');
   const [itemStockQuantity, setItemStockQuantity] = useState('');
@@ -1284,14 +1281,14 @@ const [successAnimation, setSuccessAnimation] = useState<{
       setIsLoading(false);
       return;
     }
-    
+
     setIsLoading(true);
-    
+
     try {
       // 🔥 Single optimized RPC call with all calculations and joins!
       const { data, error } = await supabase
         .rpc('get_inventory_complete');
-  
+
       if (error) {
         console.error('Error fetching inventory:', error.message);
         setFetchError(`Could not fetch inventory: ${error.message}`);
@@ -1306,7 +1303,7 @@ const [successAnimation, setSuccessAnimation] = useState<{
       setFetchError('Network error while fetching inventory');
       setItems([]);
     }
-    
+
     setIsLoading(false);
   }, []);
 
@@ -1410,13 +1407,13 @@ const [successAnimation, setSuccessAnimation] = useState<{
 
   // Enhanced columns for DataTableWrapper with search functionality
   const enhancedColumns = [
-    { 
-      key: 'name', 
+    {
+      key: 'name',
       header: 'Product Name',
       sortable: true
     },
-    { 
-      key: 'category', 
+    {
+      key: 'category',
       header: 'Category',
       render: (value: any, item: any) => (
         <Badge variant="outline" className="capitalize bg-slate-100 text-slate-700 border-slate-300">
@@ -1424,19 +1421,19 @@ const [successAnimation, setSuccessAnimation] = useState<{
         </Badge>
       )
     },
-    { 
-      key: 'vehicle_type', 
+    {
+      key: 'vehicle_type',
       header: 'Vehicle Type',
       render: (value: any, item: any) => <VehicleTypeBadge type={item.vehicle_type} />
     },
-    { 
-      key: 'stock_quantity', 
+    {
+      key: 'stock_quantity',
       header: 'Stock Level',
       sortable: true,
       render: (value: any, item: any) => <StockLevelIndicator quantity={Number(value)} reorderLevel={item.reorder_level} />
     },
-    { 
-      key: 'adjust_stock', 
+    {
+      key: 'adjust_stock',
       header: 'Adjust Stock',
       render: (value: any, item: any) => (
         <Button
@@ -1450,30 +1447,30 @@ const [successAnimation, setSuccessAnimation] = useState<{
         </Button>
       )
     },
-    { 
-      key: 'cost_price', 
+    {
+      key: 'cost_price',
       header: 'Cost (₱)',
       sortable: true,
       render: (value: any) => `₱${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     },
-    { 
-      key: 'sale_price', 
+    {
+      key: 'sale_price',
       header: 'Price (₱)',
       sortable: true,
       render: (value: any) => `₱${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     },
-    { 
-      key: 'profit_margin', 
+    {
+      key: 'profit_margin',
       header: 'Margin %',
       render: (value: any, item: any) => {
         const margin = calculateMargin(item);
         return (
-          <Badge 
+          <Badge
             variant={margin >= 30 ? "default" : "outline"}
             className={
               margin >= 30 ? 'bg-green-100 text-green-700 border-green-200' :
-              margin >= 15 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-              'bg-red-100 text-red-700 border-red-200'
+                margin >= 15 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                  'bg-red-100 text-red-700 border-red-200'
             }
           >
             {margin.toFixed(1)}%
@@ -1542,7 +1539,7 @@ const [successAnimation, setSuccessAnimation] = useState<{
     setAdjustingItem(item);
     setIsStockAdjustmentOpen(true);
   };
-  
+
   const handleOpenDeleteDialog = (item: InventoryItem) => {
     setDeletingItem(item);
     setIsDeleteConfirmationOpen(true);
@@ -1550,12 +1547,12 @@ const [successAnimation, setSuccessAnimation] = useState<{
 
   const handleSubmit = async () => {
     if (!supabase) return;
-    
+
     // Validate required fields and negative values
     const stockQuantity = parseInt(itemStockQuantity || '0');
     const costPrice = parseFloat(itemCostPrice || '0');
     const salePrice = parseFloat(itemSalePrice || '0');
-    
+
     const errors = {
       name: !itemName.trim(),
       category: !itemCategory,
@@ -1564,52 +1561,54 @@ const [successAnimation, setSuccessAnimation] = useState<{
       salePrice: salePrice < 0,
       stock: stockQuantity < 0
     };
-    
+
     setFormErrors(errors);
-    
+
     // Check if any errors exist
     if (Object.values(errors).some(error => error)) {
-      toast({ 
-        title: "Validation Error", 
-        description: "Please fix all errors before saving.", 
-        variant: "destructive" 
+      toast({
+        title: "Validation Error",
+        description: "Please fix all errors before saving.",
+        variant: "destructive"
       });
       return;
     }
-    
+
     const itemData = {
       name: itemName.trim(),
-      category: itemCategory,
-      vehicle_type: itemVehicleType,
+      category: itemCategory as InventoryItem['category'],
+      vehicle_type: itemVehicleType as InventoryItem['vehicle_type'],
       cost_price: costPrice,
       sale_price: salePrice,
       stock_quantity: stockQuantity,
     };
-  
+
     setIsLoading(true);
-  
+
     let error;
     let result;
-  
+
     if (editingItem) {
-        const { data, error: updateError } = await supabase
-          .from('inventory_item')
-          .update(itemData)
-          .eq('item_id', editingItem.item_id)
-          .select();
-        error = updateError;
-        result = data;
+      const { data, error: updateError } = await supabase
+        .from('inventory_item')
+        // @ts-ignore
+        .update(itemData as any)
+        .eq('item_id', editingItem.item_id)
+        .select();
+      error = updateError;
+      result = data;
     } else {
-        const { data, error: insertError } = await supabase
-          .from('inventory_item')
-          .insert([itemData])
-          .select();
-        error = insertError;
-        result = data;
+      const { data, error: insertError } = await supabase
+        .from('inventory_item')
+        // @ts-ignore
+        .insert([itemData] as any)
+        .select();
+      error = insertError;
+      result = data;
     }
-  
+
     setIsLoading(false);
-  
+
     if (error) {
       console.error('Error saving item:', error);
       toast({ title: "Save Error", description: `Could not save item: ${error.message}`, variant: "destructive" });
@@ -1630,52 +1629,53 @@ const [successAnimation, setSuccessAnimation] = useState<{
           actionType: 'add'
         });
       }
-      
+
       setIsAddItemDialogOpen(false);
       setIsEditItemDialogOpen(false);
       setEditingItem(null);
       resetForm();
-      fetchProducts();      
+      fetchProducts();
     }
   };
 
   const handleStockAdjustment = async (adjustment: number, reason: string) => {
     if (!adjustingItem || !supabase) return;
-  
+
     const newQuantity = adjustingItem.stock_quantity + adjustment;
     if (newQuantity < 0) {
       toast({ title: "Error", description: "Stock cannot be negative.", variant: "destructive" });
       return;
     }
-  
+
     setIsLoading(true);
     const { error } = await supabase
       .from('inventory_item')
-      .update({ 
+      // @ts-ignore
+      .update({
         stock_quantity: newQuantity,
         updated_at: new Date().toISOString()
       })
       .eq('item_id', adjustingItem.item_id);
-  
+
     setIsLoading(false);
-  
+
     // In handleStockAdjustment function, replace the success handling with:
-if (error) {
-  console.error('Error adjusting stock:', error);
-  toast({ title: "Adjustment Error", description: `Could not adjust stock: ${error.message}`, variant: "destructive" });
-} else {
-  // Show success animation for stock adjustment
-  setSuccessAnimation({
-    isVisible: true,
-    title: "Stock Adjusted Successfully!",
-    message: `Stock has been updated by ${adjustment}. New quantity: ${newQuantity}`,
-    actionType: 'adjust'
-  });
-  
-  setIsStockAdjustmentOpen(false);
-  setAdjustingItem(null);
-  fetchProducts();
-}
+    if (error) {
+      console.error('Error adjusting stock:', error);
+      toast({ title: "Adjustment Error", description: `Could not adjust stock: ${error.message}`, variant: "destructive" });
+    } else {
+      // Show success animation for stock adjustment
+      setSuccessAnimation({
+        isVisible: true,
+        title: "Stock Adjusted Successfully!",
+        message: `Stock has been updated by ${adjustment}. New quantity: ${newQuantity}`,
+        actionType: 'adjust'
+      });
+
+      setIsStockAdjustmentOpen(false);
+      setAdjustingItem(null);
+      fetchProducts();
+    }
   };
 
   const handleDeleteItem = async () => {
@@ -1686,24 +1686,24 @@ if (error) {
       .delete()
       .eq('item_id', deletingItem.item_id);
     setIsLoading(false);
-  
+
     // In handleDeleteItem function, replace the success handling with:
-if (error) {
-  console.error('Error deleting item:', error);
-  toast({ title: "Delete Error", description: `Could not delete item: ${error.message}`, variant: "destructive" });
-} else {
-  // Show success animation for deletion
-  setSuccessAnimation({
-    isVisible: true,
-    title: "Item Deleted Successfully!",
-    message: "The inventory item has been removed from the system.",
-    actionType: 'delete'
-  });
-  
-  setIsDeleteConfirmationOpen(false);
-  setDeletingItem(null);
-  fetchProducts();
-}
+    if (error) {
+      console.error('Error deleting item:', error);
+      toast({ title: "Delete Error", description: `Could not delete item: ${error.message}`, variant: "destructive" });
+    } else {
+      // Show success animation for deletion
+      setSuccessAnimation({
+        isVisible: true,
+        title: "Item Deleted Successfully!",
+        message: "The inventory item has been removed from the system.",
+        actionType: 'delete'
+      });
+
+      setIsDeleteConfirmationOpen(false);
+      setDeletingItem(null);
+      fetchProducts();
+    }
   };
 
   const handleRefresh = () => {
@@ -1722,57 +1722,57 @@ if (error) {
   };
 
   // Enhanced Excel Export with better formatting
-const handleExportExcel = () => {
-  const headers = ['Product Name', 'Category', 'Vehicle Type', 'Stock Level', 'Cost Price (₱)', 'Sale Price (₱)', 'Margin %', 'Status'];
-  
-  const csvContent = [
-    headers.join(','),
-    ...processedItems.map(item => {
-      const margin = calculateMargin(item);
-      const status = item.stock_quantity === 0 ? 'Out of Stock' : 
-                    item.stock_quantity <= 2 ? 'Critical' : 
-                    item.stock_quantity <= 5 ? 'Low Stock' : 'In Stock';
-      
-      return [
-        `"${item.name}"`,
-        item.category,
-        item.vehicle_type,
-        item.stock_quantity,
-        item.cost_price.toFixed(2),
-        item.sale_price.toFixed(2),
-        margin.toFixed(1),
-        status
-      ].join(',');
-    })
-  ].join('\n');
+  const handleExportExcel = () => {
+    const headers = ['Product Name', 'Category', 'Vehicle Type', 'Stock Level', 'Cost Price (₱)', 'Sale Price (₱)', 'Margin %', 'Status'];
 
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-  link.setAttribute('href', url);
-  link.setAttribute('download', `inventory_export_${new Date().toISOString().split('T')[0]}.csv`);
-  link.style.visibility = 'hidden';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+    const csvContent = [
+      headers.join(','),
+      ...processedItems.map(item => {
+        const margin = calculateMargin(item);
+        const status = item.stock_quantity === 0 ? 'Out of Stock' :
+          item.stock_quantity <= 2 ? 'Critical' :
+            item.stock_quantity <= 5 ? 'Low Stock' : 'In Stock';
 
-  // Show success animation for export
-  setSuccessAnimation({
-    isVisible: true,
-    title: "Export Successful!",
-    message: `Exported ${processedItems.length} items to CSV file.`,
-    actionType: 'export'
-  });
-};
+        return [
+          `"${item.name}"`,
+          item.category,
+          item.vehicle_type,
+          item.stock_quantity,
+          item.cost_price.toFixed(2),
+          item.sale_price.toFixed(2),
+          margin.toFixed(1),
+          status
+        ].join(',');
+      })
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `inventory_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Show success animation for export
+    setSuccessAnimation({
+      isVisible: true,
+      title: "Export Successful!",
+      message: `Exported ${processedItems.length} items to CSV file.`,
+      actionType: 'export'
+    });
+  };
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
-      
+
       {/* Background Sections */}
       <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
-        <div 
+        <div
           className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
-          style={{ 
+          style={{
             backgroundImage: "url('/images/image2.jpg')",
             backgroundSize: "cover",
             backgroundPosition: "center 30%"
@@ -1787,12 +1787,12 @@ const handleExportExcel = () => {
       </div>
 
       <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-        
+
         {/* Header Section */}
         <div className={`mb-12 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
           <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
-            
+
             <div className="relative z-10 flex-1">
               <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
                 Inventory Management
@@ -1816,8 +1816,8 @@ const handleExportExcel = () => {
                 </div>
               </div>
             </div>
-            
-            <Button 
+
+            <Button
               onClick={handleRefresh}
               disabled={isLoading}
               className={buttonStyles.glass + " active:scale-95"}
@@ -1829,62 +1829,62 @@ const handleExportExcel = () => {
         </div>
 
         {/* Stock Alerts */}
-        <StockAlertsBar 
-          criticalCount={criticalStockCount} 
+        <StockAlertsBar
+          criticalCount={criticalStockCount}
           warningCount={lowStockCount}
           outOfStockCount={outOfStockCount} // NEW: Add out of stock count
           onShowDetails={() => setIsCriticalDetailsOpen(true)}
         />
 
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
-              {/* Add New Item - large gradient card */}
-              <button
-                type="button"
-                onClick={handleOpenAddDialog}
-                className="min-w-[220px] flex-1 sm:flex-auto flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1"
-                style={{ background: 'linear-gradient(90deg,#7c3aed 0%,#4f46e5 100%)' }}
-              >
-                <div className="text-left">
-                  <div className="text-lg font-semibold">Add New Item</div>
-                  <div className="text-sm opacity-90">Create a new inventory item</div>
-                </div>
-                <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
-                  <Plus className="h-5 w-5 text-white" />
-                </div>
-              </button>
+          {/* Add New Item - large gradient card */}
+          <button
+            type="button"
+            onClick={handleOpenAddDialog}
+            className="min-w-[220px] flex-1 sm:flex-auto flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1"
+            style={{ background: 'linear-gradient(90deg,#7c3aed 0%,#4f46e5 100%)' }}
+          >
+            <div className="text-left">
+              <div className="text-lg font-semibold">Add New Item</div>
+              <div className="text-sm opacity-90">Create a new inventory item</div>
+            </div>
+            <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
+              <Plus className="h-5 w-5 text-white" />
+            </div>
+          </button>
 
-              {/* Export Excel - blue gradient card */}
-              <button
-                type="button"
-                onClick={handleExportExcel}
-                className="min-w-[220px] flex-1 sm:flex-auto flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1"
-                style={{ background: 'linear-gradient(90deg,#0ea5e9 0%,#0284c7 100%)' }}
-              >
-                <div className="text-left">
-                  <div className="text-lg font-semibold">Export Excel</div>
-                  <div className="text-sm opacity-90">Download filtered items</div>
-                </div>
-                <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
-                  <Download className="h-5 w-5 text-white" />
-                </div>
-              </button>
+          {/* Export Excel - blue gradient card */}
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            className="min-w-[220px] flex-1 sm:flex-auto flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1"
+            style={{ background: 'linear-gradient(90deg,#0ea5e9 0%,#0284c7 100%)' }}
+          >
+            <div className="text-left">
+              <div className="text-lg font-semibold">Export Excel</div>
+              <div className="text-sm opacity-90">Download filtered items</div>
+            </div>
+            <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
+              <Download className="h-5 w-5 text-white" />
+            </div>
+          </button>
 
-              {/* View More - green gradient card */}
-              <button
-                type="button"
-                onClick={() => setIsViewMoreOpen(true)}
-                className="min-w-[220px] flex-1 sm:flex-auto flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1"
-                style={{ background: 'linear-gradient(90deg,#10b981 0%,#06b6d4 100%)' }}
-              >
-                <div className="text-left">
-                  <div className="text-lg font-semibold">View More</div>
-                  <div className="text-sm opacity-90">Open detailed list</div>
-                </div>
-                <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
-                  <Eye className="h-5 w-5 text-white" />
-                </div>
-              </button> 
-          </div>
+          {/* View More - green gradient card */}
+          <button
+            type="button"
+            onClick={() => setIsViewMoreOpen(true)}
+            className="min-w-[220px] flex-1 sm:flex-auto flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1"
+            style={{ background: 'linear-gradient(90deg,#10b981 0%,#06b6d4 100%)' }}
+          >
+            <div className="text-left">
+              <div className="text-lg font-semibold">View More</div>
+              <div className="text-sm opacity-90">Open detailed list</div>
+            </div>
+            <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
+              <Eye className="h-5 w-5 text-white" />
+            </div>
+          </button>
+        </div>
 
         {/* Enhanced Inventory Table using DataTableWrapper */}
         <section aria-labelledby="inventory-list-heading">
@@ -1895,7 +1895,7 @@ const handleExportExcel = () => {
               <p className="text-slate-600">Loading inventory items...</p>
             </div>
           ) : processedItems.length === 0 ? (
-            <EnhancedEmptyState 
+            <EnhancedEmptyState
               filters={filters}
               onClearFilters={handleClearFilters}
               onAddItem={handleOpenAddDialog}
@@ -1922,7 +1922,7 @@ const handleExportExcel = () => {
                       </div>
                     </div>
                   </div>
- 
+
                   {/* Rows per page relocated to the header (right side) */}
                   <div className="flex items-center gap-3">
                     <div className="text-sm text-white/90 mr-2">Rows per page:</div>
@@ -1941,25 +1941,25 @@ const handleExportExcel = () => {
                     </div>
                   </div>
                 </div>
- 
+
                 {/* Advanced Filters now live directly under the gradient header so they appear as part of the table header */}
                 <div>
-                  <AdvancedFilters 
+                  <AdvancedFilters
                     filters={filters}
                     onFiltersChange={setFilters}
                     onClearFilters={handleClearFilters}
                   />
                 </div>
 
-                   {/* DataTableWrapper without its own title so the gradient header remains part of the same card */}
-                   <DataTableWrapper
-                     className="w-full"
-                     columns={enhancedColumns}
-                     data={displayedItems.map(i => ({ ...i, id: i.item_id }))}
-                     onEdit={handleOpenEditDialog}
-                     onDelete={handleOpenDeleteDialog}
-                   />
-                 {/* footer: rows-per-page + showing X of Y + simple pager */}
+                {/* DataTableWrapper without its own title so the gradient header remains part of the same card */}
+                <DataTableWrapper
+                  className="w-full"
+                  columns={enhancedColumns}
+                  data={displayedItems.map(i => ({ ...i, id: i.item_id }))}
+                  onEdit={handleOpenEditDialog}
+                  onDelete={handleOpenDeleteDialog}
+                />
+                {/* footer: rows-per-page + showing X of Y + simple pager */}
                 <div className="px-6 py-3 border-t border-slate-100 bg-white flex items-center justify-between">
                   <div className="text-sm text-slate-600">
                     Showing {processedItems.length === 0 ? 0 : ((currentPage - 1) * rowsPerPage + 1)} to {Math.min(currentPage * rowsPerPage, processedItems.length)} of {processedItems.length} entries
@@ -1985,11 +1985,11 @@ const handleExportExcel = () => {
                     </Button>
                   </div>
                 </div>
-               </div>
-             </>
-            )}
-          </section>
-        </div>
+              </div>
+            </>
+          )}
+        </section>
+      </div>
 
       {/* === DIALOGS / MODALS === */}
       {/* Add / Edit Item Dialog */}
@@ -2013,7 +2013,7 @@ const handleExportExcel = () => {
               {isEditItemDialogOpen ? 'Update inventory item details' : 'Create a new inventory item'}
             </DialogDescription>
           </DialogHeader>
- 
+
           <div className="py-2">
             {/* Compact form in list style */}
             <div className="space-y-3">
@@ -2031,8 +2031,8 @@ const handleExportExcel = () => {
                       }
                     }}
                     className={
-                      formErrors.name 
-                        ? "border-red-500 focus:border-red-500 bg-white h-9" 
+                      formErrors.name
+                        ? "border-red-500 focus:border-red-500 bg-white h-9"
                         : "border-slate-300 focus:border-indigo-400 bg-white h-9"
                     }
                   />
@@ -2043,7 +2043,7 @@ const handleExportExcel = () => {
                     </p>
                   )}
                 </div>
-                
+
                 <div className="w-32">
                   <Label className="text-sm font-medium text-slate-700 mb-1 block">Stock</Label>
                   <div className="flex items-center border border-slate-300 rounded-md bg-white focus-within:border-indigo-400 overflow-hidden h-9">
@@ -2065,8 +2065,8 @@ const handleExportExcel = () => {
                         }
                       }}
                       className={
-                        formErrors.stock 
-                          ? "border-0 text-center focus:ring-0 shadow-none flex-1 h-full text-sm px-1 border-red-500" 
+                        formErrors.stock
+                          ? "border-0 text-center focus:ring-0 shadow-none flex-1 h-full text-sm px-1 border-red-500"
                           : "border-0 text-center focus:ring-0 shadow-none flex-1 h-full text-sm px-1"
                       }
                     />
@@ -2091,8 +2091,8 @@ const handleExportExcel = () => {
               <div className="flex gap-4 items-start">
                 <div className="flex-1">
                   <Label className="text-sm font-medium text-slate-700 mb-1 block">Category *</Label>
-                  <Select 
-                    value={itemCategory} 
+                  <Select
+                    value={itemCategory}
                     onValueChange={(v) => {
                       setItemCategory(v as any);
                       if (formErrors.category) {
@@ -2101,8 +2101,8 @@ const handleExportExcel = () => {
                     }}
                   >
                     <SelectTrigger className={
-                      formErrors.category 
-                        ? "border-red-500 focus:border-red-500 bg-white h-9" 
+                      formErrors.category
+                        ? "border-red-500 focus:border-red-500 bg-white h-9"
                         : "border-slate-300 focus:border-indigo-400 bg-white h-9"
                     }>
                       <SelectValue placeholder="Select Category" />
@@ -2120,11 +2120,11 @@ const handleExportExcel = () => {
                     </p>
                   )}
                 </div>
-                
+
                 <div className="flex-1">
                   <Label className="text-sm font-medium text-slate-700 mb-1 block">Vehicle Type *</Label>
-                  <Select 
-                    value={itemVehicleType} 
+                  <Select
+                    value={itemVehicleType}
                     onValueChange={(v) => {
                       setItemVehicleType(v as any);
                       if (formErrors.vehicleType) {
@@ -2133,8 +2133,8 @@ const handleExportExcel = () => {
                     }}
                   >
                     <SelectTrigger className={
-                      formErrors.vehicleType 
-                        ? "border-red-500 focus:border-red-500 bg-white h-9" 
+                      formErrors.vehicleType
+                        ? "border-red-500 focus:border-red-500 bg-white h-9"
                         : "border-slate-300 focus:border-indigo-400 bg-white h-9"
                     }>
                       <SelectValue placeholder="Select Vehicle Type" />
@@ -2169,8 +2169,8 @@ const handleExportExcel = () => {
                       }
                     }}
                     className={
-                      formErrors.costPrice 
-                        ? "border-red-500 focus:border-red-500 bg-white h-9" 
+                      formErrors.costPrice
+                        ? "border-red-500 focus:border-red-500 bg-white h-9"
                         : "border-slate-300 focus:border-indigo-400 bg-white h-9"
                     }
                   />
@@ -2181,7 +2181,7 @@ const handleExportExcel = () => {
                     </p>
                   )}
                 </div>
-                
+
                 <div className="flex-1">
                   <Label className="text-sm font-medium text-slate-700 mb-1 block">Sale Price (₱)</Label>
                   <Input
@@ -2195,8 +2195,8 @@ const handleExportExcel = () => {
                       }
                     }}
                     className={
-                      formErrors.salePrice 
-                        ? "border-red-500 focus:border-red-500 bg-white h-9" 
+                      formErrors.salePrice
+                        ? "border-red-500 focus:border-red-500 bg-white h-9"
                         : "border-slate-300 focus:border-indigo-400 bg-white h-9"
                     }
                   />
@@ -2210,7 +2210,7 @@ const handleExportExcel = () => {
               </div>
             </div>
           </div>
- 
+
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsAddItemDialogOpen(false); setIsEditItemDialogOpen(false); resetForm(); }}>
               Cancel
@@ -2221,7 +2221,7 @@ const handleExportExcel = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
- 
+
       {/* Stock Adjustment Dialog */}
       <Dialog open={isStockAdjustmentOpen} onOpenChange={(open) => { if (!open) { setIsStockAdjustmentOpen(false); setAdjustingItem(null); } }}>
         <DialogContent className="sm:max-w-xl bg-white border border-slate-200 shadow-2xl">
@@ -2240,14 +2240,14 @@ const handleExportExcel = () => {
           )}
         </DialogContent>
       </Dialog>
- 
+
       {/* Critical Stock Details (Review Alerts) */}
       <CriticalStockDetails
         items={items}
         isOpen={isCriticalDetailsOpen}
         onClose={() => setIsCriticalDetailsOpen(false)}
       />
- 
+
       {/* View More Dialog */}
       <ViewMoreDialog
         items={items}
@@ -2256,13 +2256,13 @@ const handleExportExcel = () => {
       />
 
       {/* Success Animation for All Actions */}
-<SuccessAnimation
-  isVisible={successAnimation.isVisible}
-  title={successAnimation.title}
-  message={successAnimation.message}
-  actionType={successAnimation.actionType}
-  onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))}
-/>
+      <SuccessAnimation
+        isVisible={successAnimation.isVisible}
+        title={successAnimation.title}
+        message={successAnimation.message}
+        actionType={successAnimation.actionType}
+        onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))}
+      />
 
       {/* Error Display */}
       {fetchError && (
@@ -2273,7 +2273,7 @@ const handleExportExcel = () => {
                 <AlertTriangle className="h-5 w-5 text-red-600" />
                 <span className="text-red-800">{fetchError}</span>
               </div>
-              <button 
+              <button
                 onClick={() => setFetchError(null)}
                 className="text-red-600 hover:text-red-800 transition-all duration-300"
               >

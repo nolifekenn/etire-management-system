@@ -16,9 +16,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { 
-  MoreHorizontal, 
-  Edit, 
+import {
+  MoreHorizontal,
+  Edit,
   Trash2
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -37,6 +37,7 @@ interface DataTableWrapperProps<T> {
   onEdit?: (item: T) => void;
   onDelete?: (item: T) => void;
   onRowClick?: (item: T) => void;
+  className?: string;
 }
 
 export function DataTableWrapper<T>({
@@ -46,6 +47,7 @@ export function DataTableWrapper<T>({
   onEdit,
   onDelete,
   onRowClick,
+  className,
 }: DataTableWrapperProps<T>) {
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
@@ -76,7 +78,7 @@ export function DataTableWrapper<T>({
   };
 
   return (
-    <Card className="bg-white border-slate-100 transition-all duration-300 hover:shadow-xl rounded-none overflow-hidden">
+    <Card className={`bg-white border-slate-100 transition-all duration-300 hover:shadow-xl rounded-none overflow-hidden ${className || ''}`}>
       <CardContent className="pb-0 pt-0 px-0">
         {/* Table - completely square with no rounding */}
         <div className="border-0 bg-white">
@@ -85,11 +87,10 @@ export function DataTableWrapper<T>({
               <TableHeader>
                 <TableRow className="bg-gradient-to-r from-slate-50 to-indigo-50/20 border-b border-slate-200 hover:bg-slate-50/80">
                   {columns.map((col) => (
-                    <TableHead 
+                    <TableHead
                       key={String(col.key)}
-                      className={`text-slate-700 font-semibold text-sm uppercase tracking-wide py-3 px-6 ${
-                        col.sortable ? 'cursor-pointer hover:bg-slate-100 select-none transition-colors' : ''
-                      }`}
+                      className={`text-slate-700 font-semibold text-sm uppercase tracking-wide py-3 px-6 ${col.sortable ? 'cursor-pointer hover:bg-slate-100 select-none transition-colors' : ''
+                        }`}
                       onClick={() => col.sortable && handleSort(col.key)}
                     >
                       <div className="flex items-center gap-2">
@@ -112,8 +113,8 @@ export function DataTableWrapper<T>({
               <TableBody>
                 {sortedData.length === 0 ? (
                   <TableRow>
-                    <TableCell 
-                      colSpan={columns.length + ((onEdit || onDelete) ? 1 : 0)} 
+                    <TableCell
+                      colSpan={columns.length + ((onEdit || onDelete) ? 1 : 0)}
                       className="text-center py-8 text-slate-500"
                     >
                       <div className="flex flex-col items-center gap-2">
@@ -131,7 +132,7 @@ export function DataTableWrapper<T>({
                   </TableRow>
                 ) : (
                   sortedData.map((item, index) => (
-                    <TableRow 
+                    <TableRow
                       key={(item as any).id || `row-${index}`}
                       className={`
                         border-b border-slate-100 
@@ -143,7 +144,7 @@ export function DataTableWrapper<T>({
                       onClick={() => onRowClick?.(item)}
                     >
                       {columns.map((col) => (
-                        <TableCell 
+                        <TableCell
                           key={String(col.key)}
                           className="py-3 px-6 text-slate-700"
                         >
@@ -156,8 +157,8 @@ export function DataTableWrapper<T>({
                         <TableCell className="text-right py-3 px-6">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button 
-                                variant="ghost" 
+                              <Button
+                                variant="ghost"
                                 className="h-8 w-8 p-0 hover:bg-indigo-100 hover:text-indigo-600 transition-all duration-200"
                                 onClick={(e) => e.stopPropagation()}
                               >
@@ -165,12 +166,12 @@ export function DataTableWrapper<T>({
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent 
+                            <DropdownMenuContent
                               align="end"
                               className="bg-white border-slate-200 shadow-xl w-48"
                             >
                               {onEdit && (
-                                <DropdownMenuItem 
+                                <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     onEdit(item);
@@ -182,7 +183,7 @@ export function DataTableWrapper<T>({
                                 </DropdownMenuItem>
                               )}
                               {onDelete && (
-                                <DropdownMenuItem 
+                                <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     onDelete(item);

@@ -42,6 +42,7 @@ export interface Database {
           item_id: string
           name: string
           category: 'tire' | 'tool' | 'accessory'
+          vehicle_type: 'car' | 'motor' | 'truck'
           stock_quantity: number
           cost_price: number
           sale_price: number
@@ -55,6 +56,7 @@ export interface Database {
           item_id?: string
           name: string
           category: 'tire' | 'tool' | 'accessory'
+          vehicle_type: 'car' | 'motor' | 'truck'
           stock_quantity?: number
           cost_price: number
           sale_price: number
@@ -68,6 +70,7 @@ export interface Database {
           item_id?: string
           name?: string
           category?: 'tire' | 'tool' | 'accessory'
+          vehicle_type?: 'car' | 'motor' | 'truck'
           stock_quantity?: number
           cost_price?: number
           sale_price?: number

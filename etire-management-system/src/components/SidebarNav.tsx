@@ -64,7 +64,7 @@ const navItems = [
 ];
 
 const adminNavItems = [
-    { href: '/admin', label: 'Admin', icon: Shield, requiredRole: 2 }
+  { href: '/admin', label: 'Admin', icon: Shield, requiredRole: 2 }
 ]
 
 // Updated avatar options with face emojis and better gradients
@@ -98,7 +98,7 @@ export function SidebarNav() {
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState(avatarOptions[0]);
-  const [isHovering, setIsHovering] = useState(false);
+
 
   // Enhanced color system with better visual hierarchy
   const colors = {
@@ -142,6 +142,29 @@ export function SidebarNav() {
     admin: { background: 'rgba(99, 102, 241, 0.15)', icon: '#6366f1' }
   };
 
+  // RBAC Logic
+  const checkAccess = (href: string, userRole: number) => {
+    if (!userRole) return false;
+
+    // Admin (3) - ONLY Admin panel
+    if (userRole === 3) {
+      return href === '/admin';
+    }
+
+    // Branch Manager (2) - Everything except Admin Panel
+    if (userRole === 2) {
+      return href !== '/admin';
+    }
+
+    // Staff (1)
+    if (userRole === 1) {
+      const allowed = ['/inventory', '/pos', '/services', '/customers'];
+      return allowed.includes(href);
+    }
+
+    return false;
+  };
+
   // Enhanced micro-animations
   const microAnimations = {
     cardHover: "transition-all duration-300 ease-out hover:translate-y-[-2px] hover:shadow-md",
@@ -161,7 +184,7 @@ export function SidebarNav() {
     if (savedState !== null) {
       setIsCollapsed(savedState === 'true');
     }
-    
+
     // Load selected avatar from localStorage
     const savedAvatar = localStorage.getItem('selectedAvatar');
     if (savedAvatar) {
@@ -171,21 +194,21 @@ export function SidebarNav() {
 
   // Broadcast collapse state changes to parent layout
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent('sidebarCollapse', { 
-      detail: { isCollapsed } 
+    window.dispatchEvent(new CustomEvent('sidebarCollapse', {
+      detail: { isCollapsed }
     }));
   }, [isCollapsed]);
 
   // Fetch branches for admin branch switching - FIXED
   const fetchBranches = useCallback(async () => {
     if (!supabase || !user || user.role !== 3) return;
-    
+
     const { data, error } = await supabase
       .from('branch')
       .select('*')
       .eq('is_active', true)
       .order('name', { ascending: true });
-    
+
     if (error) {
       console.error('Error fetching branches:', error);
     } else {
@@ -203,7 +226,7 @@ export function SidebarNav() {
 
   const handleBranchSwitch = async (branchId: string) => {
     if (!supabase || !user || user.role !== 3) return;
-    
+
     const selectedBranch = branches.find(b => b.branch_id === branchId);
     if (selectedBranch) {
       setCurrentBranch(selectedBranch);
@@ -243,7 +266,7 @@ export function SidebarNav() {
       'Backup': 'analytics',
       'Admin': 'admin'
     };
-    
+
     return iconCategories[categoryMap[itemLabel] as keyof typeof iconCategories] || iconCategories.dashboard;
   };
 
@@ -268,7 +291,7 @@ export function SidebarNav() {
         <SidebarHeader className="p-6 bg-white border-b border-gray-200">
           <div className="flex items-center justify-between gap-3">
             {isCollapsed ? (
-              <button 
+              <button
                 onClick={toggleSidebar}
                 className="flex items-center justify-center w-full cursor-pointer hover:opacity-90 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 rounded-full p-2"
                 title="Expand sidebar"
@@ -279,7 +302,7 @@ export function SidebarNav() {
               </button>
             ) : (
               <>
-                <button 
+                <button
                   onClick={toggleSidebar}
                   className="flex items-center gap-4 cursor-pointer hover:opacity-90 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 rounded-2xl p-2 -ml-2"
                 >
@@ -301,15 +324,15 @@ export function SidebarNav() {
               </>
             )}
           </div>
-          
+
           {/* Enhanced Branch Switcher for Admins */}
           {!isCollapsed && user && user.role === 3 && branches.length > 0 && (
             <div className="mt-6">
               <label className="text-sm font-semibold text-gray-700 mb-3 block font-poppins">
                 Current Branch
               </label>
-              <Select 
-                value={currentBranch?.branch_id || ''} 
+              <Select
+                value={currentBranch?.branch_id || ''}
                 onValueChange={handleBranchSwitch}
               >
                 <SelectTrigger className="w-full bg-white border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 font-poppins">
@@ -317,8 +340,8 @@ export function SidebarNav() {
                 </SelectTrigger>
                 <SelectContent className="bg-white border border-gray-300 rounded-xl shadow-xl font-poppins">
                   {branches.map((branch) => (
-                    <SelectItem 
-                      key={branch.branch_id} 
+                    <SelectItem
+                      key={branch.branch_id}
                       value={branch.branch_id}
                       className="focus:bg-purple-50 focus:text-purple-700 rounded-lg font-poppins"
                     >
@@ -337,21 +360,24 @@ export function SidebarNav() {
             {navItems.map((item) => {
               const hasAccess = user && user.role >= item.requiredRole;
               if (!hasAccess) return null;
+
+              const isAllowed = user ? checkAccess(item.href, user.role) : false;
               const active = pathname === item.href;
               const iconColor = getIconColor(item.label);
-              
+
               return (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
                     isActive={active}
                     tooltip={isCollapsed ? item.label : undefined}
+                    className={!isAllowed ? 'opacity-50 pointer-events-none cursor-not-allowed grayscale' : ''}
                   >
                     <Link
-                      href={item.href}
+                      href={isAllowed ? item.href : '#'}
                       className={`group flex items-center gap-3 px-4 py-3 transition-all duration-200 text-sm rounded-xl font-poppins
-                        ${active 
-                          ? `${colors.active.background} text-white font-semibold ${colors.active.shadow}` 
+                        ${active
+                          ? `${colors.active.background} text-white font-semibold ${colors.active.shadow}`
                           : 'bg-transparent text-gray-700 hover:bg-gray-100 hover:text-purple-600 border border-transparent'
                         }
                         focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50
@@ -359,20 +385,21 @@ export function SidebarNav() {
                         ${isCollapsed ? 'justify-center' : ''}
                       `}
                       title={isCollapsed ? item.label : undefined}
+                      aria-disabled={!isAllowed}
+                      tabIndex={!isAllowed ? -1 : undefined}
                     >
-                      <div 
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
-                          active 
-                            ? 'bg-white/20' 
-                            : 'bg-gray-100 group-hover:bg-gray-200'
-                        } ${microAnimations.iconHover}`}
-                        style={{ 
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${active
+                          ? 'bg-white/20'
+                          : 'bg-gray-100 group-hover:bg-gray-200'
+                          } ${microAnimations.iconHover}`}
+                        style={{
                           backgroundColor: active ? 'rgba(255,255,255,0.2)' : iconColor.background,
                         }}
                       >
-                        <item.icon 
+                        <item.icon
                           className="w-5 h-5 flex-shrink-0"
-                          style={{ 
+                          style={{
                             color: active ? 'white' : iconColor.icon
                           }}
                         />
@@ -393,12 +420,13 @@ export function SidebarNav() {
                   asChild
                   isActive={pathname === '/admin'}
                   tooltip={isCollapsed ? "Admin Panel" : undefined}
+                  className={!checkAccess('/admin', user.role) ? 'opacity-50 pointer-events-none cursor-not-allowed grayscale' : ''}
                 >
                   <Link
-                    href="/admin"
+                    href={checkAccess('/admin', user.role) ? "/admin" : "#"}
                     className={`group flex items-center gap-3 px-4 py-3 transition-all duration-200 text-sm rounded-xl font-poppins
-                      ${pathname === '/admin' 
-                        ? `${colors.active.background} text-white font-semibold ${colors.active.shadow}` 
+                      ${pathname === '/admin'
+                        ? `${colors.active.background} text-white font-semibold ${colors.active.shadow}`
                         : 'bg-transparent text-gray-700 hover:bg-gray-100 hover:text-purple-600 border border-transparent'
                       }
                       focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50
@@ -406,20 +434,21 @@ export function SidebarNav() {
                       ${isCollapsed ? 'justify-center' : ''}
                     `}
                     title={isCollapsed ? "Admin" : undefined}
+                    aria-disabled={!checkAccess('/admin', user.role)}
+                    tabIndex={!checkAccess('/admin', user.role) ? -1 : undefined}
                   >
-                    <div 
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
-                        pathname === '/admin' 
-                          ? 'bg-white/20' 
-                          : 'bg-gray-100 group-hover:bg-gray-200'
-                      } ${microAnimations.iconHover}`}
-                      style={{ 
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${pathname === '/admin'
+                        ? 'bg-white/20'
+                        : 'bg-gray-100 group-hover:bg-gray-200'
+                        } ${microAnimations.iconHover}`}
+                      style={{
                         backgroundColor: pathname === '/admin' ? 'rgba(255,255,255,0.2)' : iconCategories.admin.background,
                       }}
                     >
-                      <Shield 
+                      <Shield
                         className="w-5 h-5 flex-shrink-0"
-                        style={{ 
+                        style={{
                           color: pathname === '/admin' ? 'white' : iconCategories.admin.icon
                         }}
                       />
@@ -440,7 +469,7 @@ export function SidebarNav() {
           {!isCollapsed ? (
             <>
               {/* Enhanced User Profile with better typography */}
-              <div 
+              <div
                 className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100 transition-all duration-200 group"
                 onClick={() => setIsAvatarDialogOpen(true)}
               >
@@ -466,37 +495,35 @@ export function SidebarNav() {
               </div>
 
               {/* Enhanced Footer Buttons with consistent styling */}
-              <Button 
-                asChild 
-                variant="ghost" 
-                className={`w-full justify-start hover:bg-gray-100 hover:text-purple-600 text-gray-700 rounded-xl py-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 font-poppins ${
-                  pathname === '/settings' ? 'bg-purple-50 text-purple-700' : ''
-                }`}
+              <Button
+                asChild
+                variant="ghost"
+                className={`w-full justify-start hover:bg-gray-100 hover:text-purple-600 text-gray-700 rounded-xl py-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 font-poppins ${pathname === '/settings' ? 'bg-purple-50 text-purple-700' : ''
+                  } ${user && (user.role === 2) ? '' : 'opacity-50 pointer-events-none cursor-not-allowed grayscale'}`}
               >
-                <Link href="/settings" className="group flex items-center gap-2 w-full">
+                <Link href={user && (user.role === 2) ? "/settings" : "#"} className="group flex items-center gap-2 w-full">
                   <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-all duration-200">
                     <Settings className="w-4 h-4 text-gray-600 group-hover:text-purple-600 transition-colors" />
                   </div>
                   <span className="font-medium font-poppins">Settings</span>
                 </Link>
               </Button>
-              <Button 
-                asChild 
-                variant="ghost" 
-                className={`w-full justify-start hover:bg-gray-100 hover:text-purple-600 text-gray-700 rounded-xl py-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 font-poppins ${
-                  pathname === '/support' ? 'bg-purple-50 text-purple-700' : ''
-                }`}
+              <Button
+                asChild
+                variant="ghost"
+                className={`w-full justify-start hover:bg-gray-100 hover:text-purple-600 text-gray-700 rounded-xl py-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 font-poppins ${pathname === '/support' ? 'bg-purple-50 text-purple-700' : ''
+                  } ${user && (user.role === 2) ? '' : 'opacity-50 pointer-events-none cursor-not-allowed grayscale'}`}
               >
-                <Link href="/support" className="group flex items-center gap-2 w-full">
+                <Link href={user && (user.role === 2) ? "/support" : "#"} className="group flex items-center gap-2 w-full">
                   <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-all duration-200">
                     <LifeBuoy className="w-4 h-4 text-gray-600 group-hover:text-purple-600 transition-colors" />
                   </div>
                   <span className="font-medium font-poppins">Support</span>
                 </Link>
               </Button>
-              <Button 
-                variant="ghost" 
-                className="w-full justify-start hover:bg-red-50 hover:text-red-600 text-gray-700 rounded-xl py-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 font-poppins" 
+              <Button
+                variant="ghost"
+                className="w-full justify-start hover:bg-red-50 hover:text-red-600 text-gray-700 rounded-xl py-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 font-poppins"
                 onClick={() => setIsLogoutDialogOpen(true)}
               >
                 <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-red-100 transition-all duration-200 mr-2">
@@ -508,7 +535,7 @@ export function SidebarNav() {
           ) : (
             <>
               {/* Collapsed Footer with better tooltips */}
-              <div 
+              <div
                 className="flex justify-center w-full mb-2 cursor-pointer group"
                 onClick={() => setIsAvatarDialogOpen(true)}
                 title="Change Avatar"
@@ -523,38 +550,36 @@ export function SidebarNav() {
                   <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
                 </div>
               </div>
-              <Button 
-                asChild 
-                variant="ghost" 
-                className={`w-full justify-center hover:bg-gray-100 rounded-xl p-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 ${
-                  pathname === '/settings' ? 'bg-purple-50' : ''
-                }`} 
+              <Button
+                asChild
+                variant="ghost"
+                className={`w-full justify-center hover:bg-gray-100 rounded-xl p-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 ${pathname === '/settings' ? 'bg-purple-50' : ''
+                  } ${user && (user.role === 2) ? '' : 'opacity-50 pointer-events-none cursor-not-allowed grayscale'}`}
                 title="Settings"
               >
-                <Link href="/settings" className="group flex items-center justify-center w-full text-gray-700 hover:text-purple-600">
+                <Link href={user && (user.role === 2) ? "/settings" : "#"} className="group flex items-center justify-center w-full text-gray-700 hover:text-purple-600">
                   <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-all duration-200">
                     <Settings className="w-5 h-5 text-gray-600 group-hover:text-purple-600 transition-colors" />
                   </div>
                 </Link>
               </Button>
-              <Button 
-                asChild 
-                variant="ghost" 
-                className={`w-full justify-center hover:bg-gray-100 rounded-xl p-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 ${
-                  pathname === '/support' ? 'bg-purple-50' : ''
-                }`} 
+              <Button
+                asChild
+                variant="ghost"
+                className={`w-full justify-center hover:bg-gray-100 rounded-xl p-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 ${pathname === '/support' ? 'bg-purple-50' : ''
+                  } ${user && (user.role === 2) ? '' : 'opacity-50 pointer-events-none cursor-not-allowed grayscale'}`}
                 title="Support"
               >
-                <Link href="/support" className="group flex items-center justify-center w-full text-gray-700 hover:text-purple-600">
+                <Link href={user && (user.role === 2) ? "/support" : "#"} className="group flex items-center justify-center w-full text-gray-700 hover:text-purple-600">
                   <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-all duration-200">
                     <LifeBuoy className="w-5 h-5 text-gray-600 group-hover:text-purple-600 transition-colors" />
                   </div>
                 </Link>
               </Button>
-              <Button 
-                variant="ghost" 
-                className="w-full justify-center hover:bg-red-50 rounded-xl p-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50" 
-                onClick={() => setIsLogoutDialogOpen(true)} 
+              <Button
+                variant="ghost"
+                className="w-full justify-center hover:bg-red-50 rounded-xl p-3 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50"
+                onClick={() => setIsLogoutDialogOpen(true)}
                 title="Logout"
               >
                 <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center group-hover:bg-red-100 transition-all duration-200">
@@ -580,11 +605,10 @@ export function SidebarNav() {
               <button
                 key={avatar.id}
                 onClick={() => handleAvatarSelect(avatar)}
-                className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all duration-200 font-poppins ${
-                  selectedAvatar.id === avatar.id
-                    ? 'border-purple-500 bg-purple-50 scale-105 shadow-md'
-                    : 'border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400'
-                } ${microAnimations.buttonHover}`}
+                className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all duration-200 font-poppins ${selectedAvatar.id === avatar.id
+                  ? 'border-purple-500 bg-purple-50 scale-105 shadow-md'
+                  : 'border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400'
+                  } ${microAnimations.buttonHover}`}
               >
                 <div className={`w-12 h-12 rounded-full bg-gradient-to-r ${avatar.gradient} flex items-center justify-center text-xl mb-2 shadow-lg`}>
                   {avatar.emoji}

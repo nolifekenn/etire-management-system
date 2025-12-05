@@ -100,9 +100,9 @@ interface SaleItem {
 }
 
 interface EnhancedSale extends Sale {
-  customer?: { name: string };
-  sale_items?: SaleItem[];
-  total_amount?: number;
+  customer?: { name: string; phone?: string };
+  sale_item?: SaleItem[];
+  user?: { name: string };
 }
 
 const ANONYMOUS_CUSTOMER_ID = "anonymous_customer";
@@ -172,7 +172,7 @@ function DataTableWrapper({
   const [internalSearchTerm, setInternalSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [internalRowsPerPage, setInternalRowsPerPage] = useState(rowsPerPageOptions[0]);
-  
+
   // Use external props if provided, otherwise internal state
   const rowsPerPage = typeof externalRowsPerPage === 'number' ? externalRowsPerPage : internalRowsPerPage;
   const searchTerm = typeof externalSearchTerm === 'string' ? externalSearchTerm : internalSearchTerm;
@@ -488,39 +488,39 @@ const SuccessAnimation = ({
   const getActionConfig = () => {
     switch (actionType) {
       case 'sale':
-        return { 
+        return {
           gradient: 'from-green-500 to-emerald-600',
-          icon: CheckCircle 
+          icon: CheckCircle
         };
       case 'receipt':
-        return { 
+        return {
           gradient: 'from-blue-500 to-cyan-600',
-          icon: Printer 
+          icon: Printer
         };
       case 'void':
-        return { 
+        return {
           gradient: 'from-red-500 to-orange-600',
-          icon: Archive 
+          icon: Archive
         };
       case 'access':
-        return { 
+        return {
           gradient: 'from-purple-500 to-indigo-600',
-          icon: Lock 
+          icon: Lock
         };
       case 'edit':
-        return { 
+        return {
           gradient: 'from-amber-500 to-yellow-600',
-          icon: Save 
+          icon: Save
         };
       case 'export':
-        return { 
+        return {
           gradient: 'from-teal-500 to-green-600',
-          icon: Download 
+          icon: Download
         };
       default:
-        return { 
+        return {
           gradient: 'from-purple-500 to-indigo-600',
-          icon: CheckCircle 
+          icon: CheckCircle
         };
     }
   };
@@ -798,7 +798,7 @@ export default function POSPage() {
   // NEW: State for Receipt View Modal
   const [viewReceiptModalOpen, setViewReceiptModalOpen] = useState(false);
   const [viewReceiptHtml, setViewReceiptHtml] = useState('');
-  
+
   // Sort State
   const [sortOption, setSortOption] = useState('date-desc');
 
@@ -919,8 +919,8 @@ export default function POSPage() {
         break;
       case 'items-desc':
         sorted.sort((a, b) => {
-          const aItems = a.sale_item?.reduce((acc, i) => acc + i.quantity, 0) || 0;
-          const bItems = b.sale_item?.reduce((acc, i) => acc + i.quantity, 0) || 0;
+          const aItems = a.sale_item?.reduce((acc: number, i: SaleItem) => acc + i.quantity, 0) || 0;
+          const bItems = b.sale_item?.reduce((acc: number, i: SaleItem) => acc + i.quantity, 0) || 0;
           return bItems - aItems;
         });
         break;
@@ -934,64 +934,64 @@ export default function POSPage() {
     // Get the CURRENT stock from inventory state (not the passed item)
     const currentInventoryItem = inventory.find(inv => inv.item_id === item.item_id);
     const currentStock = currentInventoryItem?.stock_quantity ?? 0;
-    
+
     // Check stock before doing anything
     if (currentStock <= 0) {
-      toast({ 
-        title: 'Out of stock', 
-        description: `${item.name} is out of stock.`, 
-        variant: 'destructive' 
+      toast({
+        title: 'Out of stock',
+        description: `${item.name} is out of stock.`,
+        variant: 'destructive'
       });
       return;
     }
-  
+
     const existingItem = cart.find(cartItem => cartItem.item_id === item.item_id);
-    
+
     if (existingItem) {
       // Item already in cart - check against CURRENT stock, not cart quantity
       if (currentStock > 0) {
         setCart(prevCart =>
           prevCart.map(cartItem =>
-            cartItem.item_id === item.item_id 
-              ? { ...cartItem, quantity: cartItem.quantity + 1 } 
+            cartItem.item_id === item.item_id
+              ? { ...cartItem, quantity: cartItem.quantity + 1 }
               : cartItem
           )
         );
-        
+
         // Update inventory
-        setInventory(prevInventory => 
-          prevInventory.map(invItem => 
-            invItem.item_id === item.item_id 
+        setInventory(prevInventory =>
+          prevInventory.map(invItem =>
+            invItem.item_id === item.item_id
               ? { ...invItem, stock_quantity: invItem.stock_quantity - 1 }
               : invItem
           )
         );
       } else {
-        toast({ 
-          title: 'Stock Limit', 
-          description: `Cannot add more of ${item.name}. Stock limit reached.`, 
-          variant: 'destructive' 
+        toast({
+          title: 'Stock Limit',
+          description: `Cannot add more of ${item.name}. Stock limit reached.`,
+          variant: 'destructive'
         });
       }
     } else {
       // New item - add to cart
-      const newCartItem: CartItem = { 
-        ...item, 
-        quantity: 1, 
-        installationFee: 0 
+      const newCartItem: CartItem = {
+        ...item,
+        quantity: 1,
+        installationFee: 0
       };
-      
+
       setCart(prevCart => [...prevCart, newCartItem]);
-      
+
       // Update inventory
-      setInventory(prevInventory => 
-        prevInventory.map(invItem => 
-          invItem.item_id === item.item_id 
+      setInventory(prevInventory =>
+        prevInventory.map(invItem =>
+          invItem.item_id === item.item_id
             ? { ...invItem, stock_quantity: invItem.stock_quantity - 1 }
             : invItem
         )
       );
-      
+
       // Handle installation modal for accessories
       if (item.category === 'accessory' && item.name.toLowerCase() !== 'installation service') {
         const serviceItemTemplate = inventory.find(i => i.name.toLowerCase() === 'installation service');
@@ -1013,22 +1013,22 @@ export default function POSPage() {
   const updateQuantity = (itemId: string, newQuantity: number) => {
     const item = inventory.find(p => p.item_id === itemId);
     if (!item) return;
-  
+
     const cartItem = cart.find(c => c.item_id === itemId);
     if (!cartItem) return;
-  
+
     const quantityDifference = newQuantity - cartItem.quantity;
-  
+
     if (newQuantity > 0 && newQuantity <= item.stock_quantity + cartItem.quantity) {
       // Update inventory based on quantity change
-      setInventory(prevInventory => 
-        prevInventory.map(invItem => 
-          invItem.item_id === itemId 
+      setInventory(prevInventory =>
+        prevInventory.map(invItem =>
+          invItem.item_id === itemId
             ? { ...invItem, stock_quantity: invItem.stock_quantity - quantityDifference }
             : invItem
         )
       );
-      
+
       setCart(cart.map(cartItem => cartItem.item_id === itemId ? { ...cartItem, quantity: newQuantity } : cartItem));
     } else if (newQuantity > item.stock_quantity + cartItem.quantity) {
       toast({ title: 'Stock Limit', description: `Only ${item.stock_quantity} units of ${item.name} available.`, variant: 'destructive' });
@@ -1041,9 +1041,9 @@ export default function POSPage() {
     const cartItem = cart.find(item => item.item_id === itemId);
     if (cartItem) {
       // Restore the stock when removing from cart
-      setInventory(prevInventory => 
-        prevInventory.map(invItem => 
-          invItem.item_id === itemId 
+      setInventory(prevInventory =>
+        prevInventory.map(invItem =>
+          invItem.item_id === itemId
             ? { ...invItem, stock_quantity: invItem.stock_quantity + cartItem.quantity }
             : invItem
         )
@@ -1064,14 +1064,14 @@ export default function POSPage() {
       });
       return;
     }
-  
-    if (!authUser) {
+
+    if (!authUser || !supabase) {
       toast({ title: 'Not Authenticated', description: 'You must be logged in to process a sale.', variant: 'destructive' });
       return;
     }
-  
+
     setIsSubmitting(true);
-  
+
     try {
       // If editing a sale, void the original first
       if (editingSale) {
@@ -1079,17 +1079,17 @@ export default function POSPage() {
           .from('sale_item')
           .delete()
           .eq('sale_id', editingSale.sale_id);
-  
+
         if (deleteItemsError) throw deleteItemsError;
-  
+
         const { error: deleteSaleError } = await supabase
           .from('sale')
           .delete()
           .eq('sale_id', editingSale.sale_id);
-  
+
         if (deleteSaleError) throw deleteSaleError;
       }
-  
+
       const response = await fetch("/api/sales", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1101,11 +1101,11 @@ export default function POSPage() {
           branchId: null,
         }),
       });
-  
+
       const data = await response.json();
-  
+
       if (!response.ok) throw new Error(data.error || "Failed to process sale");
-  
+
       // Generate receipt
       try {
         const businessInfo: BusinessInfo = {
@@ -1115,18 +1115,18 @@ export default function POSPage() {
           taxInfo: 'To be given',
           footerMessage: 'Thank You!',
         };
-  
+
         const receiptItems: ReceiptItem[] = cart.map(item => ({
           name: item.name,
           quantity: item.quantity,
           price: item.sale_price,
         }));
-  
+
         const selectedCustomerObj = customers.find(c => c.customer_id === selectedCustomerId);
         const receiptCustomer: ReceiptCustomer | undefined = selectedCustomerObj
           ? { name: selectedCustomerObj.name, phone: selectedCustomerObj.phone }
           : undefined;
-  
+
         const newSaleObject: Sale = {
           sale_id: data.sale_id,
           sale_date: new Date().toISOString(),
@@ -1137,7 +1137,7 @@ export default function POSPage() {
           tax_amount: 0,
           total_amount: total,
         };
-  
+
         const receiptData: ReceiptData = {
           sale: newSaleObject,
           items: receiptItems,
@@ -1145,15 +1145,15 @@ export default function POSPage() {
           customer: receiptCustomer,
           businessInfo: businessInfo,
         };
-  
+
         const html = generateHtmlReceipt(receiptData);
         printReceipt(html);
-  
+
       } catch (receiptError: any) {
         console.error('Receipt generation failed:', receiptError);
         toast({ title: 'Receipt Error', description: `Sale was saved (ID: ${data.sale_id}), but receipt failed to print: ${receiptError.message}`, variant: 'destructive' });
       }
-  
+
       // Show success animation
       setSuccessAnimation({
         isVisible: true,
@@ -1161,7 +1161,7 @@ export default function POSPage() {
         message: "The transaction has been processed successfully.",
         actionType: 'sale'
       });
-  
+
     } catch (err: any) {
       toast({
         title: "Checkout Failed ❌",
@@ -1209,7 +1209,7 @@ export default function POSPage() {
           )
         `)
       .eq('sale_id', saleId)
-      .single();
+      .single<EnhancedSale>();
 
     if (saleError) throw new Error(`Sale data fetch error: ${saleError.message}`);
     if (!saleData) throw new Error('Sale not found.');
@@ -1222,7 +1222,7 @@ export default function POSPage() {
       footerMessage: 'Thank You!',
     };
 
-    const receiptItems: ReceiptItem[] = saleData.sale_item.map((item: any) => ({
+    const receiptItems: ReceiptItem[] = (saleData.sale_item || []).map((item: any) => ({
       name: item.inventory_item?.name || 'Unknown Item',
       quantity: item.quantity,
       price: item.price_at_sale,
@@ -1266,18 +1266,18 @@ export default function POSPage() {
     setIsSubmitting(true);
     try {
       const html = await generateReceiptHtmlString(saleId);
-      
+
       // Create a Blob from the HTML string
       const blob = new Blob([html], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
-      
+
       // Create temporary link and click it
       const a = document.createElement('a');
       a.href = url;
       a.download = `Receipt-${saleId}.html`; // Downloads as .html file
       document.body.appendChild(a);
       a.click();
-      
+
       // Cleanup
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
@@ -1327,7 +1327,7 @@ export default function POSPage() {
         .select('user_id, name')
         .eq('role', 2)
         .eq('password', managerPassword)
-        .maybeSingle();
+        .maybeSingle<AppUser>();
 
       if (error) {
         console.error('Database error verifying credentials:', error);
@@ -1365,10 +1365,10 @@ export default function POSPage() {
 
   const handleEditSale = async (sale: EnhancedSale) => {
     if (!supabase) return;
-    
+
     try {
       setIsLoading(true);
-      
+
       const { data: saleItems, error } = await supabase
         .from('sale_item')
         .select(`
@@ -1390,7 +1390,7 @@ export default function POSPage() {
       setEditingSale(sale);
       setShowVoidManagement(false);
       setShowSalesHistory(false);
-      
+
       // Show success animation for edit
       setSuccessAnimation({
         isVisible: true,
@@ -1411,7 +1411,7 @@ export default function POSPage() {
 
   const handleClearCart = () => {
     // Restore stock for all items in cart
-    setInventory(prevInventory => 
+    setInventory(prevInventory =>
       prevInventory.map(invItem => {
         const cartItem = cart.find(c => c.item_id === invItem.item_id);
         if (cartItem) {
@@ -1425,7 +1425,7 @@ export default function POSPage() {
 
   const handleCancelEditSale = () => {
     // Restore stock for all items in cart when canceling edit
-    setInventory(prevInventory => 
+    setInventory(prevInventory =>
       prevInventory.map(invItem => {
         const cartItem = cart.find(c => c.item_id === invItem.item_id);
         if (cartItem) {
@@ -1447,7 +1447,7 @@ export default function POSPage() {
     if (!supabase || !saleToVoid) return;
 
     // Close dialog immediately to prevent double clicks
-    setShowVoidConfirm(false); 
+    setShowVoidConfirm(false);
 
     try {
       setIsLoading(true);
@@ -1455,7 +1455,7 @@ export default function POSPage() {
       const { data: saleItems, error: fetchError } = await supabase
         .from('sale_item')
         .select('item_id, quantity')
-        .eq('sale_id', saleToVoid);
+        .eq('sale_id', saleToVoid).returns<{ item_id: string; quantity: number }[]>();
 
       if (fetchError) throw fetchError;
 
@@ -1463,7 +1463,7 @@ export default function POSPage() {
         const { error: updateError } = await supabase.rpc('increment_stock', {
           item_id_param: item.item_id,
           quantity_param: item.quantity
-        });
+        } as any);
 
         if (updateError) {
           // Fallback if RPC fails
@@ -1471,11 +1471,13 @@ export default function POSPage() {
             .from('inventory_item')
             .select('stock_quantity')
             .eq('item_id', item.item_id)
-            .single();
+            .single<{ stock_quantity: number }>();
 
-          await supabase
-            .from('inventory_item')
-            .update({ stock_quantity: currentItem.stock_quantity + item.quantity })
+          if (!currentItem) continue;
+
+          await (supabase
+            .from('inventory_item') as any)
+            .update({ stock_quantity: currentItem.stock_quantity + item.quantity } as any)
             .eq('item_id', item.item_id);
         }
       }
@@ -1553,7 +1555,7 @@ export default function POSPage() {
       key: 'customer',
       label: 'Customer',
       sortable: true,
-      render: (value: any, row: any) => (
+      render: (value: any, row: EnhancedSale) => (
         <span className={!row.customer ? 'text-slate-500 italic' : 'font-medium'}>
           {row.customer?.name || 'Walk-in Customer'}
         </span>
@@ -1564,7 +1566,7 @@ export default function POSPage() {
       key: 'products',
       label: 'Products Sold',
       sortable: false,
-      render: (_: any, row: any) => {
+      render: (_: any, row: EnhancedSale) => {
         return <ProductsCell items={row.sale_item || []} />;
       }
     },
@@ -1572,7 +1574,7 @@ export default function POSPage() {
       key: 'total_items',
       label: 'Total Items',
       sortable: true,
-      render: (_: any, row: any) => {
+      render: (_: any, row: EnhancedSale) => {
         const totalQuantity = (row.sale_item || []).reduce((sum: number, item: SaleItem) => sum + item.quantity, 0);
         return (
           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
@@ -1598,9 +1600,9 @@ export default function POSPage() {
         // reduced gap and compact button padding for tighter actions column
         <div className="flex gap-1 items-center">
           {/* VIEW BUTTON - Opens Modal */}
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2 py-1"
             onClick={(e) => {
               e.stopPropagation();
@@ -1612,17 +1614,17 @@ export default function POSPage() {
           </Button>
 
           {/* DOWNLOAD BUTTON - Direct Download */}
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             className="text-green-600 hover:text-green-700 hover:bg-green-50 px-2 py-1"
             onClick={(e) => {
               e.stopPropagation();
               handleDownloadReceipt(row.sale_id);
-            }} 
+            }}
             disabled={isSubmitting}
           >
-            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4"/>}
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           </Button>
         </div>
       )
@@ -1657,7 +1659,7 @@ export default function POSPage() {
       key: 'customer',
       label: 'Customer',
       sortable: true,
-      render: (value: any, row: any) => (
+      render: (value: any, row: EnhancedSale) => (
         <span className={!row.customer ? 'text-slate-500 italic' : 'font-medium'}>
           {row.customer?.name || 'Walk-in Customer'}
         </span>
@@ -1667,12 +1669,12 @@ export default function POSPage() {
       key: 'products',
       label: 'Products Sold',
       sortable: false,
-      render: (_: any, row: any) => {
+      render: (_: any, row: EnhancedSale) => {
         const saleItems = row.sale_item || [];
-        const productNames = saleItems.map((item: SaleItem) => 
+        const productNames = saleItems.map((item: SaleItem) =>
           item.inventory_item?.name || 'Unknown Product'
         );
-        
+
         if (productNames.length === 0) {
           return <span className="text-slate-500 italic">No products</span>;
         }
@@ -1704,9 +1706,9 @@ export default function POSPage() {
       label: 'Actions',
       render: (_: any, row: any) => (
         <div className="flex gap-2">
-          <Button 
-            variant="destructive" 
-            size="sm" 
+          <Button
+            variant="destructive"
+            size="sm"
             onClick={(e) => {
               e.stopPropagation();
               handleVoidClick(row.sale_id);
@@ -1724,7 +1726,7 @@ export default function POSPage() {
   const totalSalesAmount = sales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
   const todaySales = sales.filter(s => new Date(s.sale_date).toDateString() === new Date().toDateString());
   const todayRevenue = todaySales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
-  
+
   if (fetchError) {
     return (
       <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
@@ -1889,14 +1891,14 @@ export default function POSPage() {
                 Viewing receipt content.
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="flex-1 w-full bg-slate-100 p-4 overflow-hidden">
               <div className="w-full h-full bg-white shadow-sm rounded-lg overflow-hidden border border-slate-200">
                 {/* iframe allows us to render the full HTML receipt safely */}
-                <iframe 
-                  srcDoc={viewReceiptHtml} 
-                  className="w-full h-full border-none" 
-                  title="Receipt Preview" 
+                <iframe
+                  srcDoc={viewReceiptHtml}
+                  className="w-full h-full border-none"
+                  title="Receipt Preview"
                 />
               </div>
             </div>
@@ -1905,7 +1907,7 @@ export default function POSPage() {
               <Button variant="outline" onClick={() => setViewReceiptModalOpen(false)}>
                 Close
               </Button>
-              <Button 
+              <Button
                 className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white"
                 onClick={() => {
                   // Allow downloading directly from the view modal if they want
@@ -1981,7 +1983,7 @@ export default function POSPage() {
               <Button
                 type="button"
                 className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins"
-                onClick={(e) => { e.preventDefault(); handlePasswordSubmit(); }} 
+                onClick={(e) => { e.preventDefault(); handlePasswordSubmit(); }}
               >
                 Authenticate
               </Button>
@@ -1993,7 +1995,7 @@ export default function POSPage() {
         {showVoidManagement && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
             <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-200">
-              
+
               {/* 1. Custom Gradient Header */}
               <div className="w-full bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 text-white p-5 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-4">
@@ -2037,17 +2039,17 @@ export default function POSPage() {
                   {/* Rows Control */}
                   <div className="flex items-center gap-3 w-full sm:w-auto">
                     <div className="flex items-center gap-2">
-                        <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block font-poppins">Rows</Label>
-                        <Select value={String(rowsPerPageVoid)} onValueChange={(v) => setRowsPerPageVoid(Number(v))}>
-                            <SelectTrigger className="h-10 w-[70px] border-slate-200 bg-white font-poppins">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="z-[60] font-poppins">
-                              {[5, 10, 20, 50].map(opt => (
-                                <SelectItem key={opt} value={String(opt)}>{opt}</SelectItem>
-                              ))}
-                            </SelectContent>
-                        </Select>
+                      <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block font-poppins">Rows</Label>
+                      <Select value={String(rowsPerPageVoid)} onValueChange={(v) => setRowsPerPageVoid(Number(v))}>
+                        <SelectTrigger className="h-10 w-[70px] border-slate-200 bg-white font-poppins">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="z-[60] font-poppins">
+                          {[5, 10, 20, 50].map(opt => (
+                            <SelectItem key={opt} value={String(opt)}>{opt}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>
@@ -2068,7 +2070,7 @@ export default function POSPage() {
                   rowsPerPageOptions={[5, 10, 25, 50]}
                 />
               </div>
-              
+
               {/* Footer */}
               <div className="p-4 border-t border-slate-200 bg-slate-50 shrink-0 flex justify-between items-center">
                 <p className="text-xs text-slate-500 font-poppins">
@@ -2104,7 +2106,7 @@ export default function POSPage() {
                 onChange={(e) => setInstallationFee(Number(e.target.value) || 0)}
                 placeholder="0.00"
                 className="text-lg"
-                           />
+              />
             </div>
             <DialogFooter className="gap-2">
               <Button
@@ -2130,10 +2132,10 @@ export default function POSPage() {
             {/* Product Selection - Left Side */}
             <div className="lg:col-span-2">
               <Card className="bg-white border-slate-200 shadow-xl rounded-[20px] overflow-hidden flex flex-col font-poppins">
-                
+
                 {/* Header & Filters Section */}
                 <div className="p-6 pb-0 space-y-6">
-                  
+
                   {/* Title */}
                   <h2 className="text-xl font-bold text-slate-900 tracking-tight">
                     Available Products
@@ -2149,15 +2151,15 @@ export default function POSPage() {
                         const Icon = vehicle.icon;
                         const isSelected = selectedVehicleType === vehicle.value;
                         const visual = vehicleTypeVisuals[vehicle.value as keyof typeof vehicleTypeVisuals];
-                        
+
                         return (
                           <button
                             key={vehicle.value}
                             onClick={() => setSelectedVehicleType(selectedVehicleType === vehicle.value ? 'all' : vehicle.value)}
                             className={`
                               relative group flex items-center justify-center gap-3 py-3 px-4 rounded-xl border text-sm font-semibold transition-all duration-300
-                              ${isSelected 
-                                ? `${visual.buttonActive} ring-2 ring-offset-2 ring-indigo-100 border-transparent` 
+                              ${isSelected
+                                ? `${visual.buttonActive} ring-2 ring-offset-2 ring-indigo-100 border-transparent`
                                 : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                               }
                             `}
@@ -2179,15 +2181,15 @@ export default function POSPage() {
                       {categories.map((category) => {
                         const isSelected = selectedCategory === category.value;
                         const visual = categoryVisuals[category.value as keyof typeof categoryVisuals];
-                        
+
                         return (
                           <button
                             key={category.value}
                             onClick={() => setSelectedCategory(selectedCategory === category.value ? 'all' : category.value)}
                             className={`
                               relative group flex items-center justify-center gap-3 py-3 px-4 rounded-xl border text-sm font-semibold transition-all duration-300
-                              ${isSelected 
-                                ? `${visual.buttonActive} ring-2 ring-offset-2 ring-pink-100 border-transparent` 
+                              ${isSelected
+                                ? `${visual.buttonActive} ring-2 ring-offset-2 ring-pink-100 border-transparent`
                                 : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                               }
                             `}
@@ -2225,7 +2227,7 @@ export default function POSPage() {
                   {(selectedVehicleType !== 'all' || selectedCategory !== 'all') && (
                     <div className="flex items-center gap-2 pt-2 animate-in fade-in slide-in-from-top-2">
                       <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-2">Filters:</span>
-                      
+
                       {selectedVehicleType !== 'all' && (
                         <Badge variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-100 px-3 py-1 text-xs gap-1">
                           Vehicle: <span className="font-bold">{vehicleTypes.find(v => v.value === selectedVehicleType)?.label}</span>
@@ -2238,7 +2240,7 @@ export default function POSPage() {
                         </Badge>
                       )}
 
-                      <button 
+                      <button
                         onClick={clearFilters}
                         className="text-xs text-slate-400 hover:text-red-500 ml-auto flex items-center gap-1 transition-colors"
                       >
@@ -2266,9 +2268,9 @@ export default function POSPage() {
                         const vehicleVisual = vehicleTypeVisuals[item.vehicle_type as keyof typeof vehicleTypeVisuals] || vehicleTypeVisuals.all;
                         const categoryVisual = categoryVisuals[item.category as keyof typeof categoryVisuals] || categoryVisuals.all;
                         const VehicleIcon = vehicleVisual.icon;
-                        
+
                         return (
-                          <div 
+                          <div
                             key={item.item_id}
                             className="group relative bg-white border border-slate-200 rounded-[20px] p-5 shadow-sm hover:border-indigo-100 transition-all duration-300 flex flex-col justify-between h-full"
                           >
@@ -2285,7 +2287,7 @@ export default function POSPage() {
                                   {item.name}
                                 </h3>
                               </div>
- 
+
                               {/* Tags */}
                               <div className="flex flex-wrap gap-2 mb-6">
                                 <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold capitalize flex items-center gap-1 ${categoryVisual.badge}`}>
@@ -2305,10 +2307,9 @@ export default function POSPage() {
                                 <div className="text-xl font-bold text-green-600 tracking-tight">
                                   ₱{formatPrice(item.sale_price)}
                                 </div>
-                                <div className={`text-xs font-semibold mt-1 flex items-center gap-1.5 ${
-                                  currentStock === 0 ? 'text-red-500' :
+                                <div className={`text-xs font-semibold mt-1 flex items-center gap-1.5 ${currentStock === 0 ? 'text-red-500' :
                                   currentStock <= 5 ? 'text-amber-500' : 'text-green-600'
-                                }`}>
+                                  }`}>
                                   <div className={`w-1.5 h-1.5 rounded-full ${currentStock === 0 ? 'bg-red-500' : currentStock <= 5 ? 'bg-amber-500' : 'bg-green-500'}`} />
                                   {currentStock === 0 ? 'Out of Stock' : `${currentStock} in stock`}
                                 </div>
@@ -2323,8 +2324,8 @@ export default function POSPage() {
                                 }}
                                 className={`
                                   h-10 px-5 font-semibold shadow-lg shadow-indigo-500/20 transition-all duration-300
-                                  ${currentStock > 0 
-                                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:scale-105 hover:shadow-indigo-500/40 text-white' 
+                                  ${currentStock > 0
+                                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:scale-105 hover:shadow-indigo-500/40 text-white'
                                     : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                   }
                                 `}
@@ -2336,7 +2337,7 @@ export default function POSPage() {
                           </div>
                         );
                       })}
-                      
+
                       {/* Empty State */}
                       {filteredInventory.length === 0 && (
                         <div className="col-span-full py-12 flex flex-col items-center justify-center text-center">
@@ -2547,10 +2548,10 @@ export default function POSPage() {
         ) : (
           // Sales History View
           <div className="space-y-6">
-            
+
             {/* Summary Cards - Redesigned to match Service Management Dashboard */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-poppins">
-              
+
               {/* Card 1: Today's Sales (Purple/Pink Gradient) */}
               <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-r from-purple-600 to-pink-600 p-6 shadow-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-purple-500/25 group">
                 {/* Abstract Background Shapes */}
@@ -2566,7 +2567,7 @@ export default function POSPage() {
                     <DollarSign className="h-6 w-6 text-white" />
                   </div>
                 </div>
-                
+
                 <div className="relative z-10 mt-6 flex items-center gap-2 text-white/80 text-sm">
                   <span className="flex items-center justify-center bg-white/20 px-2.5 py-1 rounded-lg text-xs font-bold text-white backdrop-blur-sm border border-white/10">
                     {todaySales.length}
@@ -2627,7 +2628,7 @@ export default function POSPage() {
 
             {/* Sales Table - Inventory Style Design */}
             <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-xl font-poppins">
-              
+
               {/* 1. Gradient Header (Title + Total like Inventory page) */}
               <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-400 text-white p-5 flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -2665,7 +2666,7 @@ export default function POSPage() {
                 {/* Top row: Search + Controls */}
                 <div className="w-full flex flex-col sm:flex-row gap-4 justify-between items-center">
                   {/* Left: Search */}
-                  <div className="relative w-full flex-1"> 
+                  <div className="relative w-full flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                     <Input
                       placeholder="Search by ID or Customer Name..."
@@ -2676,40 +2677,40 @@ export default function POSPage() {
                   </div>
                   {/* Right: Sort & Rows Controls */}
                   <div className="flex items-center gap-3 w-full sm:w-auto">
-                      {/* Sort By Dropdown */}
-                      <div className="flex items-center gap-2 flex-1 sm:flex-none">
-                          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block font-poppins">Sort By</Label>
-                          <Select value={sortOption} onValueChange={setSortOption}>
-                              <SelectTrigger className="h-10 w-full sm:w-[220px] border-slate-200 bg-white">
-                                  <ListFilter className="w-4 h-4 mr-2 text-slate-500"/>
-                                  <SelectValue placeholder="Sort by" />
-                              </SelectTrigger>
+                    {/* Sort By Dropdown */}
+                    <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                      <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block font-poppins">Sort By</Label>
+                      <Select value={sortOption} onValueChange={setSortOption}>
+                        <SelectTrigger className="h-10 w-full sm:w-[220px] border-slate-200 bg-white">
+                          <ListFilter className="w-4 h-4 mr-2 text-slate-500" />
+                          <SelectValue placeholder="Sort by" />
+                        </SelectTrigger>
 
-                              {/* Single SelectContent with z-index so dropdown doesn't push layout */}
-                              <SelectContent className="z-50">
-                                  <SelectItem value="date-desc">Date: Newest First</SelectItem>
-                                  <SelectItem value="date-asc">Date: Oldest First</SelectItem>
-                                  <SelectItem value="amount-desc">Amount: High to Low</SelectItem>
-                                  <SelectItem value="amount-asc">Amount: Low to High</SelectItem>
-                                  <SelectItem value="items-desc">Items: Most First</SelectItem>
-                              </SelectContent>
-                          </Select>
-                      </div>
+                        {/* Single SelectContent with z-index so dropdown doesn't push layout */}
+                        <SelectContent className="z-50">
+                          <SelectItem value="date-desc">Date: Newest First</SelectItem>
+                          <SelectItem value="date-asc">Date: Oldest First</SelectItem>
+                          <SelectItem value="amount-desc">Amount: High to Low</SelectItem>
+                          <SelectItem value="amount-asc">Amount: Low to High</SelectItem>
+                          <SelectItem value="items-desc">Items: Most First</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                      {/* Rows Per Page */}
-                      <div className="flex items-center gap-2">
-                          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block font-poppins">Rows</Label>
-                          <Select value={String(rowsPerPageSales)} onValueChange={(v) => setRowsPerPageSales(Number(v))}>
-                              <SelectTrigger className="h-10 w-[70px] border-slate-200 bg-white">
-                                  <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="z-50">
-                                {[5, 10, 20, 50].map(opt => (
-                                  <SelectItem key={opt} value={String(opt)}>{opt}</SelectItem>
-                                ))}
-                              </SelectContent>
-                          </Select>
-                      </div>
+                    {/* Rows Per Page */}
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap hidden md:block font-poppins">Rows</Label>
+                      <Select value={String(rowsPerPageSales)} onValueChange={(v) => setRowsPerPageSales(Number(v))}>
+                        <SelectTrigger className="h-10 w-[70px] border-slate-200 bg-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="z-50">
+                          {[5, 10, 20, 50].map(opt => (
+                            <SelectItem key={opt} value={String(opt)}>{opt}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2718,7 +2719,7 @@ export default function POSPage() {
               <div className="p-0">
                 <DataTableWrapper
                   className="border-0 rounded-none"
-                  data={sortedSales} 
+                  data={sortedSales}
                   columns={salesColumns}
                   searchKeys={['sale_id', 'customer.name']}
                   rowsPerPageOptions={[5, 10, 20, 50]}
