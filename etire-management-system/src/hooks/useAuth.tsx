@@ -44,20 +44,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const initializeAuth = async () => {
       console.log("[useAuth] initializeAuth started");
       try {
-        // Get initial session
+        // First, try to get the session from cookies (set by proxy.ts)
+        // This reads local storage/cookies which should be in sync after proxy runs
         const { data: { session }, error: sessionError } = await supabase!.auth.getSession();
 
         if (sessionError) {
           console.error("[useAuth] getSession error:", sessionError);
         }
 
-        if (session?.user && mounted) {
-          console.log("[useAuth] Initial session found:", session.user.email);
-          // Fetch user profile from public.user
+        // If we have a session, validate it with the server
+        if (session?.user) {
+          console.log("[useAuth] Session found, validating with server...");
+
+          // Validate session is still valid on server (this also refreshes token if needed)
+          const { data: { user: authUser }, error: userError } = await supabase!.auth.getUser();
+
+          if (userError || !authUser) {
+            console.log("[useAuth] Session invalid on server:", userError?.message);
+            // Clear stale session
+            await supabase!.auth.signOut();
+            if (mounted) {
+              setUser(null);
+              setIsLoading(false);
+            }
+            return;
+          }
+
+          // Session is valid, fetch user profile
           const { data: profile, error } = await supabase!
             .from("user")
             .select("user_id, name, username, role")
-            .eq("uuid", session.user.id)
+            .eq("uuid", authUser.id)
             .single();
 
           if (profile && !error && mounted) {
@@ -65,17 +82,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             setUser(profile as any);
           } else if (mounted) {
             console.error("[useAuth] Failed to fetch user profile:", JSON.stringify(error, null, 2));
-            // If profile is missing (likely PGRST116 or empty error from single()), logout to clear invalid session
             if (!profile) {
-              console.warn("[useAuth] No user profile found for session. Logging out to prevent inconsistent state.");
+              console.warn("[useAuth] No user profile found. Logging out.");
               await supabase!.auth.signOut();
               setUser(null);
               router.push("/login?error=missing_profile");
             }
           }
-        } else if (mounted) {
-          console.log("[useAuth] No initial session");
-          setUser(null);
+        } else {
+          console.log("[useAuth] No session found in cookies");
+          if (mounted) {
+            setUser(null);
+          }
         }
       } catch (error) {
         console.error("[useAuth] Error initializing auth:", error);
