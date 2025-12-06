@@ -2229,9 +2229,152 @@ export default function EnhancedCustomersPage() {
           </EnhancedTabs>
         </div>
 
-        {/* ... (Modals/Dialogs remain the same) ... */}
-        <SuccessAnimation isVisible={successAnimation.isVisible} title={successAnimation.title} message={successAnimation.message} actionType={successAnimation.actionType} onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))} />
-        <Dialog open={isCustomerDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) { setIsCustomerDialogOpen(false); resetCustomerForm(); } }}> <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300"> <DialogHeader> <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins"> {editingCustomer ? 'Edit Customer' : 'Add New Customer'} </DialogTitle> <DialogDescription className="text-slate-600 font-poppins"> {editingCustomer ? `Update details for ${editingCustomer.name}.` : 'Enter the details for the new customer.'} </DialogDescription> </DialogHeader> <div className="space-y-4 py-4"> <div className="space-y-2"> <Label htmlFor="customer-name" className="text-slate-700 font-medium font-poppins">Customer Name *</Label> <Input id="customer-name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="John Doe" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" /> </div> <div className="grid grid-cols-2 gap-4"> <div className="space-y-2"> <Label htmlFor="customer-phone" className="text-slate-700 font-medium font-poppins">Phone</Label> <Input id="customer-phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="+1-555-0101" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" /> </div> </div> </div> <DialogFooter> <DialogClose asChild> <Button type="button" variant="outline" className={buttonStyles.back}> <ArrowLeft className="h-4 w-4 mr-2" /> Cancel </Button> </DialogClose> <Button onClick={handleSubmitCustomer} disabled={isCustomerLoading} className={buttonStyles.primary}> {isCustomerLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {editingCustomer ? 'Save Changes' : 'Create Customer'} </Button> </DialogFooter> </DialogContent> </Dialog> <Dialog open={isVehicleDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) { setIsVehicleDialogOpen(false); resetVehicleForm(); } }}> <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300"> <DialogHeader> <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins"> {editingVehicle ? 'Edit Vehicle' : 'Add New Vehicle'} </DialogTitle> <DialogDescription className="text-slate-600 font-poppins"> {editingVehicle ? `Update details for ${editingVehicle.plate_number}.` : 'Enter the details for the new vehicle.'} </DialogDescription> </DialogHeader> <div className="space-y-4 py-4"> <div className="space-y-2"> <Label htmlFor="customer" className="text-slate-700 font-medium font-poppins">Customer *</Label> <Select value={selectedCustomer} onValueChange={setSelectedCustomer}> <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"> <SelectValue placeholder="Select customer" /> </SelectTrigger> <SelectContent> {customers.map(customer => (<SelectItem key={customer.customer_id} value={customer.customer_id} className="font-poppins"> {customer.name} </SelectItem>))} </SelectContent> </Select> </div> <div className="space-y-2"> <Label htmlFor="plate-number" className="text-slate-700 font-medium font-poppins">Plate Number *</Label> <Input id="plate-number" value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} placeholder="ABC-1234" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" /> </div> <div className="space-y-2"> <Label htmlFor="vehicle-type" className="text-slate-700 font-medium font-poppins">Vehicle Type</Label> <Select value={selectedVehicleType} onValueChange={setSelectedVehicleType}> <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"> <SelectValue placeholder="Select vehicle type" /> </SelectTrigger> <SelectContent> {vehicleTypes.map(vt => (<SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id} className="font-poppins"> {vt.name.charAt(0).toUpperCase() + vt.name.slice(1)} </SelectItem>))} </SelectContent> </Select> </div> <div className="grid grid-cols-2 gap-4"> <div className="space-y-2"> <Label htmlFor="make" className="text-slate-700 font-medium font-poppins">Make</Label> <Input id="make" value={make} onChange={(e) => setMake(e.target.value)} placeholder="Toyota" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" /> </div> <div className="space-y-2"> <Label htmlFor="model" className="text-slate-700 font-medium font-poppins">Model</Label> <Input id="model" value={model} onChange={(e) => setModel(e.target.value)} placeholder="Camry" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" /> </div> </div> <div className="grid grid-cols-2 gap-4"> <div className="space-y-2"> <Label htmlFor="color" className="text-slate-700 font-medium font-poppins">Color</Label> <Input id="color" value={color} onChange={(e) => setColor(e.target.value)} placeholder="White" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" /> </div> </div> </div> <DialogFooter> <DialogClose asChild> <Button type="button" variant="outline" className={buttonStyles.back}> <ArrowLeft className="h-4 w-4 mr-2" /> Cancel </Button> </DialogClose> <Button onClick={handleSubmitVehicle} disabled={isVehicleLoading} className={buttonStyles.primary}> {isVehicleLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {editingVehicle ? 'Save Changes' : 'Create Vehicle'} </Button> </DialogFooter> </DialogContent> </Dialog> <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}> <AlertDialogContent className="bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300"> <AlertDialogHeader> <AlertDialogTitle className="text-slate-900 font-poppins">Confirm Deletion</AlertDialogTitle> <AlertDialogDescription className="text-slate-600 font-poppins"> Are you sure you want to delete this {deletingItem?.type}? This action cannot be undone. </AlertDialogDescription> </AlertDialogHeader> <AlertDialogFooter> <AlertDialogCancel className={buttonStyles.back}> <ArrowLeft className="h-4 w-4 mr-2" /> Cancel </AlertDialogCancel> <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-red-600 active:scale-95 font-poppins shadow-md"> Delete </AlertDialogAction> </AlertDialogFooter> </AlertDialogContent> </AlertDialog>
+
+{/* Success Animation */}
+<SuccessAnimation 
+          isVisible={successAnimation.isVisible} 
+          title={successAnimation.title} 
+          message={successAnimation.message} 
+          actionType={successAnimation.actionType} 
+          onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))} 
+        />
+
+        {/* Customer Dialog */}
+        <Dialog open={isCustomerDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) { setIsCustomerDialogOpen(false); resetCustomerForm(); } }}>
+          <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
+                {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
+              </DialogTitle>
+              <DialogDescription className="text-slate-600 font-poppins">
+                {editingCustomer ? `Update details for ${editingCustomer.name}.` : 'Enter the details for the new customer.'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="customer-name" className="text-slate-700 font-medium font-poppins">Customer Name *</Label>
+                <Input id="customer-name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="John Doe" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="customer-phone" className="text-slate-700 font-medium font-poppins">Phone</Label>
+                  <Input id="customer-phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="+1-555-0101" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline" className={buttonStyles.back}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button onClick={handleSubmitCustomer} disabled={isCustomerLoading} className={buttonStyles.primary}>
+                {isCustomerLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editingCustomer ? 'Save Changes' : 'Create Customer'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Vehicle Dialog */}
+        <Dialog open={isVehicleDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) { setIsVehicleDialogOpen(false); resetVehicleForm(); } }}>
+          <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
+                {editingVehicle ? 'Edit Vehicle' : 'Add New Vehicle'}
+              </DialogTitle>
+              <DialogDescription className="text-slate-600 font-poppins">
+                {editingVehicle ? `Update details for ${editingVehicle.plate_number}.` : 'Enter the details for the new vehicle.'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="customer" className="text-slate-700 font-medium font-poppins">Customer *</Label>
+                <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
+                  <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins">
+                    <SelectValue placeholder="Select customer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map(customer => (
+                      <SelectItem key={customer.customer_id} value={customer.customer_id} className="font-poppins">
+                        {customer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="plate-number" className="text-slate-700 font-medium font-poppins">Plate Number *</Label>
+                <Input id="plate-number" value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} placeholder="ABC-1234" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vehicle-type" className="text-slate-700 font-medium font-poppins">Vehicle Type</Label>
+                <Select value={selectedVehicleType} onValueChange={setSelectedVehicleType}>
+                  <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins">
+                    <SelectValue placeholder="Select vehicle type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vehicleTypes.map(vt => (
+                      <SelectItem key={vt.vehicle_type_id} value={vt.vehicle_type_id} className="font-poppins">
+                        {vt.name.charAt(0).toUpperCase() + vt.name.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="make" className="text-slate-700 font-medium font-poppins">Make</Label>
+                  <Input id="make" value={make} onChange={(e) => setMake(e.target.value)} placeholder="Toyota" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="model" className="text-slate-700 font-medium font-poppins">Model</Label>
+                  <Input id="model" value={model} onChange={(e) => setModel(e.target.value)} placeholder="Camry" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="color" className="text-slate-700 font-medium font-poppins">Color</Label>
+                  <Input id="color" value={color} onChange={(e) => setColor(e.target.value)} placeholder="White" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline" className={buttonStyles.back}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button onClick={handleSubmitVehicle} disabled={isVehicleLoading} className={buttonStyles.primary}>
+                {isVehicleLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editingVehicle ? 'Save Changes' : 'Create Vehicle'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Dialog */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent className="bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-slate-900 font-poppins">Confirm Deletion</AlertDialogTitle>
+              <AlertDialogDescription className="text-slate-600 font-poppins">
+                Are you sure you want to delete this {deletingItem?.type}? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className={buttonStyles.back}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-red-600 active:scale-95 font-poppins shadow-md">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       <style jsx global>{`
