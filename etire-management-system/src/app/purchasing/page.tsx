@@ -956,7 +956,7 @@ const EnhancedPOForm = ({
   };
 
   return (
-    <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-2">
+    <div className="space-y-4 py-2">
       <div className="grid grid-cols-2 gap-4">
         {/* Left Column */}
         <div className="space-y-4">
@@ -3275,100 +3275,6 @@ export default function EnhancedPurchasingPage() {
           </TabsContent>
         </EnhancedTabs>
 
-        {/* Enhanced Supplier Dialog */}
-        <Dialog open={isSupplierDialogOpen} onOpenChange={(isOpen) => {
-          if (!isOpen) {
-            setIsSupplierDialogOpen(false);
-            resetSupplierForm();
-          }
-        }}>
-          <DialogContent className="sm:max-w-lg bg-white border-0 shadow-2xl rounded-2xl font-poppins max-h-[85vh] overflow-hidden fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-lg">
-            <DialogHeader className="pb-4">
-              <DialogTitle className="text-2xl font-bold text-slate-900 font-poppins">
-                {editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}
-              </DialogTitle>
-              <DialogDescription className="text-slate-600 font-poppins">
-                {editingSupplier ? `Update details for ${editingSupplier.name}.` : 'Enter the details for the new supplier.'}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-2">
-              <div className="space-y-2">
-                <Label htmlFor="supplier-name" className="text-slate-700 font-medium font-poppins">Supplier Name *</Label>
-                <Input
-                  id="supplier-name"
-                  value={supplierName}
-                  onChange={(e) => setSupplierName(e.target.value)}
-                  placeholder="Neugen Tire Sales Inc"
-                  className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="contact-person" className="text-slate-700 font-medium font-poppins">Contact Person</Label>
-                <Input
-                  id="contact-person"
-                  value={contactPerson}
-                  onChange={(e) => setContactPerson(e.target.value)}
-                  placeholder="John Smith"
-                  className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="supplier-phone" className="text-slate-700 font-medium font-poppins">Phone</Label>
-                  <Input
-                    id="supplier-phone"
-                    value={supplierPhone}
-                    onChange={(e) => setSupplierPhone(e.target.value)}
-                    placeholder="+1-555-0201"
-                    className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="supplier-email" className="text-slate-700 font-medium font-poppins">Email</Label>
-                  <Input
-                    id="supplier-email"
-                    type="email"
-                    value={supplierEmail}
-                    onChange={(e) => setSupplierEmail(e.target.value)}
-                    placeholder="orders@neugen.com"
-                    className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="supplier-address" className="text-slate-700 font-medium font-poppins">Address</Label>
-                <Textarea
-                  id="supplier-address"
-                  value={supplierAddress}
-                  onChange={(e) => setSupplierAddress(e.target.value)}
-                  placeholder="789 Tire Street, City"
-                  className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="supplier-active"
-                  checked={supplierActive}
-                  onCheckedChange={setSupplierActive}
-                />
-                <Label htmlFor="supplier-active" className="text-slate-700 font-medium font-poppins">Active Supplier</Label>
-              </div>
-            </div>
-            <DialogFooter className="pt-4">
-              <DialogClose asChild>
-                <Button type="button" variant="outline" className={buttonStyles.back}>
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Cancel
-                </Button>
-              </DialogClose>
-              <Button onClick={handleSubmitSupplier} disabled={isSupplierLoading} className={buttonStyles.primary}>
-                {isSupplierLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {editingSupplier ? 'Save Changes' : 'Create Supplier'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
         {/* Enhanced Purchase Order Dialog - Scrollable Form */}
         <Dialog open={isPODialogOpen} onOpenChange={(isOpen) => {
           if (!isOpen) {
@@ -3376,18 +3282,24 @@ export default function EnhancedPurchasingPage() {
             resetPOForm();
           }
         }}>
-          <DialogContent className="bg-white border-0 shadow-2xl rounded-2xl font-poppins max-h-[85vh] overflow-hidden flex flex-col fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-4xl">
-            <DialogHeader className="pb-4">
-              <DialogTitle className="text-2xl font-bold text-slate-900 font-poppins">
-                {editingPO ? 'Edit Purchase Order' : 'Create Purchase Order'}
-              </DialogTitle>
-              <DialogDescription className="text-slate-600 font-poppins">
-                {editingPO ? `Update details for PO ${editingPO.po_number}.` : 'Enter the details for the new purchase order.'}
-              </DialogDescription>
-            </DialogHeader>
+          {/* REMOVED: h-[85vh] (This was forcing a fixed height even when zoomed) */}
+          {/* KEPT: max-h-[85vh] (This keeps it responsive) */}
+          <DialogContent className="bg-white border-0 shadow-2xl rounded-2xl font-poppins flex flex-col fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl max-h-[85vh] overflow-hidden p-0">
+            
+            {/* Header with padding */}
+            <div className="p-6 pb-4 shrink-0">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold text-slate-900 font-poppins">
+                  {editingPO ? 'Edit Purchase Order' : 'Create Purchase Order'}
+                </DialogTitle>
+                <DialogDescription className="text-slate-600 font-poppins">
+                  {editingPO ? `Update details for PO ${editingPO.po_number}.` : 'Enter the details for the new purchase order.'}
+                </DialogDescription>
+              </DialogHeader>
+            </div>
 
-            {/* Scrollable form area */}
-            <div className="flex-1 overflow-y-auto pr-2">
+            {/* Scrollable form area - Parent scroll handler */}
+            <div className="flex-1 overflow-y-auto px-6 min-h-0">
               <EnhancedPOForm
                 editingPO={editingPO}
                 formData={poFormData}
@@ -3399,7 +3311,7 @@ export default function EnhancedPurchasingPage() {
               />
 
               {/* Line Items Section */}
-              <div className="mt-4">
+              <div className="mt-4 pb-4">
                 <POLineItems
                   items={poLineItems}
                   onItemsChange={setPOLineItems}
@@ -3408,22 +3320,25 @@ export default function EnhancedPurchasingPage() {
               </div>
             </div>
 
-            <DialogFooter className="pt-4">
-              <DialogClose asChild>
-                <Button type="button" variant="outline" className={buttonStyles.back}>
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Cancel
+            {/* Footer with padding and border for separation */}
+            <div className="p-6 pt-4 shrink-0 border-t border-slate-100 bg-white">
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" className={buttonStyles.back}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
+                </DialogClose>
+                <Button
+                  onClick={handleSubmitPO}
+                  disabled={isPOLoading || !poFormData.selectedSupplier || !poFormData.selectedBranch}
+                  className={buttonStyles.primary}
+                >
+                  {isPOLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {editingPO ? 'Save Changes' : 'Create PO'}
                 </Button>
-              </DialogClose>
-              <Button
-                onClick={handleSubmitPO}
-                disabled={isPOLoading || !poFormData.selectedSupplier || !poFormData.selectedBranch}
-                className={buttonStyles.primary}
-              >
-                {isPOLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {editingPO ? 'Save Changes' : 'Create PO'}
-              </Button>
-            </DialogFooter>
+              </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
 
