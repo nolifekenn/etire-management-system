@@ -6,7 +6,8 @@ import { DataTableWrapper } from '@/components/DataTableWrapper';
 import {
   Archive, Coins, AlertTriangle, PlusCircle, PackageSearch, Loader2, Filter,
   TrendingUp, Clock, RefreshCw, Plus, Search, X, Download, SlidersHorizontal,
-  ArrowUpDown, Eye, Save, CheckCircle, ListFilter, ChevronLeft, ChevronRight
+  ArrowUpDown, Eye, Save, CheckCircle, ListFilter, ChevronLeft, ChevronRight,
+  Pencil, Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -1207,6 +1208,14 @@ export default function EnhancedInventoryPage() {
   const [itemCostPrice, setItemCostPrice] = useState('');
   const [itemSalePrice, setItemSalePrice] = useState('');
   const [itemStockQuantity, setItemStockQuantity] = useState('');
+  const [formErrors, setFormErrors] = useState({
+    name: false,
+    category: false,
+    vehicleType: false,
+    costPrice: false,
+    salePrice: false,
+    stock: false
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -1403,21 +1412,39 @@ export default function EnhancedInventoryPage() {
         );
       }
     },
+    // NEW ACTIONS COLUMN (Replaces 3-dot menu)
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (value: any, item: any) => (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleOpenEditDialog(item)}
+            className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+            title="Edit Item"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleOpenDeleteDialog(item)}
+            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+            title="Delete Item"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      )
+    }
   ];
 
   const totalStockValue = processedItems.reduce((acc, p) => acc + (p.sale_price * p.stock_quantity), 0);
   const lowStockCount = items.filter(p => p.stock_quantity > 2 && p.stock_quantity <= 5).length;
   const outOfStockCount = items.filter(p => p.stock_quantity === 0).length;
   const criticalStockCount = items.filter(p => p.stock_quantity > 0 && p.stock_quantity <= 2).length;
-
-  const [formErrors, setFormErrors] = useState({
-    name: false,
-    category: false,
-    vehicleType: false,
-    costPrice: false,
-    salePrice: false,
-    stock: false
-  });
 
   const resetForm = () => {
     setItemName('');
@@ -1847,36 +1874,67 @@ export default function EnhancedInventoryPage() {
                 </div>
 
                 {/* DataTableWrapper without its own title so the gradient header remains part of the same card */}
+                {/* REMOVED onEdit and onDelete props to remove the automatic 3-dot menu */}
                 <DataTableWrapper
                   className="w-full"
                   columns={enhancedColumns}
                   data={displayedItems.map(i => ({ ...i, id: i.item_id }))}
-                  onEdit={handleOpenEditDialog}
-                  onDelete={handleOpenDeleteDialog}
                 />
                 
-                {/* Footer: Showing X of Y + Pager */}
-                <div className="px-6 py-3 border-t border-slate-100 bg-white flex items-center justify-between">
-                  <div className="text-sm text-slate-600">
-                    Showing {processedItems.length === 0 ? 0 : ((currentPage - 1) * rowsPerPage + 1)} to {Math.min(currentPage * rowsPerPage, processedItems.length)} of {processedItems.length} entries
+                {/* Footer: Showing X of Y + Pager - UPDATED PAGINATION */}
+                <div className="px-6 py-4 border-t border-slate-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-sm text-slate-500">
+                    Showing <span className="text-slate-500 font-xs">{processedItems.length === 0 ? 0 : ((currentPage - 1) * rowsPerPage + 1)}</span> to <span className="text-slate-500 font-xs">{Math.min(currentPage * rowsPerPage, processedItems.length)}</span> of <span className="text-slate-500 font-xs">{processedItems.length}</span> entries
                   </div>
+
                   <div className="flex items-center gap-2">
+                    {/* First Page Button */}
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+                      title="First Page"
+                    >
+                      <span className="text-lg">«</span>
+                    </Button>
+
+                    {/* Previous Page Button */}
                     <Button
                       variant="outline"
                       onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
-                      className="min-w-[36px] h-8 px-2 py-1"
+                      className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+                      title="Previous Page"
                     >
-                      «
+                      <span className="text-lg">‹</span>
                     </Button>
-                    <div className="text-sm text-slate-700 px-3">Page {currentPage} of {Math.max(1, Math.ceil(processedItems.length / rowsPerPage))}</div>
+
+                    {/* Page Indicator Text */}
+                    <div className="text-sm font-xs text-slate-500 px-2 min-w-[80px] text-center select-none">
+                      Page {currentPage} of {Math.max(1, Math.ceil(processedItems.length / rowsPerPage))}
+                    </div>
+
+                    {/* Next Page Button */}
                     <Button
                       variant="outline"
                       onClick={() => setCurrentPage(p => Math.min(Math.ceil(processedItems.length / rowsPerPage) || 1, p + 1))}
                       disabled={currentPage >= Math.ceil(processedItems.length / rowsPerPage)}
-                      className="min-w-[36px] h-8 px-2 py-1"
+                      className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+                      title="Next Page"
                     >
-                      »
+                      <span className="text-lg">›</span>
+                    </Button>
+
+                    {/* Last Page Button */}
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(Math.max(1, Math.ceil(processedItems.length / rowsPerPage)))}
+                      disabled={currentPage >= Math.ceil(processedItems.length / rowsPerPage)}
+                      className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+                      title="Last Page"
+                    >
+                      <span className="text-lg">»</span>
                     </Button>
                   </div>
                 </div>
@@ -2106,18 +2164,42 @@ export default function EnhancedInventoryPage() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setIsAddItemDialogOpen(false); setIsEditItemDialogOpen(false); resetForm(); }}>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddItemDialogOpen(false);
+                setIsEditItemDialogOpen(false);
+                resetForm();
+              }}
+              disabled={isLoading}
+            >
               Cancel
             </Button>
-            <Button onClick={handleSubmit} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg hover:shadow-xl">
-              Save
+            <Button
+              onClick={(e) => {
+                e.preventDefault(); // Prevent standard form submission issues
+                handleSubmit();
+              }}
+              disabled={isLoading}
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg hover:shadow-xl min-w-[100px]"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isEditItemDialogOpen ? 'Saving...' : 'Adding...'}
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  {isEditItemDialogOpen ? 'Save Changes' : 'Save Item'}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Stock Adjustment Dialog */}
       <Dialog open={isStockAdjustmentOpen} onOpenChange={(open) => { if (!open) { setIsStockAdjustmentOpen(false); setAdjustingItem(null); } }}>
         <DialogContent className="sm:max-w-xl bg-white border border-slate-200 shadow-2xl">
           <DialogHeader>
@@ -2135,6 +2217,44 @@ export default function EnhancedInventoryPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* === ADDED MISSING DELETE CONFIRMATION DIALOG === */}
+      <AlertDialog open={isDeleteConfirmationOpen} onOpenChange={setIsDeleteConfirmationOpen}>
+        <AlertDialogContent className="bg-white border border-slate-200 shadow-xl rounded-xl">
+          <AlertDialogHeader>
+            <div className="mx-auto w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
+              <Trash2 className="h-6 w-6 text-red-600" />
+            </div>
+            <AlertDialogTitle className="text-center text-xl font-bold text-slate-800">
+              Delete Item?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-slate-600">
+              Are you sure you want to delete <span className="font-semibold text-slate-900">"{deletingItem?.name}"</span>?
+              <br />
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center gap-3 mt-4">
+            <AlertDialogCancel className="mt-0 w-full sm:w-auto border-slate-200">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault(); // Prevent auto-close to handle async loading
+                handleDeleteItem();
+              }}
+              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white border-0"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...
+                </>
+              ) : (
+                'Delete Item'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Critical Stock Details (Review Alerts) */}
       <CriticalStockDetails

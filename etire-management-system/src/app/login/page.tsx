@@ -472,6 +472,20 @@ export default function EnhancedLoginPage() {
     setMounted(true);
   }, []);
 
+  // ===== NEW HELPER: RESET FUNCTION =====
+  const resetRegisterForm = () => {
+    setFirstName("");
+    setLastName("");
+    setEmail("");
+    setPhone("");
+    setAddress("");
+    setRegisterUsername("");
+    setRegisterPassword("");
+    setConfirmPassword("");
+    setAcceptedTerms(false);
+    setRegistrationError(null);
+  };
+
   const simulateProgress = (duration: number = 2000) => {
     setIsLoading(true);
     setLoadingProgress(0);
@@ -602,13 +616,11 @@ export default function EnhancedLoginPage() {
         throw new Error(result.message || "Registration failed");
       }
       
-      // === FIX IMPLEMENTED HERE ===
       setLoadingProgress(100);
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
 
-      // Short delay to show 100% then terminate loading screen
       setTimeout(() => {
-        setIsLoading(false); // <--- Hides the loader
+        setIsLoading(false);
         setSuccessUserData({ firstName, lastName, username: registerUsername });
         setSuccessType('register');
         setShowSuccess(true);
@@ -621,7 +633,7 @@ export default function EnhancedLoginPage() {
         description: error.message,
         variant: "destructive",
       });
-      setIsLoading(false); // Make sure to hide loader on error too
+      setIsLoading(false);
       setLoadingProgress(0);
     } finally {
       setFormLoading(false);
@@ -634,16 +646,9 @@ export default function EnhancedLoginPage() {
     if (successType === 'register') {
       setIsLogin(true);
       setCurrentStep(1);
-      setFirstName("");
-      setLastName("");
-      setEmail("");
-      setPhone("");
-      setAddress("");
-      setRegisterUsername("");
-      setRegisterPassword("");
-      setConfirmPassword("");
-      setAcceptedTerms(false);
       setSuccessUserData(null);
+      resetRegisterForm();
+      setFormKey(prev => prev + 1); 
     } else {
       router.push('/dashboard');
     }
@@ -660,6 +665,9 @@ export default function EnhancedLoginPage() {
   };
 
   const handleFormSwitch = (toLogin: boolean) => {
+    if (toLogin) {
+      resetRegisterForm();
+    }
     setIsLogin(toLogin);
     setCurrentStep(1);
     setFormKey(prev => prev + 1);
@@ -673,11 +681,17 @@ export default function EnhancedLoginPage() {
     if (currentStep > 1) setCurrentStep(currentStep - 1);
   };
 
+  // ===== UPDATED VALIDATE STEP =====
   const validateStep = (step: number) => {
     switch (step) {
       case 1: return firstName.trim() && lastName.trim();
       case 2: return email.trim() && phone.trim();
-      case 3: return registerUsername.trim() && registerPassword.trim() && confirmPassword.trim();
+      case 3: 
+        // Checks if all fields are filled AND passwords match
+        return registerUsername.trim() && 
+               registerPassword.trim() && 
+               confirmPassword.trim() && 
+               registerPassword === confirmPassword; 
       case 4: return acceptedTerms;
       default: return false;
     }
@@ -705,7 +719,7 @@ export default function EnhancedLoginPage() {
                   placeholder="John"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  className="h-11 border-2 border-slate-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 rounded-xl"
+                  className="h-11 border-2 border-slate-200 transition-all duration-300 rounded-xl"
                   required
                 />
               </div>
@@ -718,7 +732,7 @@ export default function EnhancedLoginPage() {
                   placeholder="Doe"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className="h-11 border-2 border-slate-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 rounded-xl"
+                  className="h-11 border-2 border-slate-200 transition-all duration-300 rounded-xl"
                   required
                 />
               </div>
@@ -746,7 +760,7 @@ export default function EnhancedLoginPage() {
                   placeholder="john.doe@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="h-11 border-2 border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 rounded-xl"
+                  className="h-11 border-2 border-slate-200 transition-all duration-300 rounded-xl"
                   required
                 />
               </div>
@@ -760,7 +774,7 @@ export default function EnhancedLoginPage() {
                   placeholder="+63 912 345 6789"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="h-11 border-2 border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300 rounded-xl"
+                  className="h-11 border-2 border-slate-200 transition-all duration-300 rounded-xl"
                   required
                 />
               </div>
@@ -787,8 +801,9 @@ export default function EnhancedLoginPage() {
                   placeholder="Choose a unique username"
                   value={registerUsername}
                   onChange={(e) => setRegisterUsername(e.target.value)}
-                  className="h-11 border-2 border-slate-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-300 rounded-xl"
+                  className="h-11 border-2 border-slate-200 transition-all duration-300 rounded-xl"
                   required
+                  autoComplete="off"
                 />
               </div>
               <div className="space-y-2">
@@ -802,7 +817,7 @@ export default function EnhancedLoginPage() {
                     placeholder="Create a strong password"
                     value={registerPassword}
                     onChange={(e) => setRegisterPassword(e.target.value)}
-                    className="h-11 pr-12 border-2 border-slate-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-300 rounded-xl"
+                    className="h-11 pr-12 border-2 border-slate-200 transition-all duration-300 rounded-xl"
                     required
                   />
                   <Button
@@ -815,7 +830,7 @@ export default function EnhancedLoginPage() {
                     {showRegisterPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </Button>
                 </div>
-                <PasswordStrengthIndicator password={registerPassword} />
+                {registerPassword && <PasswordStrengthIndicator password={registerPassword} />}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirm-password" className="text-sm font-semibold text-slate-700 flex items-center gap-1">
@@ -828,7 +843,7 @@ export default function EnhancedLoginPage() {
                     placeholder="Re-enter your password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="h-11 pr-12 border-2 border-slate-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-300 rounded-xl"
+                    className="h-11 pr-12 border-2 border-slate-200 transition-all duration-300 rounded-xl"
                     required
                   />
                   <Button
@@ -939,7 +954,7 @@ export default function EnhancedLoginPage() {
         <div
           className="absolute inset-0 z-0"
           style={{
-            backgroundImage: "url('/images/tire-platform-3d.png')",
+            backgroundImage: "url('/images/image3.jpg')",
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}
@@ -1018,7 +1033,7 @@ export default function EnhancedLoginPage() {
                           placeholder="Enter your username"
                           value={loginUsername}
                           onChange={(e) => setLoginUsername(e.target.value)}
-                          className="h-12 pl-11 border-2 border-slate-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 rounded-xl"
+                          className="h-12 pl-11 border-2 border-slate-200 transition-all duration-300 rounded-xl"
                           required
                         />
                         <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
@@ -1035,8 +1050,9 @@ export default function EnhancedLoginPage() {
                           placeholder="Enter your password"
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
-                          className="h-12 pl-11 pr-12 border-2 border-slate-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 rounded-xl"
+                          className="h-12 pl-11 pr-12 border-2 border-slate-200 transition-all duration-300 rounded-xl"
                           required
+                          autoComplete="off"
                         />
                         <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-5 w-5" />
                         <Button
@@ -1109,85 +1125,85 @@ export default function EnhancedLoginPage() {
           ) : (
             // Registration Form
             <Card key={formKey} className="border-0 shadow-2xl bg-white/90 backdrop-blur-sm rounded-3xl overflow-hidden">
-  <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600"></div>
-  <form onSubmit={handleRegister}>
-    <CardHeader className="space-y-1 pb-4 pt-10 px-10">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="w-fit -ml-3 mb-2 text-slate-600 hover:text-purple-600 transition-colors animate-in fade-in duration-500"
-        onClick={() => handleFormSwitch(true)}
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to login
-      </Button>
-      <CardTitle className="text-2xl font-bold text-slate-800 text-center">
-        CREATE ACCOUNT
-      </CardTitle>
-      <CardDescription className="text-sm text-slate-600 text-center">
-        Step {currentStep} of {totalSteps}
-      </CardDescription>
-    </CardHeader>
-    <CardContent className="px-10 pb-10">
-      <StepProgress currentStep={currentStep} totalSteps={totalSteps} />
-      {registrationError && (
-        <Alert variant="destructive" className="rounded-xl animate-in fade-in duration-500 mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {registrationError}
-          </AlertDescription>
-        </Alert>
-      )}
-      <div className={(currentStep === 3 || currentStep === 4) ? "max-h-[316px] overflow-y-auto -mr-10 pr-8 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent hover:scrollbar-thumb-slate-400 pb-4" : ""}>
-        {renderRegistrationStep()}
-      </div>
-      <div className={`flex gap-3 mt-8 ${currentStep === 1 ? 'justify-end' : 'justify-between'
-        }`}>
-        {currentStep > 1 && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={prevStep}
-            className="flex items-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50 rounded-xl px-6"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Previous
-          </Button>
-        )}
-        {currentStep < totalSteps ? (
-          <Button
-            type="button"
-            onClick={nextStep}
-            disabled={!validateStep(currentStep)}
-            className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-xl px-6 ml-auto"
-          >
-            Next
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        ) : (
-          <Button
-            className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl px-6 ml-auto"
-            type="submit"
-            disabled={formLoading || !acceptedTerms}
-          >
-            {formLoading ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" />
-                CREATING ACCOUNT...
-              </>
-            ) : (
-              <>
-                <UserPlus className="h-5 w-5" />
-                CREATE ACCOUNT
-              </>
-            )}
-          </Button>
-        )}
-      </div>
-    </CardContent>
-  </form>
-</Card>
+              <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600"></div>
+              <form onSubmit={handleRegister}>
+                <CardHeader className="space-y-1 pb-4 pt-10 px-10">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-fit -ml-3 mb-2 text-slate-600 hover:text-purple-600 transition-colors animate-in fade-in duration-500"
+                    onClick={() => handleFormSwitch(true)}
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back to login
+                  </Button>
+                  <CardTitle className="text-2xl font-bold text-slate-800 text-center">
+                    CREATE ACCOUNT
+                  </CardTitle>
+                  <CardDescription className="text-sm text-slate-600 text-center">
+                    Step {currentStep} of {totalSteps}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="px-10 pb-10">
+                  <StepProgress currentStep={currentStep} totalSteps={totalSteps} />
+                  {registrationError && (
+                    <Alert variant="destructive" className="rounded-xl animate-in fade-in duration-500 mb-4">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        {registrationError}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  <div className={(currentStep === 3 || currentStep === 4) ? "max-h-[316px] overflow-y-auto -mr-10 pr-8 -ml-2 pl-2 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent hover:scrollbar-thumb-slate-400 pb-4" : ""}>
+                    {renderRegistrationStep()}
+                  </div>
+                  <div className={`flex gap-3 mt-8 ${currentStep === 1 ? 'justify-end' : 'justify-between'
+                    }`}>
+                    {currentStep > 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={prevStep}
+                        className="flex items-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50 rounded-xl px-6"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Previous
+                      </Button>
+                    )}
+                    {currentStep < totalSteps ? (
+                      <Button
+                        type="button"
+                        onClick={nextStep}
+                        disabled={!validateStep(currentStep)}
+                        className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-xl px-6 ml-auto"
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl px-6 ml-auto"
+                        type="submit"
+                        disabled={formLoading || !acceptedTerms}
+                      >
+                        {formLoading ? (
+                          <>
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            CREATING ACCOUNT...
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="h-5 w-5" />
+                            CREATE ACCOUNT
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </form>
+            </Card>
           )}
 
           <div className="text-center mt-6">

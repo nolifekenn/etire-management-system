@@ -224,18 +224,18 @@ export default function EnhancedReportsPage() {
   return (
     <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
       
-      {/* Background Sections - Matching branches page */}
+      {/* Background Sections */}
       <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
-        <div 
+        <div
           className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
-          style={{ 
+          style={{
             backgroundImage: "url('/images/image2.jpg')",
             backgroundSize: "cover",
             backgroundPosition: "center 30%"
           }}
         ></div>
         <div className="absolute top-0 left-0 w-32 h-32 bg-purple-300/20 rounded-br-full"></div>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-300/20 rounded-bl-full"></div>
+        <div className="absolute top-0 right-0 w-32 h-32 bg-teal-300/20 rounded-bl-full"></div>
       </div>
 
       <div className="absolute top-64 left-0 w-full h-full bg-indigo-50/10">
@@ -243,55 +243,46 @@ export default function EnhancedReportsPage() {
       </div>
 
       <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-        
-        {/* Header Section - Clean and properly aligned */}
-        <div className={`mb-8 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
-          <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-6 shadow-xl relative overflow-hidden">
+
+        {/* Header Section */}
+        <div className={`mb-12 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+          <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
-            
-            <div className="relative z-10">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h1 className="text-4xl font-bold text-white drop-shadow-2xl font-poppins tracking-tight">
-                    Reports & Analytics
-                  </h1>
-                </div>
-                <Button 
-                  onClick={handleRefresh}
-                  disabled={isLoading}
-                  className={buttonStyles.glass + " active:scale-95 font-poppins group min-w-[140px]"}
-                >
-                  <RefreshCw className={`h-6 w-6 mr-3 ${isLoading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-                  Refresh
-                </Button>
-              </div>
-              
-              {/* Description row with live data indicator inline */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-4">
-                <div className="flex items-center gap-3 text-white/90">
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 opacity-80" />
-                    <span className="font-poppins">Generate detailed reports for sales, inventory, and service jobs</span>
-                  </div>
-                </div>
-                
-                {/* Live data indicators aligned horizontally */}
-                <div className="flex items-center gap-4">
+
+            <div className="relative z-10 flex-1">
+              <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
+                Reports and Analytics
+              </h1>
+              <div className="flex items-center gap-6 text-white/90">
+                <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium">
+                  Generate Reports and Analyze Performance
+                </p>
+                <div className="flex items-center gap-4 text-lg">
                   {lastUpdated && (
-                    <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
+                    <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">
                       <Clock className="w-5 h-5" />
-                      <span>Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
+                      Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                     </div>
                   )}
-                  <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
+                  <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm">
                     <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                    <span>Live data</span>
+                    Live data
                   </div>
                 </div>
               </div>
             </div>
+
+            <Button
+              onClick={handleRefresh}
+              disabled={isLoading}
+              className={buttonStyles.glass + " active:scale-95"}
+            >
+              <RefreshCw className={`h-6 w-6 mr-3 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh Data
+            </Button>
           </div>
         </div>
+
 
         {/* ENHANCED DASHBOARD SUMMARY - First Row */}
         <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 transition-all duration-700 ${
