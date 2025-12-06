@@ -255,11 +255,11 @@ const SuccessConfirmation = ({
           </div>
           <DialogTitle className="text-xl font-bold text-green-800 mb-2">Item Added Successfully!</DialogTitle>
           <DialogDescription className="text-slate-600 mb-6">Your new inventory item has been added.</DialogDescription>
-          
+
           {/* Simple Item Details for Context */}
           <div className="w-full bg-slate-50 p-4 rounded-lg mb-6 text-left border border-slate-200">
-             <p className="text-sm font-semibold text-slate-800">{item.name}</p>
-             <p className="text-xs text-slate-500 mt-1 capitalize">{item.category} • {item.vehicle_type}</p>
+            <p className="text-sm font-semibold text-slate-800">{item.name}</p>
+            <p className="text-xs text-slate-500 mt-1 capitalize">{item.category} • {item.vehicle_type}</p>
           </div>
 
           <div className="flex gap-3 w-full">
@@ -934,9 +934,9 @@ const CriticalStockDetails = ({
 
         {/* Gradient Header with X Close Button */}
         <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 sticky top-0 z-20 text-white relative">
-          
+
           {/* X Close Button */}
-          <button 
+          <button
             onClick={onClose}
             className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
           >
@@ -997,7 +997,7 @@ const CriticalStockDetails = ({
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="flex flex-col gap-1.5 w-20">
                 <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Rows</Label>
                 <Select value={String(rowsPerPage)} onValueChange={(v) => setRowsPerPage(Number(v))}>
@@ -1633,7 +1633,17 @@ export default function EnhancedInventoryPage() {
 
     if (error) {
       console.error('Error deleting item:', error);
-      toast({ title: "Delete Error", description: `Could not delete item: ${error.message}`, variant: "destructive" });
+
+      // Handle foreign key constraint violation (item is referenced in sale_item table)
+      if (error.code === '23503') {
+        toast({
+          title: "Cannot Delete Item",
+          description: "This item cannot be deleted because it has been used in one or more sales. Consider setting stock to 0 instead if you want to hide it from active inventory.",
+          variant: "destructive"
+        });
+      } else {
+        toast({ title: "Delete Error", description: `Could not delete item: ${error.message}`, variant: "destructive" });
+      }
     } else {
       setSuccessAnimation({
         isVisible: true,
@@ -1880,7 +1890,7 @@ export default function EnhancedInventoryPage() {
                   columns={enhancedColumns}
                   data={displayedItems.map(i => ({ ...i, id: i.item_id }))}
                 />
-                
+
                 {/* Footer: Showing X of Y + Pager - UPDATED PAGINATION */}
                 <div className="px-6 py-4 border-t border-slate-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="text-sm text-slate-500">
