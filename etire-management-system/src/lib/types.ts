@@ -119,7 +119,14 @@ export interface Vehicle {
   plate_number: string;
   make?: string;
   model?: string;
+  year?: number;
   color?: string;
+  vehicle_type_id?: string;
+  vehicle_type?: {
+    vehicle_type_id: string;
+    name: string;
+  };
+  customer?: Customer;
   created_at?: string;
   updated_at?: string;
 }
@@ -127,13 +134,20 @@ export interface Vehicle {
 export interface TireHistory {
   history_id: string;
   vehicle_id: string;
-  item_id: string;
-  service_type: 'repair' | 'replacement' | 'rotation' | 'balancing';
+  item_id?: string;
+  service_type: string;
   service_date: string;
   mileage?: number;
   notes?: string;
   created_by: string;
   created_at?: string;
+  vehicle?: Vehicle;
+  items?: Array<{
+    item_id: string;
+    name: string;
+    quantity: number;
+  }>;
+  user?: User;
 }
 
 // Notifications

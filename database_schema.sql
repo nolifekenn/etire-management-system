@@ -151,11 +151,13 @@ CREATE TABLE public.sale (
   vehicle_type_id uuid,
   total_amount numeric,
   service_job_id uuid,
+  job_id uuid,
   CONSTRAINT sale_pkey PRIMARY KEY (sale_id),
   CONSTRAINT sale_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.user(user_id),
   CONSTRAINT sale_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customer(customer_id),
   CONSTRAINT sale_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branch(branch_id),
   CONSTRAINT sale_service_job_id_fkey FOREIGN KEY (service_job_id) REFERENCES public.service_job(job_id),
+  CONSTRAINT sale_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.service_job(job_id),
   CONSTRAINT sale_vehicle_type_id_fkey FOREIGN KEY (vehicle_type_id) REFERENCES public.vehicle_type(vehicle_type_id)
 );
 CREATE TABLE public.sale_item (
@@ -176,13 +178,14 @@ CREATE TABLE public.service_job (
   customer_id uuid,
   vehicle_id uuid,
   job_description text NOT NULL,
-  job_date timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  job_date timestamp with time zone NOT NULL DEFAULT now(),
   status character varying NOT NULL DEFAULT 'pending'::character varying CHECK (status::text = ANY (ARRAY['pending'::character varying::text, 'in-progress'::character varying::text, 'completed'::character varying::text, 'cancelled'::character varying::text])),
   service_fee numeric NOT NULL DEFAULT 0 CHECK (service_fee >= 0::numeric),
   remarks text,
   created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
   updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
   vehicle_type_id uuid,
+  mileage integer,
   CONSTRAINT service_job_pkey PRIMARY KEY (job_id),
   CONSTRAINT service_job_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.user(user_id),
   CONSTRAINT service_job_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customer(customer_id),
@@ -221,20 +224,38 @@ CREATE TABLE public.system_setting (
   CONSTRAINT system_setting_pkey PRIMARY KEY (setting_id),
   CONSTRAINT system_setting_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.user(user_id)
 );
+CREATE TABLE public.system_settings (
+  setting_id uuid NOT NULL DEFAULT gen_random_uuid(),
+  key text NOT NULL UNIQUE,
+  value text,
+  description text,
+  updated_by uuid,
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT system_settings_pkey PRIMARY KEY (setting_id),
+  CONSTRAINT system_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id)
+);
 CREATE TABLE public.tire_history (
   history_id uuid NOT NULL DEFAULT uuid_generate_v4(),
   vehicle_id uuid NOT NULL,
-  item_id uuid NOT NULL,
-  service_type character varying NOT NULL CHECK (service_type::text = ANY (ARRAY['repair'::text, 'replacement'::text, 'rotation'::text, 'balancing'::text])),
+  item_id uuid,
+  service_type character varying NOT NULL,
   service_date timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-  mileage integer,
   notes text,
   created_by uuid NOT NULL,
-  created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT tire_history_pkey PRIMARY KEY (history_id),
   CONSTRAINT tire_history_vehicle_id_fkey FOREIGN KEY (vehicle_id) REFERENCES public.vehicle(vehicle_id),
   CONSTRAINT tire_history_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.inventory_item(item_id),
   CONSTRAINT tire_history_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.user(user_id)
+);
+CREATE TABLE public.tire_history_item (
+  tire_history_item_id uuid NOT NULL DEFAULT gen_random_uuid(),
+  history_id uuid NOT NULL,
+  item_id uuid NOT NULL,
+  quantity integer NOT NULL DEFAULT 1,
+  CONSTRAINT tire_history_item_pkey PRIMARY KEY (tire_history_item_id),
+  CONSTRAINT tire_history_item_history_id_fkey FOREIGN KEY (history_id) REFERENCES public.tire_history(history_id),
+  CONSTRAINT tire_history_item_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.inventory_item(item_id)
 );
 CREATE TABLE public.user (
   user_id uuid NOT NULL DEFAULT uuid_generate_v4(),
