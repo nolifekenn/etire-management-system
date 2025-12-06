@@ -1190,7 +1190,7 @@ const EnhancedTableRow = ({
 
   return (
     <div
-      className="grid grid-cols-9 gap-3 px-3 py-2 items-center border-b border-slate-200 hover:bg-slate-50 transition-colors group cursor-pointer"
+      className="grid grid-cols-9 gap-3 px-6 py-2 items-center border-b border-slate-200 hover:bg-slate-50 transition-colors group cursor-pointer"
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
       onClick={() => onRowClick(item)}
@@ -1256,15 +1256,15 @@ const EnhancedTableRow = ({
 
       {/* Actions Column */}
       <div className="flex justify-center">
-        <div className={`flex items-center gap-1 transition-opacity duration-200 ${showActions ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        <div className={`flex items-center gap-1 transition-opacity duration-200'
           }`}>
           <button
             onClick={(e) => {
               e.stopPropagation();
               onEdit(item);
             }}
-            className="p-1.5 text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors border border-transparent hover:border-purple-200"
-            title="Edit PO"
+            className="p-1.5 text-slate-600 text-purple-600 rounded-md transition-colors border border-transparent"
+            title="Edit"
           >
             <Edit className="h-3.5 w-3.5" />
           </button>
@@ -1274,7 +1274,7 @@ const EnhancedTableRow = ({
               onDelete(item);
             }}
             className="p-1.5 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors border border-transparent hover:border-red-200"
-            title="Delete PO"
+            title="Delete"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -1297,7 +1297,9 @@ const POFilter = ({
   orderDateFrom,
   orderDateTo,
   onOrderDateFromChange,
-  onOrderDateToChange
+  onOrderDateToChange,
+  rowsPerPage,
+  onRowsPerPageChange
 }: {
   statusFilter: string;
   onStatusFilterChange: (status: string) => void;
@@ -1311,136 +1313,146 @@ const POFilter = ({
   orderDateTo?: string;
   onOrderDateFromChange?: (date: string) => void;
   onOrderDateToChange?: (date: string) => void;
+  rowsPerPage?: number;
+  onRowsPerPageChange?: (size: number) => void;
 }) => {
   return (
-    <div className="space-y-4 p-4 bg-white/60 rounded-xl border border-slate-200/50">
-      {/* Search and Status Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="md:col-span-2">
-          <Label htmlFor="search-pos" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
+    <div className="bg-white p-5 border-b border-slate-200">
+      {/* Single Row with all filters */}
+      <div className="flex flex-col xl:flex-row gap-3 items-end">
+        {/* Search - takes more space */}
+        <div className="flex-1 w-full min-w-[200px]">
+          <Label htmlFor="search-pos" className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
             Search Purchase Orders
           </Label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4 group-focus-within:text-indigo-500 transition-colors" />
             <Input
               id="search-pos"
               placeholder="Search by PO number, supplier, or branch..."
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="pl-10 pr-4 py-2 border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm"
+              className="pl-10 h-10 bg-slate-50 border-slate-200 focus:bg-white focus:border-indigo-500 transition-all rounded-md text-sm"
             />
             {searchTerm && (
               <button
                 onClick={() => onSearchChange('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors duration-200"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
         </div>
 
-        <div>
-          <Label htmlFor="status-filter" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
-            Filter by Status
-          </Label>
+        {/* Status Filter */}
+        <div className="w-full xl:w-[140px]">
+          <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Status</Label>
           <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-            <SelectTrigger className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm">
-              <SelectValue placeholder="All Statuses" />
+            <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md text-sm">
+              <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all" className="font-poppins text-sm">All Statuses</SelectItem>
-              <SelectItem value="ordered" className="font-poppins text-sm">📦 Ordered</SelectItem>
-              <SelectItem value="delivered" className="font-poppins text-sm">🚚 Delivered</SelectItem>
-              <SelectItem value="cancelled" className="font-poppins text-sm">❌ Cancelled</SelectItem>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="ordered">📦 Ordered</SelectItem>
+              <SelectItem value="delivered">🚚 Delivered</SelectItem>
+              <SelectItem value="cancelled">❌ Cancelled</SelectItem>
             </SelectContent>
           </Select>
         </div>
-      </div>
 
-      {/* Branch Filter and Date Range */}
-      <div className="pt-2 border-t border-slate-200/50">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {showBranchFilter && (
-            <div>
-              <Label htmlFor="branch-filter" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
-                Filter by Branch
-              </Label>
-              <Select value={selectedBranch || 'all'} onValueChange={onBranchChange}>
-                <SelectTrigger className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm">
-                  <SelectValue placeholder="All Branches" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="font-poppins text-sm">All Branches</SelectItem>
-                  {branches?.map(branch => (
-                    <SelectItem key={branch.branch_id} value={branch.branch_id} className="font-poppins text-sm">
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Order Date From Filter */}
-          <div>
-            <Label htmlFor="order-date-from" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
-              Order Date From
-            </Label>
-            <Input
-              id="order-date-from"
-              type="date"
-              value={orderDateFrom || ''}
-              onChange={(e) => onOrderDateFromChange?.(e.target.value)}
-              className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm"
-            />
+        {/* Branch Filter */}
+        {showBranchFilter && (
+          <div className="w-full xl:w-[140px]">
+            <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Branch</Label>
+            <Select value={selectedBranch || 'all'} onValueChange={onBranchChange}>
+              <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md text-sm">
+                <SelectValue placeholder="Branch" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Branches</SelectItem>
+                {branches?.map(branch => (
+                  <SelectItem key={branch.branch_id} value={branch.branch_id}>
+                    {branch.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+        )}
 
-          {/* Order Date To Filter */}
-          <div>
-            <Label htmlFor="order-date-to" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
-              Order Date To
-            </Label>
-            <Input
-              id="order-date-to"
-              type="date"
-              value={orderDateTo || ''}
-              onChange={(e) => onOrderDateToChange?.(e.target.value)}
-              className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm"
-            />
-          </div>
-
-          {/* Clear Date Filters Button */}
-          <div className="flex items-end">
-            {(orderDateFrom || orderDateTo) && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  onOrderDateFromChange?.('');
-                  onOrderDateToChange?.('');
-                }}
-                className="h-10 w-full"
-              >
-                <X className="h-3 w-3 mr-2" />
-                Clear Date Filters
-              </Button>
-            )}
-          </div>
+        {/* Date From */}
+        <div className="w-full xl:w-[150px]">
+          <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">From</Label>
+          <Input
+            type="date"
+            value={orderDateFrom || ''}
+            onChange={(e) => onOrderDateFromChange?.(e.target.value)}
+            className="h-10 bg-white border-slate-200 rounded-md text-sm"
+          />
         </div>
+
+        {/* Date To */}
+        <div className="w-full xl:w-[150px]">
+          <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">To</Label>
+          <Input
+            type="date"
+            value={orderDateTo || ''}
+            onChange={(e) => onOrderDateToChange?.(e.target.value)}
+            className="h-10 bg-white border-slate-200 rounded-md text-sm"
+          />
+        </div>
+
+        {/* Rows Per Page */}
+        <div className="w-full xl:w-20">
+          <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Rows</Label>
+          <Select
+            value={String(rowsPerPage || 25)}
+            onValueChange={(v) => onRowsPerPageChange?.(Number(v))}
+          >
+            <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">5</SelectItem>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="25">25</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Clear Dates Button */}
+        {(orderDateFrom || orderDateTo) && (
+          <div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                onOrderDateFromChange?.('');
+                onOrderDateToChange?.('');
+              }}
+              className="h-10 px-3 text-slate-500 border-slate-200 hover:bg-slate-50"
+              title="Clear Dates"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-// Pagination Component
-const Pagination = ({
+// Enhanced Pagination Component
+const EnhancedPagination = ({
   currentPage,
   totalPages,
   onPageChange,
   pageSize,
   onPageSizeChange,
-  totalItems
+  totalItems,
+  displayedCount
 }: {
   currentPage: number;
   totalPages: number;
@@ -1448,76 +1460,67 @@ const Pagination = ({
   pageSize: number;
   onPageSizeChange: (size: number) => void;
   totalItems: number;
+  displayedCount: number;
 }) => {
-  const pages = [];
-  const maxVisiblePages = 5;
-
-  let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-  let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
-  if (endPage - startPage + 1 < maxVisiblePages) {
-    startPage = Math.max(1, endPage - maxVisiblePages + 1);
-  }
-
-  for (let i = startPage; i <= endPage; i++) {
-    pages.push(i);
-  }
-
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
-      <div className="text-sm text-slate-600">
-        Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalItems)} of {totalItems} entries
+    <div className="px-6 py-4 border-t border-slate-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-4">
+      {/* Left: Showing X to Y of Z entries */}
+      <div className="text-sm text-slate-500">
+        Showing <span className="font-medium">{totalItems === 0 ? 0 : ((currentPage - 1) * pageSize + 1)}</span> to{' '}
+        <span className="font-medium">{Math.min(currentPage * pageSize, totalItems)}</span> of{' '}
+        <span className="font-medium">{totalItems}</span> entries
       </div>
 
+      {/* Right: Pagination Controls */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-2 text-sm text-slate-600">
-          <span>Rows per page:</span>
-          <Select value={pageSize.toString()} onValueChange={(value) => onPageSizeChange(Number(value))}>
-            <SelectTrigger className="w-20 h-8 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10">10</SelectItem>
-              <SelectItem value="25">25</SelectItem>
-              <SelectItem value="50">50</SelectItem>
-              <SelectItem value="100">100</SelectItem>
-            </SelectContent>
-          </Select>
+        {/* First Page Button */}
+        <Button
+          variant="outline"
+          onClick={() => onPageChange(1)}
+          disabled={currentPage === 1}
+          className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+          title="First Page"
+        >
+          <span className="text-lg">«</span>
+        </Button>
+
+        {/* Previous Page Button */}
+        <Button
+          variant="outline"
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+          disabled={currentPage === 1}
+          className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+          title="Previous Page"
+        >
+          <span className="text-lg">‹</span>
+        </Button>
+
+        {/* Page Indicator */}
+        <div className="text-sm font-medium text-slate-500 px-2 min-w-[100px] text-center select-none">
+          Page {currentPage} of {totalPages || 1}
         </div>
 
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="h-8 w-8 p-0"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
+        {/* Next Page Button */}
+        <Button
+          variant="outline"
+          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+          disabled={currentPage >= totalPages}
+          className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+          title="Next Page"
+        >
+          <span className="text-lg">›</span>
+        </Button>
 
-          {pages.map(page => (
-            <Button
-              key={page}
-              variant={currentPage === page ? "default" : "outline"}
-              size="sm"
-              onClick={() => onPageChange(page)}
-              className={`h-8 w-8 p-0 text-xs ${currentPage === page ? 'bg-purple-600 text-white' : ''}`}
-            >
-              {page}
-            </Button>
-          ))}
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="h-8 w-8 p-0"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
+        {/* Last Page Button */}
+        <Button
+          variant="outline"
+          onClick={() => onPageChange(totalPages)}
+          disabled={currentPage >= totalPages}
+          className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+          title="Last Page"
+        >
+          <span className="text-lg">»</span>
+        </Button>
       </div>
     </div>
   );
@@ -1792,6 +1795,16 @@ export default function EnhancedPurchasingPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
+  // Pagination states for each tab
+  const [supplierPage, setSupplierPage] = useState(1);
+  const [supplierPageSize, setSupplierPageSize] = useState(5);
+
+  const [poPage, setPOPage] = useState(1);
+  const [poPageSize, setPOPageSize] = useState(5);
+
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(5);
+
   // Enhanced PO Form State - Default to 'ordered' status
   const [poFormData, setPOFormData] = useState({
     poNumber: '',
@@ -1974,6 +1987,54 @@ export default function EnhancedPurchasingPage() {
     );
   }, [purchaseOrders]);
 
+  // Paginated Suppliers
+  const paginatedSuppliers = useMemo(() => {
+    const startIndex = (supplierPage - 1) * supplierPageSize;
+    const endIndex = startIndex + supplierPageSize;
+    return filteredSuppliers.slice(startIndex, endIndex);
+  }, [filteredSuppliers, supplierPage, supplierPageSize]);
+
+  const supplierTotalPages = Math.ceil(filteredSuppliers.length / supplierPageSize);
+
+  // Paginated Transaction History
+  const filteredHistory = useMemo(() => {
+    return transactionHistory.filter(po => {
+      const matchesSearch = po.po_number.toLowerCase().includes(poSearchTerm.toLowerCase()) ||
+        po.supplier?.name.toLowerCase().includes(poSearchTerm.toLowerCase()) ||
+        po.branch?.name.toLowerCase().includes(poSearchTerm.toLowerCase());
+
+      const matchesStatus = statusFilter === 'all' || po.status === statusFilter;
+      const matchesBranch = branchFilter === 'all' || po.branch_id === branchFilter;
+
+      let matchesDate = true;
+      if (orderDateFrom || orderDateTo) {
+        const poDate = po.order_date ? new Date(po.order_date) : null;
+        if (poDate) {
+          if (orderDateFrom) {
+            const fromDate = new Date(orderDateFrom);
+            fromDate.setHours(0, 0, 0, 0);
+            matchesDate = matchesDate && poDate >= fromDate;
+          }
+          if (orderDateTo) {
+            const toDate = new Date(orderDateTo);
+            toDate.setHours(23, 59, 59, 999);
+            matchesDate = matchesDate && poDate <= toDate;
+          }
+        }
+      }
+
+      return matchesSearch && matchesStatus && matchesBranch && matchesDate;
+    });
+  }, [transactionHistory, poSearchTerm, statusFilter, branchFilter, orderDateFrom, orderDateTo]);
+
+  const paginatedHistory = useMemo(() => {
+    const startIndex = (historyPage - 1) * historyPageSize;
+    const endIndex = startIndex + historyPageSize;
+    return filteredHistory.slice(startIndex, endIndex);
+  }, [filteredHistory, historyPage, historyPageSize]);
+
+  const historyTotalPages = Math.ceil(filteredHistory.length / historyPageSize);
+
   // Paginated data
   const paginatedPurchaseOrders = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
@@ -1985,7 +2046,15 @@ export default function EnhancedPurchasingPage() {
 
   // Reset pagination when filters change
   useEffect(() => {
+    setSupplierPage(1);
+  }, [supplierSearchTerm, filteredSuppliers.length]);
+
+  useEffect(() => {
     setCurrentPage(1);
+  }, [poSearchTerm, statusFilter, branchFilter, orderDateFrom, orderDateTo]);
+  
+  useEffect(() => {
+    setHistoryPage(1);
   }, [poSearchTerm, statusFilter, branchFilter, orderDateFrom, orderDateTo]);
 
   const handleRefresh = () => {
@@ -2644,7 +2713,10 @@ export default function EnhancedPurchasingPage() {
   };
 
   // Custom table renderer for transaction history
-  const renderHistoryTable = () => {
+  const renderHistoryTable = (itemsToRender?: any[]) => {
+    // Use provided items or fall back to full transactionHistory
+    const items = itemsToRender || transactionHistory;
+    
     if (isPOLoading && purchaseOrders.length === 0) {
       return (
         <div className="flex justify-center items-center h-64">
@@ -2655,8 +2727,8 @@ export default function EnhancedPurchasingPage() {
 
     return (
       <div className="space-y-1">
-        {transactionHistory.map((po) => (
-          <div key={po.po_id} className="grid grid-cols-9 gap-3 px-3 py-2 items-center border-b border-slate-200 hover:bg-slate-50 transition-colors text-sm cursor-pointer" onClick={() => handleEditPO(po)}>
+        {items.map((po) => (
+          <div key={po.po_id} className="grid grid-cols-9 gap-3 px-6 py-2 items-center border-b border-slate-200 hover:bg-slate-50 transition-colors text-sm cursor-pointer" onClick={() => handleEditPO(po)}>
             <div className="font-semibold text-purple-700">{po.po_number}</div>
             <div className="truncate">{po.supplier?.name || 'Unknown'}</div>
             <div className="truncate">{po.branch?.name || 'Unknown'}</div>
@@ -2860,50 +2932,75 @@ export default function EnhancedPurchasingPage() {
         <EnhancedTabs value={activeTab} onValueChange={setActiveTab}>
           {/* Suppliers Tab */}
           <TabsContent value="suppliers" className="space-y-6">
-            <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
-              <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-purple-50/50 border-b border-slate-200/50">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Supplier Management</CardTitle>
-                    <CardDescription className="text-slate-600 font-poppins">
-                      {filteredSuppliers.length} of {suppliers.length} supplier{filteredSuppliers.length !== 1 ? 's' : ''} shown
-                    </CardDescription>
+            <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
+              {/* Gradient Header */}
+              <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-500 text-white p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <Building2 className="h-6 w-6 text-white" />
                   </div>
-                  <Button onClick={handleOpenSupplierDialog} className={buttonStyles.primary}>
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                    New Supplier
-                  </Button>
+                  <div>
+                    <div className="text-xl font-bold font-poppins">Supplier Management</div>
+                    <div className="text-sm opacity-90">Manage your vendor relationships</div>
+                    <div className="text-sm text-white/90 mt-1">
+                      Showing: <strong>{filteredSuppliers.length}</strong> of <strong>{suppliers.length}</strong> suppliers
+                    </div>
+                  </div>
                 </div>
+              </div>
 
-                {/* Filter Bar */}
-                <div className="flex flex-col sm:flex-row gap-4 mt-6 p-4 bg-white/60 rounded-xl border border-slate-200/50">
+              {/* Search Bar & Rows Per Page*/}
+              <div className="bg-white p-5 border-b border-slate-200">
+                <div className="flex flex-col sm:flex-row items-end gap-4">
+                  {/* Search Bar - Left side */}
                   <div className="flex-1">
-                    <Label htmlFor="search-suppliers" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Search Suppliers</Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Label htmlFor="search-suppliers" className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+                      Search Suppliers
+                    </Label>
+                    <div className="relative group">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4 group-focus-within:text-indigo-500 transition-colors" />
                       <Input
                         id="search-suppliers"
-                        placeholder="Search by name, contact, phone, email, or address..."
+                        placeholder="Search by name, contact, phone, email..."
                         value={supplierSearchTerm}
                         onChange={(e) => setSupplierSearchTerm(e.target.value)}
-                        className="pl-10 pr-4 py-2 border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm"
+                        className="pl-10 h-10 bg-slate-50 border-slate-200 focus:bg-white focus:border-indigo-500 transition-all rounded-md"
                       />
                       {supplierSearchTerm && (
                         <button
                           onClick={() => setSupplierSearchTerm('')}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors duration-200"
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
                         >
-                          <X className="h-4 w-4" />
+                          <X className="h-3.5 w-3.5" />
                         </button>
                       )}
                     </div>
                   </div>
-                </div>
-              </CardHeader>
 
-              <CardContent className="p-6">
+                  {/* Rows per Page - Right side, label above dropdown */}
+                  <div>
+                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+                      Rows
+                    </Label>
+                    <Select value={String(supplierPageSize)} onValueChange={(v) => setSupplierPageSize(Number(v))}>
+                      <SelectTrigger className="h-10 w-20 bg-white border-slate-200 text-slate-700">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Table Content */}
+              <div className="p-0">
                 {supplierError && (
-                  <Alert variant="destructive" className="mb-6 font-poppins">
+                  <Alert variant="destructive" className="m-6 font-poppins">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>Error</AlertTitle>
                     <AlertDescription>{supplierError}</AlertDescription>
@@ -2915,76 +3012,83 @@ export default function EnhancedPurchasingPage() {
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
                 ) : (
-                  <DataTableWrapper
-                    title=""
-                    columns={supplierColumns as any}
-                    data={filteredSuppliers.map(supplier => ({ ...supplier, id: supplier.supplier_id }))}
-                    onEdit={handleEditSupplier as any}
-                    onDelete={handleDeleteSupplier as any}
-                  />
+                  <>
+                    <DataTableWrapper
+                      className="w-full border-none"
+                      title=""
+                      columns={supplierColumns as any}
+                      data={paginatedSuppliers.map(supplier => ({ ...supplier, id: supplier.supplier_id }))}
+                      onEdit={handleEditSupplier as any}
+                      onDelete={handleDeleteSupplier as any}
+                    />
+                    
+                    {/* Enhanced Pagination */}
+                    {filteredSuppliers.length > 0 && (
+                      <EnhancedPagination
+                        currentPage={supplierPage}
+                        totalPages={supplierTotalPages}
+                        onPageChange={setSupplierPage}
+                        pageSize={supplierPageSize}
+                        onPageSizeChange={setSupplierPageSize}
+                        totalItems={filteredSuppliers.length}
+                        displayedCount={paginatedSuppliers.length}
+                      />
+                    )}
+                  </>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Purchase Orders Tab */}
           <TabsContent value="purchase-orders" className="space-y-6">
-            <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
-              <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-blue-50/50 border-b border-slate-200/50">
-                <div className="flex items-center justify-between">
+            <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
+              {/* Gradient Header */}
+              <div className="w-full bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-400 text-white p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <ShoppingCart className="h-6 w-6 text-white" />
+                  </div>
                   <div>
-                    <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Active Purchase Orders</CardTitle>
-                    <CardDescription className="text-slate-600 font-poppins">
-                      {filteredPurchaseOrders.length} active order{filteredPurchaseOrders.length !== 1 ? 's' : ''} •
-                      Delivered orders moved to Transaction History
-                    </CardDescription>
+                    <div className="text-xl font-bold font-poppins">Active Purchase Orders</div>
+                    <div className="text-sm opacity-90">Track ongoing orders and deliveries</div>
+                    <div className="text-sm text-white/90 mt-1">
+                      Active: <strong>{filteredPurchaseOrders.length}</strong> order{filteredPurchaseOrders.length !== 1 ? 's' : ''}
+                    </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Enhanced Filter Bar with Order Date Filter */}
-                <POFilter
-                  statusFilter={statusFilter}
-                  onStatusFilterChange={setStatusFilter}
-                  searchTerm={poSearchTerm}
-                  onSearchChange={setPOSearchTerm}
-                  selectedBranch={branchFilter}
-                  onBranchChange={setBranchFilter}
-                  branches={branches}
-                  showBranchFilter={true}
-                  orderDateFrom={orderDateFrom}
-                  orderDateTo={orderDateTo}
-                  onOrderDateFromChange={setOrderDateFrom}
-                  onOrderDateToChange={setOrderDateTo}
-                />
-              </CardHeader>
+              {/* Enhanced Filter Bar */}
+              <POFilter
+                statusFilter={statusFilter}
+                onStatusFilterChange={setStatusFilter}
+                searchTerm={poSearchTerm}
+                onSearchChange={setPOSearchTerm}
+                selectedBranch={branchFilter}
+                onBranchChange={setBranchFilter}
+                branches={branches}
+                showBranchFilter={true}
+                orderDateFrom={orderDateFrom}
+                orderDateTo={orderDateTo}
+                onOrderDateFromChange={setOrderDateFrom}
+                onOrderDateToChange={setOrderDateTo}
+                rowsPerPage={poPageSize}
+                onRowsPerPageChange={setPOPageSize}
+              />
 
-              <CardContent className="p-6">
+              {/* Table Content */}
+              <div className="p-0">
                 {poError && (
-                  <Alert variant="destructive" className="mb-6 font-poppins">
+                  <Alert variant="destructive" className="m-6 font-poppins">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>Error</AlertTitle>
                     <AlertDescription>{poError}</AlertDescription>
                   </Alert>
                 )}
 
-                {/* Table Header */}
-                <div className="grid grid-cols-9 gap-3 px-3 py-3 bg-slate-50 rounded-lg border border-slate-200 mb-2 font-semibold text-slate-700 text-sm">
-                  <div>PO Number</div>
-                  <div>Supplier</div>
-                  <div>Branch</div>
-                  <div>Order Date</div>
-                  <div>Expected Delivery</div>
-                  <div>Total Amount</div>
-                  <div>Delivery Status</div>
-                  <div>Payment Status</div>
-                  <div className="text-center">Actions</div>
-                </div>
-
-                {/* Enhanced Table with Fixed Actions */}
-                {renderPOTable(paginatedPurchaseOrders)}
-
-                {filteredPurchaseOrders.length === 0 && !isPOLoading && (
-                  <div className="text-center py-12 text-slate-500">
+                {filteredPurchaseOrders.length === 0 && !isPOLoading ? (
+                  <div className="text-center py-6 text-slate-500 m-6">
                     <ShoppingCart className="h-12 w-12 mx-auto mb-4 text-slate-300" />
                     <p className="text-lg font-medium">No active purchase orders found</p>
                     <p className="text-sm mt-1">Create your first purchase order to get started</p>
@@ -2993,136 +3097,181 @@ export default function EnhancedPurchasingPage() {
                       Create Purchase Order
                     </Button>
                   </div>
-                )}
+                ) : (
+                  <>
+                    {/* Manual Header for consistency with Inventory design */}
+                    <div className="grid grid-cols-9 gap-3 px-6 py-3 bg-slate-50 border-b border-slate-200 font-bold text-slate-600 text-xs uppercase tracking-wider">
+                      <div>PO Number</div>
+                      <div>Supplier</div>
+                      <div>Branch</div>
+                      <div>Order Date</div>
+                      <div>Expected Delivery</div>
+                      <div>Total Amount</div>
+                      <div>Delivery Status</div>
+                      <div>Payment Status</div>
+                      <div className="text-center">Actions</div>
+                    </div>
 
-                {/* Pagination */}
-                {filteredPurchaseOrders.length > 0 && (
-                  <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                    pageSize={pageSize}
-                    onPageSizeChange={setPageSize}
-                    totalItems={filteredPurchaseOrders.length}
-                  />
+                    {renderPOTable(paginatedPurchaseOrders)}
+
+                    {filteredPurchaseOrders.length > 0 && (
+                      <div className="p-0">
+                        <EnhancedPagination
+                          currentPage={poPage}
+                          totalPages={totalPages}
+                          onPageChange={setPOPage}
+                          pageSize={poPageSize}
+                          onPageSizeChange={setPOPageSize}
+                          totalItems={filteredPurchaseOrders.length}
+                          displayedCount={paginatedPurchaseOrders.length}
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Transaction History Tab */}
           <TabsContent value="transaction-history" className="space-y-6">
-            <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
-              <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-purple-50/50 border-b border-slate-200/50">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Transaction History</CardTitle>
-                    <CardDescription className="text-slate-600 font-poppins">
-                      {transactionHistory.length} completed transaction{transactionHistory.length !== 1 ? 's' : ''} •
-                      Includes delivered and cancelled orders only
-                    </CardDescription>
+            <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
+              {/* Gradient Header */}
+              <div className="w-full bg-gradient-to-r from-green-600 via-emerald-600 to-teal-500 text-white p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <History className="h-6 w-6 text-white" />
                   </div>
-                  <Button onClick={handleExportData} className={buttonStyles.primary}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Export History
-                  </Button>
+                  <div>
+                    <div className="text-xl font-bold font-poppins">Transaction History</div>
+                    <div className="text-sm opacity-90">Completed and cancelled orders</div>
+                    <div className="text-sm text-white/90 mt-1">
+                      Total: <strong>{transactionHistory.length}</strong> transactions
+                    </div>
+                  </div>
                 </div>
+                <Button onClick={handleExportData} className="bg-white/20 hover:bg-white/30 text-white border border-white/30 shadow-lg backdrop-blur-sm">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export History
+                </Button>
+              </div>
 
-                {/* History Filter */}
-                <POFilter
-                  statusFilter={statusFilter}
-                  onStatusFilterChange={setStatusFilter}
-                  searchTerm={poSearchTerm}
-                  onSearchChange={setPOSearchTerm}
-                  selectedBranch={branchFilter}
-                  onBranchChange={setBranchFilter}
-                  branches={branches}
-                  showBranchFilter={true}
-                  orderDateFrom={orderDateFrom}
-                  orderDateTo={orderDateTo}
-                  onOrderDateFromChange={setOrderDateFrom}
-                  onOrderDateToChange={setOrderDateTo}
-                />
-              </CardHeader>
+              {/* Filter Bar */}
+              <POFilter
+                statusFilter={statusFilter}
+                onStatusFilterChange={setStatusFilter}
+                searchTerm={poSearchTerm}
+                onSearchChange={setPOSearchTerm}
+                selectedBranch={branchFilter}
+                onBranchChange={setBranchFilter}
+                branches={branches}
+                showBranchFilter={true}
+                orderDateFrom={orderDateFrom}
+                orderDateTo={orderDateTo}
+                onOrderDateFromChange={setOrderDateFrom}
+                onOrderDateToChange={setOrderDateTo}
+                rowsPerPage={historyPageSize}
+                onRowsPerPageChange={setHistoryPageSize}
+              />
 
-              <CardContent className="p-6">
-                {/* Table Header */}
-                <div className="grid grid-cols-9 gap-3 px-3 py-3 bg-slate-50 rounded-lg border border-slate-200 mb-2 font-semibold text-slate-700 text-sm">
-                  <div>PO Number</div>
-                  <div>Supplier</div>
-                  <div>Branch</div>
-                  <div>Order Date</div>
-                  <div>Completion Date</div>
-                  <div>Total Amount</div>
-                  <div>Final Status</div>
-                  <div>Payment Status</div>
-                  <div className="text-center">Notes</div>
-                </div>
-
-                {/* History Table */}
-                {renderHistoryTable()}
-
-                {transactionHistory.length === 0 && !isPOLoading && (
-                  <div className="text-center py-12 text-slate-500">
+              {/* Table Content */}
+              <div className="p-0">
+                {paginatedHistory.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500 m-6">
                     <History className="h-12 w-12 mx-auto mb-4 text-slate-300" />
                     <p className="text-lg font-medium">No transaction history yet</p>
                     <p className="text-sm mt-1">Completed orders will appear here automatically</p>
                   </div>
+                ) : (
+                  <>
+                    {/* Manual Header */}
+                    <div className="grid grid-cols-9 gap-3 px-6 py-3 bg-slate-50 border-b border-slate-200 font-bold text-slate-600 text-xs uppercase tracking-wider">
+                      <div>PO Number</div>
+                      <div>Supplier</div>
+                      <div>Branch</div>
+                      <div>Order Date</div>
+                      <div>Completion Date</div>
+                      <div>Total Amount</div>
+                      <div>Final Status</div>
+                      <div>Payment Status</div>
+                      <div className="text-center">Notes</div>
+                    </div>
+
+                    {/* Render paginated history */}
+                    {renderHistoryTable(paginatedHistory)}
+
+                    {/* Pagination */}
+                    <EnhancedPagination
+                      currentPage={historyPage}
+                      totalPages={historyTotalPages}
+                      onPageChange={setHistoryPage}
+                      pageSize={historyPageSize}
+                      onPageSizeChange={setHistoryPageSize}
+                      totalItems={transactionHistory.length}
+                      displayedCount={paginatedHistory.length}
+                    />
+                  </>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Credit Management Tab */}
           <TabsContent value="credit-management" className="space-y-6">
-            <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
-              <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-red-50/50 border-b border-slate-200/50">
-                <div className="flex items-center justify-between">
+            <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
+              {/* Gradient Header */}
+              <div className="w-full bg-gradient-to-r from-red-600 via-orange-600 to-amber-500 text-white p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <CreditCardIcon className="h-6 w-6 text-white" />
+                  </div>
                   <div>
-                    <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Credit Management</CardTitle>
-                    <CardDescription className="text-slate-600 font-poppins">
-                      {creditOrders.length} active credit purchase{creditOrders.length !== 1 ? 's' : ''} •
-                      Track payments and due dates
-                    </CardDescription>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={() => setIsCreditTableOpen(true)} variant="outline" className="flex items-center gap-2">
-                      <List className="h-4 w-4" />
-                      View Details
-                    </Button>
-                    <Button onClick={handleExportData} className={buttonStyles.primary}>
-                      <Download className="h-4 w-4 mr-2" />
-                      Export Credit Data
-                    </Button>
+                    <div className="text-xl font-bold font-poppins">Credit Management</div>
+                    <div className="text-sm opacity-90">Track payments and due dates</div>
+                    <div className="text-sm text-white/90 mt-1">
+                      Active: <strong>{creditOrders.length}</strong> credit purchase{creditOrders.length !== 1 ? 's' : ''}
+                    </div>
                   </div>
                 </div>
-              </CardHeader>
-
-              <CardContent className="p-6">
-                {/* Table Header */}
-                <div className="grid grid-cols-8 gap-3 px-3 py-3 bg-slate-50 rounded-lg border border-slate-200 mb-2 font-semibold text-slate-700 text-sm">
-                  <div>PO Number</div>
-                  <div>Supplier</div>
-                  <div>Branch</div>
-                  <div>Order Date</div>
-                  <div>Due Date</div>
-                  <div>Total Amount</div>
-                  <div>Payment Status</div>
-                  <div className="text-center">Days Until Due</div>
+                <div className="flex gap-2">
+                  <Button onClick={() => setIsCreditTableOpen(true)} className="bg-white/20 hover:bg-white/30 text-white border border-white/30 flex items-center gap-2">
+                    <List className="h-4 w-4" />
+                    View Details
+                  </Button>
+                  <Button onClick={handleExportData} className="bg-white/20 hover:bg-white/30 text-white border border-white/30 shadow-lg backdrop-blur-sm">
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Credit Data
+                  </Button>
                 </div>
+              </div>
 
-                {/* Credit Table */}
-                {renderCreditTable()}
-
-                {creditOrders.length === 0 && !isPOLoading && (
-                  <div className="text-center py-12 text-slate-500">
+              {/* Table Content */}
+              <div className="p-0">
+                {creditOrders.length === 0 && !isPOLoading ? (
+                  <div className="text-center py-12 text-slate-500 m-6">
                     <CreditCardIcon className="h-12 w-12 mx-auto mb-4 text-slate-300" />
                     <p className="text-lg font-medium">No credit purchases</p>
                     <p className="text-sm mt-1">Credit purchases will appear here automatically</p>
                   </div>
+                ) : (
+                  <>
+                    {/* Manual Header */}
+                    <div className="grid grid-cols-8 gap-3 px-6 py-3 bg-slate-50 border-b border-slate-200 font-bold text-slate-600 text-xs uppercase tracking-wider">
+                      <div>PO Number</div>
+                      <div>Supplier</div>
+                      <div>Branch</div>
+                      <div>Order Date</div>
+                      <div>Due Date</div>
+                      <div>Total Amount</div>
+                      <div>Payment Status</div>
+                      <div className="text-center">Days Until Due</div>
+                    </div>
+
+                    {renderCreditTable()}
+                  </>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </TabsContent>
         </EnhancedTabs>
 
@@ -3133,7 +3282,7 @@ export default function EnhancedPurchasingPage() {
             resetSupplierForm();
           }
         }}>
-          <DialogContent className="sm:max-w-lg bg-white border-0 shadow-2xl mt-10 font-poppins max-h-[85vh] overflow-hidden">
+          <DialogContent className="sm:max-w-lg bg-white border-0 shadow-2xl rounded-2xl font-poppins max-h-[85vh] overflow-hidden fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-lg">
             <DialogHeader className="pb-4">
               <DialogTitle className="text-2xl font-bold text-slate-900 font-poppins">
                 {editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}
@@ -3227,7 +3376,7 @@ export default function EnhancedPurchasingPage() {
             resetPOForm();
           }
         }}>
-          <DialogContent className="sm:max-w-4xl bg-white border-0 shadow-2xl mt-10 font-poppins max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogContent className="bg-white border-0 shadow-2xl rounded-2xl font-poppins max-h-[85vh] overflow-hidden flex flex-col fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-4xl">
             <DialogHeader className="pb-4">
               <DialogTitle className="text-2xl font-bold text-slate-900 font-poppins">
                 {editingPO ? 'Edit Purchase Order' : 'Create Purchase Order'}
