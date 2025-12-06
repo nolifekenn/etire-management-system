@@ -210,7 +210,7 @@ const SuccessAnimation = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300">
-      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300">
+      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300 font-poppins">
         <div className={`w-20 h-20 bg-gradient-to-r ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500`}>
           <ActionIcon className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
         </div>
@@ -246,7 +246,7 @@ const SuccessConfirmation = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w bg-white border border-green-200 shadow-2xl">
+      <DialogContent className="sm:max-w bg-white border border-green-200 shadow-2xl font-poppins">
         <div className="flex flex-col items-center text-center p-6">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
             <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
@@ -930,7 +930,7 @@ const CriticalStockDetails = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl p-0 gap-0">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl p-0 gap-0 font-poppins">
 
         {/* Gradient Header with X Close Button */}
         <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 sticky top-0 z-20 text-white relative">
@@ -1085,7 +1085,7 @@ const ViewMoreDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl">
+      <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl font-poppins">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
             Complete Inventory List
@@ -1882,7 +1882,8 @@ export default function EnhancedInventoryPage() {
               filters={filters}
               onClearFilters={handleClearFilters}
               onAddItem={handleOpenAddDialog}
-            />
+              variant="table"
+              />
           </div>
         ) : (
           <>
@@ -1970,7 +1971,7 @@ export default function EnhancedInventoryPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-2xl bg-white border border-slate-200 shadow-2xl">
+        <DialogContent className="sm:max-w-2xl bg-white border border-slate-200 shadow-2xl font-poppins">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">
               {isEditItemDialogOpen ? 'Edit Item' : 'Add New Item'}
@@ -2214,7 +2215,7 @@ export default function EnhancedInventoryPage() {
       </Dialog>
 
       <Dialog open={isStockAdjustmentOpen} onOpenChange={(open) => { if (!open) { setIsStockAdjustmentOpen(false); setAdjustingItem(null); } }}>
-        <DialogContent className="sm:max-w-xl bg-white border border-slate-200 shadow-2xl">
+      <DialogContent className="sm:max-w-xl bg-white border border-slate-200 shadow-2xl font-poppins">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold">Adjust Stock</DialogTitle>
             <DialogDescription>Modify stock quantity for the selected item</DialogDescription>
@@ -2233,7 +2234,7 @@ export default function EnhancedInventoryPage() {
 
       {/* === ADDED MISSING DELETE CONFIRMATION DIALOG === */}
       <AlertDialog open={isDeleteConfirmationOpen} onOpenChange={setIsDeleteConfirmationOpen}>
-        <AlertDialogContent className="bg-white border border-slate-200 shadow-xl rounded-xl">
+      <AlertDialogContent className="bg-white border border-slate-200 shadow-xl rounded-xl font-poppins">
           <AlertDialogHeader>
             <div className="mx-auto w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
               <Trash2 className="h-6 w-6 text-red-600" />
@@ -2312,7 +2313,6 @@ export default function EnhancedInventoryPage() {
         </div>
       )}
 
-// Update the global styles at the bottom of your component
 <style jsx global>{`
   @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
   
