@@ -1838,120 +1838,123 @@ export default function EnhancedInventoryPage() {
 
         {/* Enhanced Inventory Table using DataTableWrapper */}
         <section aria-labelledby="inventory-list-heading">
-          {isLoading && items.length === 0 && !fetchError ? (
-            <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl border border-slate-200 p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-4" />
-              <p className="text-slate-600">Loading inventory items...</p>
+  {isLoading && items.length === 0 && !fetchError ? (
+    <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl border border-slate-200 p-8">
+      <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-4" />
+      <p className="text-slate-600">Loading inventory items...</p>
+    </div>
+  ) : (
+    <>
+      {/* Single rounded card: gradient header + table */}
+      <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
+        <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-400 text-white p-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <PackageSearch className="h-6 w-6 text-white" />
             </div>
-          ) : processedItems.length === 0 ? (
+            <div>
+              <div className="text-xl font-bold font-poppins">Inventory Items</div>
+              <div className="text-sm opacity-90">Track products, stock levels and pricing</div>
+              <div className="text-sm text-white/90 mt-1">
+                {filters.search || filters.category !== 'all' || filters.stockStatus !== 'all' || filters.vehicleType !== 'all' ? (
+                  <>Filtered: <strong>{processedItems.length}</strong> of <strong>{items.length}</strong> items</>
+                ) : (
+                  <>Total: <strong>{items.length}</strong> items</>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Advanced Filters - ALWAYS VISIBLE */}
+        <AdvancedFilters
+          filters={filters}
+          onFiltersChange={setFilters}
+          onClearFilters={handleClearFilters}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={setRowsPerPage}
+        />
+
+        {/* Show empty state ONLY when there are no items, but keep it inside the table card */}
+        {processedItems.length === 0 ? (
+          <div className="p-8">
             <EnhancedEmptyState
               filters={filters}
               onClearFilters={handleClearFilters}
               onAddItem={handleOpenAddDialog}
             />
-          ) : (
-            <>
-              {/* Single rounded card: gradient header + table (header spans full card width) */}
-              <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
-                <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-400 text-white p-4 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="p-2 bg-white/20 rounded-lg">
-                      <PackageSearch className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-xl font-bold font-poppins">Inventory Items</div>
-                      <div className="text-sm opacity-90">Track products, stock levels and pricing</div>
-                      <div className="text-sm text-white/90 mt-1">
-                        {filters.search || filters.category !== 'all' || filters.stockStatus !== 'all' || filters.vehicleType !== 'all' ? (
-                          <>Filtered: <strong>{processedItems.length}</strong> of <strong>{items.length}</strong> items</>
-                        ) : (
-                          <>Total: <strong>{items.length}</strong> items</>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+          </div>
+        ) : (
+          <>
+            <DataTableWrapper
+              className="w-full"
+              columns={enhancedColumns}
+              data={displayedItems.map(i => ({ ...i, id: i.item_id }))}
+            />
 
-                {/* Advanced Filters now live directly under the gradient header so they appear as part of the table header */}
-                <div>
-                  <AdvancedFilters
-                    filters={filters}
-                    onFiltersChange={setFilters}
-                    onClearFilters={handleClearFilters}
-                    rowsPerPage={rowsPerPage}
-                    onRowsPerPageChange={setRowsPerPage}
-                  />
-                </div>
-
-                {/* DataTableWrapper without its own title so the gradient header remains part of the same card */}
-                {/* REMOVED onEdit and onDelete props to remove the automatic 3-dot menu */}
-                <DataTableWrapper
-                  className="w-full"
-                  columns={enhancedColumns}
-                  data={displayedItems.map(i => ({ ...i, id: i.item_id }))}
-                />
-
-                {/* Footer: Showing X of Y + Pager - UPDATED PAGINATION */}
-                <div className="px-6 py-4 border-t border-slate-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="text-sm text-slate-500">
-                    Showing <span className="text-slate-500 font-xs">{processedItems.length === 0 ? 0 : ((currentPage - 1) * rowsPerPage + 1)}</span> to <span className="text-slate-500 font-xs">{Math.min(currentPage * rowsPerPage, processedItems.length)}</span> of <span className="text-slate-500 font-xs">{processedItems.length}</span> entries
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {/* First Page Button */}
-                    <Button
-                      variant="outline"
-                      onClick={() => setCurrentPage(1)}
-                      disabled={currentPage === 1}
-                      className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
-                      title="First Page"
-                    >
-                      <span className="text-lg">«</span>
-                    </Button>
-
-                    {/* Previous Page Button */}
-                    <Button
-                      variant="outline"
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
-                      title="Previous Page"
-                    >
-                      <span className="text-lg">‹</span>
-                    </Button>
-
-                    {/* Page Indicator Text */}
-                    <div className="text-sm font-xs text-slate-500 px-2 min-w-[80px] text-center select-none">
-                      Page {currentPage} of {Math.max(1, Math.ceil(processedItems.length / rowsPerPage))}
-                    </div>
-
-                    {/* Next Page Button */}
-                    <Button
-                      variant="outline"
-                      onClick={() => setCurrentPage(p => Math.min(Math.ceil(processedItems.length / rowsPerPage) || 1, p + 1))}
-                      disabled={currentPage >= Math.ceil(processedItems.length / rowsPerPage)}
-                      className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
-                      title="Next Page"
-                    >
-                      <span className="text-lg">›</span>
-                    </Button>
-
-                    {/* Last Page Button */}
-                    <Button
-                      variant="outline"
-                      onClick={() => setCurrentPage(Math.max(1, Math.ceil(processedItems.length / rowsPerPage)))}
-                      disabled={currentPage >= Math.ceil(processedItems.length / rowsPerPage)}
-                      className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
-                      title="Last Page"
-                    >
-                      <span className="text-lg">»</span>
-                    </Button>
-                  </div>
-                </div>
+            {/* Footer: Showing X of Y + Pager - UPDATED PAGINATION */}
+            <div className="px-6 py-4 border-t border-slate-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-sm text-slate-500">
+                Showing <span className="text-slate-500 font-xs">{processedItems.length === 0 ? 0 : ((currentPage - 1) * rowsPerPage + 1)}</span> to <span className="text-slate-500 font-xs">{Math.min(currentPage * rowsPerPage, processedItems.length)}</span> of <span className="text-slate-500 font-xs">{processedItems.length}</span> entries
               </div>
-            </>
-          )}
-        </section>
+
+              <div className="flex items-center gap-2">
+                {/* First Page Button */}
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+                  title="First Page"
+                >
+                  <span className="text-lg">«</span>
+                </Button>
+
+                {/* Previous Page Button */}
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+                  title="Previous Page"
+                >
+                  <span className="text-lg">‹</span>
+                </Button>
+
+                {/* Page Indicator Text */}
+                <div className="text-sm font-xs text-slate-500 px-2 min-w-[80px] text-center select-none">
+                  Page {currentPage} of {Math.max(1, Math.ceil(processedItems.length / rowsPerPage))}
+                </div>
+
+                {/* Next Page Button */}
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentPage(p => Math.min(Math.ceil(processedItems.length / rowsPerPage) || 1, p + 1))}
+                  disabled={currentPage >= Math.ceil(processedItems.length / rowsPerPage)}
+                  className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+                  title="Next Page"
+                >
+                  <span className="text-lg">›</span>
+                </Button>
+
+                {/* Last Page Button */}
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentPage(Math.max(1, Math.ceil(processedItems.length / rowsPerPage)))}
+                  disabled={currentPage >= Math.ceil(processedItems.length / rowsPerPage)}
+                  className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+                  title="Last Page"
+                >
+                  <span className="text-lg">»</span>
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  )}
+</section>
       </div>
 
       {/* === DIALOGS / MODALS === */}
@@ -2309,26 +2312,32 @@ export default function EnhancedInventoryPage() {
         </div>
       )}
 
-      <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
-        
-        .font-poppins {
-          font-family: 'Poppins', sans-serif;
-        }
+// Update the global styles at the bottom of your component
+<style jsx global>{`
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+  
+  /* Apply Poppins globally for form elements */
+  body, input, textarea, select, button {
+    font-family: 'Poppins', sans-serif;
+  }
 
-        .ease-spring {
-          transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
+  .font-poppins {
+    font-family: 'Poppins', sans-serif;
+  }
 
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-        
-        .animate-pulse {
-          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-      `}</style>
+  .ease-spring {
+    transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  
+  .animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+`}</style>
     </div>
   );
 }
