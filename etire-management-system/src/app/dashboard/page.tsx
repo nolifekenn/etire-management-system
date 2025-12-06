@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
 import {
   BarChart, Blocks, DollarSign, AlertTriangle, Users, Wrench, Loader2, Bell,
   Building2, Package, Car, TrendingUp, FileText, Download, ArrowUpRight,
-  Calendar, Clock, RefreshCw, Plus, ChevronDown, ChevronUp, TrendingDown
+  Calendar, Clock, RefreshCw, Plus, ChevronDown, ChevronUp, TrendingDown,
+  BarChart3, ShoppingBag, Star
 } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, XAxis, YAxis, Tooltip, Area, ReferenceLine } from 'recharts';
+import { ResponsiveContainer, AreaChart, XAxis, YAxis, Tooltip, Area, ReferenceLine, BarChart as RechartsBarChart, Bar, Cell } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -54,6 +55,16 @@ interface LowStockItem {
   reorder_level: number;
 }
 
+interface TopSellingItem {
+  item_id?: string;
+  name: string;
+  category: string;
+  total_quantity: number;
+  total_revenue: number;
+  average_price: number;
+  sales_count: number;
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -69,7 +80,6 @@ export default function DashboardPage() {
     low_stock_count: 0,
   });
   const [salesData, setSalesData] = useState<SalesDataPoint[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
   const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([]);
   const [recentSales, setRecentSales] = useState<RecentSale[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -77,6 +87,37 @@ export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [showSecondaryStats, setShowSecondaryStats] = useState(false);
+
+  // Calculate top selling items from recent sales data
+  const topSellingItems = useMemo(() => {
+    if (!recentSales || recentSales.length === 0) return [];
+    
+    const itemMap = new Map<string, TopSellingItem>();
+    
+    recentSales.forEach(sale => {
+      const existing = itemMap.get(sale.item_name);
+      if (existing) {
+        existing.total_quantity += sale.quantity;
+        existing.total_revenue += sale.total_amount;
+        existing.average_price = existing.total_revenue / existing.total_quantity;
+        existing.sales_count += 1;
+      } else {
+        itemMap.set(sale.item_name, {
+          name: sale.item_name,
+          category: sale.item_category,
+          total_quantity: sale.quantity,
+          total_revenue: sale.total_amount,
+          average_price: sale.price_at_sale,
+          sales_count: 1
+        });
+      }
+    });
+    
+    // Sort by total revenue (descending) and take top 6
+    return Array.from(itemMap.values())
+      .sort((a, b) => b.total_revenue - a.total_revenue)
+      .slice(0, 6);
+  }, [recentSales]);
 
   const buttonStyles = {
     primary: "bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-green-600",
@@ -99,14 +140,7 @@ export default function DashboardPage() {
     customers: { background: 'rgba(59, 130, 246, 0.1)', icon: '#3b82f6' },
     branches: { background: 'rgba(16, 185, 129, 0.1)', icon: '#10b981' },
     suppliers: { background: 'rgba(6, 182, 212, 0.1)', icon: '#06b6d4' },
-    vehicles: { background: 'rgba(59, 130, 246, 0.1)', icon: '#3b82f6' },
-    notifications: { background: 'rgba(139, 92, 246, 0.1)', icon: '#8b5cf6' }
-  };
-
-  // CHANGED: Updated card colors for better visibility
-  const cardColors = {
-    sales: { icon: '#10b981' }, // Changed from #15803d to #10b981 for better visibility
-    average: { icon: '#8b5cf6' } // Violet color for average line
+    vehicles: { background: 'rgba(59, 130, 246, 0.1)', icon: '#3b82f6' }
   };
 
   const MetricSkeleton = () => (
@@ -174,108 +208,17 @@ export default function DashboardPage() {
       jobs: '/services',
       branches: '/branches',
       suppliers: '/purchasing',
-      vehicles: '/vehicles',
-      notifications: '/notifications'
+      vehicles: '/vehicles'
     };
     if (routes[cardId]) {
       router.push(routes[cardId]);
     }
   };
 
-  const handleCardKeyPress = async (event: React.KeyboardEvent, cardId: string) => {
+  const handleCardKeyPress = (event: React.KeyboardEvent, cardId: string) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      try {
-        // Create promises for all independent data fetches
-        const statsPromise = supabase
-          .rpc('get_dashboard_stats', { user_uuid: user.user_id } as any);
-
-        const recentSalesPromise = supabase
-          .from('sale_item')
-          .select(`
-          sale_item_id,
-          quantity,
-          price_at_sale,
-          created_at,
-          sale!inner(
-            sale_id,
-            sale_date,
-            user:user_id(name),
-            total_amount
-          ),
-          inventory_item!inner(name, category)
-        `)
-          .order('created_at', { ascending: false })
-          .limit(10);
-
-        const salesChartPromise = supabase
-          .rpc('get_weekly_sales');
-
-        const lowStockPromise = supabase
-          .from('inventory_item')
-          .select('*')
-          .lte('stock_quantity', 5)
-          .order('stock_quantity', { ascending: true })
-          .limit(10);
-
-        const notificationsPromise = supabase
-          .from('notification')
-          .select('notification_id, title, message, type, is_read, created_at')
-          .eq('user_id', user.user_id)
-          .order('created_at', { ascending: false })
-          .limit(5);
-
-        // Execute all promises in parallel
-        const [
-          { data: statsData, error: statsError },
-          { data: recentSalesData, error: recentSalesError },
-          { data: salesChartData, error: salesChartError },
-          { data: lowStockData, error: lowStockError },
-          { data: notificationsData, error: notificationsError }
-        ] = await Promise.all([
-          statsPromise,
-          recentSalesPromise,
-          salesChartPromise,
-          lowStockPromise,
-          notificationsPromise
-        ]);
-
-        if (statsError) throw statsError;
-        if (recentSalesError) throw recentSalesError;
-        if (salesChartError) throw salesChartError;
-        if (lowStockError) throw lowStockError;
-        if (notificationsError) throw notificationsError;
-
-        // Transform recent sales data to match the interface
-        const formattedRecentSales: RecentSale[] = (recentSalesData as any[] || []).map(item => ({
-          sale_item_id: item.sale_item_id,
-          quantity: item.quantity,
-          price_at_sale: item.price_at_sale,
-          created_at: item.created_at,
-          item_name: item.inventory_item?.name || 'Unknown',
-          item_category: item.inventory_item?.category || 'Unknown',
-          user_name: item.sale?.user?.name || 'Unknown',
-          total_amount: item.quantity * item.price_at_sale
-        }));
-
-        // Calculate 7-day average and enhance sales data
-        const enhancedSalesData = await calculateEnhancedSalesData(salesChartData as SalesDataPoint[]);
-
-        // Set all data
-        setStats(statsData as any as DashboardStats);
-        setSalesData(enhancedSalesData);
-        setLowStockItems(lowStockData as LowStockItem[] || []);
-        setNotifications(notificationsData || []);
-        setRecentSales(formattedRecentSales);
-
-        setLastUpdated(new Date());
-
-      } catch (err: any) {
-        console.error('Dashboard data fetch error:', err);
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
+      handleCardClick(cardId);
     }
   };
 
@@ -289,7 +232,6 @@ export default function DashboardPage() {
     setError(null);
 
     try {
-      // Create promises for all independent data fetches
       const statsPromise = supabase
         .rpc('get_dashboard_stats', { user_uuid: user.user_id } as any);
 
@@ -309,7 +251,7 @@ export default function DashboardPage() {
           inventory_item!inner(name, category)
         `)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(50);
 
       const salesChartPromise = supabase
         .rpc('get_weekly_sales');
@@ -321,35 +263,23 @@ export default function DashboardPage() {
         .order('created_at', { ascending: false })
         .limit(10);
 
-      const notificationsPromise = supabase
-        .from('notification')
-        .select('notification_id, title, message, type, is_read, created_at')
-        .eq('user_id', user.user_id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      // Execute all promises in parallel
       const [
         { data: statsData, error: statsError },
         { data: recentSalesData, error: recentSalesError },
         { data: salesChartData, error: salesChartError },
-        { data: lowStockData, error: lowStockError },
-        { data: notificationsData, error: notificationsError }
+        { data: lowStockData, error: lowStockError }
       ] = await Promise.all([
         statsPromise,
         recentSalesPromise,
         salesChartPromise,
-        lowStockPromise,
-        notificationsPromise
+        lowStockPromise
       ]);
 
       if (statsError) throw statsError;
       if (recentSalesError) throw recentSalesError;
       if (salesChartError) throw salesChartError;
       if (lowStockError) throw lowStockError;
-      if (notificationsError) throw notificationsError;
 
-      // Transform recent sales data to match the interface
       const formattedRecentSales: RecentSale[] = (recentSalesData as any[] || []).map(item => ({
         sale_item_id: item.sale_item_id,
         quantity: item.quantity,
@@ -361,16 +291,12 @@ export default function DashboardPage() {
         total_amount: item.quantity * item.price_at_sale
       }));
 
-      // Calculate 7-day average and enhance sales data
       const enhancedSalesData = await calculateEnhancedSalesData(salesChartData as SalesDataPoint[]);
 
-      // Set all data
       setStats(statsData as any as DashboardStats);
       setSalesData(enhancedSalesData);
       setLowStockItems(lowStockData as LowStockItem[] || []);
-      setNotifications(notificationsData || []);
       setRecentSales(formattedRecentSales);
-
       setLastUpdated(new Date());
 
     } catch (err: any) {
@@ -381,13 +307,11 @@ export default function DashboardPage() {
     }
   }, [user]);
 
-  // NEW: Function to calculate enhanced sales data with average
   const calculateEnhancedSalesData = async (salesData: SalesDataPoint[]): Promise<SalesDataPoint[]> => {
     if (!salesData || salesData.length === 0) {
-      // Generate sample data if no data exists
       const sampleData: SalesDataPoint[] = [];
       const today = new Date();
-      const sevenDayAverage = 15000; // Sample average
+      const sevenDayAverage = 15000;
 
       for (let i = 6; i >= 0; i--) {
         const date = new Date(today);
@@ -403,11 +327,9 @@ export default function DashboardPage() {
       return sampleData;
     }
 
-    // Calculate 7-day average
     const totalSales = salesData.reduce((sum, day) => sum + day.sales, 0);
     const sevenDayAverage = totalSales / Math.max(salesData.length, 1);
 
-    // Enhance data with average and trend
     return salesData.map(day => ({
       ...day,
       average: sevenDayAverage,
@@ -439,11 +361,20 @@ export default function DashboardPage() {
   const secondaryStats = [
     { id: 'branches', title: "Active Branches", value: stats.total_branches.toLocaleString(), icon: Building2, category: "branches" },
     { id: 'suppliers', title: "Suppliers", value: stats.total_suppliers.toLocaleString(), icon: Package, category: "suppliers" },
-    { id: 'vehicles', title: "Vehicles", value: stats.total_vehicles.toLocaleString(), icon: Car, category: "vehicles" },
-    { id: 'notifications', title: "Notifications", value: stats.unread_notifications.toLocaleString(), icon: Bell, category: "notifications" }
+    { id: 'vehicles', title: "Vehicles", value: stats.total_vehicles.toLocaleString(), icon: Car, category: "vehicles" }
   ];
 
   const focusStyles = "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2";
+
+  // Color palette for top selling items chart
+  const chartColors = [
+    '#8b5cf6', // Purple
+    '#06b6d4', // Cyan
+    '#3b82f6', // Blue
+    '#ec4899', // Pink
+    '#a855f7', // Purple variant
+    '#14b8a6', // Teal
+  ];
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
@@ -509,7 +440,6 @@ export default function DashboardPage() {
         </div>
 
         {/* QUICK ACTIONS SECTION */}
-        {/* CHANGED: Added margin-top and smaller font size */}
         <section className="mb-10 mt-20" aria-labelledby="quick-actions-heading">
           <h2 id="quick-actions-heading" className="text-xl font-bold text-slate-900 mb-6">Quick Actions</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8">
@@ -525,7 +455,7 @@ export default function DashboardPage() {
                 <div
                   className={`group bg-white border border-slate-200 rounded-2xl p-5 cursor-pointer h-full flex flex-col shadow-sm hover:border-indigo-300/25 active:scale-[0.98] ${microAnimations.cardHover} ${focusStyles}`}
                   onClick={() => router.push(action.href)}
-                  onKeyPress={(e) => e.key === 'Enter' && router.push(action.href)}
+                  onKeyDown={(e) => e.key === 'Enter' && router.push(action.href)}
                   tabIndex={0}
                   role="button"
                   aria-label={`${action.label} - ${action.description}`}
@@ -547,16 +477,12 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="flex-1 flex flex-col">
-                    {/* CHANGED: Smaller font size for title */}
                     <h3 className="text-base font-semibold text-slate-900 group-hover:text-indigo-700 transition-colors leading-tight mb-2">
                       {action.label}
                     </h3>
-
-                    {/* CHANGED: Smaller font size for description */}
                     <p className="text-xs text-slate-600 leading-relaxed flex-1 mb-3">
                       {action.description}
                     </p>
-
                     <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100 group-hover:border-indigo-100 transition-colors">
                       <span className="text-xs font-medium text-slate-500 group-hover:text-indigo-600 transition-colors">
                         Quick access
@@ -571,7 +497,6 @@ export default function DashboardPage() {
         </section>
 
         {/* Key Metrics Section */}
-        {/* CHANGED: Added margin adjustment and smaller font size */}
         <section className="mb-10" aria-labelledby="key-metrics-heading">
           <h2 id="key-metrics-heading" className="text-xl font-bold text-slate-900 mb-6">Key Metrics</h2>
 
@@ -584,7 +509,7 @@ export default function DashboardPage() {
                   key={i}
                   className={`group bg-white border border-slate-200 rounded-2xl p-5 cursor-pointer shadow-sm hover:border-indigo-300/25 active:scale-[0.98] ${microAnimations.cardHover} ${focusStyles}`}
                   onClick={() => handleCardClick(stat.id)}
-                  onKeyPress={(e) => handleCardKeyPress(e, stat.id)}
+                  onKeyDown={(e) => handleCardKeyPress(e, stat.id)}
                   tabIndex={0}
                   role="button"
                   aria-label={`View ${stat.title} details. Current value: ${stat.value}`}
@@ -622,7 +547,6 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="space-y-2">
-                    {/* CHANGED: Smaller font size and updated color for values */}
                     <p
                       className={`text-3xl font-extrabold tracking-tight tabular-nums leading-none mb-2 ${stat.value === '₱0' || stat.value === '0' ? 'text-slate-300' : 'text-slate-800'
                         }`}
@@ -630,7 +554,6 @@ export default function DashboardPage() {
                     >
                       {stat.value}
                     </p>
-                    {/* CHANGED: Smaller font size for title */}
                     <p className="text-sm font-semibold text-slate-700">{stat.title}</p>
                     <p className="text-xs text-slate-500 flex items-center gap-1">
                       <Clock className="w-3 h-3" />
@@ -658,7 +581,6 @@ export default function DashboardPage() {
         </section>
 
         {/* Additional Metrics Section */}
-        {/* CHANGED: Smaller font size for heading */}
         <section className="mb-12" aria-labelledby="additional-metrics-heading">
           <div className="flex items-center justify-between mb-6">
             <h2 id="additional-metrics-heading" className="text-xl font-bold text-slate-900">Additional Metrics</h2>
@@ -690,7 +612,7 @@ export default function DashboardPage() {
                   key={i}
                   className={`group bg-white border border-slate-200 rounded-2xl p-5 cursor-pointer shadow-sm hover:border-indigo-300/25 active:scale-[0.98] ${microAnimations.cardHover} ${focusStyles}`}
                   onClick={() => handleCardClick(stat.id)}
-                  onKeyPress={(e) => handleCardKeyPress(e, stat.id)}
+                  onKeyDown={(e) => handleCardKeyPress(e, stat.id)}
                   tabIndex={0}
                   role="button"
                   aria-label={`View ${stat.title} details. Current value: ${stat.value}`}
@@ -722,7 +644,6 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="space-y-2">
-                    {/* CHANGED: Smaller font size and updated color for values */}
                     <p
                       className={`text-3xl font-extrabold tracking-tight tabular-nums leading-none ${stat.value === '0' ? 'text-slate-300' : 'text-slate-800'
                         }`}
@@ -730,7 +651,6 @@ export default function DashboardPage() {
                     >
                       {stat.value}
                     </p>
-                    {/* CHANGED: Smaller font size for title */}
                     <p className="text-sm font-semibold text-slate-700">{stat.title}</p>
                   </div>
 
@@ -746,7 +666,6 @@ export default function DashboardPage() {
         </section>
 
         {/* Performance & Analytics Section */}
-        {/* CHANGED: Smaller font size for heading */}
         <section className="mb-8" aria-labelledby="performance-heading">
           <div className="flex items-center justify-between mb-6">
             <h2 id="performance-heading" className="text-xl font-bold text-slate-800">Performance & Analytics</h2>
@@ -765,7 +684,6 @@ export default function DashboardPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    {/* CHANGED: Smaller font size for title */}
                     <CardTitle id="sales-chart-title" className="flex items-center text-xl font-bold text-slate-800">
                       <BarChart className="mr-3 h-5 w-5 text-green-600" aria-hidden="true" />
                       Sales Overview
@@ -787,7 +705,6 @@ export default function DashboardPage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={salesData}>
                         <defs>
-                          {/* Single green gradient */}
                           <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
                             <stop offset="95%" stopColor="#10b981" stopOpacity={0.1} />
@@ -823,7 +740,6 @@ export default function DashboardPage() {
                           }}
                           labelFormatter={(label) => `Date: ${label}`}
                         />
-                        {/* 7-Day Average Reference Line - Keep it but make it less prominent */}
                         <ReferenceLine
                           y={salesData[0]?.average}
                           stroke="#64748b"
@@ -836,7 +752,6 @@ export default function DashboardPage() {
                             fontSize: 10
                           }}
                         />
-                        {/* Sales Area - Always green */}
                         <Area
                           type="monotone"
                           dataKey="sales"
@@ -866,7 +781,6 @@ export default function DashboardPage() {
               aria-labelledby="low-stock-title"
             >
               <CardHeader>
-                {/* CHANGED: Smaller font size for title */}
                 <CardTitle id="low-stock-title" className="flex items-center text-lg font-bold text-slate-800">
                   <AlertTriangle className="mr-2 h-5 w-5 text-amber-600" aria-hidden="true" />
                   Low Stock Alerts
@@ -876,14 +790,13 @@ export default function DashboardPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {/* FIXED: Removed horizontal scroll by removing overflow-x-auto */}
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {lowStockItems.length > 0 ? lowStockItems.slice(0, 5).map((item) => (
                     <div
                       key={item.item_id}
                       className="p-4 rounded-xl border border-slate-200 hover:shadow-lg transition-all duration-300 cursor-pointer group bg-white hover:scale-105"
                       onClick={() => router.push('/inventory')}
-                      onKeyPress={(e) => e.key === 'Enter' && router.push('/inventory')}
+                      onKeyDown={(e) => e.key === 'Enter' && router.push('/inventory')}
                       tabIndex={0}
                       role="button"
                       aria-label={`Low stock item: ${item.name}, only ${item.stock_quantity} units left`}
@@ -914,71 +827,54 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Recent Activity Section */}
-        {/* CHANGED: Smaller font size for heading */}
+        {/* Recent Activity Section - UPDATED */}
         <section aria-labelledby="recent-activity-heading">
           <h2 id="recent-activity-heading" className="text-xl font-bold mb-6 text-slate-800">Recent Activity</h2>
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Recent Sales */}
+          <div className="grid lg:grid-cols-12 gap-6">
+            {/* Recent Sales - SLIMMER (4 columns) */}
             <Card
-              className="bg-white border-slate-200 shadow-lg transition-all duration-300 hover:shadow-xl"
+              className="lg:col-span-4 bg-white border-slate-200 shadow-lg transition-all duration-300 hover:shadow-xl"
               role="region"
               aria-labelledby="recent-sales-title"
             >
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    {/* CHANGED: Smaller font size for title */}
                     <CardTitle id="recent-sales-title" className="flex items-center text-lg font-bold text-slate-800">
                       <TrendingUp className="mr-2 h-5 w-5 text-green-600" aria-hidden="true" />
                       Recent Sales
                     </CardTitle>
                     <CardDescription className="text-slate-600">Latest transactions</CardDescription>
                   </div>
-                  {/* FIXED: Removed the green "Create Sale" button */}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-700 hover:text-indigo-800 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 hover:bg-indigo-50"
-                    onClick={() => router.push('/pos')}
-                  >
-                    View POS
-                    <ArrowUpRight className="h-4 w-4 ml-1" aria-hidden="true" />
-                  </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
+                <div className="space-y-3 max-h-[500px] overflow-y-auto">
                   {recentSales.length > 0 ? recentSales.slice(0, 5).map((sale) => (
                     <div
                       key={sale.sale_item_id}
-                      className="p-4 rounded-xl border border-slate-200 hover:shadow-lg transition-all duration-300 cursor-pointer group bg-white hover:scale-105"
+                      className="p-3 rounded-xl border border-slate-200 hover:shadow-lg transition-all duration-300 cursor-pointer group bg-white hover:scale-[1.02]"
                       onClick={() => router.push('/pos')}
-                      onKeyPress={(e) => e.key === 'Enter' && router.push('/pos')}
+                      onKeyDown={(e) => e.key === 'Enter' && router.push('/pos')}
                       tabIndex={0}
                       role="button"
                       aria-label={`Recent sale: ${sale.item_name || 'Unknown Item'}, amount: ₱${sale.total_amount.toLocaleString()}`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <p className="font-semibold text-slate-800 group-hover:text-slate-900 transition-colors">
-                            {sale.item_name || 'Unknown Item'}
-                          </p>
-                          <p className="text-sm text-slate-600 mt-1">
+                      <div className="space-y-2">
+                        <p className="font-semibold text-slate-800 text-sm group-hover:text-slate-900 transition-colors truncate">
+                          {sale.item_name || 'Unknown Item'}
+                        </p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-slate-600">
                             {sale.quantity} × ₱{sale.price_at_sale?.toLocaleString() || '0'}
                           </p>
-                          <p className="text-xs text-slate-500 mt-1">
-                            Sold by: {sale.user_name || 'Unknown'}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xl font-bold text-green-600 transition-transform duration-300 group-hover:scale-110">
+                          <p className="text-lg font-bold text-green-600 transition-transform duration-300 group-hover:scale-110">
                             ₱{sale.total_amount.toLocaleString()}
                           </p>
-                          <p className="text-xs text-slate-500 mt-1">
-                            {sale.created_at ? new Date(sale.created_at).toLocaleDateString() : 'Unknown date'}
-                          </p>
                         </div>
+                        <p className="text-xs text-slate-500">
+                          {sale.created_at ? new Date(sale.created_at).toLocaleDateString() : 'Unknown date'}
+                        </p>
                       </div>
                     </div>
                   )) : (
@@ -990,85 +886,216 @@ export default function DashboardPage() {
                     />
                   )}
                 </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full mt-4 flex items-center justify-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-700 hover:text-indigo-800 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 hover:bg-indigo-50"
+                  onClick={() => router.push('/pos')}
+                >
+                  View All Sales
+                  <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                </Button>
               </CardContent>
             </Card>
 
-            {/* Notifications */}
+            {/* Top Selling Items - WIDER (8 columns) */}
             <Card
-              className="bg-white border-slate-200 shadow-lg transition-all duration-300 hover:shadow-xl"
+              className="lg:col-span-8 bg-gradient-to-br from-white via-white to-purple-50/30 border-slate-200 shadow-lg transition-all duration-300 hover:shadow-2xl"
               role="region"
-              aria-labelledby="notifications-title"
+              aria-labelledby="top-selling-title"
             >
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    {/* CHANGED: Smaller font size for title */}
-                    <CardTitle id="notifications-title" className="flex items-center text-lg font-bold text-slate-800">
-                      <Bell className="mr-2 h-5 w-5 text-blue-600" aria-hidden="true" />
-                      Notifications
+                    <CardTitle id="top-selling-title" className="flex items-center text-lg font-bold text-slate-800">
+                      <TrendingUp className="mr-2 h-5 w-5 text-purple-600" aria-hidden="true" />
+                      Top Selling Items
                     </CardTitle>
-                    <CardDescription className="text-slate-600">Latest system alerts</CardDescription>
+                    <CardDescription className="text-slate-600">
+                      Best performers by revenue in the last 7 days
+                    </CardDescription>
                   </div>
                   <Button
                     asChild
                     size="sm"
-                    className="flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-700 hover:text-indigo-800 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 hover:bg-indigo-50"
+                    className="flex items-center gap-2 min-h-[44px] bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 shadow-md hover:shadow-lg"
                   >
-                    <Link href="/notifications">
-                      View All
-                      <ArrowUpRight className="h-4 w-4 ml-1" aria-hidden="true" />
+                    <Link href="/inventory">
+                      View Inventory
+                      <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
                     </Link>
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {notifications.length > 0 ? notifications.map((notification) => (
-                    <div
-                      key={notification.notification_id}
-                      className="p-4 rounded-xl border border-slate-200 hover:shadow-lg transition-all duration-300 cursor-pointer group bg-white hover:scale-105"
-                      onClick={() => router.push('/notifications')}
-                      onKeyPress={(e) => e.key === 'Enter' && router.push('/notifications')}
-                      tabIndex={0}
-                      role="button"
-                      aria-label={`Notification: ${notification.title}. ${notification.message}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 mt-1">
-                          {notification.type === 'success' && <div className="w-3 h-3 rounded-full shadow-lg bg-green-500 group-hover:scale-110 transition-transform" aria-hidden="true"></div>}
-                          {notification.type === 'warning' && <div className="w-3 h-3 rounded-full shadow-lg bg-amber-500 group-hover:scale-110 transition-transform" aria-hidden="true"></div>}
-                          {notification.type === 'error' && <div className="w-3 h-3 rounded-full shadow-lg bg-rose-500 group-hover:scale-110 transition-transform" aria-hidden="true"></div>}
-                          {notification.type === 'info' && <div className="w-3 h-3 rounded-full shadow-lg bg-blue-500 group-hover:scale-110 transition-transform" aria-hidden="true"></div>}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between">
-                            <p className="font-semibold text-slate-800 text-sm group-hover:text-slate-900 transition-colors">{notification.title}</p>
-                            {!notification.is_read && (
-                              <Badge variant="default" className="text-xs ml-2 bg-rose-500 group-hover:scale-110 transition-transform">
-                                New
-                              </Badge>
-                            )}
+                {isLoading ? (
+                  <div className="flex justify-center items-center h-80">
+                    <Loader2 className="h-8 w-8 animate-spin text-purple-600" aria-hidden="true" />
+                    <span className="sr-only">Loading top selling items</span>
+                  </div>
+                ) : topSellingItems.length > 0 ? (
+                  <div className="space-y-6">
+                    {/* Enhanced Horizontal Bar Chart */}
+                    <div className="h-64 bg-gradient-to-br from-slate-50/50 to-purple-50/30 rounded-2xl p-4 border border-slate-100" aria-label="Horizontal bar chart showing top selling items by revenue">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RechartsBarChart
+                          data={topSellingItems}
+                          layout="vertical"
+                          margin={{ top: 5, right: 40, left: 0, bottom: 5 }}
+                        >
+                          <defs>
+                            {chartColors.map((color, idx) => (
+                              <linearGradient key={idx} id={`gradient-${idx}`} x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor={color} stopOpacity={0.8} />
+                                <stop offset="100%" stopColor={color} stopOpacity={1} />
+                              </linearGradient>
+                            ))}
+                          </defs>
+                          <XAxis
+                            type="number"
+                            stroke="#94a3b8"
+                            fontSize={11}
+                            tickLine={false}
+                            axisLine={false}
+                            tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
+                          />
+                          <YAxis
+                            type="category"
+                            dataKey="name"
+                            stroke="#64748b"
+                            fontSize={12}
+                            tickLine={false}
+                            axisLine={false}
+                            width={100}
+                            tickFormatter={(value) => value.length > 12 ? value.substring(0, 10) + '...' : value}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: "rgba(255, 255, 255, 0.98)",
+                              backdropFilter: "blur(16px)",
+                              border: `2px solid rgba(139, 92, 246, 0.2)`,
+                              borderRadius: "16px",
+                              boxShadow: "0 12px 40px rgba(139, 92, 246, 0.15)",
+                              color: "#1e293b",
+                              padding: "12px 16px"
+                            }}
+                            cursor={{ fill: 'rgba(139, 92, 246, 0.05)' }}
+                            formatter={(value: any, name: string) => {
+                              if (name === 'total_revenue') {
+                                return [
+                                  <span className="font-bold text-purple-600">₱{Number(value).toLocaleString()}</span>,
+                                  'Total Revenue'
+                                ];
+                              }
+                              return [value, name];
+                            }}
+                            labelFormatter={(label) => <span className="font-semibold text-slate-800">{label}</span>}
+                          />
+                          <Bar
+                            dataKey="total_revenue"
+                            radius={[0, 8, 8, 0]}
+                            background={{ fill: 'rgba(226, 232, 240, 0.4)', radius: 8 }}
+                          >
+                            {topSellingItems.map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={`url(#gradient-${index % chartColors.length})`}
+                              />
+                            ))}
+                          </Bar>
+                        </RechartsBarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Enhanced Item Details List */}
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                        <Package className="w-4 h-4 text-purple-600" />
+                        Detailed Breakdown
+                      </h3>
+                      <div className="grid md:grid-cols-2 gap-3">
+                        {topSellingItems.map((item, index) => (
+                          <div
+                            key={item.name}
+                            className="group relative p-4 rounded-xl border border-slate-200 hover:border-purple-300 hover:shadow-lg transition-all duration-300 cursor-pointer bg-white overflow-hidden"
+                            onClick={() => router.push('/inventory')}
+                            onKeyDown={(e) => e.key === 'Enter' && router.push('/inventory')}
+                            tabIndex={0}
+                            role="button"
+                            aria-label={`Top selling item: ${item.name}, revenue: ₱${item.total_revenue.toLocaleString()}`}
+                          >
+                            {/* Gradient background on hover */}
+                            <div 
+                              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                              style={{
+                                background: `linear-gradient(135deg, ${chartColors[index % chartColors.length]}08 0%, ${chartColors[index % chartColors.length]}03 100%)`
+                              }}
+                            />
+                            
+                            <div className="relative flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3 flex-1 min-w-0">
+                                <div
+                                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm group-hover:shadow-md transition-shadow duration-300"
+                                  style={{
+                                    background: `linear-gradient(135deg, ${chartColors[index % chartColors.length]}20 0%, ${chartColors[index % chartColors.length]}10 100%)`,
+                                  }}
+                                >
+                                  {index === 0 ? (
+                                    <TrendingUp className="w-5 h-5" style={{ color: chartColors[index % chartColors.length] }} />
+                                  ) : (
+                                    <Package className="w-5 h-5" style={{ color: chartColors[index % chartColors.length] }} />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <p className="font-semibold text-slate-800 text-sm truncate group-hover:text-purple-700 transition-colors">
+                                      {item.name}
+                                    </p>
+                                    {index === 0 && (
+                                      <Badge className="text-[10px] px-2 py-0.5 bg-gradient-to-r from-yellow-400 to-orange-400 text-white border-0">
+                                        #1
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-slate-500 mb-2">{item.category}</p>
+                                  <div className="flex items-center gap-3 text-xs">
+                                    <span className="text-slate-600 flex items-center gap-1">
+                                      <span className="font-medium">{item.total_quantity}</span> units
+                                    </span>
+                                    <span className="text-slate-300">•</span>
+                                    <span className="text-slate-600 flex items-center gap-1">
+                                      <span className="font-medium">{item.sales_count}</span> sales
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-xl font-bold bg-gradient-to-br from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                                  ₱{item.total_revenue.toLocaleString()}
+                                </p>
+                                <p className="text-xs text-slate-500 mt-1">
+                                  ₱{item.average_price.toFixed(2)} avg
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                          <p className="text-sm text-slate-600 mt-1">{notification.message}</p>
-                          <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
-                            <Clock className="h-3 w-3 opacity-70" aria-hidden="true" />
-                            {new Date(notification.created_at).toLocaleString()}
-                          </p>
-                        </div>
+                        ))}
                       </div>
                     </div>
-                  )) : (
-                    <EmptyState
-                      icon={Bell}
-                      title="No Notifications"
-                      description="You're all caught up with notifications"
-                    />
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={Package}
+                    title="No Sales Data"
+                    description="Start making sales to see your top performing items"
+                    action="Create First Sale"
+                  />
+                )}
               </CardContent>
             </Card>
           </div>
         </section>
+
       </div>
 
       {/* ERROR DISPLAY */}
