@@ -50,6 +50,8 @@ export interface PurchaseOrder {
   order_date: string;
   expected_delivery_date?: string;
   status: 'pending' | 'approved' | 'ordered' | 'delivered' | 'cancelled';  // ✅ Keep this!
+  payment_method?: 'cash' | 'credit';  // ✅ Added
+  payment_status?: 'pending' | 'paid' | 'partial' | 'overdue' | 'cancelled';  // ✅ Added
   notes?: string;
   created_at?: string;
   updated_at?: string;

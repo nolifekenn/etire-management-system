@@ -30,8 +30,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Loader2, PlusCircle, AlertTriangle, Package, Truck, ShoppingCart, Users, Building2, 
+import {
+  Loader2, PlusCircle, AlertTriangle, Package, Truck, ShoppingCart, Users, Building2,
   RefreshCw, Search, X, Download, Eye, ArrowUpDown, Filter, Clock, TrendingUp,
   Calendar, Phone, Mail, MapPin, FileText, CheckCircle, Clock4, TruckIcon, ArrowLeft,
   CreditCard, DollarSign, Shield, AlertCircle, Edit, Trash2, Save,
@@ -64,49 +64,49 @@ const SuccessAnimation = ({
   const getActionConfig = () => {
     switch (actionType) {
       case 'add':
-        return { 
+        return {
           gradient: 'from-green-500 to-emerald-600',
-          icon: PlusCircle 
+          icon: PlusCircle
         };
       case 'edit':
-        return { 
+        return {
           gradient: 'from-blue-500 to-cyan-600',
-          icon: Edit 
+          icon: Edit
         };
       case 'delete':
-        return { 
+        return {
           gradient: 'from-red-500 to-orange-600',
-          icon: Trash2 
+          icon: Trash2
         };
       case 'export':
-        return { 
+        return {
           gradient: 'from-purple-500 to-indigo-600',
-          icon: Download 
+          icon: Download
         };
       case 'create':
-        return { 
+        return {
           gradient: 'from-teal-500 to-green-600',
-          icon: FileText 
+          icon: FileText
         };
       case 'payment':
-        return { 
+        return {
           gradient: 'from-amber-500 to-yellow-600',
-          icon: DollarSign 
+          icon: DollarSign
         };
       case 'save':
-        return { 
+        return {
           gradient: 'from-blue-500 to-cyan-600',
-          icon: Save 
+          icon: Save
         };
       case 'credit':
-        return { 
+        return {
           gradient: 'from-purple-500 to-indigo-600',
-          icon: CreditCard 
+          icon: CreditCard
         };
       default:
-        return { 
+        return {
           gradient: 'from-purple-500 to-indigo-600',
-          icon: CheckCircle 
+          icon: CheckCircle
         };
     }
   };
@@ -158,13 +158,13 @@ const microAnimations = {
 };
 
 // ===== NOTES DIALOG COMPONENT =====
-const NotesDialog = ({ 
-  isOpen, 
-  onClose, 
-  notes 
-}: { 
-  isOpen: boolean; 
-  onClose: () => void; 
+const NotesDialog = ({
+  isOpen,
+  onClose,
+  notes
+}: {
+  isOpen: boolean;
+  onClose: () => void;
   notes: string;
 }) => {
   return (
@@ -209,18 +209,18 @@ const NotesDialog = ({
 // Simple Delivery Status Badge with smaller font
 const SimpleDeliveryStatus = ({ status }: { status: string }) => {
   const statusConfig = {
-    ordered: { 
-      label: 'Ordered', 
+    ordered: {
+      label: 'Ordered',
       color: 'bg-purple-100 text-purple-800 border-purple-200',
       icon: Package
     },
-    delivered: { 
-      label: 'Delivered', 
+    delivered: {
+      label: 'Delivered',
       color: 'bg-green-100 text-green-800 border-green-200',
       icon: Truck
     },
-    cancelled: { 
-      label: 'Cancelled', 
+    cancelled: {
+      label: 'Cancelled',
       color: 'bg-red-100 text-red-800 border-red-200',
       icon: X
     }
@@ -240,24 +240,24 @@ const SimpleDeliveryStatus = ({ status }: { status: string }) => {
 // Enhanced Payment Status with Credit Terms
 const SimplePaymentStatus = ({ status, method, orderDate }: { status: string; method: string; orderDate?: string }) => {
   const statusConfig = {
-    pending: { 
-      label: 'Pending', 
+    pending: {
+      label: 'Pending',
       color: 'bg-orange-100 text-orange-800 border-orange-200'
     },
-    paid: { 
-      label: 'Paid', 
+    paid: {
+      label: 'Paid',
       color: 'bg-emerald-100 text-emerald-800 border-emerald-200'
     },
-    partial: { 
-      label: 'Partial', 
+    partial: {
+      label: 'Partial',
       color: 'bg-amber-100 text-amber-800 border-amber-200'
     },
-    overdue: { 
-      label: 'Overdue', 
+    overdue: {
+      label: 'Overdue',
       color: 'bg-red-100 text-red-800 border-red-200'
     },
-    cancelled: { 
-      label: 'Cancelled', 
+    cancelled: {
+      label: 'Cancelled',
       color: 'bg-gray-100 text-gray-800 border-gray-200'
     }
   };
@@ -273,16 +273,16 @@ const SimplePaymentStatus = ({ status, method, orderDate }: { status: string; me
   // Calculate due date for credit (120 days from order date) and overdue status
   const getDueDateInfo = () => {
     if (method !== 'credit' || !orderDate) return null;
-    
+
     const order = new Date(orderDate);
     const dueDate = new Date(order);
     dueDate.setDate(order.getDate() + 120);
     const today = new Date();
     const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    
+
     // Only mark as overdue if more than 120 days have passed AND payment is not paid
     const isOverdue = daysUntilDue < 0 && status !== 'paid';
-    
+
     return { dueDate, daysUntilDue, isOverdue };
   };
 
@@ -339,27 +339,25 @@ const DeliveryStepper = ({ currentStatus, onStatusChange }: { currentStatus: str
               <div className="flex items-center w-full">
                 {/* Connector line */}
                 {index > 0 && (
-                  <div 
-                    className={`flex-1 h-1 ${
-                      index <= currentIndex ? 'bg-green-500' : 'bg-slate-200'
-                    }`}
+                  <div
+                    className={`flex-1 h-1 ${index <= currentIndex ? 'bg-green-500' : 'bg-slate-200'
+                      }`}
                   />
                 )}
-                
+
                 {/* Step circle - NOW CLICKABLE */}
                 <button
                   type="button"
                   onClick={() => handleStepClick(step.key, index)}
-                  className={`relative flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 ${
-                    isCompleted
-                      ? 'bg-green-500 border-green-500 text-white hover:bg-green-600 hover:border-green-600 cursor-pointer'
-                      : isCurrent
+                  className={`relative flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 ${isCompleted
+                    ? 'bg-green-500 border-green-500 text-white hover:bg-green-600 hover:border-green-600 cursor-pointer'
+                    : isCurrent
                       ? 'bg-blue-500 border-blue-500 text-white hover:bg-blue-600 hover:border-blue-600 cursor-pointer'
                       : 'bg-white border-slate-300 text-slate-400 hover:bg-slate-100 hover:border-slate-400 cursor-pointer'
-                  } transform hover:scale-110 active:scale-95`}
+                    } transform hover:scale-110 active:scale-95`}
                 >
                   <IconComponent className="h-4 w-4" />
-                  
+
                   {/* Show checkmark for completed steps */}
                   {isCompleted && (
                     <div className="absolute -top-1 -right-1 bg-green-500 rounded-full w-5 h-5 flex items-center justify-center">
@@ -370,23 +368,21 @@ const DeliveryStepper = ({ currentStatus, onStatusChange }: { currentStatus: str
 
                 {/* Connector line */}
                 {index < steps.length - 1 && (
-                  <div 
-                    className={`flex-1 h-1 ${
-                      index < currentIndex ? 'bg-green-500' : 'bg-slate-200'
-                    }`}
+                  <div
+                    className={`flex-1 h-1 ${index < currentIndex ? 'bg-green-500' : 'bg-slate-200'
+                      }`}
                   />
                 )}
               </div>
-              
+
               {/* Step label - ALSO CLICKABLE */}
               <button
                 type="button"
                 onClick={() => handleStepClick(step.key, index)}
-                className={`mt-2 text-center transition-all duration-200 ${
-                  isCompleted || isCurrent 
-                    ? 'text-slate-800 font-medium hover:text-slate-900 cursor-pointer' 
-                    : 'text-slate-400 hover:text-slate-600 cursor-pointer'
-                }`}
+                className={`mt-2 text-center transition-all duration-200 ${isCompleted || isCurrent
+                  ? 'text-slate-800 font-medium hover:text-slate-900 cursor-pointer'
+                  : 'text-slate-400 hover:text-slate-600 cursor-pointer'
+                  }`}
               >
                 <div className="text-xs font-medium">
                   {step.label}
@@ -396,16 +392,15 @@ const DeliveryStepper = ({ currentStatus, onStatusChange }: { currentStatus: str
           );
         })}
       </div>
-      
+
       {/* Current Status Display */}
       <div className="text-center mt-2">
-        <Badge 
-          variant="outline" 
-          className={`${
-            currentStatus === 'delivered' 
-              ? 'bg-green-100 text-green-800 border-green-200'
-              : 'bg-blue-100 text-blue-800 border-blue-200'
-          } text-sm font-medium`}
+        <Badge
+          variant="outline"
+          className={`${currentStatus === 'delivered'
+            ? 'bg-green-100 text-green-800 border-green-200'
+            : 'bg-blue-100 text-blue-800 border-blue-200'
+            } text-sm font-medium`}
         >
           Current Status: {currentStatus === 'delivered' ? 'Delivered' : 'Ordered'}
         </Badge>
@@ -415,18 +410,18 @@ const DeliveryStepper = ({ currentStatus, onStatusChange }: { currentStatus: str
 };
 
 // Credit Table Component
-const CreditTableDialog = ({ 
-  isOpen, 
-  onClose, 
-  purchaseOrders 
-}: { 
-  isOpen: boolean; 
-  onClose: () => void; 
+const CreditTableDialog = ({
+  isOpen,
+  onClose,
+  purchaseOrders
+}: {
+  isOpen: boolean;
+  onClose: () => void;
   purchaseOrders: any[];
 }) => {
   const creditOrders = useMemo(() => {
-    return purchaseOrders.filter(po => 
-      po.payment_method === 'credit' && 
+    return purchaseOrders.filter(po =>
+      po.payment_method === 'credit' &&
       (po.payment_status === 'partial' || po.payment_status === 'pending' || po.payment_status === 'overdue')
     );
   }, [purchaseOrders]);
@@ -469,7 +464,7 @@ const CreditTableDialog = ({
               {creditOrders.map(po => {
                 const dueDate = calculateDueDate(po.order_date);
                 const overdue = isOverdue(po.order_date);
-                
+
                 return (
                   <div key={po.po_id} className="bg-slate-50 rounded-lg p-4 border border-slate-200">
                     <div className="grid grid-cols-4 gap-4 items-center">
@@ -477,7 +472,7 @@ const CreditTableDialog = ({
                         <div className="font-semibold text-purple-700">{po.po_number}</div>
                         <div className="text-sm text-slate-600">{po.supplier?.name}</div>
                       </div>
-                      
+
                       <div>
                         <div className="font-bold text-slate-800">
                           ₱{Number(po.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -486,7 +481,7 @@ const CreditTableDialog = ({
                           {po.payment_status === 'partial' ? 'Partial Payment' : 'Pending Payment'}
                         </div>
                       </div>
-                      
+
                       <div>
                         <div className={`font-medium ${overdue ? 'text-red-600' : 'text-slate-700'}`}>
                           Due: {dueDate.toLocaleDateString('en-US')}
@@ -495,10 +490,10 @@ const CreditTableDialog = ({
                           {overdue ? `${Math.ceil((new Date().getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))} days overdue` : 'On track'}
                         </div>
                       </div>
-                      
+
                       <div className="text-right">
-                        <Badge 
-                          variant="outline" 
+                        <Badge
+                          variant="outline"
                           className={overdue ? 'bg-red-100 text-red-800 border-red-200' : 'bg-amber-100 text-amber-800 border-amber-200'}
                         >
                           {overdue ? 'Overdue' : 'Active'}
@@ -526,11 +521,11 @@ const CreditTableDialog = ({
 };
 
 // Payment Recording Component for Credit Management
-const PaymentRecording = ({ 
-  po, 
-  onPaymentRecorded 
-}: { 
-  po: any; 
+const PaymentRecording = ({
+  po,
+  onPaymentRecorded
+}: {
+  po: any;
   onPaymentRecorded: () => void;
 }) => {
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -541,6 +536,8 @@ const PaymentRecording = ({
   const remainingBalance = Number(po.total_amount || 0) - Number(po.paid_amount || 0);
 
   const handleRecordPayment = async () => {
+    if (!supabase) return;
+
     if (!paymentAmount || Number(paymentAmount) <= 0) {
       toast({
         title: "Invalid Amount",
@@ -569,11 +566,12 @@ const PaymentRecording = ({
       // Update the purchase order in database
       const { error } = await supabase
         .from('purchase_order')
+        // @ts-ignore
         .update({
           paid_amount: newPaidAmount,
           payment_status: newPaymentStatus,
           last_payment_date: paymentDate
-        })
+        } as any)
         .eq('po_id', po.po_id);
 
       if (error) throw error;
@@ -581,13 +579,14 @@ const PaymentRecording = ({
       // Record payment transaction
       const { error: paymentError } = await supabase
         .from('payment_transactions')
+        // @ts-ignore
         .insert({
           po_id: po.po_id,
           amount: paymentAmount,
           payment_date: paymentDate,
           payment_method: 'credit_payment',
           recorded_at: new Date().toISOString()
-        });
+        } as any);
 
       if (paymentError) throw paymentError;
 
@@ -615,7 +614,7 @@ const PaymentRecording = ({
         <DollarSign className="h-4 w-4" />
         Record Payment
       </Label>
-      
+
       <div className="grid grid-cols-3 gap-4 mb-3">
         <div>
           <Label className="text-slate-600 text-sm">Total Amount</Label>
@@ -642,7 +641,7 @@ const PaymentRecording = ({
           <Label htmlFor="payment-amount" className="text-slate-700 font-poppins text-sm">
             Payment Amount
           </Label>
-          <Input 
+          <Input
             id="payment-amount"
             type="number"
             placeholder="0.00"
@@ -657,7 +656,7 @@ const PaymentRecording = ({
           <Label htmlFor="payment-date" className="text-slate-700 font-poppins text-sm">
             Payment Date
           </Label>
-          <Input 
+          <Input
             id="payment-date"
             type="date"
             value={paymentDate}
@@ -667,7 +666,7 @@ const PaymentRecording = ({
         </div>
       </div>
 
-      <Button 
+      <Button
         onClick={handleRecordPayment}
         disabled={isProcessing || !paymentAmount || Number(paymentAmount) <= 0}
         className="mt-3 w-full"
@@ -690,10 +689,209 @@ const PaymentRecording = ({
   );
 };
 
+// ===== PO LINE ITEMS COMPONENT =====
+interface POLineItem {
+  id: string;
+  item_id: string | null;  // null for custom items
+  customName: string;      // Used when item_id is null
+  quantity: number;
+  unit_cost: number;
+}
+
+const POLineItems = ({
+  items,
+  onItemsChange,
+  inventory
+}: {
+  items: POLineItem[];
+  onItemsChange: (items: POLineItem[]) => void;
+  inventory: any[];
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showDropdown, setShowDropdown] = useState<string | null>(null);
+
+  const addItem = () => {
+    onItemsChange([
+      ...items,
+      {
+        id: `temp-${Date.now()}`,
+        item_id: null,
+        customName: '',
+        quantity: 1,
+        unit_cost: 0
+      }
+    ]);
+  };
+
+  const removeItem = (id: string) => {
+    onItemsChange(items.filter(item => item.id !== id));
+  };
+
+  const updateItem = (id: string, field: keyof POLineItem, value: any) => {
+    onItemsChange(items.map(item =>
+      item.id === id ? { ...item, [field]: value } : item
+    ));
+  };
+
+  const selectInventoryItem = (lineId: string, inventoryItem: any) => {
+    onItemsChange(items.map(item =>
+      item.id === lineId
+        ? {
+          ...item,
+          item_id: inventoryItem.item_id,
+          customName: inventoryItem.name,
+          unit_cost: inventoryItem.cost_price || 0
+        }
+        : item
+    ));
+    setShowDropdown(null);
+    setSearchTerm('');
+  };
+
+  // Sort inventory alphabetically and filter by search term
+  const filteredInventory = inventory
+    .filter(inv => inv.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const lineTotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
+
+  return (
+    <div className="space-y-4 border border-slate-200 rounded-lg p-4 bg-slate-50/50">
+      <div className="flex items-center justify-between">
+        <Label className="text-slate-700 font-medium font-poppins text-base">
+          📦 Order Items
+        </Label>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addItem}
+          className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+        >
+          <PlusCircle className="h-4 w-4 mr-1" />
+          Add Item
+        </Button>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="text-center py-8 text-slate-500 border-2 border-dashed border-slate-200 rounded-lg">
+          <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">No items added yet</p>
+          <p className="text-xs">Click "Add Item" to add items to this order</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {items.map((item, index) => (
+            <div key={item.id} className="grid grid-cols-12 gap-2 items-end bg-white p-3 rounded-lg border border-slate-200">
+              {/* Item Selection/Name - col-span-5 */}
+              <div className="col-span-5 relative">
+                <Label className="text-xs text-slate-500 mb-1 block">Item</Label>
+                <div className="relative">
+                  <Input
+                    placeholder="Search or type item name..."
+                    value={item.customName}
+                    onChange={(e) => {
+                      updateItem(item.id, 'customName', e.target.value);
+                      updateItem(item.id, 'item_id', null); // Clear item_id when typing custom
+                      setSearchTerm(e.target.value);
+                      setShowDropdown(item.id);
+                    }}
+                    onFocus={() => {
+                      setShowDropdown(item.id);
+                      setSearchTerm(item.customName);
+                    }}
+                    className="h-9 text-sm"
+                  />
+                  {showDropdown === item.id && filteredInventory.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-auto">
+                      {filteredInventory.slice(0, 15).map(inv => (
+                        <button
+                          key={inv.item_id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 hover:bg-purple-50 text-sm flex justify-between items-center"
+                          onClick={() => selectInventoryItem(item.id, inv)}
+                        >
+                          <span>{inv.name}</span>
+                          <span className="text-slate-400 text-xs">₱{inv.cost_price?.toFixed(2)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {item.item_id && (
+                  <span className="text-xs text-green-600 mt-0.5 block">✓ From inventory</span>
+                )}
+              </div>
+
+              {/* Quantity - col-span-2 */}
+              <div className="col-span-2">
+                <Label className="text-xs text-slate-500 mb-1 block">Qty</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={item.quantity}
+                  onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
+                  className="h-9 text-sm text-center"
+                />
+              </div>
+
+              {/* Unit Cost - col-span-2 */}
+              <div className="col-span-2">
+                <Label className="text-xs text-slate-500 mb-1 block">Unit Cost</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={item.unit_cost}
+                  onChange={(e) => updateItem(item.id, 'unit_cost', parseFloat(e.target.value) || 0)}
+                  className="h-9 text-sm"
+                />
+              </div>
+
+              {/* Line Total - col-span-2 */}
+              <div className="col-span-2">
+                <Label className="text-xs text-slate-500 mb-1 block">Total</Label>
+                <div className="h-9 flex items-center px-2 bg-slate-100 rounded-md text-sm font-medium">
+                  ₱{(item.quantity * item.unit_cost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </div>
+
+              {/* Remove Button - col-span-1 */}
+              <div className="col-span-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeItem(item.id)}
+                  className="h-9 w-9 text-red-500 hover:text-red-700 hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Grand Total */}
+      {items.length > 0 && (
+        <div className="flex justify-end pt-3 border-t border-slate-200">
+          <div className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-4 py-2 rounded-lg">
+            <span className="text-sm opacity-90">Order Total: </span>
+            <span className="text-lg font-bold">
+              ₱{lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Enhanced Purchase Order Form with Credit Logic
-const EnhancedPOForm = ({ 
-  editingPO, 
-  formData, 
+const EnhancedPOForm = ({
+  editingPO,
+  formData,
   onFormChange,
   suppliers,
   branches,
@@ -724,7 +922,7 @@ const EnhancedPOForm = ({
   // Auto-cancel handler - UPDATED FOR CLICKABLE DELIVERY
   const handleStatusChange = (field: 'deliveryStatus' | 'paymentStatus', value: string) => {
     onFormChange(field, value);
-    
+
     // Auto-cancel the other status when one is cancelled
     if (value === 'cancelled') {
       if (field === 'deliveryStatus') {
@@ -738,7 +936,7 @@ const EnhancedPOForm = ({
     if (field === 'deliveryStatus' && value === 'delivered' && formData.paymentMethod === 'cash') {
       onFormChange('paymentStatus', 'paid');
     }
-    
+
     // Show success toast when delivery status changes
     if (field === 'deliveryStatus') {
       console.log(`Delivery status changed to: ${value}`);
@@ -748,7 +946,7 @@ const EnhancedPOForm = ({
   // Payment method change handler
   const handlePaymentMethodChange = (value: 'cash' | 'credit') => {
     onFormChange('paymentMethod', value);
-    
+
     // Auto-set payment status based on method
     if (value === 'credit') {
       onFormChange('paymentStatus', 'pending');
@@ -767,15 +965,14 @@ const EnhancedPOForm = ({
               PO Number *
             </Label>
             <div className="relative">
-              <Input 
-                id="po-number" 
-                value={formData.poNumber} 
-                onChange={(e) => onFormChange('poNumber', e.target.value)} 
+              <Input
+                id="po-number"
+                value={formData.poNumber}
+                onChange={(e) => onFormChange('poNumber', e.target.value)}
                 placeholder="PO-0001"
                 readOnly={isEditing}
-                className={`border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 ${
-                  isEditing ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
-                } font-poppins`}
+                className={`border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 ${isEditing ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                  } font-poppins`}
               />
               {!isEditing && (
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
@@ -791,14 +988,13 @@ const EnhancedPOForm = ({
             <Label htmlFor="supplier" className="text-slate-700 font-medium font-poppins">
               Supplier *
             </Label>
-            <Select 
-              value={formData.selectedSupplier} 
+            <Select
+              value={formData.selectedSupplier}
               onValueChange={(value) => onFormChange('selectedSupplier', value)}
               disabled={isEditing}
             >
-              <SelectTrigger className={`border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 ${
-                isEditing ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
-              } font-poppins`}>
+              <SelectTrigger className={`border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 ${isEditing ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                } font-poppins`}>
                 <SelectValue placeholder="Select supplier" />
               </SelectTrigger>
               <SelectContent>
@@ -815,8 +1011,8 @@ const EnhancedPOForm = ({
             <Label htmlFor="expected-delivery" className="text-slate-700 font-medium font-poppins">
               Expected Delivery
             </Label>
-            <Input 
-              id="expected-delivery" 
+            <Input
+              id="expected-delivery"
               type="date"
               value={formData.expectedDelivery}
               onChange={(e) => onFormChange('expectedDelivery', e.target.value)}
@@ -832,14 +1028,13 @@ const EnhancedPOForm = ({
             <Label htmlFor="branch" className="text-slate-700 font-medium font-poppins">
               Branch *
             </Label>
-            <Select 
-              value={formData.selectedBranch} 
+            <Select
+              value={formData.selectedBranch}
               onValueChange={(value) => onFormChange('selectedBranch', value)}
               disabled={isEditing}
             >
-              <SelectTrigger className={`border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 ${
-                isEditing ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
-              } font-poppins`}>
+              <SelectTrigger className={`border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 ${isEditing ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                } font-poppins`}>
                 <SelectValue placeholder="Select branch" />
               </SelectTrigger>
               <SelectContent>
@@ -855,14 +1050,13 @@ const EnhancedPOForm = ({
           {/* Payment Method */}
           <div className="space-y-2">
             <Label className="text-slate-700 font-medium font-poppins">Payment Method</Label>
-            <Select 
-              value={formData.paymentMethod} 
-              onValueChange={handlePaymentMethodChange} 
+            <Select
+              value={formData.paymentMethod}
+              onValueChange={handlePaymentMethodChange}
               disabled={isEditing}
             >
-              <SelectTrigger className={`border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 ${
-                isEditing ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
-              } font-poppins`}>
+              <SelectTrigger className={`border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 ${isEditing ? 'bg-slate-50 cursor-not-allowed' : 'bg-white'
+                } font-poppins`}>
                 <SelectValue placeholder="Select method" />
               </SelectTrigger>
               <SelectContent>
@@ -880,8 +1074,8 @@ const EnhancedPOForm = ({
           {/* Delivery Status - Only in Edit Mode */}
           {isEditing && (
             <div className="space-y-2">
-              <DeliveryStepper 
-                currentStatus={formData.deliveryStatus} 
+              <DeliveryStepper
+                currentStatus={formData.deliveryStatus}
                 onStatusChange={(value) => handleStatusChange('deliveryStatus', value)}
               />
             </div>
@@ -893,8 +1087,8 @@ const EnhancedPOForm = ({
       {isEditing && (
         <div className="space-y-2">
           <Label className="text-slate-700 font-medium font-poppins">Payment Status</Label>
-          <Select 
-            value={formData.paymentStatus} 
+          <Select
+            value={formData.paymentStatus}
             onValueChange={(value) => handleStatusChange('paymentStatus', value)}
             disabled={formData.paymentMethod === 'cash' && formData.deliveryStatus === 'delivered'}
           >
@@ -918,8 +1112,8 @@ const EnhancedPOForm = ({
 
       {/* Payment Recording for Credit Orders */}
       {isEditing && formData.paymentMethod === 'credit' && formData.paymentStatus !== 'paid' && formData.paymentStatus !== 'cancelled' && (
-        <PaymentRecording 
-          po={editingPO} 
+        <PaymentRecording
+          po={editingPO}
           onPaymentRecorded={onPaymentRecorded}
         />
       )}
@@ -930,7 +1124,7 @@ const EnhancedPOForm = ({
           <Label htmlFor="cancellation-reason" className="text-red-800 font-medium font-poppins">
             Cancellation Reason *
           </Label>
-          <Textarea 
+          <Textarea
             id="cancellation-reason"
             value={formData.cancellationReason || ''}
             onChange={(e) => onFormChange('cancellationReason', e.target.value)}
@@ -956,10 +1150,10 @@ const EnhancedPOForm = ({
         <Label htmlFor="po-notes" className="text-slate-700 font-medium font-poppins">
           Notes & Instructions
         </Label>
-        <Textarea 
-          id="po-notes" 
-          value={formData.poNotes} 
-          onChange={(e) => onFormChange('poNotes', e.target.value)} 
+        <Textarea
+          id="po-notes"
+          value={formData.poNotes}
+          onChange={(e) => onFormChange('poNotes', e.target.value)}
           placeholder="Additional notes, special instructions, or delivery requirements..."
           className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins min-h-[80px] text-sm"
         />
@@ -981,21 +1175,21 @@ const EnhancedPOForm = ({
 
 
 // Enhanced Table Row with Clickable Rows
-const EnhancedTableRow = ({ 
-  item, 
-  onEdit, 
+const EnhancedTableRow = ({
+  item,
+  onEdit,
   onDelete,
   onRowClick
-}: { 
-  item: any; 
-  onEdit: (item: any) => void; 
+}: {
+  item: any;
+  onEdit: (item: any) => void;
   onDelete: (item: any) => void;
   onRowClick: (item: any) => void;
 }) => {
   const [showActions, setShowActions] = useState(false);
 
   return (
-    <div 
+    <div
       className="grid grid-cols-9 gap-3 px-3 py-2 items-center border-b border-slate-200 hover:bg-slate-50 transition-colors group cursor-pointer"
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
@@ -1005,43 +1199,42 @@ const EnhancedTableRow = ({
       <div className="font-semibold text-purple-700 text-sm">
         {item.po_number}
       </div>
-      
+
       {/* Supplier */}
       <div className="flex items-center gap-2">
         <Building2 className="h-3 w-3 text-slate-500" />
         <span className="font-medium text-sm truncate">{item.supplier?.name || 'Unknown'}</span>
       </div>
-      
+
       {/* Branch */}
       <div className="flex items-center gap-2">
         <MapPin className="h-3 w-3 text-slate-500" />
         <span className="text-sm truncate">{item.branch?.name || 'Unknown'}</span>
       </div>
-      
+
       {/* Order Date */}
       <div className="text-slate-700 text-sm">
         {item.order_date ? new Date(item.order_date).toLocaleDateString('en-US') : 'No date'}
       </div>
-      
+
       {/* Expected Delivery */}
       <div>
-        <span className={`font-medium text-sm ${
-          item.expected_delivery_date && new Date(item.expected_delivery_date) < new Date() && item.status !== 'delivered' 
-            ? 'text-red-600' 
-            : 'text-slate-700'
-        }`}>
+        <span className={`font-medium text-sm ${item.expected_delivery_date && new Date(item.expected_delivery_date) < new Date() && item.status !== 'delivered'
+          ? 'text-red-600'
+          : 'text-slate-700'
+          }`}>
           {item.expected_delivery_date ? new Date(item.expected_delivery_date).toLocaleDateString('en-US') : 'Not set'}
         </span>
       </div>
-      
+
       {/* Total Amount */}
       <div className="font-bold text-slate-800 text-sm">
         ₱{Number(item.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </div>
-      
+
       {/* Delivery Status - Updated for better visual feedback */}
       <div>
-        <div 
+        <div
           className="cursor-pointer transform hover:scale-105 transition-transform duration-200"
           onClick={(e) => {
             e.stopPropagation();
@@ -1051,21 +1244,20 @@ const EnhancedTableRow = ({
           <SimpleDeliveryStatus status={item.status || 'ordered'} />
         </div>
       </div>
-      
+
       {/* Payment Status */}
       <div>
-        <SimplePaymentStatus 
-          status={item.payment_status || 'pending'} 
+        <SimplePaymentStatus
+          status={item.payment_status || 'pending'}
           method={item.payment_method || 'cash'}
           orderDate={item.order_date}
         />
       </div>
-      
+
       {/* Actions Column */}
       <div className="flex justify-center">
-        <div className={`flex items-center gap-1 transition-opacity duration-200 ${
-          showActions ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-        }`}>
+        <div className={`flex items-center gap-1 transition-opacity duration-200 ${showActions ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          }`}>
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -1093,8 +1285,8 @@ const EnhancedTableRow = ({
 };
 
 // Enhanced Filter Component for Purchase Orders with Order Date Filter
-const POFilter = ({ 
-  statusFilter, 
+const POFilter = ({
+  statusFilter,
   onStatusFilterChange,
   searchTerm,
   onSearchChange,
@@ -1130,7 +1322,7 @@ const POFilter = ({
           </Label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input 
+            <Input
               id="search-pos"
               placeholder="Search by PO number, supplier, or branch..."
               value={searchTerm}
@@ -1138,7 +1330,7 @@ const POFilter = ({
               className="pl-10 pr-4 py-2 border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm"
             />
             {searchTerm && (
-              <button 
+              <button
                 onClick={() => onSearchChange('')}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors duration-200"
               >
@@ -1147,7 +1339,7 @@ const POFilter = ({
             )}
           </div>
         </div>
-        
+
         <div>
           <Label htmlFor="status-filter" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
             Filter by Status
@@ -1189,13 +1381,13 @@ const POFilter = ({
               </Select>
             </div>
           )}
-          
+
           {/* Order Date From Filter */}
           <div>
             <Label htmlFor="order-date-from" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
               Order Date From
             </Label>
-            <Input 
+            <Input
               id="order-date-from"
               type="date"
               value={orderDateFrom || ''}
@@ -1203,13 +1395,13 @@ const POFilter = ({
               className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm"
             />
           </div>
-          
+
           {/* Order Date To Filter */}
           <div>
             <Label htmlFor="order-date-to" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">
               Order Date To
             </Label>
-            <Input 
+            <Input
               id="order-date-to"
               type="date"
               value={orderDateTo || ''}
@@ -1217,7 +1409,7 @@ const POFilter = ({
               className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm"
             />
           </div>
-          
+
           {/* Clear Date Filters Button */}
           <div className="flex items-end">
             {(orderDateFrom || orderDateTo) && (
@@ -1242,16 +1434,16 @@ const POFilter = ({
 };
 
 // Pagination Component
-const Pagination = ({ 
-  currentPage, 
-  totalPages, 
+const Pagination = ({
+  currentPage,
+  totalPages,
   onPageChange,
   pageSize,
   onPageSizeChange,
-  totalItems 
-}: { 
-  currentPage: number; 
-  totalPages: number; 
+  totalItems
+}: {
+  currentPage: number;
+  totalPages: number;
   onPageChange: (page: number) => void;
   pageSize: number;
   onPageSizeChange: (size: number) => void;
@@ -1259,10 +1451,10 @@ const Pagination = ({
 }) => {
   const pages = [];
   const maxVisiblePages = 5;
-  
+
   let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
   let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-  
+
   if (endPage - startPage + 1 < maxVisiblePages) {
     startPage = Math.max(1, endPage - maxVisiblePages + 1);
   }
@@ -1276,7 +1468,7 @@ const Pagination = ({
       <div className="text-sm text-slate-600">
         Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalItems)} of {totalItems} entries
       </div>
-      
+
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-2 text-sm text-slate-600">
           <span>Rows per page:</span>
@@ -1303,7 +1495,7 @@ const Pagination = ({
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          
+
           {pages.map(page => (
             <Button
               key={page}
@@ -1315,7 +1507,7 @@ const Pagination = ({
               {page}
             </Button>
           ))}
-          
+
           <Button
             variant="outline"
             size="sm"
@@ -1335,8 +1527,8 @@ const Pagination = ({
 const StatsOverview = ({ suppliers, purchaseOrders }: { suppliers: any[], purchaseOrders: any[] }) => {
   const activeSuppliers = suppliers.filter(s => s.is_active).length;
   const orderedPOs = purchaseOrders.filter(po => po.status === 'ordered').length;
-  const deliveredThisMonth = purchaseOrders.filter(po => 
-    po.status === 'delivered' && 
+  const deliveredThisMonth = purchaseOrders.filter(po =>
+    po.status === 'delivered' &&
     new Date(po.order_date).getMonth() === new Date().getMonth()
   ).length;
   const totalPOValue = purchaseOrders.reduce((acc, po) => acc + (po.total_amount || 0), 0);
@@ -1411,14 +1603,14 @@ const StatsOverview = ({ suppliers, purchaseOrders }: { suppliers: any[], purcha
 };
 
 // Quick Actions with Credit Management Button
-const EnhancedQuickActions = ({ 
-  onAddSupplier, 
-  onAddPO, 
+const EnhancedQuickActions = ({
+  onAddSupplier,
+  onAddPO,
   onExportData,
   onViewCreditTable
-}: { 
-  onAddSupplier: () => void; 
-  onAddPO: () => void; 
+}: {
+  onAddSupplier: () => void;
+  onAddPO: () => void;
   onExportData: () => void;
   onViewCreditTable: () => void;
 }) => {
@@ -1482,29 +1674,29 @@ const EnhancedTabs = ({ value, onValueChange, children }: any) => {
   return (
     <Tabs value={value} onValueChange={onValueChange} className="w-full font-poppins">
       <TabsList className="grid w-full grid-cols-4 p-1 bg-slate-100 rounded-2xl">
-        <TabsTrigger 
-          value="suppliers" 
+        <TabsTrigger
+          value="suppliers"
           className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins text-sm"
         >
           <Building2 className="h-4 w-4 mr-2" />
           Suppliers
         </TabsTrigger>
-        <TabsTrigger 
-          value="purchase-orders" 
+        <TabsTrigger
+          value="purchase-orders"
           className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins text-sm"
         >
           <ShoppingCart className="h-4 w-4 mr-2" />
           Purchase Orders
         </TabsTrigger>
-        <TabsTrigger 
-          value="transaction-history" 
+        <TabsTrigger
+          value="transaction-history"
           className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins text-sm"
         >
           <History className="h-4 w-4 mr-2" />
           History
         </TabsTrigger>
-        <TabsTrigger 
-          value="credit-management" 
+        <TabsTrigger
+          value="credit-management"
           className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins text-sm"
         >
           <CreditCardIcon className="h-4 w-4 mr-2" />
@@ -1522,12 +1714,12 @@ const supplierColumns = [
   { key: 'contact_person', header: 'Contact Person' },
   { key: 'phone', header: 'Phone' },
   { key: 'email', header: 'Email' },
-  { 
-    key: 'is_active', 
+  {
+    key: 'is_active',
     header: 'Status',
     render: (value: any) => (
-      <Badge 
-        variant={value ? 'default' : 'secondary'} 
+      <Badge
+        variant={value ? 'default' : 'secondary'}
         className={`${value ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'} font-poppins`}
       >
         {value ? 'Active' : 'Inactive'}
@@ -1543,7 +1735,7 @@ export default function EnhancedPurchasingPage() {
   const [activeTab, setActiveTab] = useState('purchase-orders');
   const [mounted, setMounted] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  
+
   // Success Animation State
   const [successAnimation, setSuccessAnimation] = useState<{
     isVisible: boolean;
@@ -1556,30 +1748,30 @@ export default function EnhancedPurchasingPage() {
     message: '',
     actionType: 'add'
   });
-  
+
   // Notes Dialog State
   const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
   const [selectedNotes, setSelectedNotes] = useState<string>('');
-  
+
   // State management
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isSupplierLoading, setIsSupplierLoading] = useState(true);
   const [supplierError, setSupplierError] = useState<string | null>(null);
-  
+
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [isPOLoading, setIsPOLoading] = useState(true);
   const [poError, setPOError] = useState<string | null>(null);
-  
+
   const [branches, setBranches] = useState<Branch[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  
+
   // Dialog states
   const [isSupplierDialogOpen, setIsSupplierDialogOpen] = useState(false);
   const [isPODialogOpen, setIsPODialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCreditTableOpen, setIsCreditTableOpen] = useState(false);
-  
+
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null);
   const [deletingItem, setDeletingItem] = useState<any>(null);
@@ -1589,7 +1781,7 @@ export default function EnhancedPurchasingPage() {
   const [poSearchTerm, setPOSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
-  
+
   // Order Date Filter states
   const [orderDateFrom, setOrderDateFrom] = useState<string>('');
   const [orderDateTo, setOrderDateTo] = useState<string>('');
@@ -1611,6 +1803,9 @@ export default function EnhancedPurchasingPage() {
     cancellationReason: ''
   });
 
+  // PO Line Items state
+  const [poLineItems, setPOLineItems] = useState<POLineItem[]>([]);
+
   // Supplier form state
   const [supplierName, setSupplierName] = useState('');
   const [contactPerson, setContactPerson] = useState('');
@@ -1631,7 +1826,7 @@ export default function EnhancedPurchasingPage() {
   const fetchSuppliers = useCallback(async () => {
     if (!supabase) return;
     setIsSupplierLoading(true);
-    
+
     try {
       const { data, error } = await supabase
         .rpc('get_suppliers_complete');
@@ -1647,7 +1842,7 @@ export default function EnhancedPurchasingPage() {
       setSupplierError('Network error');
       setSuppliers([]);
     }
-    
+
     setIsSupplierLoading(false);
     setLastUpdated(new Date());
   }, []);
@@ -1655,7 +1850,7 @@ export default function EnhancedPurchasingPage() {
   const fetchPurchaseOrders = useCallback(async () => {
     if (!supabase) return;
     setIsPOLoading(true);
-    
+
     try {
       const { data, error } = await supabase
         .rpc('get_purchase_orders_complete');
@@ -1671,7 +1866,7 @@ export default function EnhancedPurchasingPage() {
       setPOError('Network error');
       setPurchaseOrders([]);
     }
-    
+
     setIsPOLoading(false);
     setLastUpdated(new Date());
   }, []);
@@ -1700,7 +1895,7 @@ export default function EnhancedPurchasingPage() {
     if (!supabase) return;
     const [branchesRes, inventoryRes, usersRes] = await Promise.all([
       supabase.from('branch').select('branch_id, name').eq('is_active', true),
-      supabase.from('inventory_item').select('item_id, name, category'),
+      supabase.from('inventory_item').select('item_id, name, category, cost_price'),
       supabase.from('user').select('user_id, name').in('role', ['admin', 'manager'])
     ]);
 
@@ -1726,10 +1921,10 @@ export default function EnhancedPurchasingPage() {
       const matchesSearch = po.po_number.toLowerCase().includes(poSearchTerm.toLowerCase()) ||
         po.supplier?.name.toLowerCase().includes(poSearchTerm.toLowerCase()) ||
         po.branch?.name.toLowerCase().includes(poSearchTerm.toLowerCase());
-      
+
       const matchesStatus = statusFilter === 'all' || po.status === statusFilter;
       const matchesBranch = branchFilter === 'all' || po.branch_id === branchFilter;
-      
+
       // Order date filter
       let matchesDate = true;
       if (orderDateFrom || orderDateTo) {
@@ -1747,26 +1942,26 @@ export default function EnhancedPurchasingPage() {
           }
         }
       }
-      
+
       // For purchase orders tab, only show active orders (not delivered or cancelled)
       const isActiveOrder = po.status !== 'delivered' && po.status !== 'cancelled';
-      
+
       return matchesSearch && matchesStatus && matchesBranch && matchesDate &&
-             (activeTab === 'purchase-orders' ? isActiveOrder : true);
+        (activeTab === 'purchase-orders' ? isActiveOrder : true);
     });
   }, [purchaseOrders, poSearchTerm, statusFilter, branchFilter, orderDateFrom, orderDateTo, activeTab]);
 
   // Transaction History (Delivered and Cancelled orders only)
   const transactionHistory = useMemo(() => {
-    return purchaseOrders.filter(po => 
+    return purchaseOrders.filter(po =>
       po.status === 'delivered' || po.status === 'cancelled'
     );
   }, [purchaseOrders]);
 
   // Credit Management (Credit orders with partial or pending payment)
   const creditOrders = useMemo(() => {
-    return purchaseOrders.filter(po => 
-      po.payment_method === 'credit' && 
+    return purchaseOrders.filter(po =>
+      po.payment_method === 'credit' &&
       (po.payment_status === 'partial' || po.payment_status === 'pending' || po.payment_status === 'overdue')
     );
   }, [purchaseOrders]);
@@ -1802,7 +1997,7 @@ export default function EnhancedPurchasingPage() {
       poNotes: po.notes || '',
       paymentMethod: (po as any).payment_method || 'cash',
       paymentStatus: (po as any).payment_status || 'pending',
-      deliveryStatus: po.status || 'ordered', 
+      deliveryStatus: ((po.status === 'pending' || po.status === 'approved') ? 'ordered' : po.status) as 'ordered' | 'delivered' | 'cancelled',
       cancellationReason: (po as any).cancellation_reason || ''
     });
     setIsPODialogOpen(true);
@@ -1840,6 +2035,7 @@ export default function EnhancedPurchasingPage() {
       deliveryStatus: 'ordered',
       cancellationReason: ''
     });
+    setPOLineItems([]);
     setEditingPO(null);
   };
 
@@ -1917,15 +2113,15 @@ export default function EnhancedPurchasingPage() {
     }
 
     const csvContent = convertToCSV(dataToExport, headers, activeTab);
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
-    
+
     link.setAttribute('href', url);
     link.setAttribute('download', filename);
     link.style.visibility = 'hidden';
-    
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1938,10 +2134,10 @@ export default function EnhancedPurchasingPage() {
       actionType: 'export'
     });
   };
-  
+
   const convertToCSV = (data: any[], headers: string[], type: string) => {
     const headerRow = headers.join(',') + '\n';
-    
+
     const dataRows = data.map(item => {
       if (type === 'suppliers') {
         return [
@@ -1957,7 +2153,7 @@ export default function EnhancedPurchasingPage() {
         dueDate.setDate(dueDate.getDate() + 120);
         const today = new Date();
         const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        
+
         return [
           `"${item.po_number || ''}"`,
           `"${item.supplier?.name || ''}"`,
@@ -1969,20 +2165,20 @@ export default function EnhancedPurchasingPage() {
           `"${daysUntilDue}"`
         ].join(',');
       } else {
-        const formattedDate = item.order_date 
+        const formattedDate = item.order_date
           ? new Date(item.order_date).toLocaleDateString('en-US')
           : '';
-        
+
         const formattedDeliveryDate = item.expected_delivery_date
           ? new Date(item.expected_delivery_date).toLocaleDateString('en-US')
           : '';
-          
+
         const completionDate = item.status === 'delivered' && item.expected_delivery_date
           ? new Date(item.expected_delivery_date).toLocaleDateString('en-US')
-          : item.status === 'cancelled' 
-          ? new Date(item.updated_at || item.order_date).toLocaleDateString('en-US')
-          : '';
-          
+          : item.status === 'cancelled'
+            ? new Date(item.updated_at || item.order_date).toLocaleDateString('en-US')
+            : '';
+
         return [
           `"${item.po_number || ''}"`,
           `"${item.supplier?.name || ''}"`,
@@ -2020,17 +2216,19 @@ export default function EnhancedPurchasingPage() {
 
     try {
       let error;
-      
+
       if (editingSupplier) {
         const { error: updateError } = await supabase
           .from('supplier')
-          .update(supplierData)
+          // @ts-ignore
+          .update(supplierData as any)
           .eq('supplier_id', editingSupplier.supplier_id);
         error = updateError;
       } else {
         const { error: insertError } = await supabase
           .from('supplier')
-          .insert([supplierData]);
+          // @ts-ignore
+          .insert([supplierData] as any);
         error = insertError;
       }
 
@@ -2053,12 +2251,12 @@ export default function EnhancedPurchasingPage() {
             actionType: 'add'
           });
         }
-        
+
         setIsSupplierDialogOpen(false);
         resetSupplierForm();
         fetchSuppliers();
       }
-      
+
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
@@ -2077,13 +2275,13 @@ export default function EnhancedPurchasingPage() {
     if (poFormData.expectedDelivery) {
       const orderDate = new Date();
       const deliveryDate = new Date(poFormData.expectedDelivery);
-      orderDate.setHours(0,0,0,0);
-      deliveryDate.setHours(0,0,0,0);
+      orderDate.setHours(0, 0, 0, 0);
+      deliveryDate.setHours(0, 0, 0, 0);
       if (deliveryDate <= orderDate) {
-        toast({ 
-          title: "Invalid Delivery Date", 
-          description: "Expected delivery date must be after today's date.", 
-          variant: "destructive" 
+        toast({
+          title: "Invalid Delivery Date",
+          description: "Expected delivery date must be after today's date.",
+          variant: "destructive"
         });
         return;
       }
@@ -2091,10 +2289,10 @@ export default function EnhancedPurchasingPage() {
 
     // Validate cancellation reason
     if ((poFormData.deliveryStatus === 'cancelled' || poFormData.paymentStatus === 'cancelled') && !poFormData.cancellationReason?.trim()) {
-      toast({ 
-        title: "Validation Error", 
-        description: "Cancellation reason is required when cancelling an order.", 
-        variant: "destructive" 
+      toast({
+        title: "Validation Error",
+        description: "Cancellation reason is required when cancelling an order.",
+        variant: "destructive"
       });
       return;
     }
@@ -2111,28 +2309,70 @@ export default function EnhancedPurchasingPage() {
       status: editingPO ? poFormData.deliveryStatus : 'ordered',
       payment_status: poFormData.paymentStatus,
       payment_method: poFormData.paymentMethod,
-      cancellation_reason: (poFormData.deliveryStatus === 'cancelled' || poFormData.paymentStatus === 'cancelled') 
-        ? poFormData.cancellationReason 
+      cancellation_reason: (poFormData.deliveryStatus === 'cancelled' || poFormData.paymentStatus === 'cancelled')
+        ? poFormData.cancellationReason
         : null
     };
 
     try {
       let error;
-      
+      let poId: string | null = null;
+
       if (editingPO) {
+        poId = editingPO.po_id;
         const { error: updateError } = await supabase
           .from('purchase_order')
+          // @ts-ignore
           .update({
             ...poData,
             status: poFormData.deliveryStatus
-          })
+          } as any)
           .eq('po_id', editingPO.po_id);
         error = updateError;
+
+        // Delete existing line items and re-insert (simplest approach for updates)
+        if (!error && poLineItems.length > 0) {
+          await supabase.from('purchase_order_item').delete().eq('po_id', poId);
+        }
       } else {
-        const { error: insertError } = await supabase
+        // Insert PO and get back the ID
+        const { data: insertedPO, error: insertError } = await supabase
           .from('purchase_order')
-          .insert([poData]);
+          // @ts-ignore
+          .insert([poData] as any)
+          .select('po_id')
+          .single();
         error = insertError;
+        if (insertedPO) {
+          poId = (insertedPO as any).po_id;
+        }
+      }
+
+      // Insert line items if PO was saved successfully
+      if (!error && poId && poLineItems.length > 0) {
+        const lineItemsData = poLineItems
+          .filter(item => item.customName.trim() && item.quantity > 0 && item.unit_cost >= 0)
+          .map(item => ({
+            po_id: poId,
+            item_id: item.item_id, // Will be null for custom items
+            quantity: item.quantity,
+            unit_cost: item.unit_cost
+          }));
+
+        if (lineItemsData.length > 0) {
+          const { error: lineItemError } = await supabase
+            .from('purchase_order_item')
+            .insert(lineItemsData as any);
+
+          if (lineItemError) {
+            console.error('Error saving line items:', lineItemError);
+            toast({
+              title: "Warning",
+              description: "PO saved but some line items could not be saved: " + lineItemError.message,
+              variant: "destructive"
+            });
+          }
+        }
       }
 
       if (error) {
@@ -2154,7 +2394,7 @@ export default function EnhancedPurchasingPage() {
             actionType: 'create'
           });
         }
-        
+
         setIsPODialogOpen(false);
         resetPOForm();
         fetchPurchaseOrders();
@@ -2171,7 +2411,7 @@ export default function EnhancedPurchasingPage() {
 
     try {
       let error;
-      
+
       if (deletingItem.type === 'supplier') {
         const { error: deleteError } = await supabase
           .from('supplier')
@@ -2196,7 +2436,7 @@ export default function EnhancedPurchasingPage() {
           message: `${deletingItem.type === 'supplier' ? 'Supplier' : 'Purchase order'} has been removed from the system.`,
           actionType: 'delete'
         });
-        
+
         setIsDeleteDialogOpen(false);
         if (deletingItem.type === 'supplier') {
           fetchSuppliers();
@@ -2211,7 +2451,7 @@ export default function EnhancedPurchasingPage() {
 
   const handlePaymentRecorded = () => {
     fetchPurchaseOrders();
-    
+
     // Show success animation for payment
     setSuccessAnimation({
       isVisible: true,
@@ -2224,8 +2464,8 @@ export default function EnhancedPurchasingPage() {
   const renderSupplierCell = (item: any, columnKey: string, value: any) => {
     if (columnKey === 'is_active') {
       return (
-        <Badge 
-          variant={value ? 'default' : 'secondary'} 
+        <Badge
+          variant={value ? 'default' : 'secondary'}
           className={`${value ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'} font-poppins`}
         >
           {value ? 'Active' : 'Inactive'}
@@ -2288,11 +2528,11 @@ export default function EnhancedPurchasingPage() {
             <div className="truncate">{po.branch?.name || 'Unknown'}</div>
             <div>{po.order_date ? new Date(po.order_date).toLocaleDateString('en-US') : 'No date'}</div>
             <div>
-              {po.status === 'delivered' && po.expected_delivery_date 
+              {po.status === 'delivered' && po.expected_delivery_date
                 ? new Date(po.expected_delivery_date).toLocaleDateString('en-US')
-                : po.status === 'cancelled' 
-                ? new Date().toLocaleDateString('en-US')
-                : 'N/A'
+                : po.status === 'cancelled'
+                  ? new Date().toLocaleDateString('en-US')
+                  : 'N/A'
               }
             </div>
             <div className="font-bold text-slate-800">
@@ -2302,20 +2542,20 @@ export default function EnhancedPurchasingPage() {
               <SimpleDeliveryStatus status={po.status || 'ordered'} />
             </div>
             <div>
-              <SimplePaymentStatus 
-                status={po.payment_status || 'pending'} 
+              <SimplePaymentStatus
+                status={po.payment_status || 'pending'}
                 method={po.payment_method || 'cash'}
                 orderDate={po.order_date}
               />
             </div>
             <div className="text-center">
               {po.notes ? (
-                <button 
+                <button
                   className="p-1.5 text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors border border-transparent hover:border-purple-200"
                   title="View Notes"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleNotesClick(po.notes);
+                    handleNotesClick(po.notes!);
                   }}
                 >
                   <FileText className="h-4 w-4" />
@@ -2359,7 +2599,7 @@ export default function EnhancedPurchasingPage() {
           const dueDate = calculateDueDate(po.order_date);
           const overdue = isOverdue(po.order_date);
           const daysUntilDue = Math.ceil((dueDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-          
+
           return (
             <div key={po.po_id} className="grid grid-cols-8 gap-3 px-3 py-2 items-center border-b border-slate-200 hover:bg-slate-50 transition-colors text-sm cursor-pointer" onClick={() => handleEditPO(po)}>
               <div className="font-semibold text-purple-700">{po.po_number}</div>
@@ -2373,8 +2613,8 @@ export default function EnhancedPurchasingPage() {
                 ₱{Number(po.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div>
-                <SimplePaymentStatus 
-                  status={po.payment_status || 'pending'} 
+                <SimplePaymentStatus
+                  status={po.payment_status || 'pending'}
                   method={po.payment_method || 'cash'}
                   orderDate={po.order_date}
                 />
@@ -2391,7 +2631,7 @@ export default function EnhancedPurchasingPage() {
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
-      
+
       {/* Success Animation */}
       <SuccessAnimation
         isVisible={successAnimation.isVisible}
@@ -2400,19 +2640,19 @@ export default function EnhancedPurchasingPage() {
         actionType={successAnimation.actionType}
         onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))}
       />
-      
+
       {/* Notes Dialog */}
       <NotesDialog
         isOpen={isNotesDialogOpen}
         onClose={() => setIsNotesDialogOpen(false)}
         notes={selectedNotes}
       />
-      
+
       {/* Background Sections */}
       <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
-        <div 
+        <div
           className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
-          style={{ 
+          style={{
             backgroundImage: "url('/images/image2.jpg')",
             backgroundSize: "cover",
             backgroundPosition: "center 30%"
@@ -2427,12 +2667,12 @@ export default function EnhancedPurchasingPage() {
       </div>
 
       <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-        
+
         {/* Header Section */}
         <div className={`mb-8 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
           <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
-            
+
             <div className="relative z-10 flex-1">
               <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
                 Purchasing & Supplier Management
@@ -2456,9 +2696,9 @@ export default function EnhancedPurchasingPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
-              <Button 
+              <Button
                 onClick={handleRefresh}
                 disabled={isSupplierLoading || isPOLoading}
                 className="flex items-center gap-2 min-h-[44px] bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins active:scale-95"
@@ -2471,13 +2711,13 @@ export default function EnhancedPurchasingPage() {
         </div>
 
         <div className="mt-12"></div>
-        
+
         {/* Stats Overview */}
         <StatsOverview suppliers={suppliers} purchaseOrders={purchaseOrders} />
 
         {/* Quick Actions */}
-        <EnhancedQuickActions 
-          onAddSupplier={handleOpenSupplierDialog} 
+        <EnhancedQuickActions
+          onAddSupplier={handleOpenSupplierDialog}
           onAddPO={handleOpenPODialog}
           onExportData={handleExportData}
           onViewCreditTable={() => setIsCreditTableOpen(true)}
@@ -2507,7 +2747,7 @@ export default function EnhancedPurchasingPage() {
                     <Label htmlFor="search-suppliers" className="text-sm font-medium text-slate-700 mb-2 block font-poppins">Search Suppliers</Label>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <Input 
+                      <Input
                         id="search-suppliers"
                         placeholder="Search by name, contact, phone, email, or address..."
                         value={supplierSearchTerm}
@@ -2515,7 +2755,7 @@ export default function EnhancedPurchasingPage() {
                         className="pl-10 pr-4 py-2 border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins text-sm"
                       />
                       {supplierSearchTerm && (
-                        <button 
+                        <button
                           onClick={() => setSupplierSearchTerm('')}
                           className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors duration-200"
                         >
@@ -2526,7 +2766,7 @@ export default function EnhancedPurchasingPage() {
                   </div>
                 </div>
               </CardHeader>
-              
+
               <CardContent className="p-6">
                 {supplierError && (
                   <Alert variant="destructive" className="mb-6 font-poppins">
@@ -2543,13 +2783,10 @@ export default function EnhancedPurchasingPage() {
                 ) : (
                   <DataTableWrapper
                     title=""
-                    columns={supplierColumns}
+                    columns={supplierColumns as any}
                     data={filteredSuppliers.map(supplier => ({ ...supplier, id: supplier.supplier_id }))}
-                    onEdit={handleEditSupplier}
-                    onDelete={handleDeleteSupplier}
-                    renderCell={renderSupplierCell}
-                    searchTerm={supplierSearchTerm}
-                    onSearchChange={setSupplierSearchTerm}
+                    onEdit={handleEditSupplier as any}
+                    onDelete={handleDeleteSupplier as any}
                   />
                 )}
               </CardContent>
@@ -2564,7 +2801,7 @@ export default function EnhancedPurchasingPage() {
                   <div>
                     <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Active Purchase Orders</CardTitle>
                     <CardDescription className="text-slate-600 font-poppins">
-                      {filteredPurchaseOrders.length} active order{filteredPurchaseOrders.length !== 1 ? 's' : ''} • 
+                      {filteredPurchaseOrders.length} active order{filteredPurchaseOrders.length !== 1 ? 's' : ''} •
                       Delivered orders moved to Transaction History
                     </CardDescription>
                   </div>
@@ -2586,7 +2823,7 @@ export default function EnhancedPurchasingPage() {
                   onOrderDateToChange={setOrderDateTo}
                 />
               </CardHeader>
-              
+
               <CardContent className="p-6">
                 {poError && (
                   <Alert variant="destructive" className="mb-6 font-poppins">
@@ -2647,7 +2884,7 @@ export default function EnhancedPurchasingPage() {
                   <div>
                     <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Transaction History</CardTitle>
                     <CardDescription className="text-slate-600 font-poppins">
-                      {transactionHistory.length} completed transaction{transactionHistory.length !== 1 ? 's' : ''} • 
+                      {transactionHistory.length} completed transaction{transactionHistory.length !== 1 ? 's' : ''} •
                       Includes delivered and cancelled orders only
                     </CardDescription>
                   </div>
@@ -2673,7 +2910,7 @@ export default function EnhancedPurchasingPage() {
                   onOrderDateToChange={setOrderDateTo}
                 />
               </CardHeader>
-              
+
               <CardContent className="p-6">
                 {/* Table Header */}
                 <div className="grid grid-cols-9 gap-3 px-3 py-3 bg-slate-50 rounded-lg border border-slate-200 mb-2 font-semibold text-slate-700 text-sm">
@@ -2710,7 +2947,7 @@ export default function EnhancedPurchasingPage() {
                   <div>
                     <CardTitle className="text-2xl font-bold text-slate-900 font-poppins">Credit Management</CardTitle>
                     <CardDescription className="text-slate-600 font-poppins">
-                      {creditOrders.length} active credit purchase{creditOrders.length !== 1 ? 's' : ''} • 
+                      {creditOrders.length} active credit purchase{creditOrders.length !== 1 ? 's' : ''} •
                       Track payments and due dates
                     </CardDescription>
                   </div>
@@ -2726,7 +2963,7 @@ export default function EnhancedPurchasingPage() {
                   </div>
                 </div>
               </CardHeader>
-              
+
               <CardContent className="p-6">
                 {/* Table Header */}
                 <div className="grid grid-cols-8 gap-3 px-3 py-3 bg-slate-50 rounded-lg border border-slate-200 mb-2 font-semibold text-slate-700 text-sm">
@@ -2774,20 +3011,20 @@ export default function EnhancedPurchasingPage() {
             <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-2">
               <div className="space-y-2">
                 <Label htmlFor="supplier-name" className="text-slate-700 font-medium font-poppins">Supplier Name *</Label>
-                <Input 
-                  id="supplier-name" 
-                  value={supplierName} 
-                  onChange={(e) => setSupplierName(e.target.value)} 
+                <Input
+                  id="supplier-name"
+                  value={supplierName}
+                  onChange={(e) => setSupplierName(e.target.value)}
                   placeholder="Neugen Tire Sales Inc"
                   className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="contact-person" className="text-slate-700 font-medium font-poppins">Contact Person</Label>
-                <Input 
-                  id="contact-person" 
-                  value={contactPerson} 
-                  onChange={(e) => setContactPerson(e.target.value)} 
+                <Input
+                  id="contact-person"
+                  value={contactPerson}
+                  onChange={(e) => setContactPerson(e.target.value)}
                   placeholder="John Smith"
                   className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                 />
@@ -2795,21 +3032,21 @@ export default function EnhancedPurchasingPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="supplier-phone" className="text-slate-700 font-medium font-poppins">Phone</Label>
-                  <Input 
-                    id="supplier-phone" 
-                    value={supplierPhone} 
-                    onChange={(e) => setSupplierPhone(e.target.value)} 
+                  <Input
+                    id="supplier-phone"
+                    value={supplierPhone}
+                    onChange={(e) => setSupplierPhone(e.target.value)}
                     placeholder="+1-555-0201"
                     className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="supplier-email" className="text-slate-700 font-medium font-poppins">Email</Label>
-                  <Input 
-                    id="supplier-email" 
+                  <Input
+                    id="supplier-email"
                     type="email"
-                    value={supplierEmail} 
-                    onChange={(e) => setSupplierEmail(e.target.value)} 
+                    value={supplierEmail}
+                    onChange={(e) => setSupplierEmail(e.target.value)}
                     placeholder="orders@neugen.com"
                     className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                   />
@@ -2817,18 +3054,18 @@ export default function EnhancedPurchasingPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="supplier-address" className="text-slate-700 font-medium font-poppins">Address</Label>
-                <Textarea 
-                  id="supplier-address" 
-                  value={supplierAddress} 
-                  onChange={(e) => setSupplierAddress(e.target.value)} 
+                <Textarea
+                  id="supplier-address"
+                  value={supplierAddress}
+                  onChange={(e) => setSupplierAddress(e.target.value)}
                   placeholder="789 Tire Street, City"
                   className="border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins"
                 />
               </div>
               <div className="flex items-center space-x-2">
-                <Switch 
-                  id="supplier-active" 
-                  checked={supplierActive} 
+                <Switch
+                  id="supplier-active"
+                  checked={supplierActive}
                   onCheckedChange={setSupplierActive}
                 />
                 <Label htmlFor="supplier-active" className="text-slate-700 font-medium font-poppins">Active Supplier</Label>
@@ -2865,7 +3102,7 @@ export default function EnhancedPurchasingPage() {
                 {editingPO ? `Update details for PO ${editingPO.po_number}.` : 'Enter the details for the new purchase order.'}
               </DialogDescription>
             </DialogHeader>
-            
+
             {/* Scrollable form area */}
             <div className="flex-1 overflow-y-auto pr-2">
               <EnhancedPOForm
@@ -2877,6 +3114,15 @@ export default function EnhancedPurchasingPage() {
                 isEditing={!!editingPO}
                 onPaymentRecorded={handlePaymentRecorded}
               />
+
+              {/* Line Items Section */}
+              <div className="mt-4">
+                <POLineItems
+                  items={poLineItems}
+                  onItemsChange={setPOLineItems}
+                  inventory={inventory}
+                />
+              </div>
             </div>
 
             <DialogFooter className="pt-4">
@@ -2886,8 +3132,8 @@ export default function EnhancedPurchasingPage() {
                   Cancel
                 </Button>
               </DialogClose>
-              <Button 
-                onClick={handleSubmitPO} 
+              <Button
+                onClick={handleSubmitPO}
                 disabled={isPOLoading || !poFormData.selectedSupplier || !poFormData.selectedBranch}
                 className={buttonStyles.primary}
               >
@@ -2912,8 +3158,8 @@ export default function EnhancedPurchasingPage() {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Cancel
               </AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={handleDelete} 
+              <AlertDialogAction
+                onClick={handleDelete}
                 className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-red-600 active:scale-95 font-poppins"
               >
                 Delete
@@ -2923,7 +3169,7 @@ export default function EnhancedPurchasingPage() {
         </AlertDialog>
 
         {/* Credit Table Dialog */}
-        <CreditTableDialog 
+        <CreditTableDialog
           isOpen={isCreditTableOpen}
           onClose={() => setIsCreditTableOpen(false)}
           purchaseOrders={purchaseOrders}
