@@ -3016,10 +3016,42 @@ export default function EnhancedPurchasingPage() {
                     <DataTableWrapper
                       className="w-full border-none"
                       title=""
-                      columns={supplierColumns as any}
-                      data={paginatedSuppliers.map(supplier => ({ ...supplier, id: supplier.supplier_id }))}
-                      onEdit={handleEditSupplier as any}
-                      onDelete={handleDeleteSupplier as any}
+                      columns={[
+                        ...supplierColumns,
+                        {
+                          key: 'supplierRef',
+                          header: 'Actions',
+                          render: (supplier: any) => (
+                            <div className="flex justify-center items-center gap-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditSupplier(supplier);
+                                }}
+                                className="p-1.5 text-slate-600 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors border border-transparent"
+                                title="Edit"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteSupplier(supplier);
+                                }}
+                                className="p-1.5 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors border border-transparent hover:border-red-200"
+                                title="Delete"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          )
+                        }
+                      ] as any}
+                      data={paginatedSuppliers.map(supplier => ({ 
+                        ...supplier, 
+                        id: supplier.supplier_id, 
+                        supplierRef: supplier // This ensures the supplier object is passed to render
+                      }))}
                     />
                     
                     {/* Enhanced Pagination */}
@@ -3274,6 +3306,121 @@ export default function EnhancedPurchasingPage() {
             </div>
           </TabsContent>
         </EnhancedTabs>
+
+        <Dialog open={isSupplierDialogOpen} onOpenChange={(open) => {
+          if (!open) {
+            setIsSupplierDialogOpen(false);
+            resetSupplierForm();
+          }
+        }}>
+          <DialogContent className="sm:max-w-lg bg-white border-0 shadow-2xl font-poppins">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold text-slate-900 font-poppins">
+                {editingSupplier ? 'Edit Supplier' : 'New Supplier'}
+              </DialogTitle>
+              <DialogDescription className="text-slate-600 font-poppins">
+                {editingSupplier ? 'Update supplier details below.' : 'Add a new supplier to your list.'}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="supplier-name" className="text-slate-700 font-medium font-poppins">
+                  Supplier Name *
+                </Label>
+                <Input
+                  id="supplier-name"
+                  value={supplierName}
+                  onChange={(e) => setSupplierName(e.target.value)}
+                  placeholder="Enter supplier name"
+                  className="border-slate-300 focus:border-purple-500 bg-white font-poppins"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="contact-person" className="text-slate-700 font-medium font-poppins">
+                    Contact Person
+                  </Label>
+                  <Input
+                    id="contact-person"
+                    value={contactPerson}
+                    onChange={(e) => setContactPerson(e.target.value)}
+                    placeholder="Name"
+                    className="border-slate-300 focus:border-purple-500 bg-white font-poppins"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-phone" className="text-slate-700 font-medium font-poppins">
+                    Phone
+                  </Label>
+                  <Input
+                    id="supplier-phone"
+                    value={supplierPhone}
+                    onChange={(e) => setSupplierPhone(e.target.value)}
+                    placeholder="Phone number"
+                    className="border-slate-300 focus:border-purple-500 bg-white font-poppins"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="supplier-email" className="text-slate-700 font-medium font-poppins">
+                  Email
+                </Label>
+                <Input
+                  id="supplier-email"
+                  value={supplierEmail}
+                  onChange={(e) => setSupplierEmail(e.target.value)}
+                  placeholder="email@example.com"
+                  className="border-slate-300 focus:border-purple-500 bg-white font-poppins"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="supplier-address" className="text-slate-700 font-medium font-poppins">
+                  Address
+                </Label>
+                <Textarea
+                  id="supplier-address"
+                  value={supplierAddress}
+                  onChange={(e) => setSupplierAddress(e.target.value)}
+                  placeholder="Full address"
+                  className="border-slate-300 focus:border-purple-500 bg-white font-poppins"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 p-3 shadow-sm bg-slate-50">
+                <div className="space-y-0.5">
+                  <Label className="text-base font-medium font-poppins text-slate-700">Active Status</Label>
+                  <div className="text-xs text-slate-500 font-poppins">Enable or disable this supplier</div>
+                </div>
+                <Switch
+                  checked={supplierActive}
+                  onCheckedChange={setSupplierActive}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline" className={buttonStyles.back}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button 
+                onClick={handleSubmitSupplier} 
+                disabled={isSupplierLoading || !supplierName}
+                className={buttonStyles.primary}
+              >
+                {isSupplierLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editingSupplier ? 'Save Changes' : 'Add Supplier'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Enhanced Purchase Order Dialog - Scrollable Form */}
         <Dialog open={isPODialogOpen} onOpenChange={(isOpen) => {
