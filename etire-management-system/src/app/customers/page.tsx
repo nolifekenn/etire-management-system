@@ -739,13 +739,13 @@ const CustomDataTable = ({ columns, data, onEdit, onDelete, className = '' }: Da
             {columns.map((column) => (
               <TableHead
                 key={column.key}
-                className="font-semibold text-slate-700 whitespace-nowrap"
+                className="font-semibold text-slate-700 whitespace-nowrap px-6 flex-1"
               >
                 {column.header}
               </TableHead>
             ))}
             {(onEdit || onDelete) && (
-              <TableHead className="font-semibold text-slate-700 text-right">
+              <TableHead className="font-semibold text-slate-700 text-right px-6">
                 Actions
               </TableHead>
             )}
@@ -756,7 +756,7 @@ const CustomDataTable = ({ columns, data, onEdit, onDelete, className = '' }: Da
             <TableRow>
               <TableCell
                 colSpan={columns.length + (onEdit || onDelete ? 1 : 0)}
-                className="h-24 text-center text-slate-500"
+                className="h-24 text-center text-slate-500 px-6"
               >
                 No data found.
               </TableCell>
@@ -768,12 +768,12 @@ const CustomDataTable = ({ columns, data, onEdit, onDelete, className = '' }: Da
                 className="hover:bg-slate-50/50 transition-colors"
               >
                 {columns.map((column) => (
-                  <TableCell key={`${rowIndex}-${column.key}`}>
+                  <TableCell key={`${rowIndex}-${column.key}`} className="px-6 flex-1">
                     {renderCell(item, column)}
                   </TableCell>
                 ))}
                 {(onEdit || onDelete) && (
-                  <TableCell className="text-right space-x-2">
+                  <TableCell className="text-right space-x-2 px-6">
                     {onEdit && (
                       <Button
                         variant="ghost"
