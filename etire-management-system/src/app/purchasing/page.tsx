@@ -1771,6 +1771,8 @@ export default function EnhancedPurchasingPage() {
   const [isPODialogOpen, setIsPODialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCreditTableOpen, setIsCreditTableOpen] = useState(false);
+  const [isInventoryConfirmOpen, setIsInventoryConfirmOpen] = useState(false);
+  const [pendingDeliveryPO, setPendingDeliveryPO] = useState<PurchaseOrder | null>(null);
 
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null);
@@ -1951,11 +1953,17 @@ export default function EnhancedPurchasingPage() {
     });
   }, [purchaseOrders, poSearchTerm, statusFilter, branchFilter, orderDateFrom, orderDateTo, activeTab]);
 
-  // Transaction History (Delivered and Cancelled orders only)
+  // Transaction History (Delivered and Cancelled orders only) - sorted by PO number
   const transactionHistory = useMemo(() => {
-    return purchaseOrders.filter(po =>
-      po.status === 'delivered' || po.status === 'cancelled'
-    );
+    return purchaseOrders
+      .filter(po => po.status === 'delivered' || po.status === 'cancelled')
+      .sort((a, b) => {
+        // Sort by PO number in descending order (most recent first)
+        // Extract numeric part for proper sorting (e.g., PO-0021 > PO-0020)
+        const numA = parseInt(a.po_number.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.po_number.replace(/\D/g, '')) || 0;
+        return numB - numA;
+      });
   }, [purchaseOrders]);
 
   // Credit Management (Credit orders with partial or pending payment)
@@ -1987,7 +1995,7 @@ export default function EnhancedPurchasingPage() {
   };
 
   // Define handlers before they are used
-  const handleEditPO = useCallback((po: PurchaseOrder) => {
+  const handleEditPO = useCallback(async (po: PurchaseOrder) => {
     setEditingPO(po);
     setPOFormData({
       poNumber: po.po_number,
@@ -2000,8 +2008,41 @@ export default function EnhancedPurchasingPage() {
       deliveryStatus: ((po.status === 'pending' || po.status === 'approved') ? 'ordered' : po.status) as 'ordered' | 'delivered' | 'cancelled',
       cancellationReason: (po as any).cancellation_reason || ''
     });
+
+    // Fetch existing line items for this PO
+    if (supabase) {
+      const { data: existingItems, error } = await supabase
+        .from('purchase_order_item')
+        .select('po_item_id, item_id, quantity, unit_cost')
+        .eq('po_id', po.po_id);
+
+      if (!error && existingItems && existingItems.length > 0) {
+        // Map to POLineItem format with item names
+        const lineItems: POLineItem[] = await Promise.all(
+          (existingItems as any[]).map(async (item) => {
+            let itemName = '';
+            if (item.item_id) {
+              // Get item name from inventory
+              const inventoryItem = inventory.find(inv => inv.item_id === item.item_id);
+              itemName = inventoryItem?.name || 'Unknown Item';
+            }
+            return {
+              id: item.po_item_id,
+              item_id: item.item_id,
+              customName: itemName,
+              quantity: item.quantity,
+              unit_cost: item.unit_cost
+            };
+          })
+        );
+        setPOLineItems(lineItems);
+      } else {
+        setPOLineItems([]);
+      }
+    }
+
     setIsPODialogOpen(true);
-  }, []);
+  }, [inventory]);
 
   const handleDeletePO = useCallback((po: PurchaseOrder) => {
     setDeletingItem({ ...po, type: 'po' });
@@ -2378,6 +2419,16 @@ export default function EnhancedPurchasingPage() {
       if (error) {
         toast({ title: "Save Error", description: error.message, variant: "destructive" });
       } else {
+        // Check if status changed to 'delivered' - prompt for inventory update
+        const wasNotDelivered = editingPO && editingPO.status !== 'delivered';
+        const isNowDelivered = poFormData.deliveryStatus === 'delivered';
+
+        if (wasNotDelivered && isNowDelivered) {
+          // Save the PO info for inventory update confirmation
+          setPendingDeliveryPO({ ...editingPO, status: 'delivered' } as PurchaseOrder);
+          setIsInventoryConfirmOpen(true);
+        }
+
         // Show success animation for PO action
         if (editingPO) {
           setSuccessAnimation({
@@ -2397,7 +2448,11 @@ export default function EnhancedPurchasingPage() {
 
         setIsPODialogOpen(false);
         resetPOForm();
-        fetchPurchaseOrders();
+
+        // Only fetch if not showing inventory confirmation (it will fetch after)
+        if (!(wasNotDelivered && isNowDelivered)) {
+          fetchPurchaseOrders();
+        }
       }
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -2459,6 +2514,85 @@ export default function EnhancedPurchasingPage() {
       message: "Payment has been recorded and applied to the purchase order.",
       actionType: 'payment'
     });
+  };
+
+  // Handle inventory update confirmation when PO is marked as delivered
+  const handleConfirmInventoryUpdate = async (addToInventory: boolean) => {
+    if (!supabase || !pendingDeliveryPO) return;
+
+    setIsInventoryConfirmOpen(false);
+
+    if (addToInventory) {
+      try {
+        // Fetch the PO items for this purchase order
+        const { data: poItems, error: fetchError } = await supabase
+          .from('purchase_order_item')
+          .select('item_id, quantity')
+          .eq('po_id', pendingDeliveryPO.po_id);
+
+        if (fetchError) {
+          toast({
+            title: "Error",
+            description: "Could not fetch PO items: " + fetchError.message,
+            variant: "destructive"
+          });
+          return;
+        }
+
+        if (poItems && poItems.length > 0) {
+          let updatedCount = 0;
+          let skippedCount = 0;
+
+          // Update stock for each item with a valid item_id
+          for (const poItem of poItems as any[]) {
+            if (poItem.item_id) {
+              // Get current stock
+              const { data: currentItem, error: getError } = await supabase
+                .from('inventory_item')
+                .select('stock_quantity')
+                .eq('item_id', poItem.item_id)
+                .single();
+
+              if (!getError && currentItem) {
+                const newQuantity = ((currentItem as any).stock_quantity || 0) + poItem.quantity;
+
+                // Update stock
+                const { error: updateError } = await supabase
+                  .from('inventory_item')
+                  // @ts-ignore
+                  .update({ stock_quantity: newQuantity } as any)
+                  .eq('item_id', poItem.item_id);
+
+                if (!updateError) {
+                  updatedCount++;
+                }
+              }
+            } else {
+              skippedCount++; // Custom items without inventory link
+            }
+          }
+
+          toast({
+            title: "Inventory Updated! ✓",
+            description: `${updatedCount} item(s) added to inventory.${skippedCount > 0 ? ` ${skippedCount} custom item(s) skipped.` : ''}`,
+          });
+        }
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: "Failed to update inventory: " + error.message,
+          variant: "destructive"
+        });
+      }
+    } else {
+      toast({
+        title: "Inventory Not Updated",
+        description: "PO marked as delivered without updating inventory.",
+      });
+    }
+
+    setPendingDeliveryPO(null);
+    fetchPurchaseOrders();
   };
 
   const renderSupplierCell = (item: any, columnKey: string, value: any) => {
@@ -3163,6 +3297,42 @@ export default function EnhancedPurchasingPage() {
                 className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-red-600 active:scale-95 font-poppins"
               >
                 Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Inventory Update Confirmation Dialog */}
+        <AlertDialog open={isInventoryConfirmOpen} onOpenChange={(open) => {
+          if (!open) {
+            // If closed without action, don't update inventory
+            handleConfirmInventoryUpdate(false);
+          }
+        }}>
+          <AlertDialogContent className="bg-white border-0 shadow-2xl mt-20 font-poppins">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-slate-900 font-poppins flex items-center gap-2">
+                <Package className="h-5 w-5 text-green-600" />
+                Update Inventory Stock?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-slate-600 font-poppins">
+                This purchase order has been marked as <span className="font-semibold text-green-600">delivered</span>.
+                Would you like to add the ordered items to your inventory stock?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                onClick={() => handleConfirmInventoryUpdate(false)}
+                className={buttonStyles.back}
+              >
+                Skip
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => handleConfirmInventoryUpdate(true)}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-green-600 active:scale-95 font-poppins"
+              >
+                <Package className="h-4 w-4 mr-2" />
+                Add to Inventory
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
