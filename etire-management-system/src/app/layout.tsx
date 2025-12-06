@@ -16,17 +16,28 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   // Enable real-time notification toasts
   useNotificationListener();
 
+  // Mark as hydrated after initial render
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
   // Debug log
   useEffect(() => {
-    console.log("[AuthWrapper] State update:", { isLoading, hasUser: !!user, pathname });
-  }, [isLoading, user, pathname]);
+    console.log("[AuthWrapper] State update:", { isLoading, hasUser: !!user, pathname, isHydrated });
+  }, [isLoading, user, pathname, isHydrated]);
 
   useEffect(() => {
-    if (!isLoading && !user && pathname !== '/login') {
+    // Don't redirect until hydrated and loading is complete
+    if (!isHydrated || isLoading) {
+      return;
+    }
+
+    if (!user && pathname !== '/login') {
       console.log("[AuthWrapper] Redirecting to /login");
       router.push('/login');
       return;
@@ -46,7 +57,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         return;
       }
     }
-  }, [user, isLoading, pathname, router]);
+  }, [user, isLoading, pathname, router, isHydrated]);
 
   useEffect(() => {
     // Listen for sidebar collapse events
@@ -67,7 +78,8 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  if (isLoading) {
+  // Show loading during hydration or auth loading
+  if (!isHydrated || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />

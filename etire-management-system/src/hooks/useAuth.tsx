@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 
@@ -29,23 +29,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<ExtendedUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
-    // Safety timeout to prevent infinite loading (5 seconds)
-    const safetyTimeout = setTimeout(() => {
+    // Safety timeout to prevent infinite loading (10 seconds - increased from 5)
+    // This will be cleared when onAuthStateChange fires successfully
+    safetyTimeoutRef.current = setTimeout(() => {
       if (mounted && isLoading) {
-        console.warn("[useAuth] Auth initialization timed out (5s). Forcing isLoading = false.");
+        console.warn("[useAuth] Auth initialization timed out (10s). Forcing isLoading = false.");
         setIsLoading(false);
       }
-    }, 5000);
+    }, 10000);
 
     const initializeAuth = async () => {
       console.log("[useAuth] initializeAuth started");
       try {
         // First, try to get the session from cookies (set by proxy.ts)
-        // This reads local storage/cookies which should be in sync after proxy runs
         const { data: { session }, error: sessionError } = await supabase!.auth.getSession();
 
         if (sessionError) {
@@ -56,16 +57,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (session?.user) {
           console.log("[useAuth] Session found, validating with server...");
 
-          // Validate session is still valid on server (this also refreshes token if needed)
+          // Validate session is still valid on server
           const { data: { user: authUser }, error: userError } = await supabase!.auth.getUser();
 
           if (userError || !authUser) {
             console.log("[useAuth] Session invalid on server:", userError?.message);
-            // Clear stale session
             await supabase!.auth.signOut();
             if (mounted) {
               setUser(null);
               setIsLoading(false);
+              if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
             }
             return;
           }
@@ -80,6 +81,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           if (profile && !error && mounted) {
             console.log("[useAuth] Profile found:", (profile as any).username);
             setUser(profile as any);
+            setIsLoading(false);
+            if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
           } else if (mounted) {
             console.error("[useAuth] Failed to fetch user profile:", JSON.stringify(error, null, 2));
             if (!profile) {
@@ -88,19 +91,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               setUser(null);
               router.push("/login?error=missing_profile");
             }
+            setIsLoading(false);
+            if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
           }
         } else {
           console.log("[useAuth] No session found in cookies");
-          if (mounted) {
-            setUser(null);
-          }
+          // Don't set isLoading to false here - wait for onAuthStateChange
+          // The auth state change listener may fire with a valid session
         }
       } catch (error) {
         console.error("[useAuth] Error initializing auth:", error);
-      } finally {
         if (mounted) {
-          console.log("[useAuth] initializeAuth finished, setting isLoading = false");
           setIsLoading(false);
+          if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
         }
       }
     };
@@ -110,6 +113,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const { data: { subscription } } = supabase!.auth.onAuthStateChange(async (event, session) => {
       console.log("[useAuth] Auth State Change:", event, session?.user?.email);
 
+      // Clear safety timeout when we get any auth state change
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
+        safetyTimeoutRef.current = null;
+      }
+
+      // Handle sign out
       if (event === 'SIGNED_OUT') {
         if (mounted) {
           console.log("[useAuth] Handling SIGNED_OUT");
@@ -120,7 +130,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      if (session?.user && mounted) {
+      // Handle session events (SIGNED_IN, TOKEN_REFRESHED, INITIAL_SESSION)
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') && session?.user && mounted) {
+        console.log(`[useAuth] Handling ${event} - fetching profile`);
+
         // Fetch user profile from public.user
         const { data: profile, error } = await supabase!
           .from("user")
@@ -129,25 +142,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .single();
 
         if (profile && !error && mounted) {
-          console.log("[useAuth] AuthStateChange: Profile found/updated");
+          console.log("[useAuth] AuthStateChange: Profile found/updated:", (profile as any).username);
           setUser(profile as any);
         } else if (mounted) {
           console.error("[useAuth] AuthStateChange: Failed to fetch user profile:", error);
         }
-      } else if (mounted) {
-        console.log("[useAuth] AuthStateChange: No user in session");
-        setUser(null);
+
+        if (mounted) {
+          setIsLoading(false);
+        }
+        return;
       }
 
-      if (mounted) {
-        console.log("[useAuth] AuthStateChange: setting isLoading = false");
+      // Handle other events or no session
+      if (!session?.user && mounted) {
+        console.log("[useAuth] AuthStateChange: No user in session");
+        setUser(null);
         setIsLoading(false);
       }
     });
 
     return () => {
       mounted = false;
-      clearTimeout(safetyTimeout);
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
+      }
       subscription.unsubscribe();
     };
   }, [router]);

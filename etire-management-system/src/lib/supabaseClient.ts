@@ -311,6 +311,8 @@ if (!supabaseUrl || !supabaseKey) {
   console.error('Current values:', { supabaseUrl, supabaseKey });
 }
 
+// Create browser client - uses @supabase/ssr which automatically handles cookies
+// The proxy.ts file refreshes tokens on server-side, this client reads them on client-side
 export const supabase = supabaseUrl && supabaseKey
   ? createBrowserClient<Database>(supabaseUrl, supabaseKey)
   : null
@@ -319,3 +321,4 @@ export const supabase = supabaseUrl && supabaseKey
 export function areSupabaseCredentialsSufficient() {
   return !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 }
+
