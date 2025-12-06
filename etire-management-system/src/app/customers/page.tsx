@@ -2241,7 +2241,7 @@ export default function EnhancedCustomersPage() {
 
         {/* Customer Dialog */}
         <Dialog open={isCustomerDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) { setIsCustomerDialogOpen(false); resetCustomerForm(); } }}>
-          <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300">
+          <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl font-poppins animate-in zoom-in duration-300">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
                 {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
@@ -2279,7 +2279,7 @@ export default function EnhancedCustomersPage() {
 
         {/* Vehicle Dialog */}
         <Dialog open={isVehicleDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) { setIsVehicleDialogOpen(false); resetVehicleForm(); } }}>
-          <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl mt-20 font-poppins animate-in zoom-in duration-300">
+          <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl font-poppins animate-in zoom-in duration-300">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
                 {editingVehicle ? 'Edit Vehicle' : 'Add New Vehicle'}
