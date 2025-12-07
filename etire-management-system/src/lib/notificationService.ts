@@ -25,8 +25,8 @@ export async function createNotification(
     }
 
     try {
-        const { data, error } = await supabase
-            .from('notification')
+        const { data, error } = await (supabase
+            .from('notification') as any)
             .insert({
                 user_id: userId,
                 title,
@@ -107,8 +107,8 @@ export async function notifyLowStock(itemId: string): Promise<void> {
 
     try {
         // Get item details
-        const { data: item, error: itemError } = await supabase
-            .from('inventory_item')
+        const { data: item, error: itemError } = await (supabase
+            .from('inventory_item') as any)
             .select('item_id, name, category, stock_quantity, reorder_level')
             .eq('item_id', itemId)
             .single();
@@ -121,8 +121,8 @@ export async function notifyLowStock(itemId: string): Promise<void> {
         // Check if stock is below or at reorder level
         if (item.stock_quantity <= item.reorder_level) {
             // Get Staff, Managers, and Admins (role 1, 2, 3)
-            const { data: users, error: usersError } = await supabase
-                .from('user')
+            const { data: users, error: usersError } = await (supabase
+                .from('user') as any)
                 .select('user_id')
                 .in('role', [1, 2, 3]);
 
@@ -131,7 +131,7 @@ export async function notifyLowStock(itemId: string): Promise<void> {
                 return;
             }
 
-            const notifications = users.map((user) => ({
+            const notifications = users.map((user: any) => ({
                 userId: user.user_id,
                 title: '⚠️ Low Stock Alert',
                 message: `${item.name} (${item.category}) is running low. Current stock: ${item.stock_quantity}, Reorder level: ${item.reorder_level}`,
@@ -155,8 +155,8 @@ export async function notifyStockReplenishment(itemId: string, previousQuantity:
 
     try {
         // Get item details
-        const { data: item, error: itemError } = await supabase
-            .from('inventory_item')
+        const { data: item, error: itemError } = await (supabase
+            .from('inventory_item') as any)
             .select('item_id, name, category, stock_quantity, reorder_level')
             .eq('item_id', itemId)
             .single();
@@ -169,8 +169,8 @@ export async function notifyStockReplenishment(itemId: string, previousQuantity:
         // Check if stock was below reorder level and is now above
         if (previousQuantity <= item.reorder_level && item.stock_quantity > item.reorder_level) {
             // Get Staff, Managers, and Admins
-            const { data: users, error: usersError } = await supabase
-                .from('user')
+            const { data: users, error: usersError } = await (supabase
+                .from('user') as any)
                 .select('user_id')
                 .in('role', [1, 2, 3]);
 
@@ -179,7 +179,7 @@ export async function notifyStockReplenishment(itemId: string, previousQuantity:
                 return;
             }
 
-            const notifications = users.map((user) => ({
+            const notifications = users.map((user: any) => ({
                 userId: user.user_id,
                 title: '✅ Stock Replenished',
                 message: `${item.name} (${item.category}) has been restocked. Current stock: ${item.stock_quantity}`,
@@ -207,8 +207,8 @@ export async function notifyNewSale(saleId: string, totalAmount: number, creator
 
     try {
         // Get all Staff, Managers, and Admins
-        const { data: users, error: usersError } = await supabase
-            .from('user')
+        const { data: users, error: usersError } = await (supabase
+            .from('user') as any)
             .select('user_id')
             .in('role', [1, 2, 3]);
 
@@ -218,11 +218,11 @@ export async function notifyNewSale(saleId: string, totalAmount: number, creator
         }
 
         // Ensure creator is included even if they're not staff/manager/admin
-        const userIds = new Set(users.map(u => u.user_id));
+        const userIds = new Set(users.map((u: any) => u.user_id));
         userIds.add(creatorId);
 
-        const notifications = Array.from(userIds).map((userId) => ({
-            userId,
+        const notifications = Array.from(userIds).map((userId: unknown) => ({
+            userId: userId as string,
             title: '💵 New Sale Completed',
             message: `A new sale of ₱${totalAmount.toLocaleString()} has been completed.`,
             type: 'success' as const,
@@ -254,8 +254,8 @@ export async function notifyDailySalesHigh(): Promise<void> {
         // Check if today exceeds the previous high
         if (todayTotal > previousHigh) {
             // Get Admins only (role 3)
-            const { data: admins, error: adminsError } = await supabase
-                .from('user')
+            const { data: admins, error: adminsError } = await (supabase
+                .from('user') as any)
                 .select('user_id')
                 .eq('role', 3);
 
@@ -264,7 +264,7 @@ export async function notifyDailySalesHigh(): Promise<void> {
                 return;
             }
 
-            const notifications = admins.map((admin) => ({
+            const notifications = admins.map((admin: any) => ({
                 userId: admin.user_id,
                 title: '🎉 New Sales Record!',
                 message: `Congratulations! Today's sales (₱${todayTotal.toLocaleString()}) have reached a new high, exceeding the previous record of ₱${previousHigh.toLocaleString()}!`,
@@ -289,8 +289,8 @@ async function getTodaysSalesTotal(): Promise<number> {
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        const { data: sales, error } = await supabase
-            .from('sale')
+        const { data: sales, error } = await (supabase
+            .from('sale') as any)
             .select('total_amount')
             .gte('sale_date', today.toISOString())
             .lt('sale_date', tomorrow.toISOString());
@@ -300,7 +300,7 @@ async function getTodaysSalesTotal(): Promise<number> {
             return 0;
         }
 
-        const total = sales.reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
+        const total = sales.reduce((sum: number, sale: any) => sum + (sale.total_amount || 0), 0);
         return total;
     } catch (error) {
         console.error('Exception in getTodaysSalesTotal:', error);
@@ -316,8 +316,8 @@ async function getPreviousHighSales(): Promise<number> {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        const { data: sales, error } = await supabase
-            .from('sale')
+        const { data: sales, error } = await (supabase
+            .from('sale') as any)
             .select('sale_date, total_amount')
             .lt('sale_date', today.toISOString());
 
@@ -328,7 +328,7 @@ async function getPreviousHighSales(): Promise<number> {
 
         // Group by date and sum totals
         const dailyTotals = new Map<string, number>();
-        sales.forEach((sale) => {
+        sales.forEach((sale: any) => {
             const date = new Date(sale.sale_date).toISOString().split('T')[0];
             const current = dailyTotals.get(date) || 0;
             dailyTotals.set(date, current + (sale.total_amount || 0));
@@ -355,8 +355,8 @@ export async function notifyNewServiceJob(jobId: string, customerId?: string): P
 
     try {
         // Get job details
-        const { data: job, error: jobError } = await supabase
-            .from('service_job')
+        const { data: job, error: jobError } = await (supabase
+            .from('service_job') as any)
             .select('job_id, job_description, service_fee, user_id')
             .eq('job_id', jobId)
             .single();
@@ -369,8 +369,8 @@ export async function notifyNewServiceJob(jobId: string, customerId?: string): P
         // Get customer name if available
         let customerName = 'Walk-in Customer';
         if (customerId) {
-            const { data: customer } = await supabase
-                .from('customer')
+            const { data: customer } = await (supabase
+                .from('customer') as any)
                 .select('name')
                 .eq('customer_id', customerId)
                 .single();
@@ -381,8 +381,8 @@ export async function notifyNewServiceJob(jobId: string, customerId?: string): P
         }
 
         // Get Staff, Managers, and Admins
-        const { data: users, error: usersError } = await supabase
-            .from('user')
+        const { data: users, error: usersError } = await (supabase
+            .from('user') as any)
             .select('user_id')
             .in('role', [1, 2, 3]);
 
@@ -391,7 +391,7 @@ export async function notifyNewServiceJob(jobId: string, customerId?: string): P
             return;
         }
 
-        const notifications = users.map((user) => ({
+        const notifications = users.map((user: any) => ({
             userId: user.user_id,
             title: '🔧 New Service Job Created',
             message: `A new service job has been created for ${customerName}. Service: ${job.job_description.substring(0, 100)}${job.job_description.length > 100 ? '...' : ''}`,
@@ -418,8 +418,8 @@ export async function notifyPODeadlineApproaching(poId: string): Promise<void> {
 
     try {
         // Get PO details
-        const { data: po, error: poError } = await supabase
-            .from('purchase_order')
+        const { data: po, error: poError } = await (supabase
+            .from('purchase_order') as any)
             .select('po_id, po_number, expected_delivery_date, supplier_id')
             .eq('po_id', poId)
             .single();
@@ -438,8 +438,8 @@ export async function notifyPODeadlineApproaching(poId: string): Promise<void> {
             // Get supplier name
             let supplierName = 'Unknown Supplier';
             if (po.supplier_id) {
-                const { data: supplier } = await supabase
-                    .from('supplier')
+                const { data: supplier } = await (supabase
+                    .from('supplier') as any)
                     .select('name')
                     .eq('supplier_id', po.supplier_id)
                     .single();
@@ -450,8 +450,8 @@ export async function notifyPODeadlineApproaching(poId: string): Promise<void> {
             }
 
             // Get ALL Staff, Managers, and Admins
-            const { data: users, error: usersError } = await supabase
-                .from('user')
+            const { data: users, error: usersError } = await (supabase
+                .from('user') as any)
                 .select('user_id')
                 .in('role', [1, 2, 3]);
 
@@ -460,7 +460,7 @@ export async function notifyPODeadlineApproaching(poId: string): Promise<void> {
                 return;
             }
 
-            const notifications = users.map((user) => ({
+            const notifications = users.map((user: any) => ({
                 userId: user.user_id,
                 title: '⏰ PO Delivery Approaching',
                 message: `Purchase Order ${po.po_number} from ${supplierName} is due in ${daysUntilDelivery} day(s). Expected: ${deliveryDate.toLocaleDateString()}`,
@@ -484,8 +484,8 @@ export async function notifyPOOverdue(poId: string): Promise<void> {
 
     try {
         // Get PO details
-        const { data: po, error: poError } = await supabase
-            .from('purchase_order')
+        const { data: po, error: poError } = await (supabase
+            .from('purchase_order') as any)
             .select('po_id, po_number, expected_delivery_date, supplier_id, status')
             .eq('po_id', poId)
             .single();
@@ -505,8 +505,8 @@ export async function notifyPOOverdue(poId: string): Promise<void> {
                 // Get supplier name
                 let supplierName = 'Unknown Supplier';
                 if (po.supplier_id) {
-                    const { data: supplier } = await supabase
-                        .from('supplier')
+                    const { data: supplier } = await (supabase
+                        .from('supplier') as any)
                         .select('name')
                         .eq('supplier_id', po.supplier_id)
                         .single();
@@ -517,8 +517,8 @@ export async function notifyPOOverdue(poId: string): Promise<void> {
                 }
 
                 // Get ALL Staff, Managers, and Admins
-                const { data: users, error: usersError } = await supabase
-                    .from('user')
+                const { data: users, error: usersError } = await (supabase
+                    .from('user') as any)
                     .select('user_id')
                     .in('role', [1, 2, 3]);
 
@@ -527,7 +527,7 @@ export async function notifyPOOverdue(poId: string): Promise<void> {
                     return;
                 }
 
-                const notifications = users.map((user) => ({
+                const notifications = users.map((user: any) => ({
                     userId: user.user_id,
                     title: '🚨 PO Delivery Overdue',
                     message: `Purchase Order ${po.po_number} from ${supplierName} is ${daysOverdue} day(s) overdue. Expected: ${deliveryDate.toLocaleDateString()}`,
@@ -552,8 +552,8 @@ export async function checkPODeadlines(): Promise<void> {
 
     try {
         // Get all pending/ordered POs with expected delivery dates
-        const { data: pos, error } = await supabase
-            .from('purchase_order')
+        const { data: pos, error } = await (supabase
+            .from('purchase_order') as any)
             .select('po_id, expected_delivery_date')
             .in('status', ['pending', 'approved', 'ordered'])
             .not('expected_delivery_date', 'is', null);
@@ -564,7 +564,7 @@ export async function checkPODeadlines(): Promise<void> {
         }
 
         // Check each PO for approaching deadline or overdue status
-        for (const po of pos) {
+        for (const po of pos as any[]) {
             await notifyPODeadlineApproaching(po.po_id);
             await notifyPOOverdue(po.po_id);
         }
@@ -586,8 +586,8 @@ export async function notifyNewCustomer(customerId: string): Promise<void> {
 
     try {
         // Get customer details
-        const { data: customer, error: customerError } = await supabase
-            .from('customer')
+        const { data: customer, error: customerError } = await (supabase
+            .from('customer') as any)
             .select('customer_id, name, phone, email')
             .eq('customer_id', customerId)
             .single();
@@ -598,8 +598,8 @@ export async function notifyNewCustomer(customerId: string): Promise<void> {
         }
 
         // Get Staff, Managers, and Admins
-        const { data: users, error: usersError } = await supabase
-            .from('user')
+        const { data: users, error: usersError } = await (supabase
+            .from('user') as any)
             .select('user_id')
             .in('role', [1, 2, 3]);
 
@@ -609,7 +609,7 @@ export async function notifyNewCustomer(customerId: string): Promise<void> {
         }
 
         const contactInfo = customer.phone || customer.email || 'No contact info';
-        const notifications = users.map((user) => ({
+        const notifications = users.map((user: any) => ({
             userId: user.user_id,
             title: '👤 New Customer Registered',
             message: `New customer "${customer.name}" has been added to the system. Contact: ${contactInfo}`,
@@ -636,8 +636,8 @@ export async function notifyNewUserRegistration(newUserId: string, newUserName: 
 
     try {
         // Get Admins only (role 3)
-        const { data: admins, error: adminsError } = await supabase
-            .from('user')
+        const { data: admins, error: adminsError } = await (supabase
+            .from('user') as any)
             .select('user_id')
             .eq('role', 3);
 
@@ -646,7 +646,7 @@ export async function notifyNewUserRegistration(newUserId: string, newUserName: 
             return;
         }
 
-        const notifications = admins.map((admin) => ({
+        const notifications = admins.map((admin: any) => ({
             userId: admin.user_id,
             title: '🆕 New User Registered',
             message: `A new user "${newUserName}" has been registered in the system. Please review their account and assign appropriate permissions.`,
@@ -673,8 +673,8 @@ export async function notifyWeeklyBackup(): Promise<void> {
 
     try {
         // Get Admins only (role 3)
-        const { data: admins, error: adminsError } = await supabase
-            .from('user')
+        const { data: admins, error: adminsError } = await (supabase
+            .from('user') as any)
             .select('user_id')
             .eq('role', 3);
 
@@ -683,7 +683,7 @@ export async function notifyWeeklyBackup(): Promise<void> {
             return;
         }
 
-        const notifications = admins.map((admin) => ({
+        const notifications = admins.map((admin: any) => ({
             userId: admin.user_id,
             title: '💾 Weekly Backup Reminder',
             message: `This is your weekly reminder to perform a system backup. Please ensure all critical data is backed up securely.`,

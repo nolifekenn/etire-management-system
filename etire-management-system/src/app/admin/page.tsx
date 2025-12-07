@@ -24,10 +24,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/lib/supabaseClient';
+import { supabaseUntyped as supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Loader2, UserPlus, AlertTriangle, Eye, EyeOff, Shield, Users, RefreshCw, 
+import {
+  Loader2, UserPlus, AlertTriangle, Eye, EyeOff, Shield, Users, RefreshCw,
   Search, X, Filter, Edit, Trash2, CheckCircle, KeyRound, ShieldCheck
 } from 'lucide-react';
 import { DataTableWrapper } from '@/components/DataTableWrapper';
@@ -151,8 +151,8 @@ export default function AdminPage() {
 
   const filteredUsers = useMemo(() => {
     return users.filter(u => {
-      const matchesSearch = 
-        u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      const matchesSearch =
+        u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         u.username.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesRole = roleFilter === 'all' ? true : u.role.toString() === roleFilter;
       return matchesSearch && matchesRole;
@@ -199,17 +199,17 @@ export default function AdminPage() {
         </div>
       )
     }
-  ], []); 
+  ], []);
 
   const handleSubmit = async () => {
     if (!supabase) return;
     if (!name || !username) {
-        toast({ title: "Validation Error", description: "Name and Username are required.", variant: "destructive" });
-        return;
+      toast({ title: "Validation Error", description: "Name and Username are required.", variant: "destructive" });
+      return;
     }
     if (!editingUser && !password) {
-        toast({ title: "Validation Error", description: "Password is required for new users.", variant: "destructive" });
-        return;
+      toast({ title: "Validation Error", description: "Password is required for new users.", variant: "destructive" });
+      return;
     }
 
     setIsLoading(true);
@@ -218,12 +218,12 @@ export default function AdminPage() {
     if (editingUser) {
       const updateData: any = {};
       if (password) updateData.password = password;
-      
+
       if (Object.keys(updateData).length === 0) {
-         setIsLoading(false);
-         setIsEditUserDialogOpen(false);
-         toast({ title: "No Changes", description: "No data was changed." });
-         return;
+        setIsLoading(false);
+        setIsEditUserDialogOpen(false);
+        toast({ title: "No Changes", description: "No data was changed." });
+        return;
       }
 
       const { error: updateError } = await supabase.from('user').update(updateData).eq('user_id', editingUser.user_id);
@@ -233,7 +233,7 @@ export default function AdminPage() {
       const { error: insertError } = await supabase.from('user').insert([insertData]);
       error = insertError;
     }
-    
+
     setIsLoading(false);
 
     if (error) {
@@ -249,8 +249,8 @@ export default function AdminPage() {
   const handleRoleSubmit = async () => {
     if (!supabase || !roleUser) return;
     if (roleUser.role === role) {
-        setIsRoleDialogOpen(false);
-        return;
+      setIsRoleDialogOpen(false);
+      return;
     }
 
     setIsLoading(true);
@@ -258,11 +258,11 @@ export default function AdminPage() {
     setIsLoading(false);
 
     if (error) {
-        toast({ title: "Error", description: "Failed to update role.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to update role.", variant: "destructive" });
     } else {
-        toast({ title: "Access Updated", description: `Role for ${roleUser.name} has been updated.` });
-        setIsRoleDialogOpen(false);
-        fetchUsers();
+      toast({ title: "Access Updated", description: `Role for ${roleUser.name} has been updated.` });
+      setIsRoleDialogOpen(false);
+      fetchUsers();
     }
   };
 
@@ -309,19 +309,19 @@ export default function AdminPage() {
 
   if (!user || (user.role !== 2 && user.role !== 3)) {
     return (
-        <div className="container mx-auto p-6">
-          <Alert variant="destructive">
-            <AlertTitle>Access Denied</AlertTitle>
-            <AlertDescription>You do not have administrator privileges.</AlertDescription>
-          </Alert>
-        </div>
+      <div className="container mx-auto p-6">
+        <Alert variant="destructive">
+          <AlertTitle>Access Denied</AlertTitle>
+          <AlertDescription>You do not have administrator privileges.</AlertDescription>
+        </Alert>
+      </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-poppins">
       <div className="container mx-auto p-6 sm:p-8 lg:p-10">
-        
+
         {/* HEADER */}
         <div className={`mb-8 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
           <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between shadow-xl relative overflow-hidden">
@@ -377,7 +377,7 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
-        
+
         {/* TABLE */}
         <div className={`transition-all duration-500 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
           <div className="rounded-2xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -411,7 +411,7 @@ export default function AdminPage() {
                     className="pl-10 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus:bg-white dark:focus:bg-slate-900"
                   />
                   {searchQuery && (
-                    <button 
+                    <button
                       onClick={() => setSearchQuery('')}
                       className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
                     >
@@ -450,7 +450,6 @@ export default function AdminPage() {
             <DataTableWrapper
               columns={columns}
               data={filteredUsers.map(u => ({ ...u, id: u.user_id }))}
-              rowsPerPageOptions={[5, 10, 25, 50]}
             />
           </div>
         </div>
@@ -469,8 +468,8 @@ export default function AdminPage() {
                 {editingUser ? 'User Details & Password' : 'Add New User'}
               </DialogTitle>
               <DialogDescription className="dark:text-slate-400">
-                {editingUser 
-                  ? "Identity fields are locked to prevent errors. You can reset the password here." 
+                {editingUser
+                  ? "Identity fields are locked to prevent errors. You can reset the password here."
                   : "Create a new user account. They will start as Staff unless specified."}
               </DialogDescription>
             </DialogHeader>
@@ -497,7 +496,7 @@ export default function AdminPage() {
                   className={`border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 dark:text-slate-200 focus:border-indigo-400 ${editingUser ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 cursor-not-allowed' : ''}`}
                 />
               </div>
-              
+
               {/* Only Show Role Dropdown in ADD mode. Hidden in Edit mode. */}
               {!editingUser && (
                 <div className="space-y-2">
@@ -571,36 +570,36 @@ export default function AdminPage() {
                 Change the permission level for <strong>{roleUser?.name}</strong>.
               </DialogDescription>
             </DialogHeader>
-            
-            <div className="py-6">
-                <div className="space-y-4">
-                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900 rounded-lg">
-                        <p className="text-sm text-blue-800 dark:text-blue-300 font-medium mb-1">Current Role: {getRoleName(roleUser?.role || 0)}</p>
-                        <p className="text-xs text-blue-600 dark:text-blue-400">Select a new role below to upgrade or downgrade permissions.</p>
-                    </div>
 
-                    <div className="space-y-2">
-                        <Label className="text-slate-700 dark:text-slate-300">Select New Role</Label>
-                        <Select value={String(role)} onValueChange={(v) => setRole(Number(v))}>
-                            <SelectTrigger className="h-12 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 dark:text-slate-200">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
-                                <SelectItem value="0" className="dark:text-slate-200">Guest (Restricted Access)</SelectItem>
-                                <SelectItem value="1" className="dark:text-slate-200">Staff (Standard Access)</SelectItem>
-                                <SelectItem value="2" className="dark:text-slate-200">Branch Manager (Elevated Access)</SelectItem>
-                                <SelectItem value="3" className="dark:text-slate-200">Admin (Full Control)</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+            <div className="py-6">
+              <div className="space-y-4">
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900 rounded-lg">
+                  <p className="text-sm text-blue-800 dark:text-blue-300 font-medium mb-1">Current Role: {getRoleName(roleUser?.role || 0)}</p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400">Select a new role below to upgrade or downgrade permissions.</p>
                 </div>
+
+                <div className="space-y-2">
+                  <Label className="text-slate-700 dark:text-slate-300">Select New Role</Label>
+                  <Select value={String(role)} onValueChange={(v) => setRole(Number(v))}>
+                    <SelectTrigger className="h-12 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 dark:text-slate-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
+                      <SelectItem value="0" className="dark:text-slate-200">Guest (Restricted Access)</SelectItem>
+                      <SelectItem value="1" className="dark:text-slate-200">Staff (Standard Access)</SelectItem>
+                      <SelectItem value="2" className="dark:text-slate-200">Branch Manager (Elevated Access)</SelectItem>
+                      <SelectItem value="3" className="dark:text-slate-200">Admin (Full Control)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
 
             <DialogFooter>
-                <Button variant="outline" onClick={() => setIsRoleDialogOpen(false)} className="dark:border-slate-700 dark:text-slate-300">Cancel</Button>
-                <Button onClick={handleRoleSubmit} disabled={isLoading} className={buttonStyles.primary}>
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Update Role'}
-                </Button>
+              <Button variant="outline" onClick={() => setIsRoleDialogOpen(false)} className="dark:border-slate-700 dark:text-slate-300">Cancel</Button>
+              <Button onClick={handleRoleSubmit} disabled={isLoading} className={buttonStyles.primary}>
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Update Role'}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

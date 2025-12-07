@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabaseUntyped as supabase } from "@/lib/supabaseClient";
 import { NextResponse } from "next/server";
 
 // Define the type for a cart item
@@ -6,10 +6,11 @@ interface CartItem {
   item_id: string;
   quantity: number;
   sale_price: number;
-  installationFee?: number; // Fee is part of the item
+  installationFee?: number;
 }
 
 export async function POST(request: Request) {
+  if (!supabase) return NextResponse.json({ error: "Database not configured" }, { status: 500 });
   const { customerId, cartItems, paymentMethod, userId, branchId } = await request.json();
 
   if (!userId || !cartItems || cartItems.length === 0) {
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
   try {
     // 1. Calculate total amount
     const total_amount = cartItems.reduce((acc: number, item: CartItem) => {
-        return acc + (item.sale_price * item.quantity) + (item.installationFee || 0);
+      return acc + (item.sale_price * item.quantity) + (item.installationFee || 0);
     }, 0);
 
     // 2. Create the 'sale' record

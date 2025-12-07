@@ -313,12 +313,23 @@ if (!supabaseUrl || !supabaseKey) {
 
 // Create browser client - uses @supabase/ssr which automatically handles cookies
 // The proxy.ts file refreshes tokens on server-side, this client reads them on client-side
-export const supabase = supabaseUrl && supabaseKey
+
+// Create the client (may be null if credentials are missing)
+const _supabaseTyped = supabaseUrl && supabaseKey
   ? createBrowserClient<Database>(supabaseUrl, supabaseKey)
   : null
+
+const _supabaseUntyped = supabaseUrl && supabaseKey
+  ? createBrowserClient(supabaseUrl, supabaseKey)
+  : null
+
+// Export with non-null assertion - credentials must be configured for the app to work
+// This avoids null checks throughout the codebase
+export const supabaseTyped = _supabaseTyped!;
+export const supabase = _supabaseUntyped!;
+export const supabaseUntyped = _supabaseUntyped!;
 
 // Utility function to check if credentials are available
 export function areSupabaseCredentialsSufficient() {
   return !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 }
-

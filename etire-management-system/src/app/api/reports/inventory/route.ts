@@ -1,7 +1,8 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabaseUntyped as supabase } from "@/lib/supabaseClient";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
+  if (!supabase) return NextResponse.json({ error: "Database not configured" }, { status: 500 });
   try {
     const filters = await request.json();
 

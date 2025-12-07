@@ -1,7 +1,8 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabaseUntyped as supabase } from "@/lib/supabaseClient";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
+  if (!supabase) return NextResponse.json({ error: "Database not configured" }, { status: 500 });
   try {
     const filters = await request.json();
 
@@ -64,8 +65,8 @@ export async function POST(request: Request) {
 
     // 3️⃣ Aggregate totals per job_id
     const jobTotals = new Map<string, number>();
-    for (const item of items || []) {
-      const price = item.item?.sale_price || 0;
+    for (const item of (items || []) as any[]) {
+      const price = (item.item as any)?.sale_price || 0;
       const total = price * (item.quantity || 0);
       const current = jobTotals.get(item.job_id) || 0;
       jobTotals.set(item.job_id, current + total);
