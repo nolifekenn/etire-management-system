@@ -75,6 +75,7 @@ import {
   type ReceiptCustomer,
 } from '@/lib/receiptGenerator';
 import type { Sale, User as AppUser } from '@/lib/types';
+import { notifyLowStock } from '@/lib/notificationService';
 
 // ============================================
 // INTERFACES & TYPES
@@ -1161,6 +1162,55 @@ export default function POSPage() {
         message: "The transaction has been processed successfully.",
         actionType: 'sale'
       });
+
+      // Check for low stock items and notify (runs in background)
+      const checkLowStock = async () => {
+        if (!supabase || cart.length === 0) return;
+
+        try {
+          // Batch query: get all cart items in a single request
+          const itemIds = cart.map(item => item.item_id);
+          const { data: items, error } = await supabase
+            .from('inventory_item')
+            .select('item_id, name, stock_quantity, reorder_level')
+            .in('item_id', itemIds)
+            .returns<{ item_id: string; name: string; stock_quantity: number; reorder_level: number }[]>();
+
+          if (error || !items) {
+            console.error('Error fetching inventory for low stock check:', error);
+            return;
+          }
+
+          // Filter to low stock items only
+          const lowStockItems = items.filter(item => item.stock_quantity <= item.reorder_level);
+
+          if (lowStockItems.length === 0) return;
+
+          // Show immediate toast alert
+          const itemNames = lowStockItems.map(i => i.name);
+          toast({
+            title: "⚠️ Low Stock Alert",
+            description: itemNames.length === 1
+              ? `${itemNames[0]} is running low on stock!`
+              : `${itemNames.length} items are running low: ${itemNames.slice(0, 3).join(', ')}${itemNames.length > 3 ? '...' : ''}`,
+            variant: "destructive",
+            duration: 8000,
+          });
+
+          // Create notifications in background (don't await - fire and forget)
+          lowStockItems.forEach(item => {
+            notifyLowStock(item.item_id).catch(err =>
+              console.error('Failed to create notification for:', item.name, err)
+            );
+          });
+
+        } catch (err) {
+          console.error('Error in low stock check:', err);
+        }
+      };
+
+      // Run low stock check in background after a short delay
+      setTimeout(() => checkLowStock(), 1000);
 
     } catch (err: any) {
       toast({

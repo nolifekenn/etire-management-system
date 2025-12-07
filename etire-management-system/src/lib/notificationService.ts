@@ -61,6 +61,7 @@ export async function createBulkNotifications(
     }>
 ): Promise<{ data: Notification[] | null; error: any }> {
     if (!supabase) {
+        console.error('[Notification] Supabase client not initialized');
         return { data: null, error: 'Supabase client not initialized' };
     }
 
@@ -73,19 +74,22 @@ export async function createBulkNotifications(
             is_read: false,
         }));
 
-        const { data, error } = await supabase
-            .from('notification')
+        console.log('[Notification] Attempting to insert', notificationRecords.length, 'notifications');
+
+        const { data, error } = await (supabase
+            .from('notification') as any)
             .insert(notificationRecords)
             .select();
 
         if (error) {
-            console.error('Error creating bulk notifications:', error);
+            console.error('[Notification] Error creating bulk notifications:', error);
             return { data: null, error };
         }
 
+        console.log('[Notification] Successfully created', data?.length, 'notifications');
         return { data: data as Notification[], error: null };
     } catch (error) {
-        console.error('Exception creating bulk notifications:', error);
+        console.error('[Notification] Exception creating bulk notifications:', error);
         return { data: null, error };
     }
 }
