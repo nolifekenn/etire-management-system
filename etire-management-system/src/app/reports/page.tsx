@@ -189,11 +189,6 @@ export default function EnhancedReportsPage() {
     fetchSummary();
   };
 
-  const handleExportAll = () => {
-    // Placeholder for export functionality
-    alert("Export functionality would be implemented here");
-  };
-
   // Chart data calculations
   const revenueSourcesData = [
     { 
@@ -384,15 +379,9 @@ export default function EnhancedReportsPage() {
                 className={buttonStyles.glass + " active:scale-95"}
               >
                 <RefreshCw className={`h-5 w-5 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                Refresh
+                Refresh Data
               </Button>
-              <Button
-                onClick={handleExportAll}
-                className={buttonStyles.glass + " active:scale-95"}
-              >
-                <Download className="h-5 w-5 mr-2" />
-                Export
-              </Button>
+              
             </div>
           </div>
         </div>
@@ -687,6 +676,7 @@ export default function EnhancedReportsPage() {
                 </div>
                 
                 <div className="space-y-4">
+                  {/* 1. Inventory Efficiency Bar */}
                   <div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
@@ -716,6 +706,69 @@ export default function EnhancedReportsPage() {
                       />
                     </div>
                   </div>
+
+                  {/* 2. Projected Margin Bar */}
+                  <div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600"></div>
+                        <span className="text-sm font-medium text-slate-800">Projected Margin</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xl font-bold text-slate-900">
+                          {summary.potentialRevenue > 0 
+                            ? (((summary.potentialRevenue - summary.stockValue) / summary.potentialRevenue) * 100).toFixed(1)
+                            : '0'}%
+                        </span>
+                        <span className="text-xs text-slate-500 ml-1">profitability</span>
+                      </div>
+                    </div>
+                    <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full"
+                        style={{ 
+                          width: `${Math.min(
+                            summary.potentialRevenue > 0 
+                              ? (((summary.potentialRevenue - summary.stockValue) / summary.potentialRevenue) * 100)
+                              : 0, 
+                            100
+                          )}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 3. Cost Ratio Bar */}
+                  <div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+                        <span className="text-sm font-medium text-slate-800">Cost Ratio</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xl font-bold text-slate-900">
+                          {summary.potentialRevenue > 0 
+                            ? ((summary.stockValue / summary.potentialRevenue) * 100).toFixed(1)
+                            : '0'}%
+                        </span>
+                        <span className="text-xs text-slate-500 ml-1">investment</span>
+                      </div>
+                    </div>
+                    <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full"
+                        style={{ 
+                          width: `${Math.min(
+                            summary.potentialRevenue > 0 
+                              ? ((summary.stockValue / summary.potentialRevenue) * 100)
+                              : 0, 
+                            100
+                          )}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+
                   <div className="text-xs text-slate-500">
                     <span className="font-medium">Interpretation:</span> Higher potential revenue compared to current value indicates opportunities for sales growth. GMROI of {summary.gmroi.toFixed(1)}% shows {summary.gmroi > 100 ? 'excellent' : 'moderate'} return on inventory investment.
                   </div>
