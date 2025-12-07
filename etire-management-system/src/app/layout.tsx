@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { SidebarNav } from '@/components/SidebarNav';
 import { AuthProvider } from '@/hooks/useAuth';
