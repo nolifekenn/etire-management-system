@@ -13,12 +13,38 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useState, useEffect, useCallback } from 'react';
-import { Loader2, AlertTriangle, Settings as SettingsIcon, Shield, History, DollarSign, Bell, RefreshCw, CheckCircle, XCircle, Info, Palette, Globe, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { 
+  Loader2, 
+  AlertTriangle, 
+  Settings as SettingsIcon, 
+  Shield, 
+  History, 
+  DollarSign, 
+  Bell, 
+  CheckCircle, 
+  XCircle, 
+  Info, 
+  Palette, 
+  Eye, 
+  EyeOff, 
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight 
+} from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from '@/lib/supabaseClient';
 import { SystemSetting, AuditLog, Notification } from '@/lib/types';
 
-// Design system from POS page (keeping the button styles and animations)
+// Design system
 const buttonStyles = {
   primary: "bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg",
   secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300",
@@ -29,6 +55,114 @@ const microAnimations = {
   fadeIn: "animate-in fade-in duration-500",
   iconHover: "transition-all duration-350 group-hover:scale-105 group-hover:translate-y-[-2px]",
   cardHover: "transition-all duration-300 ease-out hover:translate-y-[-2px] hover:shadow-md",
+};
+
+// ==========================================
+// REUSABLE COMPONENTS
+// ==========================================
+
+// 1. Top Right Rows Selector
+const RowsPerPageSelector = ({ 
+  value, 
+  onChange, 
+  onPageChange 
+}: { 
+  value: number, 
+  onChange: (val: number) => void,
+  onPageChange: (page: number) => void
+}) => (
+  <div className="flex items-center gap-3">
+    <span className="text-sm text-slate-500 font-medium hidden sm:inline">Rows per page:</span>
+    <Select
+      value={String(value)}
+      onValueChange={(val) => {
+        onChange(Number(val));
+        onPageChange(1); // Reset to page 1
+      }}
+    >
+      <SelectTrigger className="h-9 w-[70px] bg-white border-slate-200">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent align="end">
+        {[5, 10, 20, 50].map(opt => (
+          <SelectItem key={opt} value={String(opt)}>{opt}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+);
+
+// 2. Bottom Pagination Controls (Navigation Only)
+interface PaginationProps {
+  totalItems: number;
+  itemsPerPage: number;
+  currentPage: number;
+  onPageChange: (page: number) => void;
+}
+
+const PaginationControls = ({ 
+  totalItems, 
+  itemsPerPage, 
+  currentPage, 
+  onPageChange
+}: PaginationProps) => {
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-slate-100 gap-4 mt-auto bg-slate-50/50 rounded-b-xl">
+      {/* Left: Showing text */}
+      <div className="text-sm text-slate-600 font-medium">
+        Showing {totalItems === 0 ? 0 : startIndex + 1} to {endIndex} of {totalItems} entries
+      </div>
+
+      {/* Right: Navigation Buttons */}
+      <div className="flex items-center gap-1">
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => onPageChange(1)}
+          disabled={currentPage === 1}
+        >
+          <ChevronsLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+          disabled={currentPage === 1}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        
+        <span className="text-sm font-medium px-2 min-w-[80px] text-center">
+          Page {currentPage} of {totalPages}
+        </span>
+
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+          disabled={currentPage === totalPages || totalPages === 0}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => onPageChange(totalPages)}
+          disabled={currentPage === totalPages || totalPages === 0}
+        >
+          <ChevronsRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
 };
 
 // ===== PASSWORD STRENGTH INDICATOR =====
@@ -125,7 +259,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('account');
   const [mounted, setMounted] = useState(false);
 
-  // Form state - initialize with authenticated user data
+  // Form state
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -138,7 +272,6 @@ export default function SettingsPage() {
   const [oldPassword, setOldPassword] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
 
-
   // System settings state
   const [systemSettings, setSystemSettings] = useState<SystemSetting[]>([]);
   const [isSettingsLoading, setIsSettingsLoading] = useState(false);
@@ -148,11 +281,19 @@ export default function SettingsPage() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isAuditLoading, setIsAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
+  
+  // -- Pagination State: Audit Logs --
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditRowsPerPage, setAuditRowsPerPage] = useState(5);
 
   // Notifications state
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isNotifLoading, setIsNotifLoading] = useState(false);
   const [notifError, setNotifError] = useState<string | null>(null);
+
+  // -- Pagination State: Notifications --
+  const [notifPage, setNotifPage] = useState(1);
+  const [notifRowsPerPage, setNotifRowsPerPage] = useState(5);
 
   // System settings form state
   const [companyName, setCompanyName] = useState('');
@@ -173,6 +314,17 @@ export default function SettingsPage() {
       setUsername(user.username);
     }
   }, [user]);
+
+  // PAGINATION LOGIC: SLICING DATA
+  const paginatedNotifications = useMemo(() => {
+    const startIndex = (notifPage - 1) * notifRowsPerPage;
+    return notifications.slice(startIndex, startIndex + notifRowsPerPage);
+  }, [notifications, notifPage, notifRowsPerPage]);
+
+  const paginatedAuditLogs = useMemo(() => {
+    const startIndex = (auditPage - 1) * auditRowsPerPage;
+    return auditLogs.slice(startIndex, startIndex + auditRowsPerPage);
+  }, [auditLogs, auditPage, auditRowsPerPage]);
 
   const fetchSystemSettings = useCallback(async () => {
     if (!supabase) return;
@@ -210,11 +362,11 @@ export default function SettingsPage() {
   const fetchAuditLogs = useCallback(async () => {
     if (!supabase) return;
     setIsAuditLoading(true);
+    // Removed .limit(50) so pagination works on full history
     const { data, error } = await supabase
       .from('audit_log')
       .select('*, user(name)')
-      .order('created_at', { ascending: false })
-      .limit(50);
+      .order('created_at', { ascending: false });
 
     if (error) {
       setAuditError(`Could not fetch audit logs: ${error.message}`);
@@ -248,7 +400,7 @@ export default function SettingsPage() {
   useEffect(() => {
     fetchSystemSettings();
     fetchNotifications();
-    if (user?.role === 2 || user?.role === 3) { // Only admins and managers can see audit logs
+    if (user?.role === 2 || user?.role === 3) {
       fetchAuditLogs();
     }
   }, [fetchSystemSettings, fetchAuditLogs, fetchNotifications, user]);
@@ -307,9 +459,7 @@ export default function SettingsPage() {
   const handleVerifyAndSave = async () => {
     if (!user || !supabase || !oldPassword) return;
     setIsVerifying(true);
-    console.log("[Settings] Starting password verification...");
 
-    // Helper to timeout promises
     const withTimeout = (promise: Promise<any>, ms: number = 20000) => {
       return Promise.race([
         promise,
@@ -318,7 +468,6 @@ export default function SettingsPage() {
     };
 
     try {
-      // 1. Verify old password by attempting to sign in
       const email = `${user.username}@etire-system.local`;
 
       const { data: signInData, error: signInError } = await withTimeout(
@@ -329,18 +478,13 @@ export default function SettingsPage() {
       );
 
       if (signInError) {
-        console.error("[Settings] Verification failed:", signInError);
         toast({ title: "Verification Failed", description: "Incorrect old password.", variant: "destructive" });
         setIsVerifying(false);
         return;
       }
 
-      console.log("[Settings] Verification successful");
-
-      // 2. If verified, proceed with password update
       setIsSaving(true);
 
-      // Update Auth Password
       const { error: authError } = await withTimeout(
         supabase.auth.updateUser({ password: password })
       );
@@ -349,7 +493,6 @@ export default function SettingsPage() {
         throw new Error(`Auth Update Failed: ${authError.message}`);
       }
 
-      // Update Public User Profile
       const updateData: { name: string; username: string; password?: string } = {
         name,
         username,
@@ -361,22 +504,17 @@ export default function SettingsPage() {
         .eq('user_id', user.user_id);
 
       if (dbError) {
-        // Note: If auth succeeded but this failed, user is in weird state, but password IS changed.
-        console.error("Profile update error", dbError);
-        // We won't throw here to avoid telling user it failed when password actually changed
         toast({ title: "Warning", description: "Password changed but profile details may not have updated.", variant: "default" });
       } else {
         toast({ title: "Success", description: "Password and profile updated successfully." });
       }
 
-      // Cleanup
       setPassword('');
       setConfirmPassword('');
       setOldPassword('');
       setIsVerifyDialogOpen(false);
 
     } catch (error: any) {
-      console.error("[Settings] Handle verify error:", error);
       toast({ title: "Update Error", description: error.message, variant: "destructive" });
     } finally {
       setIsVerifying(false);
@@ -468,14 +606,6 @@ export default function SettingsPage() {
     }
   };
 
-  const refreshData = () => {
-    fetchSystemSettings();
-    fetchNotifications();
-    if (user?.role === 2) {
-      fetchAuditLogs();
-    }
-  };
-
   if (isAuthLoading) {
     return (
       <div className="min-h-screen bg-white text-slate-800 font-poppins">
@@ -489,7 +619,7 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-white text-slate-800 font-poppins">
       <div className="container mx-auto p-6 sm:p-8 lg:p-10">
-        {/* Clean Header Section - Simplified for Settings */}
+        {/* Clean Header Section */}
         <div className={`mb-8 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
           <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 flex items-center justify-between shadow-xl">
             <div className="flex-1">
@@ -536,8 +666,8 @@ export default function SettingsPage() {
               </TabsTrigger>
             </TabsList>
 
+            {/* ACCOUNT TAB */}
             <TabsContent value="account" className="space-y-6">
-              {/* Account Information Card */}
               <Card className="bg-white border-slate-200 shadow-lg">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2">
@@ -633,6 +763,7 @@ export default function SettingsPage() {
               </Card>
             </TabsContent>
 
+            {/* GENERAL TAB */}
             <TabsContent value="general" className="space-y-6">
               <Card className={`bg-white border-slate-200 shadow-lg`}>
                 <CardHeader>
@@ -732,17 +863,26 @@ export default function SettingsPage() {
               </Card>
             </TabsContent>
 
+            {/* ACTIVITY LOGS TAB */}
             <TabsContent value="activity" className="space-y-6">
               {/* Notifications Section */}
-              <Card className={`bg-white border-slate-200 shadow-lg ${microAnimations.cardHover}`}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Bell className="h-5 w-5 text-indigo-600" />
-                    Notifications
-                  </CardTitle>
-                  <CardDescription>Recent alerts and updates.</CardDescription>
+              <Card className={`bg-white border-slate-200 shadow-lg ${microAnimations.cardHover} flex flex-col`}>
+                <CardHeader className="flex flex-row items-center justify-between pb-4">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Bell className="h-5 w-5 text-indigo-600" />
+                      Notifications
+                    </CardTitle>
+                    <CardDescription>Recent alerts and updates.</CardDescription>
+                  </div>
+                  {/* Top Right Rows Selector */}
+                  <RowsPerPageSelector 
+                    value={notifRowsPerPage} 
+                    onChange={setNotifRowsPerPage}
+                    onPageChange={setNotifPage}
+                  />
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1 flex flex-col pt-0">
                   {notifError && (
                     <Alert variant="destructive" className="mb-4">
                       <AlertTriangle className="h-4 w-4" />
@@ -756,13 +896,13 @@ export default function SettingsPage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {notifications.length === 0 ? (
+                      {paginatedNotifications.length === 0 ? (
                         <div className="text-center py-8">
                           <Bell className="h-12 w-12 text-slate-300 mx-auto mb-4" />
                           <p className="text-slate-500">No new notifications</p>
                         </div>
                       ) : (
-                        notifications.map((notification) => (
+                        paginatedNotifications.map((notification) => (
                           <div
                             key={notification.notification_id}
                             className={`flex items-start justify-between p-4 border rounded-lg transition-all duration-300 ${!notification.is_read ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-200'
@@ -810,18 +950,37 @@ export default function SettingsPage() {
                     </div>
                   )}
                 </CardContent>
+
+                {/* Notifications Pagination (Navigation Only) */}
+                {notifications.length > 0 && (
+                  <PaginationControls 
+                    totalItems={notifications.length}
+                    itemsPerPage={notifRowsPerPage}
+                    currentPage={notifPage}
+                    onPageChange={setNotifPage}
+                  />
+                )}
               </Card>
 
+              {/* Audit Logs Section */}
               {(user?.role === 2 || user?.role === 3) && (
-                <Card className={`bg-white border-slate-200 shadow-lg ${microAnimations.cardHover}`}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <History className="h-5 w-5 text-indigo-600" />
-                      Audit Logs
-                    </CardTitle>
-                    <CardDescription>View system activity and user actions.</CardDescription>
+                <Card className={`bg-white border-slate-200 shadow-lg ${microAnimations.cardHover} flex flex-col`}>
+                  <CardHeader className="flex flex-row items-center justify-between pb-4">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <History className="h-5 w-5 text-indigo-600" />
+                        Audit Logs
+                      </CardTitle>
+                      <CardDescription>View system activity and user actions.</CardDescription>
+                    </div>
+                     {/* Top Right Rows Selector */}
+                    <RowsPerPageSelector 
+                      value={auditRowsPerPage} 
+                      onChange={setAuditRowsPerPage}
+                      onPageChange={setAuditPage}
+                    />
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="flex-1 flex flex-col pt-0">
                     {auditError && (
                       <Alert variant="destructive" className="mb-4 border-red-200 bg-red-50">
                         <AlertTriangle className="h-4 w-4" />
@@ -836,14 +995,14 @@ export default function SettingsPage() {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {auditLogs.length === 0 ? (
+                        {paginatedAuditLogs.length === 0 ? (
                           <div className="text-center py-12">
                             <History className="h-16 w-16 text-slate-300 mx-auto mb-4" />
                             <p className="text-slate-500 text-lg">No audit logs found</p>
                             <p className="text-slate-400 text-sm">System activity will appear here</p>
                           </div>
                         ) : (
-                          auditLogs.map((log) => (
+                          paginatedAuditLogs.map((log) => (
                             <div
                               key={log.log_id}
                               className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:border-indigo-400 hover:shadow-md transition-all duration-300"
@@ -869,6 +1028,16 @@ export default function SettingsPage() {
                       </div>
                     )}
                   </CardContent>
+
+                  {/* Audit Logs Pagination (Navigation Only) */}
+                  {auditLogs.length > 0 && (
+                    <PaginationControls 
+                      totalItems={auditLogs.length}
+                      itemsPerPage={auditRowsPerPage}
+                      currentPage={auditPage}
+                      onPageChange={setAuditPage}
+                    />
+                  )}
                 </Card>
               )}
             </TabsContent>
