@@ -1998,6 +1998,7 @@ export default function POSPage() {
               <Input
                 id="manager-password"
                 type="password"
+                autoComplete="off"
                 value={managerPassword}
                 onChange={(e) => {
                   setManagerPassword(e.target.value);
