@@ -200,7 +200,7 @@ export default function EnhancedReportsPage() {
     { 
       name: 'Service Revenue', 
       value: summary.serviceFees,
-      color: '#14b8a6',
+      color: '#7700ef',
       description: 'Revenue from service jobs'
     }
   ];
