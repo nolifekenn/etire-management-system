@@ -296,42 +296,65 @@ export default function DashboardPage() {
 
   // Calculate sales chart data from filtered sales
   const calculateSalesChartData = useCallback((sales: RecentSale[], timeframe: TimeFrame) => {
-    if (!sales || sales.length === 0) return [];
-    
     const chartDataMap = new Map<string, number>();
+    const now = new Date();
     
-    sales.forEach(sale => {
-      const saleDate = new Date(sale.created_at);
-      let key: string;
-      
-      if (timeframe === '1d') {
-        // Group by hour for 1 day
-        const hour = saleDate.getHours();
-        key = `${hour}:00`;
-      } else {
-        // Group by day for 3d and 7d
-        const dateStr = saleDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        key = dateStr;
+    // 1. PRE-FILL TIME SLOTS (Fixes "12am to 12am" visibility issue)
+    if (timeframe === '1d') {
+      // Create 24 hour slots (0, 1, ... 23)
+      for (let i = 0; i < 24; i++) {
+        chartDataMap.set(`${i}:00`, 0);
       }
-      
-      const currentTotal = chartDataMap.get(key) || 0;
-      chartDataMap.set(key, currentTotal + sale.total_amount);
-    });
+    } else {
+      // Create day slots for 3d or 7d
+      const daysToShow = timeframe === '3d' ? 3 : 7;
+      for (let i = daysToShow - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(now.getDate() - i);
+        const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        chartDataMap.set(dateStr, 0);
+      }
+    }
     
-    // Convert map to array and sort
+    // 2. FILL ACTUAL DATA
+    if (sales && sales.length > 0) {
+      sales.forEach(sale => {
+        const saleDate = new Date(sale.created_at);
+        let key: string;
+        
+        if (timeframe === '1d') {
+          // Group by hour for 1 day
+          const hour = saleDate.getHours();
+          key = `${hour}:00`;
+        } else {
+          // Group by day for 3d and 7d
+          const dateStr = saleDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+          key = dateStr;
+        }
+        
+        // Only add to existing keys (ensures we stick to the timeframe)
+        if (chartDataMap.has(key)) {
+          const currentTotal = chartDataMap.get(key) || 0;
+          chartDataMap.set(key, currentTotal + sale.total_amount);
+        }
+      });
+    }
+    
+    // 3. CONVERT & SORT
     const chartData = Array.from(chartDataMap.entries()).map(([date, sales]) => ({
       date,
       sales,
       average: 0, // Will calculate below
       trend: 'up' as const
-    })).sort((a, b) => {
-      if (timeframe === '1d') {
-        return parseInt(a.date.split(':')[0]) - parseInt(b.date.split(':')[0]);
-      }
-      return new Date(a.date).getTime() - new Date(b.date).getTime();
-    });
+    }));
+
+    // Sort specifically for 1d to ensure 0:00 -> 23:00 order
+    if (timeframe === '1d') {
+      chartData.sort((a, b) => parseInt(a.date.split(':')[0]) - parseInt(b.date.split(':')[0]));
+    }
+    // Note: 3d/7d are generated in order by the loop above, so they are already correct.
     
-    // Calculate average
+    // 4. CALCULATE AVERAGE
     if (chartData.length > 0) {
       const totalSales = chartData.reduce((sum, day) => sum + day.sales, 0);
       const average = totalSales / chartData.length;
@@ -517,6 +540,28 @@ export default function DashboardPage() {
   };
 
   const TimeFrameIcon = getTimeFrameIcon(timeFrame);
+
+  const chartConfig = useMemo(() => {
+    const maxVal = Math.max(...salesData.map(d => d.sales), 0);
+    
+    if (maxVal === 0) {
+      return { 
+        domain: [0, 10000], 
+        ticks: [0, 2000, 4000, 6000, 8000, 10000] 
+      };
+    }
+
+    const steps = 5;
+    const rawStep = maxVal / steps;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep))); 
+    
+    const niceStep = Math.ceil(rawStep / magnitude) * magnitude;
+    const upperLimit = niceStep * steps;
+    
+    const ticks = Array.from({ length: steps + 1 }, (_, i) => i * niceStep);
+    
+    return { domain: [0, upperLimit], ticks };
+  }, [salesData]);
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
@@ -919,9 +964,14 @@ export default function DashboardPage() {
                           fontSize={11}
                           tickLine={false}
                           axisLine={false}
+                          interval={timeFrame === '1d' ? 3 : 0} // Show fewer labels on 1d to avoid clutter
                           tickFormatter={(value) => {
                             if (timeFrame === '1d') {
-                              return `${value}`;
+                              // Convert 13:00 to 1pm
+                              const hour = parseInt(value.split(':')[0]);
+                              if (hour === 0) return '12am';
+                              if (hour === 12) return '12pm';
+                              return hour > 12 ? `${hour - 12}pm` : `${hour}am`;
                             }
                             return value;
                           }}
@@ -932,6 +982,9 @@ export default function DashboardPage() {
                           tickLine={false}
                           axisLine={false}
                           tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
+                          // UPDATED: Now uses the dynamic config calculated above
+                          domain={chartConfig.domain}
+                          ticks={chartConfig.ticks}
                         />
                         <Tooltip
                           contentStyle={{
@@ -949,7 +1002,7 @@ export default function DashboardPage() {
                             return [value, name];
                           }}
                           labelFormatter={(label) => {
-                            if (timeFrame === '1d') return `Hour: ${label}`;
+                            if (timeFrame === '1d') return `Time: ${label}`;
                             return `Date: ${label}`;
                           }}
                         />
