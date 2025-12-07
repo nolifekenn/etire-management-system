@@ -20,76 +20,47 @@ import {
   RefreshCw,
   Download,
   Calendar,
-  Clock
+  Clock,
+  TrendingDown,
+  Zap,
+  Layers,
+  Target,
+  Percent,
+  BarChart,
+  PieChart as PieChartIcon,
+  LineChart as LineChartIcon,
+  TrendingUp as TrendingUpIcon,
+  DollarSign as DollarSignIcon,
+  Package as PackageIcon,
+  Wrench as WrenchIcon
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { 
+  PieChart, 
+  Pie, 
+  BarChart as RechartsBarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer,
+  Cell,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  RadialBarChart,
+  RadialBar,
+  Label
+} from "recharts";
 
 // Design System from branches page
 const buttonStyles = {
   primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins ripple",
   secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 font-poppins ripple",
   glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins ripple",
-};
-
-// Enhanced StatCard component matching branches design
-interface EnhancedStatCardProps {
-  title: string;
-  value: string | number;
-  icon: React.ReactNode;
-  trend?: 'up' | 'down' | 'neutral';
-  percentage?: number;
-  description?: string;
-  color?: 'purple' | 'blue' | 'green' | 'orange' | 'teal' | 'emerald' | 'red';
-}
-
-const EnhancedStatCard = ({ title, value, icon, trend, percentage, description, color = 'purple' }: EnhancedStatCardProps) => {
-  const colorConfig = {
-    purple: { from: 'from-purple-500', to: 'to-indigo-600', bgFrom: 'from-purple-50', bgTo: 'to-indigo-50/50' },
-    blue: { from: 'from-blue-500', to: 'to-sky-600', bgFrom: 'from-blue-50', bgTo: 'to-sky-50/50' },
-    green: { from: 'from-green-500', to: 'to-emerald-600', bgFrom: 'from-green-50', bgTo: 'to-emerald-50/50' },
-    orange: { from: 'from-orange-500', to: 'to-amber-600', bgFrom: 'from-orange-50', bgTo: 'to-amber-50/50' },
-    teal: { from: 'from-teal-500', to: 'to-cyan-600', bgFrom: 'from-teal-50', bgTo: 'to-cyan-50/50' },
-    emerald: { from: 'from-emerald-500', to: 'to-green-600', bgFrom: 'from-emerald-50', bgTo: 'to-green-50/50' },
-    red: { from: 'from-red-500', to: 'to-rose-600', bgFrom: 'from-red-50', bgTo: 'to-rose-50/50' },
-  };
-
-  const colors = colorConfig[color];
-
-  return (
-    <Card className={`bg-gradient-to-r ${colors.bgFrom} ${colors.bgTo} border-slate-200/50 backdrop-blur-sm transition-all duration-350 ease-spring hover:translate-y-[-6px] hover:shadow-2xl`}>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-slate-600 font-poppins">{title}</p>
-            <p className="text-3xl font-bold text-slate-900 mt-2 font-poppins flex items-center gap-2">
-              {typeof value === 'number' ? value.toLocaleString() : value}
-              {trend && percentage !== undefined && (
-                <span className={`text-sm font-medium flex items-center gap-1 ${
-                  trend === 'up' ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {percentage}%
-                </span>
-              )}
-            </p>
-            {description && (
-              <p className="text-sm text-slate-500 mt-1 font-poppins">{description}</p>
-            )}
-          </div>
-          <div className={`p-3 bg-gradient-to-r ${colors.from} ${colors.to} rounded-xl`}>
-            {icon}
-          </div>
-        </div>
-        {trend === 'up' && percentage !== undefined && (
-          <div className="mt-4 h-2 bg-green-100 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full progress-bar"
-              style={{ width: `${Math.min(percentage, 100)}%` }}
-            />
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
 };
 
 export default function EnhancedReportsPage() {
@@ -103,7 +74,7 @@ export default function EnhancedReportsPage() {
     serviceFees: 0,
     revenueGrowth: 0,
     profitMargin: 0,
-    stockTurnover: 0,
+    gmroi: 0, // Changed from stockTurnover to GMROI
   });
 
   const [isLoading, setIsLoading] = useState(true);
@@ -181,7 +152,9 @@ export default function EnhancedReportsPage() {
 
       // 🔹 CALCULATE METRICS
       const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-      const stockTurnover = itemsSold > 0 && stockValue > 0 ? (itemsSold / stockValue) : 0;
+      
+      // CALCULATE GMROI (Gross Margin Return on Inventory)
+      const gmroi = stockValue > 0 ? (totalProfit / stockValue) * 100 : 0;
       
       // Mock revenue growth (in real app, compare with previous period)
       const revenueGrowth = 12.5; // Example growth percentage
@@ -197,7 +170,7 @@ export default function EnhancedReportsPage() {
         serviceFees,
         revenueGrowth,
         profitMargin: parseFloat(profitMargin.toFixed(1)),
-        stockTurnover: parseFloat(stockTurnover.toFixed(2)),
+        gmroi: parseFloat(gmroi.toFixed(1)), // GMROI instead of stock turnover
       });
 
       setLastUpdated(new Date());
@@ -216,10 +189,136 @@ export default function EnhancedReportsPage() {
     fetchSummary();
   };
 
-  const handleExportAll = () => {
-    // Placeholder for export functionality
-    alert("Export functionality would be implemented here");
-  };
+  // Chart data calculations
+  const revenueSourcesData = [
+    { 
+      name: 'Sales Revenue', 
+      value: Math.max(0, summary.totalRevenue - summary.serviceFees),
+      color: '#9333ea',
+      description: 'Revenue from product sales'
+    },
+    { 
+      name: 'Service Revenue', 
+      value: summary.serviceFees,
+      color: '#7700ef',
+      description: 'Revenue from service jobs'
+    }
+  ];
+
+  const revenueProfitData = [
+    {
+      month: 'Jan',
+      revenue: summary.totalRevenue * 0.8,
+      profit: summary.totalProfit * 0.7,
+      target: summary.totalRevenue * 0.85
+    },
+    {
+      month: 'Feb',
+      revenue: summary.totalRevenue * 0.9,
+      profit: summary.totalProfit * 0.8,
+      target: summary.totalRevenue * 0.9
+    },
+    {
+      month: 'Mar',
+      revenue: summary.totalRevenue,
+      profit: summary.totalProfit,
+      target: summary.totalRevenue * 1.1
+    }
+  ];
+
+  const inventoryValueData = [
+    {
+      name: 'Current Value',
+      value: summary.stockValue,
+      color: '#f97316',
+      description: 'Total cost of inventory on hand'
+    },
+    {
+      name: 'Potential Revenue',
+      value: summary.potentialRevenue,
+      color: '#14b8a6',
+      description: 'Revenue if all inventory is sold'
+    }
+  ];
+
+  const performanceMetricsData = [
+    { 
+      metric: 'Profit Margin', 
+      value: summary.profitMargin, 
+      target: 20, 
+      unit: '%', 
+      color: '#10b981',
+      description: 'Profit as percentage of revenue',
+      icon: <Percent className="w-4 h-4" />
+    },
+    { 
+      metric: 'GMROI', 
+      value: summary.gmroi, 
+      target: 50, 
+      unit: '%', 
+      color: '#3b82f6',
+      description: 'Gross Margin Return on Inventory',
+      icon: <TrendingUpIcon className="w-4 h-4" />
+    },
+    { 
+      metric: 'Service Efficiency', 
+      value: Math.min((summary.completedJobs / 100) * 100, 100), 
+      target: 80, 
+      unit: '%', 
+      color: '#8b5cf6',
+      description: 'Job completion rate',
+      icon: <CheckCircle className="w-4 h-4" />
+    }
+  ];
+
+  const kpiCardsData = [
+    {
+      title: "Total Revenue",
+      value: `₱${summary.totalRevenue.toLocaleString()}`,
+      icon: <DollarSignIcon className="h-5 w-5 text-white" />,
+      change: summary.revenueGrowth,
+      trend: "up",
+      color: "from-purple-600 to-indigo-600",
+      bgColor: "bg-purple-500/10",
+      description: "Combined sales and service revenue",
+      iconBg: "bg-gradient-to-r from-purple-600 to-indigo-600"
+    },
+    {
+      title: "Total Profit",
+      value: `₱${summary.totalProfit.toLocaleString()}`,
+      icon: <TrendingUpIcon className="h-5 w-5 text-white" />,
+      change: summary.profitMargin,
+      trend: summary.profitMargin > 0 ? "up" : "down",
+      color: "from-emerald-600 to-green-600",
+      bgColor: "bg-emerald-500/10",
+      description: "Net profit after costs",
+      iconBg: "bg-gradient-to-r from-emerald-600 to-green-600"
+    },
+    {
+      title: "Items Sold",
+      value: summary.itemsSold.toLocaleString(),
+      icon: <ShoppingCart className="h-5 w-5 text-white" />,
+      change: 8.2,
+      trend: "up",
+      color: "from-blue-600 to-sky-600",
+      bgColor: "bg-blue-500/10",
+      description: "Total units sold",
+      iconBg: "bg-gradient-to-r from-blue-600 to-sky-600"
+    },
+    {
+      title: "Service Revenue",
+      value: `₱${summary.serviceFees.toLocaleString()}`,
+      icon: <WrenchIcon className="h-5 w-5 text-white" />,
+      change: 15.3,
+      trend: "up",
+      color: "from-rose-600 to-red-600",
+      bgColor: "bg-rose-500/10",
+      description: "Revenue from service jobs",
+      iconBg: "bg-gradient-to-r from-rose-600 to-red-600"
+    }
+  ];
+
+  const COLORS = ['#9333ea', '#14b8a6', '#f97316', '#3b82f6'];
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
@@ -238,14 +337,14 @@ export default function EnhancedReportsPage() {
         <div className="absolute top-0 right-0 w-32 h-32 bg-teal-300/20 rounded-bl-full"></div>
       </div>
 
-      <div className="absolute top-64 left-0 w-full h-full bg-indigo-50/10">
+      <div className="absolute top-64 left-0 w-full h-full bg-gradient-to-b from-indigo-50/10 to-white">
         <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-indigo-100/15 to-indigo-50/10"></div>
       </div>
 
       <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
 
         {/* Header Section */}
-        <div className={`mb-12 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+        <div className={`mb-8 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
           <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
 
@@ -255,7 +354,8 @@ export default function EnhancedReportsPage() {
               </h1>
               <div className="flex items-center gap-6 text-white/90">
                 <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium">
-                  Generate Reports and Analyze Performance
+                  <BarChart3 className="w-6 h-6" />
+                  Visual Analytics & Performance Insights
                 </p>
                 <div className="flex items-center gap-4 text-lg">
                   {lastUpdated && (
@@ -272,151 +372,631 @@ export default function EnhancedReportsPage() {
               </div>
             </div>
 
-            <Button
-              onClick={handleRefresh}
-              disabled={isLoading}
-              className={buttonStyles.glass + " active:scale-95"}
-            >
-              <RefreshCw className={`h-6 w-6 mr-3 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh Data
-            </Button>
+            <div className="relative z-10 flex gap-3">
+              <Button
+                onClick={handleRefresh}
+                disabled={isLoading}
+                className={buttonStyles.glass + " active:scale-95"}
+              >
+                <RefreshCw className={`h-5 w-5 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh Data
+              </Button>
+              
+            </div>
           </div>
         </div>
 
-
-        {/* ENHANCED DASHBOARD SUMMARY - First Row */}
-        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 transition-all duration-700 ${
+        {/* KPI Cards - Minimal Overview */}
+        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 transition-all duration-700 ${
           mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
         }`}>
-          <EnhancedStatCard
-            title="Total Revenue"
-            value={`₱${summary.totalRevenue.toLocaleString()}`}
-            icon={<DollarSign className="h-6 w-6 text-white" />}
-            trend="up"
-            percentage={summary.revenueGrowth}
-            description="All time sales revenue"
-            color="purple"
-          />
-          
-          <EnhancedStatCard
-            title="Total Profit"
-            value={`₱${summary.totalProfit.toLocaleString()}`}
-            icon={<TrendingUp className="h-6 w-6 text-white" />}
-            trend={summary.profitMargin > 0 ? "up" : "down"}
-            percentage={summary.profitMargin}
-            description={`${summary.profitMargin.toFixed(1)}% margin`}
-            color="green"
-          />
-          
-          <EnhancedStatCard
-            title="Items Sold"
-            value={summary.itemsSold.toLocaleString()}
-            icon={<ShoppingCart className="h-6 w-6 text-white" />}
-            description="Total units sold"
-            color="blue"
-          />
-          
-          <EnhancedStatCard
-            title="Stock Value"
-            value={`₱${summary.stockValue.toLocaleString()}`}
-            icon={<Package className="h-6 w-6 text-white" />}
-            description="Current inventory value"
-            color="orange"
-          />
+          {kpiCardsData.map((card, index) => (
+            <Card key={index} className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300 hover:border-slate-300">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between mb-4">
+                  <div className={`p-3 rounded-xl ${card.iconBg}`}>
+                    {card.icon}
+                  </div>
+                  <div className={`flex items-center gap-1 text-sm font-medium px-2.5 py-1 rounded-full ${
+                    card.trend === 'up' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                  }`}>
+                    {card.trend === 'up' ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                    {card.change}%
+                  </div>
+                </div>
+                <p className="text-sm font-medium text-slate-600 mb-1">{card.title}</p>
+                <p className="text-2xl font-bold text-slate-900 mb-2">{card.value}</p>
+                <p className="text-xs text-slate-500">{card.description}</p>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
-        {/* SECOND ROW OF METRICS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <EnhancedStatCard
-            title="Potential Revenue"
-            value={`₱${summary.potentialRevenue.toLocaleString()}`}
-            icon={<Rocket className="h-6 w-6 text-white" />}
-            description="From current stock"
-            color="teal"
-          />
-          
-          <EnhancedStatCard
-            title="Completed Jobs"
-            value={summary.completedJobs.toString()}
-            icon={<CheckCircle className="h-6 w-6 text-white" />}
-            description="Service jobs completed"
-            color="emerald"
-          />
-          
-          <EnhancedStatCard
-            title="Service Fees"
-            value={`₱${summary.serviceFees.toLocaleString()}`}
-            icon={<Wrench className="h-6 w-6 text-white" />}
-            description="Total service revenue"
-            color="red"
-          />
-        </div>
+        {/* MAIN CHART SECTION */}
+        <div className="space-y-8">
 
-        {/* Performance Metrics Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <Card className="bg-gradient-to-r from-slate-50 to-slate-100/50 border-slate-200/50 backdrop-blur-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-slate-800 font-poppins">Profit Margin</h3>
-                <div className={`p-2 rounded-lg ${summary.profitMargin >= 20 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                  <span className="font-bold">{summary.profitMargin.toFixed(1)}%</span>
+          {/* Revenue Analysis Row */}
+          <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 transition-all duration-700 ${
+            mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
+          }`}>
+            {/* Revenue Sources Pie Chart */}
+            <Card className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-3 mb-6">
+                  <div className="p-3 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl">
+                    <PieChartIcon className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-slate-900 font-poppins">Revenue Distribution</h3>
+                    <p className="text-sm text-slate-500 font-poppins">
+                      Visual breakdown of income sources between product sales and service fees
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full"
-                  style={{ width: `${Math.min(summary.profitMargin, 100)}%` }}
-                />
-              </div>
-              <p className="text-sm text-slate-500 mt-2 font-poppins">
-                {summary.profitMargin >= 20 ? 'Excellent' : summary.profitMargin >= 10 ? 'Good' : 'Needs Improvement'}
-              </p>
-            </CardContent>
-          </Card>
+                
+                <div className="h-64 mb-6">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={revenueSourcesData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={2}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                        animationDuration={800}
+                      >
+                        {revenueSourcesData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={COLORS[index % COLORS.length]}
+                            stroke="white"
+                            strokeWidth={2}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value, name, props) => {
+                          const { payload } = props;
+                          return [
+                            `₱${Number(value).toLocaleString()}`,
+                            payload.description || name
+                          ];
+                        }}
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontFamily: "'Poppins', sans-serif",
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                <div className="space-y-3">
+                  {revenueSourcesData.map((source, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: source.color }}></div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">{source.name}</p>
+                          <p className="text-xs text-slate-500">{source.description}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-slate-900">₱{source.value.toLocaleString()}</p>
+                        <p className="text-xs text-slate-500">
+                          {((source.value / summary.totalRevenue) * 100 || 0).toFixed(1)}% of total
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-gradient-to-r from-slate-50 to-slate-100/50 border-slate-200/50 backdrop-blur-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-slate-800 font-poppins">Stock Turnover</h3>
-                <div className={`p-2 rounded-lg ${summary.stockTurnover > 0.5 ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                  <span className="font-bold">{summary.stockTurnover.toFixed(2)}x</span>
+            {/* Revenue & Profit Trend */}
+            <Card className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-3 mb-6">
+                  <div className="p-3 bg-gradient-to-r from-emerald-500 to-green-600 rounded-xl">
+                    <LineChartIcon className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-slate-900 font-poppins">Revenue & Profit Trend</h3>
+                    <p className="text-sm text-slate-500 font-poppins">
+                      Track monthly performance trends and compare against targets for better financial planning
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-blue-400 to-cyan-500 rounded-full"
-                  style={{ width: `${Math.min(summary.stockTurnover * 100, 100)}%` }}
-                />
-              </div>
-              <p className="text-sm text-slate-500 mt-2 font-poppins">
-                {summary.stockTurnover > 0.5 ? 'Good turnover' : 'Slow moving inventory'}
-              </p>
-            </CardContent>
-          </Card>
+                
+                <div className="h-64 mb-6">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={revenueProfitData}
+                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis 
+                        dataKey="month" 
+                        tick={{ fill: '#64748b', fontSize: 12 }}
+                      />
+                      <YAxis 
+                        tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
+                        tick={{ fill: '#64748b', fontSize: 12 }}
+                      />
+                      <Tooltip 
+                        formatter={(value, name) => {
+                          const label = name === 'revenue' ? 'Revenue' : 
+                                       name === 'profit' ? 'Profit' : 'Target';
+                          return [`₱${Number(value).toLocaleString()}`, label];
+                        }}
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontFamily: "'Poppins', sans-serif",
+                        }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="revenue" 
+                        name="Revenue"
+                        stroke="#9333ea" 
+                        fill="url(#colorRevenue)" 
+                        fillOpacity={0.3}
+                        strokeWidth={2}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="profit" 
+                        name="Profit"
+                        stroke="#10b981" 
+                        fill="url(#colorProfit)" 
+                        fillOpacity={0.3}
+                        strokeWidth={2}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="target" 
+                        name="Target"
+                        stroke="#f59e0b" 
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        dot={false}
+                      />
+                      <defs>
+                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#9333ea" stopOpacity={0.4}/>
+                          <stop offset="95%" stopColor="#9333ea" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center p-3 bg-purple-50 rounded-lg">
+                      <p className="text-xs text-purple-700 font-medium">Current Revenue</p>
+                      <p className="text-lg font-bold text-purple-900">
+                        ₱{summary.totalRevenue.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="text-center p-3 bg-emerald-50 rounded-lg">
+                      <p className="text-xs text-emerald-700 font-medium">Current Profit</p>
+                      <p className="text-lg font-bold text-emerald-900">
+                        ₱{summary.totalProfit.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="text-center p-3 bg-amber-50 rounded-lg">
+                      <p className="text-xs text-amber-700 font-medium">Growth</p>
+                      <p className="text-lg font-bold text-amber-900">
+                        +{summary.revenueGrowth}%
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    <span className="font-medium">Insight:</span> {summary.profitMargin >= 15 
+                      ? "Strong profit margins with consistent growth" 
+                      : "Focus on improving profit margins through cost optimization"}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-          <Card className="bg-gradient-to-r from-slate-50 to-slate-100/50 border-slate-200/50 backdrop-blur-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-slate-800 font-poppins">Service Efficiency</h3>
-                <div className="p-2 rounded-lg bg-purple-100 text-purple-700">
-                  <span className="font-bold">{summary.completedJobs}</span>
+          {/* Inventory & Performance Row */}
+          <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 transition-all duration-700 ${
+            mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5 delay-200'
+          }`}>
+            {/* Inventory Analysis */}
+            <Card className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-3 mb-6">
+                  <div className="p-3 bg-gradient-to-r from-orange-500 to-amber-600 rounded-xl">
+                    <PackageIcon className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-slate-900 font-poppins">Inventory Value Analysis</h3>
+                    <p className="text-sm text-slate-500 font-poppins">
+                      Compare current inventory investment against potential revenue to identify opportunity gaps
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-purple-400 to-indigo-500 rounded-full"
-                  style={{ width: `${Math.min((summary.completedJobs / 100) * 100, 100)}%` }}
-                />
-              </div>
-              <p className="text-sm text-slate-500 mt-2 font-poppins">
-                {summary.completedJobs > 50 ? 'High efficiency' : 'Moderate efficiency'}
-              </p>
-            </CardContent>
-          </Card>
+                
+                <div className="h-64 mb-6">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsBarChart
+                      data={inventoryValueData}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fill: '#64748b', fontSize: 12 }}
+                      />
+                      <YAxis 
+                        tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
+                        tick={{ fill: '#64748b', fontSize: 12 }}
+                      />
+                      <Tooltip 
+                        formatter={(value, name, props) => {
+                          const { payload } = props;
+                          return [
+                            `₱${Number(value).toLocaleString()}`,
+                            payload.description || name
+                          ];
+                        }}
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontFamily: "'Poppins', sans-serif",
+                        }}
+                      />
+                      <Bar 
+                        dataKey="value" 
+                        radius={[6, 6, 0, 0]}
+                        animationDuration={1000}
+                      >
+                        {inventoryValueData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </RechartsBarChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                <div className="space-y-4">
+                  {/* 1. Inventory Efficiency Bar */}
+                  <div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-500 to-amber-600"></div>
+                        <span className="text-sm font-medium text-slate-800">Inventory Efficiency</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xl font-bold text-slate-900">
+                          {summary.potentialRevenue > 0 
+                            ? ((summary.totalRevenue - summary.serviceFees) / summary.potentialRevenue * 100).toFixed(1)
+                            : '0'}%
+                        </span>
+                        <span className="text-xs text-slate-500 ml-1">utilization</span>
+                      </div>
+                    </div>
+                    <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-orange-400 to-amber-500 rounded-full"
+                        style={{ 
+                          width: `${Math.min(
+                            summary.potentialRevenue > 0 
+                              ? ((summary.totalRevenue - summary.serviceFees) / summary.potentialRevenue * 100)
+                              : 0, 
+                            100
+                          )}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 2. Projected Margin Bar */}
+                  <div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600"></div>
+                        <span className="text-sm font-medium text-slate-800">Projected Margin</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xl font-bold text-slate-900">
+                          {summary.potentialRevenue > 0 
+                            ? (((summary.potentialRevenue - summary.stockValue) / summary.potentialRevenue) * 100).toFixed(1)
+                            : '0'}%
+                        </span>
+                        <span className="text-xs text-slate-500 ml-1">profitability</span>
+                      </div>
+                    </div>
+                    <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full"
+                        style={{ 
+                          width: `${Math.min(
+                            summary.potentialRevenue > 0 
+                              ? (((summary.potentialRevenue - summary.stockValue) / summary.potentialRevenue) * 100)
+                              : 0, 
+                            100
+                          )}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 3. Cost Ratio Bar */}
+                  <div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+                        <span className="text-sm font-medium text-slate-800">Cost Ratio</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xl font-bold text-slate-900">
+                          {summary.potentialRevenue > 0 
+                            ? ((summary.stockValue / summary.potentialRevenue) * 100).toFixed(1)
+                            : '0'}%
+                        </span>
+                        <span className="text-xs text-slate-500 ml-1">investment</span>
+                      </div>
+                    </div>
+                    <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full"
+                        style={{ 
+                          width: `${Math.min(
+                            summary.potentialRevenue > 0 
+                              ? ((summary.stockValue / summary.potentialRevenue) * 100)
+                              : 0, 
+                            100
+                          )}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-slate-500">
+                    <span className="font-medium">Interpretation:</span> Higher potential revenue compared to current value indicates opportunities for sales growth. GMROI of {summary.gmroi.toFixed(1)}% shows {summary.gmroi > 100 ? 'excellent' : 'moderate'} return on inventory investment.
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Performance Metrics */}
+            <Card className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-3 mb-6">
+                  <div className="p-3 bg-gradient-to-r from-blue-500 to-sky-600 rounded-xl">
+                    <Target className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-slate-900 font-poppins">Key Performance Indicators</h3>
+                    <p className="text-sm text-slate-500 font-poppins">
+                      Critical business metrics showing overall performance and efficiency across operations
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="h-64 mb-6">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadialBarChart 
+                      innerRadius="25%" 
+                      outerRadius="95%" 
+                      data={performanceMetricsData}
+                      startAngle={180}
+                      endAngle={0}
+                      barSize={24}
+                    >
+                      <RadialBar 
+                        minAngle={15} 
+                        background={{ fill: '#f8fafc', fillOpacity: 0.8 }}
+                        dataKey="value" 
+                        cornerRadius={8}
+                        label={false}
+                      >
+                        {performanceMetricsData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={entry.color}
+                            fillOpacity={0.8}
+                          />
+                        ))}
+                      </RadialBar>
+                      <Tooltip 
+                        formatter={(value, name, props) => {
+                          const { payload } = props;
+                          return [
+                            `${value}${payload.unit}`,
+                            payload.metric
+                          ];
+                        }}
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontFamily: "'Poppins', sans-serif",
+                        }}
+                      />
+                    </RadialBarChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                <div className="space-y-4">
+                  {performanceMetricsData.map((metric, index) => (
+                    <div key={index} className="p-3 bg-gradient-to-r from-slate-50 to-slate-100 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg`} style={{ backgroundColor: `${metric.color}20` }}>
+                            {metric.icon}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-slate-800">{metric.metric}</p>
+                            <p className="text-xs text-slate-500">{metric.description}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-lg font-bold text-slate-900">{metric.value.toFixed(1)}{metric.unit}</span>
+                          <div className="text-xs text-slate-500">
+                            Target: {metric.target}{metric.unit}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{ 
+                            width: `${Math.min((metric.value / metric.target) * 100, 100)}%`,
+                            backgroundColor: metric.color
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-slate-500 mt-1">
+                        <span>Current</span>
+                        <span className={metric.value >= metric.target ? 'text-green-600 font-medium' : 'text-amber-600 font-medium'}>
+                          {metric.value >= metric.target ? '✓ Target Achieved' : `${((metric.target - metric.value) / metric.target * 100).toFixed(1)}% below target`}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Service Performance */}
+          <div className={`transition-all duration-700 ${
+            mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5 delay-300'
+          }`}>
+            <Card className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-3 mb-6">
+                  <div className="p-3 bg-gradient-to-r from-rose-500 to-red-600 rounded-xl">
+                    <Wrench className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-slate-900 font-poppins">Service Operations Performance</h3>
+                    <p className="text-sm text-slate-500 font-poppins">
+                      Monitor service department efficiency, revenue generation, and job completion metrics
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="p-5 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="p-3 bg-gradient-to-r from-emerald-500 to-green-600 rounded-xl">
+                        <CheckCircle className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">Completed Jobs</p>
+                        <p className="text-2xl font-bold text-slate-900">{summary.completedJobs}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 mb-3">Total service jobs successfully completed</p>
+                    <div className="h-2 bg-emerald-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-emerald-400 to-green-500 rounded-full transition-all duration-700"
+                        style={{ width: `${Math.min((summary.completedJobs / 100) * 100, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="p-5 bg-gradient-to-r from-blue-50 to-sky-50 rounded-xl hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="p-3 bg-gradient-to-r from-blue-500 to-sky-600 rounded-xl">
+                        <DollarSign className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">Service Revenue</p>
+                        <p className="text-2xl font-bold text-slate-900">
+                          ₱{summary.serviceFees.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 mb-3">Total income generated from service operations</p>
+                    <div className="h-2 bg-blue-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-blue-400 to-sky-500 rounded-full transition-all duration-700"
+                        style={{ 
+                          width: `${Math.min(
+                            summary.totalRevenue > 0 
+                              ? (summary.serviceFees / summary.totalRevenue * 100) 
+                              : 0, 
+                            100
+                          )}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="p-5 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl hover:shadow-md transition-all duration-300">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="p-3 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl">
+                        <Zap className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-700">Service Contribution</p>
+                        <p className="text-2xl font-bold text-slate-900">
+                          {summary.totalRevenue > 0 
+                            ? ((summary.serviceFees / summary.totalRevenue) * 100).toFixed(1) 
+                            : '0'}%
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-500 mb-3">Percentage of total revenue from services</p>
+                    <div className="h-2 bg-purple-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-purple-400 to-indigo-500 rounded-full transition-all duration-700"
+                        style={{ 
+                          width: `${Math.min(
+                            summary.totalRevenue > 0 
+                              ? (summary.serviceFees / summary.totalRevenue * 100) 
+                              : 0, 
+                            100
+                          )}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                    <span className="text-sm font-medium text-slate-800">Service Department Insights</span>
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    {summary.serviceFees > summary.totalRevenue * 0.3 
+                      ? "Services are a significant revenue driver. Consider expanding service offerings." 
+                      : "Services have growth potential. Focus on upselling and marketing service packages."}
+                    {" "}Average revenue per job: ₱{summary.completedJobs > 0 
+                      ? (summary.serviceFees / summary.completedJobs).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                      : '0'}.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* REPORT CARDS */}
-        <div className="space-y-8">
+        <div className={`mt-12 space-y-8 transition-all duration-700 ${
+          mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5 delay-400'
+        }`}>
           <SalesReportCard />
           <InventoryReportCard />
           <ServiceReportCard />

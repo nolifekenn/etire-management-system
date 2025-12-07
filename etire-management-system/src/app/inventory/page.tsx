@@ -210,7 +210,7 @@ const SuccessAnimation = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300">
-      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300">
+      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300 font-poppins">
         <div className={`w-20 h-20 bg-gradient-to-r ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500`}>
           <ActionIcon className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
         </div>
@@ -246,7 +246,7 @@ const SuccessConfirmation = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w bg-white border border-green-200 shadow-2xl">
+      <DialogContent className="sm:max-w bg-white border border-green-200 shadow-2xl font-poppins">
         <div className="flex flex-col items-center text-center p-6">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
             <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
@@ -930,7 +930,7 @@ const CriticalStockDetails = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl p-0 gap-0">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl p-0 gap-0 font-poppins">
 
         {/* Gradient Header with X Close Button */}
         <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 sticky top-0 z-20 text-white relative">
@@ -1068,7 +1068,6 @@ const CriticalStockDetails = ({
   );
 };
 
-// View More Dialog Component
 const ViewMoreDialog = ({
   items,
   isOpen,
@@ -1083,77 +1082,194 @@ const ViewMoreDialog = ({
     return ((item.sale_price - item.cost_price) / item.cost_price) * 100;
   };
 
+  // Function to get stock status badge
+  const getStockStatusBadge = (quantity: number) => {
+    if (quantity === 0) return {
+      text: 'Out of Stock',
+      color: 'bg-gray-100 text-gray-700 border-gray-200'
+    };
+    if (quantity <= 2) return {
+      text: 'Critical',
+      color: 'bg-red-100 text-red-700 border-red-200'
+    };
+    if (quantity <= 5) return {
+      text: 'Low Stock',
+      color: 'bg-yellow-100 text-yellow-700 border-yellow-200'
+    };
+    return {
+      text: 'In Stock',
+      color: 'bg-green-100 text-green-700 border-green-200'
+    };
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-            Complete Inventory List
-          </DialogTitle>
-          <DialogDescription className="text-slate-600">
-            Detailed view of all inventory items with comprehensive information
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="mt-4">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-slate-200">
-              <thead>
-                <tr className="bg-slate-50">
-                  <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Product Name</th>
-                  <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Category</th>
-                  <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Vehicle Type</th>
-                  <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Stock</th>
-                  <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Cost (₱)</th>
-                  <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Price (₱)</th>
-                  <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Margin %</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => {
-                  const margin = calculateMargin(item);
-                  return (
-                    <tr key={item.item_id} className="hover:bg-slate-50">
-                      <td className="border border-slate-200 p-3">{item.name}</td>
-                      <td className="border border-slate-200 p-3 capitalize">{item.category}</td>
-                      <td className="border border-slate-200 p-3">
-                        <VehicleTypeBadge type={item.vehicle_type} />
-                      </td>
-                      <td className="border border-slate-200 p-3">
-                        <StockLevelIndicator quantity={item.stock_quantity} />
-                      </td>
-                      <td className="border border-slate-200 p-3">₱{item.cost_price.toFixed(2)}</td>
-                      <td className="border border-slate-200 p-3">₱{item.sale_price.toFixed(2)}</td>
-                      <td className="border border-slate-200 p-3">
-                        <Badge
-                          variant={margin >= 30 ? "default" : "outline"}
-                          className={
-                            margin >= 30 ? 'bg-green-100 text-green-700 border-green-200' :
-                              margin >= 15 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-                                'bg-red-100 text-red-700 border-red-200'
-                          }
-                        >
-                          {margin.toFixed(1)}%
-                        </Badge>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl font-poppins p-0">
+        
+        {/* Gradient Header */}
+        <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-400 text-white p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle className="text-2xl font-bold text-white">
+                Complete Inventory List
+              </DialogTitle>
+              <DialogDescription className="text-white/90 mt-1">
+                Detailed view of all {items.length} inventory items
+              </DialogDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-white/20 text-white border-white/30">
+                <PackageSearch className="h-3 w-3 mr-1" />
+                {items.length} Items
+              </Badge>
+            </div>
           </div>
         </div>
 
-        <DialogFooter>
-          <Button onClick={onClose} variant="outline" className="flex items-center gap-2">
+        {/* Table Container */}
+        <div className="p-6">
+          <div className="rounded-lg border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="text-left p-4 font-semibold text-slate-700 text-sm">Product Name</th>
+                    <th className="text-left p-4 font-semibold text-slate-700 text-sm">Category</th>
+                    <th className="text-left p-4 font-semibold text-slate-700 text-sm">Vehicle Type</th>
+                    <th className="text-left p-4 font-semibold text-slate-700 text-sm">Stock</th>
+                    <th className="text-left p-4 font-semibold text-slate-700 text-sm">Cost</th>
+                    <th className="text-left p-4 font-semibold text-slate-700 text-sm">Price</th>
+                    <th className="text-left p-4 font-semibold text-slate-700 text-sm">Margin</th>
+                    <th className="text-left p-4 font-semibold text-slate-700 text-sm">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => {
+                    const margin = calculateMargin(item);
+                    const stockStatus = getStockStatusBadge(item.stock_quantity);
+                    
+                    return (
+                      <tr 
+                        key={item.item_id} 
+                        className="hover:bg-slate-50/50 border-b border-slate-100 last:border-0 transition-colors"
+                      >
+                        <td className="p-4">
+                          <div className="font-medium text-slate-800">{item.name}</div>
+                          <div className="text-xs text-slate-500 mt-1">ID: {item.item_id}</div>
+                        </td>
+                        <td className="p-4">
+                          <Badge 
+                            variant="outline" 
+                            className="capitalize bg-slate-100 text-slate-700 border-slate-200"
+                          >
+                            {item.category}
+                          </Badge>
+                        </td>
+                        <td className="p-4">
+                          <VehicleTypeBadge type={item.vehicle_type} />
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <div className="font-medium text-slate-900">{item.stock_quantity}</div>
+                            <div className="w-2 h-2 rounded-full bg-slate-300"></div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="font-medium text-slate-900">₱{item.cost_price.toFixed(2)}</div>
+                        </td>
+                        <td className="p-4">
+                          <div className="font-medium text-slate-900">₱{item.sale_price.toFixed(2)}</div>
+                        </td>
+                        <td className="p-4">
+                          <Badge
+                            variant="outline"
+                            className={
+                              margin >= 30 ? 'bg-green-100 text-green-700 border-green-200' :
+                              margin >= 15 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                              'bg-red-100 text-red-700 border-red-200'
+                            }
+                          >
+                            {margin.toFixed(1)}%
+                          </Badge>
+                        </td>
+                        <td className="p-4">
+                          <Badge variant="outline" className={stockStatus.color}>
+                            {stockStatus.text}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Summary Footer */}
+          <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="text-sm text-slate-600">
+                  <span className="font-medium">Total Value:</span> 
+                  <span className="ml-2 font-bold text-slate-800">
+                    ₱{items.reduce((acc, item) => acc + (item.sale_price * item.stock_quantity), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="h-4 w-px bg-slate-300"></div>
+                <div className="text-sm text-slate-600">
+                  <span className="font-medium">Average Margin:</span> 
+                  <span className="ml-2 font-bold text-slate-800">
+                    {items.length > 0 
+                      ? (items.reduce((acc, item) => acc + calculateMargin(item), 0) / items.length).toFixed(1) 
+                      : '0.0'}%
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">
+                  In Stock: {items.filter(i => i.stock_quantity > 5).length}
+                </Badge>
+                <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-200">
+                  Low: {items.filter(i => i.stock_quantity > 2 && i.stock_quantity <= 5).length}
+                </Badge>
+                <Badge variant="outline" className="bg-red-100 text-red-700 border-red-200">
+                  Critical: {items.filter(i => i.stock_quantity > 0 && i.stock_quantity <= 2).length}
+                </Badge>
+                <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-200">
+                  Out: {items.filter(i => i.stock_quantity === 0).length}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Dialog Footer */}
+        <div className="p-6 border-t border-slate-200 bg-white flex justify-end gap-3">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="flex items-center gap-2 border-slate-300 hover:border-slate-400"
+          >
             <X className="h-4 w-4" />
             Close
           </Button>
-        </DialogFooter>
+          <Button
+            onClick={() => {
+              handleExportExcel();
+              onClose();
+            }}
+            className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Export This List
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
 };
+
 
 export default function EnhancedInventoryPage() {
   const { toast } = useToast();
@@ -1786,55 +1902,55 @@ export default function EnhancedInventoryPage() {
           onShowDetails={() => setIsCriticalDetailsOpen(true)}
         />
 
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          {/* Add New Item - large gradient card */}
-          <button
-            type="button"
-            onClick={handleOpenAddDialog}
-            className="min-w-[220px] flex-1 sm:flex-auto flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1"
-            style={{ background: 'linear-gradient(90deg,#7c3aed 0%,#4f46e5 100%)' }}
-          >
-            <div className="text-left">
-              <div className="text-lg font-semibold">Add New Item</div>
-              <div className="text-sm opacity-90">Create a new inventory item</div>
-            </div>
-            <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
-              <Plus className="h-5 w-5 text-white" />
-            </div>
-          </button>
+<div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+  {/* Add New Item */}
+  <button
+    type="button"
+    onClick={handleOpenAddDialog}
+    className="flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1 min-h-[100px] w-full"
+    style={{ background: 'linear-gradient(90deg,#7c3aed 0%,#4f46e5 100%)' }}
+  >
+    <div className="text-left">
+      <div className="text-lg font-semibold">Add New Item</div>
+      <div className="text-sm opacity-90">Create a new inventory item</div>
+    </div>
+    <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
+      <Plus className="h-5 w-5 text-white" />
+    </div>
+  </button>
 
-          {/* Export Excel - blue gradient card */}
-          <button
-            type="button"
-            onClick={handleExportExcel}
-            className="min-w-[220px] flex-1 sm:flex-auto flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1"
-            style={{ background: 'linear-gradient(90deg,#0ea5e9 0%,#0284c7 100%)' }}
-          >
-            <div className="text-left">
-              <div className="text-lg font-semibold">Export Excel</div>
-              <div className="text-sm opacity-90">Download filtered items</div>
-            </div>
-            <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
-              <Download className="h-5 w-5 text-white" />
-            </div>
-          </button>
+  {/* Export Excel */}
+  <button
+    type="button"
+    onClick={handleExportExcel}
+    className="flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1 min-h-[100px] w-full"
+    style={{ background: 'linear-gradient(90deg,#0ea5e9 0%,#0284c7 100%)' }}
+  >
+    <div className="text-left">
+      <div className="text-lg font-semibold">Export Excel</div>
+      <div className="text-sm opacity-90">Download filtered items</div>
+    </div>
+    <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
+      <Download className="h-5 w-5 text-white" />
+    </div>
+  </button>
 
-          {/* View More - green gradient card */}
-          <button
-            type="button"
-            onClick={() => setIsViewMoreOpen(true)}
-            className="min-w-[220px] flex-1 sm:flex-auto flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1"
-            style={{ background: 'linear-gradient(90deg,#10b981 0%,#06b6d4 100%)' }}
-          >
-            <div className="text-left">
-              <div className="text-lg font-semibold">View More</div>
-              <div className="text-sm opacity-90">Open detailed list</div>
-            </div>
-            <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
-              <Eye className="h-5 w-5 text-white" />
-            </div>
-          </button>
-        </div>
+  {/* View More */}
+  <button
+    type="button"
+    onClick={() => setIsViewMoreOpen(true)}
+    className="flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1 min-h-[100px] w-full"
+    style={{ background: 'linear-gradient(90deg,#10b981 0%,#06b6d4 100%)' }}
+  >
+    <div className="text-left">
+      <div className="text-lg font-semibold">View More</div>
+      <div className="text-sm opacity-90">Open detailed list</div>
+    </div>
+    <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
+      <Eye className="h-5 w-5 text-white" />
+    </div>
+  </button>
+</div>
 
         {/* Enhanced Inventory Table using DataTableWrapper */}
         <section aria-labelledby="inventory-list-heading">
@@ -1882,7 +1998,8 @@ export default function EnhancedInventoryPage() {
               filters={filters}
               onClearFilters={handleClearFilters}
               onAddItem={handleOpenAddDialog}
-            />
+              variant="table"
+              />
           </div>
         ) : (
           <>
@@ -1970,7 +2087,7 @@ export default function EnhancedInventoryPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-2xl bg-white border border-slate-200 shadow-2xl">
+        <DialogContent className="sm:max-w-2xl bg-white border border-slate-200 shadow-2xl font-poppins">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">
               {isEditItemDialogOpen ? 'Edit Item' : 'Add New Item'}
@@ -2214,7 +2331,7 @@ export default function EnhancedInventoryPage() {
       </Dialog>
 
       <Dialog open={isStockAdjustmentOpen} onOpenChange={(open) => { if (!open) { setIsStockAdjustmentOpen(false); setAdjustingItem(null); } }}>
-        <DialogContent className="sm:max-w-xl bg-white border border-slate-200 shadow-2xl">
+      <DialogContent className="sm:max-w-xl bg-white border border-slate-200 shadow-2xl font-poppins">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold">Adjust Stock</DialogTitle>
             <DialogDescription>Modify stock quantity for the selected item</DialogDescription>
@@ -2233,7 +2350,7 @@ export default function EnhancedInventoryPage() {
 
       {/* === ADDED MISSING DELETE CONFIRMATION DIALOG === */}
       <AlertDialog open={isDeleteConfirmationOpen} onOpenChange={setIsDeleteConfirmationOpen}>
-        <AlertDialogContent className="bg-white border border-slate-200 shadow-xl rounded-xl">
+      <AlertDialogContent className="bg-white border border-slate-200 shadow-xl rounded-xl font-poppins">
           <AlertDialogHeader>
             <div className="mx-auto w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
               <Trash2 className="h-6 w-6 text-red-600" />
@@ -2312,7 +2429,6 @@ export default function EnhancedInventoryPage() {
         </div>
       )}
 
-// Update the global styles at the bottom of your component
 <style jsx global>{`
   @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
   
