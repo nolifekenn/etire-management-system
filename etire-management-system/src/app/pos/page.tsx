@@ -2574,11 +2574,11 @@ export default function POSPage() {
                 </CardContent>
 
                 <CardFooter className="flex flex-col gap-3 p-6 bg-slate-50/80 border-t border-slate-200/60">
-                  <Button
-                    className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins shadow-lg shadow-purple-500/30 w-full"
-                    onClick={handleProcessSale}
-                    disabled={cart.length === 0 || isSubmitting}
-                  >
+                    <Button
+                      className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins shadow-purple-500/30 w-full"
+                      onClick={handleProcessSale}
+                      disabled={cart.length === 0 || isSubmitting}
+                    >
                     {isSubmitting ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
