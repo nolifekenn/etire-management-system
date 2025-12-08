@@ -52,9 +52,37 @@
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
   }
+
+  html,
   body {
     @apply bg-background text-foreground;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
+  }
+
+  /* Prevent images and media from overflowing */
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Prevent tables from overflowing - make them scrollable */
+  table {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+
+  @media (min-width: 768px) {
+    table {
+      display: table;
+    }
   }
 }
 
@@ -64,78 +92,79 @@
 
 /* Mobile-first base styles */
 @layer utilities {
+
   /* Container responsive padding */
   .container-responsive {
     @apply px-4 sm:px-6 lg:px-8;
   }
-  
+
   /* Responsive text sizes */
   .text-responsive-xs {
     @apply text-xs sm:text-sm;
   }
-  
+
   .text-responsive-sm {
     @apply text-sm sm:text-base;
   }
-  
+
   .text-responsive-base {
     @apply text-base sm:text-lg lg:text-xl;
   }
-  
+
   .text-responsive-lg {
     @apply text-lg sm:text-xl lg:text-2xl;
   }
-  
+
   .text-responsive-xl {
     @apply text-xl sm:text-2xl lg:text-3xl;
   }
-  
+
   .text-responsive-2xl {
     @apply text-2xl sm:text-3xl lg:text-4xl;
   }
-  
+
   /* Responsive grid layouts */
   .grid-responsive {
     @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6;
   }
-  
+
   .grid-responsive-2 {
     @apply grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6;
   }
-  
+
   .grid-responsive-3 {
     @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6;
   }
-  
+
   /* Responsive spacing */
   .space-responsive {
     @apply space-y-4 sm:space-y-6 lg:space-y-8;
   }
-  
+
   .gap-responsive {
     @apply gap-3 sm:gap-4 lg:gap-6;
   }
-  
+
   /* Touch-friendly button sizes on mobile */
   .btn-touch {
     @apply min-h-[44px] min-w-[44px];
   }
-  
+
   /* Hide on mobile, show on desktop */
   .desktop-only {
     @apply hidden lg:block;
   }
-  
+
   /* Show on mobile, hide on desktop */
   .mobile-only {
     @apply block lg:hidden;
   }
-  
+
   /* Tablet and up only */
   .tablet-up {
     @apply hidden md:block;
   }
-  
+
   /* Mobile and tablet only */
   .tablet-down {
     @apply block md:hidden;
@@ -146,36 +175,64 @@
    MOBILE STYLES (< 640px)
    ============================================ */
 @media (max-width: 639px) {
-  /* Sidebar adjustments for mobile */
-  [data-sidebar="sidebar"] {
-    position: fixed !important;
-    z-index: 50;
-    transform: translateX(-100%);
-    transition: transform 0.3s ease-in-out;
+
+  /* Global container fixes */
+  .container,
+  [class*="container"] {
+    max-width: 100% !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    overflow-x: hidden;
   }
-  
-  [data-sidebar="sidebar"][data-state="open"] {
-    transform: translateX(0);
+
+  /* Fix any element that might overflow */
+  main,
+  section,
+  article,
+  div {
+    max-width: 100%;
   }
-  
-  /* Mobile overlay when sidebar is open */
-  .sidebar-overlay {
-    position: fixed;
-    inset: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 40;
+
+  /* Reduce large padding/margins on mobile */
+  .p-6,
+  .p-8,
+  .p-10 {
+    padding: 1rem !important;
   }
-  
-  /* Better touch targets */
-  button, 
-  a, 
-  [role="button"],
-  input[type="checkbox"],
-  input[type="radio"] {
+
+  .px-6,
+  .px-8,
+  .px-10 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  .py-6,
+  .py-8,
+  .py-10 {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+  }
+
+  .m-6,
+  .m-8,
+  .m-10 {
+    margin: 0.75rem !important;
+  }
+
+  .mx-6,
+  .mx-8,
+  .mx-10 {
+    margin-left: 0.75rem !important;
+    margin-right: 0.75rem !important;
+  }
+
+  /* Better touch targets - but not for inline links */
+  button:not(.inline-btn),
+  [role="button"]:not(.inline-btn) {
     min-height: 44px;
-    min-width: 44px;
   }
-  
+
   /* Full-width inputs on mobile */
   input:not([type="checkbox"]):not([type="radio"]),
   select,
@@ -183,53 +240,97 @@
     width: 100% !important;
     min-height: 44px;
   }
-  
+
   /* Stack form layouts on mobile */
   .form-row {
     flex-direction: column !important;
     gap: 1rem;
   }
-  
-  /* Full-width cards on mobile */
-  .card {
-    margin-left: -1rem;
-    margin-right: -1rem;
-    border-radius: 0;
+
+  /* Cards should have less padding on mobile */
+  .card,
+  [class*="Card"] {
+    padding: 0.75rem !important;
   }
-  
+
+  /* Fix grids on mobile - single column */
+  .grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* But allow 2-column grids for small items */
+  .grid-cols-2:not(.force-1-col) {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
   /* Responsive tables - horizontal scroll */
-  .table-responsive {
+  .table-responsive,
+  table {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    display: block;
+    max-width: 100%;
   }
-  
-  /* Dialog/modal adjustments */
+
+  /* Dialog/modal adjustments - full screen on mobile */
   [role="dialog"] {
     width: 100% !important;
     max-width: 100% !important;
+    min-width: 0 !important;
     margin: 0 !important;
     border-radius: 0 !important;
     max-height: 100vh;
+    top: 0 !important;
+    left: 0 !important;
+    transform: none !important;
   }
-  
+
   /* Hide less important columns on mobile tables */
   .hide-mobile {
     display: none !important;
   }
-  
-  /* Reduce padding on mobile */
-  .p-responsive {
-    padding: 0.75rem !important;
-  }
-  
+
   /* Stack buttons on mobile */
-  .button-group {
-    flex-direction: column;
-    width: 100%;
+  .button-group,
+  .flex.gap-2,
+  .flex.gap-3,
+  .flex.gap-4 {
+    flex-wrap: wrap;
   }
-  
-  .button-group > * {
-    width: 100%;
+
+  /* Reduce text sizes on mobile */
+  .text-4xl {
+    font-size: 1.5rem !important;
+  }
+
+  .text-3xl {
+    font-size: 1.25rem !important;
+  }
+
+  .text-2xl {
+    font-size: 1.125rem !important;
+  }
+
+  .text-xl {
+    font-size: 1rem !important;
+  }
+
+  /* Fix flex items from overflowing */
+  .flex {
+    min-width: 0;
+  }
+
+  .flex>* {
+    min-width: 0;
+    flex-shrink: 1;
+  }
+
+  /* Truncate long text */
+  .truncate-mobile {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
   }
 }
 
@@ -237,28 +338,29 @@
    TABLET STYLES (640px - 1023px)
    ============================================ */
 @media (min-width: 640px) and (max-width: 1023px) {
+
   /* Collapsible sidebar on tablet */
   [data-sidebar="sidebar"] {
     width: 80px !important;
   }
-  
+
   [data-sidebar="sidebar"][data-state="expanded"] {
     width: 256px !important;
   }
-  
+
   /* Touch-friendly but slightly smaller targets */
-  button, 
-  a, 
+  button,
+  a,
   [role="button"] {
     min-height: 40px;
   }
-  
+
   /* Tablet dialog sizing */
   [role="dialog"] {
     max-width: 90vw !important;
     max-height: 90vh;
   }
-  
+
   /* Show some columns hidden on mobile */
   .show-tablet {
     display: table-cell !important;
@@ -269,17 +371,18 @@
    DESKTOP STYLES (>= 1024px)
    ============================================ */
 @media (min-width: 1024px) {
+
   /* Full sidebar on desktop */
   [data-sidebar="sidebar"] {
     position: relative;
     transform: translateX(0);
   }
-  
+
   /* Standard dialog sizing */
   [role="dialog"] {
     max-width: 600px;
   }
-  
+
   /* Show all table columns */
   .hide-mobile,
   .show-tablet {
@@ -291,11 +394,12 @@
    LARGE DESKTOP STYLES (>= 1280px)
    ============================================ */
 @media (min-width: 1280px) {
+
   /* Larger dialogs for big screens */
   [role="dialog"].dialog-lg {
     max-width: 800px;
   }
-  
+
   [role="dialog"].dialog-xl {
     max-width: 1000px;
   }
@@ -305,6 +409,7 @@
    PRINT STYLES
    ============================================ */
 @media print {
+
   /* Hide navigation and non-essential elements */
   [data-sidebar="sidebar"],
   .no-print,
@@ -312,14 +417,14 @@
   nav {
     display: none !important;
   }
-  
+
   /* Full width content when printing */
   main {
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
   }
-  
+
   /* Ensure links show URLs when printed */
   a[href]:after {
     content: " (" attr(href) ")";
@@ -340,6 +445,7 @@
 
 /* Reduce motion for users who prefer it */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -389,7 +495,7 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
-  
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;

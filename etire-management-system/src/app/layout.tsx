@@ -7,7 +7,7 @@ import { SidebarNav } from '@/components/SidebarNav';
 import { AuthProvider } from '@/hooks/useAuth';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Menu, X } from 'lucide-react';
 import { Toaster } from '@/components/ui/toaster';
 import { useNotificationListener } from '@/hooks/useNotificationListener';
 import './globals.css';
@@ -18,6 +18,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Enable real-time notification toasts
   useNotificationListener();
@@ -26,6 +27,11 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setIsHydrated(true);
   }, []);
+
+  // Close mobile sidebar when route changes
+  useEffect(() => {
+    setIsMobileSidebarOpen(false);
+  }, [pathname]);
 
   // Debug log
   useEffect(() => {
@@ -79,6 +85,18 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Prevent body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (isMobileSidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileSidebarOpen]);
+
   // Show loading during hydration or auth loading
   if (!isHydrated || isLoading) {
     return (
@@ -102,11 +120,46 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <div className="flex h-screen w-full overflow-hidden bg-gray-50">
-        {/* Sidebar */}
-        <SidebarNav />
+        {/* Mobile Header Bar */}
+        <div className="fixed top-0 left-0 right-0 z-40 lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
+          <button
+            onClick={() => setIsMobileSidebarOpen(true)}
+            className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+            aria-label="Open menu"
+          >
+            <Menu className="h-6 w-6 text-gray-700" />
+          </button>
+          <h1 className="text-lg font-bold text-gray-800">eTire Manager</h1>
+          <div className="w-10" /> {/* Spacer for centering */}
+        </div>
 
-        {/* Main Content */}
-        <main className="flex-1 overflow-auto">
+        {/* Mobile Sidebar Overlay */}
+        {isMobileSidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          />
+        )}
+
+        {/* Sidebar - hidden on mobile by default, shown when isMobileSidebarOpen */}
+        <div className={`
+          fixed inset-y-0 left-0 z-50 lg:relative lg:z-auto
+          transform transition-transform duration-300 ease-in-out
+          ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}>
+          {/* Mobile close button */}
+          <button
+            onClick={() => setIsMobileSidebarOpen(false)}
+            className="absolute top-4 right-4 z-50 p-2 rounded-lg bg-gray-100 hover:bg-gray-200 lg:hidden"
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5 text-gray-700" />
+          </button>
+          <SidebarNav />
+        </div>
+
+        {/* Main Content - add top padding on mobile for header */}
+        <main className="flex-1 overflow-x-hidden overflow-y-auto pt-16 lg:pt-0">
           {children}
         </main>
       </div>
