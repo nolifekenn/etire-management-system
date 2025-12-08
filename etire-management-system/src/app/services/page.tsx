@@ -396,7 +396,7 @@ const SearchInput = ({
   id: string;
 }) => {
   const [localValue, setLocalValue] = useState(value);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setLocalValue(value);
@@ -3137,7 +3137,6 @@ export default function EnhancedServiceManagementPage() {
                                 onPageChange={setCurrentPage}
                                 totalItems={filteredJobs.length}
                                 rowsPerPage={rowsPerPage}
-                                onRowsPerPageChange={setRowsPerPage} // This prop was missing in PaginationControls
                             />
                         )}
                     </div>
