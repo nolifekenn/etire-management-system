@@ -315,14 +315,27 @@
     font-size: 1rem !important;
   }
 
-  /* Fix flex items from overflowing */
-  .flex {
+  /* Fix flex items from overflowing - but not sidebar */
+  .flex:not([data-sidebar]):not([data-sidebar] *) {
     min-width: 0;
   }
 
-  .flex>* {
+  .flex:not([data-sidebar]):not([data-sidebar] *)>* {
     min-width: 0;
     flex-shrink: 1;
+  }
+
+  /* Ensure sidebar nav items display properly */
+  [data-sidebar] .flex,
+  [data-sidebar="menu"] a,
+  [data-sidebar="menu-button"] {
+    min-width: auto;
+    overflow: visible;
+  }
+
+  [data-sidebar] span {
+    flex-shrink: 0;
+    white-space: nowrap;
   }
 
   /* Truncate long text */
