@@ -1977,7 +1977,7 @@ export default function EnhancedCustomersPage() {
                   <Users className="h-6 w-6 opacity-90" />
                   Manage customers, vehicles, and tire service history
                 </p>
-                <div className="flex items-center gap-4 text-lg hidden sm:flex">
+                <div className="hidden sm:flex items-center gap-4 text-lg">
                   {lastUpdated && (
                     <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
                       <Clock className="w-5 h-5" />
