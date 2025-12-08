@@ -158,7 +158,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
             >
               <X className="h-5 w-5 text-gray-700" />
             </button>
-            <SidebarNav />
+            <SidebarNav forceExpanded={true} />
           </div>
         </div>
 
