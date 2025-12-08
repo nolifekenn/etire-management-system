@@ -52,18 +52,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }, 10000);
 
     const fetchUserProfile = async (authUserId: string): Promise<ExtendedUser | null> => {
+      console.log("[useAuth] fetchUserProfile called with authUserId:", authUserId);
       try {
+        console.log("[useAuth] Querying user table...");
         const { data: profile, error } = await supabase
           .from("user")
           .select("user_id, name, username, role")
           .eq("uuid", authUserId)
           .single();
 
+        console.log("[useAuth] Query result - profile:", profile, "error:", error);
+
         if (profile && !error) {
           console.log("[useAuth] Profile found:", (profile as any).username);
           return profile as any;
         } else {
-          console.error("[useAuth] Failed to fetch user profile:", error);
+          console.error("[useAuth] Failed to fetch user profile. Error:", JSON.stringify(error));
+          console.error("[useAuth] Profile data:", profile);
           return null;
         }
       } catch (err) {
@@ -172,12 +177,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.log(`[useAuth] Handling ${event} - fetching profile`);
 
         const profile = await fetchUserProfile(session.user.id);
+        console.log(`[useAuth] After fetchUserProfile - got profile:`, !!profile, "mounted:", mounted);
+
         if (mounted) {
           if (profile) {
+            console.log("[useAuth] Setting user to profile");
             setUser(profile);
+          } else {
+            console.log("[useAuth] No profile found, user will be null");
           }
+          console.log("[useAuth] Setting isLoading to false");
           setIsLoading(false);
           hasInitialized = true;
+        } else {
+          console.log("[useAuth] Component unmounted, not updating state");
         }
         return;
       }
