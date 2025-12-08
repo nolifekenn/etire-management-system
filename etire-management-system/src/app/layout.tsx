@@ -120,8 +120,8 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <div className="flex h-screen w-full overflow-hidden bg-gray-50">
-        {/* Mobile Header Bar */}
-        <div className="fixed top-0 left-0 right-0 z-40 lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
+        {/* Mobile Header Bar - only visible below lg breakpoint */}
+        <div className="fixed top-0 left-0 right-0 z-30 lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
           <button
             onClick={() => setIsMobileSidebarOpen(true)}
             className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
@@ -133,28 +133,37 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
           <div className="w-10" /> {/* Spacer for centering */}
         </div>
 
-        {/* Mobile Sidebar Overlay */}
-        {isMobileSidebarOpen && (
+        {/* Mobile Sidebar Overlay + Drawer - only rendered below lg breakpoint */}
+        <div className={`
+          fixed inset-0 z-40 lg:hidden
+          transition-opacity duration-300
+          ${isMobileSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
+        `}>
+          {/* Backdrop */}
           <div
-            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+            className="absolute inset-0 bg-black/50"
             onClick={() => setIsMobileSidebarOpen(false)}
           />
-        )}
+          {/* Drawer */}
+          <div className={`
+            absolute inset-y-0 left-0 w-64 bg-white shadow-2xl
+            transform transition-transform duration-300 ease-in-out
+            ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          `}>
+            {/* Close button */}
+            <button
+              onClick={() => setIsMobileSidebarOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-lg bg-gray-100 hover:bg-gray-200 z-10"
+              aria-label="Close menu"
+            >
+              <X className="h-5 w-5 text-gray-700" />
+            </button>
+            <SidebarNav />
+          </div>
+        </div>
 
-        {/* Sidebar - hidden on mobile by default, shown when isMobileSidebarOpen */}
-        <div className={`
-          fixed inset-y-0 left-0 z-50 lg:relative lg:z-auto
-          transform transition-transform duration-300 ease-in-out
-          ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        `}>
-          {/* Mobile close button */}
-          <button
-            onClick={() => setIsMobileSidebarOpen(false)}
-            className="absolute top-4 right-4 z-50 p-2 rounded-lg bg-gray-100 hover:bg-gray-200 lg:hidden"
-            aria-label="Close menu"
-          >
-            <X className="h-5 w-5 text-gray-700" />
-          </button>
+        {/* Desktop Sidebar - only visible at lg breakpoint and above */}
+        <div className="hidden lg:block">
           <SidebarNav />
         </div>
 
