@@ -33,7 +33,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let mounted = true;
-    let hasInitialized = false; // Prevent double-processing
+    let hasInitialized = false;
 
     // Check if supabase client is available
     if (!supabase) {
@@ -51,34 +51,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     }, 10000);
 
+    // Fetch user profile with timeout
     const fetchUserProfile = async (authUserId: string): Promise<ExtendedUser | null> => {
       console.log("[useAuth] fetchUserProfile called with authUserId:", authUserId);
 
-      // Create a timeout promise
-      const timeoutPromise = new Promise<null>((resolve) => {
+      // Small delay to let session fully sync
+      await new Promise(resolve => setTimeout(resolve, 300));
+      console.log("[useAuth] Delay complete, now querying...");
+
+      // Timeout promise
+      const timeout = new Promise<null>((resolve) => {
         setTimeout(() => {
-          console.error("[useAuth] Profile query timed out after 5 seconds");
+          console.error("[useAuth] Profile query timed out after 8 seconds");
           resolve(null);
-        }, 5000);
+        }, 8000);
       });
 
-      const queryPromise = (async () => {
+      // Query promise
+      const query = (async (): Promise<ExtendedUser | null> => {
         try {
           console.log("[useAuth] Querying user table...");
           const { data: profile, error } = await supabase
             .from("user")
             .select("user_id, name, username, role")
             .eq("uuid", authUserId)
-            .single();
+            .maybeSingle();
 
           console.log("[useAuth] Query result - profile:", profile, "error:", error);
 
           if (profile && !error) {
             console.log("[useAuth] Profile found:", (profile as any).username);
             return profile as ExtendedUser;
-          } else {
+          } else if (error) {
             console.error("[useAuth] Failed to fetch user profile. Error:", JSON.stringify(error));
-            console.error("[useAuth] Profile data:", profile);
+            return null;
+          } else {
+            console.warn("[useAuth] No profile found for uuid:", authUserId);
             return null;
           }
         } catch (err) {
@@ -87,8 +95,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       })();
 
-      // Race between the query and the timeout
-      return Promise.race([queryPromise, timeoutPromise]);
+      return Promise.race([query, timeout]);
     };
 
     const initializeAuth = async () => {
@@ -99,7 +106,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (sessionError) {
           console.error("[useAuth] getSession error:", sessionError);
-          // Don't return here - continue to set loading false
         }
 
         if (session?.user) {
@@ -180,7 +186,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       // For INITIAL_SESSION, skip if we've already initialized via getSession
-      // This prevents the race condition where INITIAL_SESSION fires before getSession completes
       if (event === 'INITIAL_SESSION' && hasInitialized) {
         console.log("[useAuth] Skipping INITIAL_SESSION - already initialized via getSession");
         return;
@@ -236,7 +241,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     try {
-      // Use dummy email format as per project convention
       const email = `${username}@etire-system.local`;
 
       const { error } = await supabase.auth.signInWithPassword({
@@ -269,7 +273,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsLoading(true);
     try {
       await supabase.auth.signOut();
-      // State updates and redirect are handled by onAuthStateChange ('SIGNED_OUT' event)
     } catch (error) {
       console.error("Logout Error:", error);
       setIsLoading(false);
