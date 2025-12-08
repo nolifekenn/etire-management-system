@@ -53,28 +53,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const fetchUserProfile = async (authUserId: string): Promise<ExtendedUser | null> => {
       console.log("[useAuth] fetchUserProfile called with authUserId:", authUserId);
-      try {
-        console.log("[useAuth] Querying user table...");
-        const { data: profile, error } = await supabase
-          .from("user")
-          .select("user_id, name, username, role")
-          .eq("uuid", authUserId)
-          .single();
 
-        console.log("[useAuth] Query result - profile:", profile, "error:", error);
+      // Create a timeout promise
+      const timeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => {
+          console.error("[useAuth] Profile query timed out after 5 seconds");
+          resolve(null);
+        }, 5000);
+      });
 
-        if (profile && !error) {
-          console.log("[useAuth] Profile found:", (profile as any).username);
-          return profile as any;
-        } else {
-          console.error("[useAuth] Failed to fetch user profile. Error:", JSON.stringify(error));
-          console.error("[useAuth] Profile data:", profile);
+      const queryPromise = (async () => {
+        try {
+          console.log("[useAuth] Querying user table...");
+          const { data: profile, error } = await supabase
+            .from("user")
+            .select("user_id, name, username, role")
+            .eq("uuid", authUserId)
+            .single();
+
+          console.log("[useAuth] Query result - profile:", profile, "error:", error);
+
+          if (profile && !error) {
+            console.log("[useAuth] Profile found:", (profile as any).username);
+            return profile as ExtendedUser;
+          } else {
+            console.error("[useAuth] Failed to fetch user profile. Error:", JSON.stringify(error));
+            console.error("[useAuth] Profile data:", profile);
+            return null;
+          }
+        } catch (err) {
+          console.error("[useAuth] Exception fetching user profile:", err);
           return null;
         }
-      } catch (err) {
-        console.error("[useAuth] Exception fetching user profile:", err);
-        return null;
-      }
+      })();
+
+      // Race between the query and the timeout
+      return Promise.race([queryPromise, timeoutPromise]);
     };
 
     const initializeAuth = async () => {
