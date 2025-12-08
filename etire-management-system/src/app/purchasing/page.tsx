@@ -1263,7 +1263,7 @@ const EnhancedTableRow = ({
               e.stopPropagation();
               onEdit(item);
             }}
-            className="p-1.5 text-slate-600 text-purple-600 rounded-md transition-colors border border-transparent"
+            className="p-1.5 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-md transition-colors border border-transparent"
             title="Edit"
           >
             <Edit className="h-3.5 w-3.5" />
