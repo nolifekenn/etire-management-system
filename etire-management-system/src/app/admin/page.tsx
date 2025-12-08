@@ -81,16 +81,21 @@ export default function AdminPage() {
   }, []);
 
   const fetchUsers = useCallback(async () => {
-    if (!supabase) return;
     setIsLoading(true);
-    const { data, error } = await supabase.from('user').select('*').order('name', { ascending: true });
+    try {
+      const response = await fetch('/api/admin/users');
+      const result = await response.json();
 
-    if (error) {
-      setFetchError(`Could not fetch users: ${error.message}`);
+      if (!response.ok) {
+        setFetchError(result.error || 'Could not fetch users');
+        setUsers([]);
+      } else {
+        setUsers(result.data as User[]);
+        setFetchError(null);
+      }
+    } catch (err: any) {
+      setFetchError(`Could not fetch users: ${err.message}`);
       setUsers([]);
-    } else {
-      setUsers(data as User[]);
-      setFetchError(null);
     }
     setIsLoading(false);
   }, []);
@@ -131,17 +136,25 @@ export default function AdminPage() {
   };
 
   const handleQuickApprove = async (userToApprove: User) => {
-    if (!supabase) return;
     setIsLoading(true);
-    const { error } = await supabase.from('user').update({ role: 1 }).eq('user_id', userToApprove.user_id);
-    setIsLoading(false);
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userToApprove.user_id, role: 1 }),
+      });
+      const result = await response.json();
 
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "User Approved", description: `${userToApprove.name} is now a Staff member.` });
-      fetchUsers();
+      if (!response.ok) {
+        toast({ title: "Error", description: result.error || 'Failed to approve user', variant: "destructive" });
+      } else {
+        toast({ title: "User Approved", description: `${userToApprove.name} is now a Staff member.` });
+        fetchUsers();
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
+    setIsLoading(false);
   };
 
   const handleOpenDeleteDialog = (userToDelete: User) => {
@@ -202,7 +215,6 @@ export default function AdminPage() {
   ], []);
 
   const handleSubmit = async () => {
-    if (!supabase) return;
     if (!name || !username) {
       toast({ title: "Validation Error", description: "Name and Username are required.", variant: "destructive" });
       return;
@@ -214,71 +226,102 @@ export default function AdminPage() {
 
     setIsLoading(true);
 
-    let error;
-    if (editingUser) {
-      const updateData: any = {};
-      if (password) updateData.password = password;
+    try {
+      if (editingUser) {
+        // Update existing user (password reset)
+        if (!password) {
+          setIsLoading(false);
+          setIsEditUserDialogOpen(false);
+          toast({ title: "No Changes", description: "No data was changed." });
+          return;
+        }
 
-      if (Object.keys(updateData).length === 0) {
-        setIsLoading(false);
-        setIsEditUserDialogOpen(false);
-        toast({ title: "No Changes", description: "No data was changed." });
-        return;
+        const response = await fetch('/api/admin/users', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: editingUser.user_id, password }),
+        });
+        const result = await response.json();
+
+        if (!response.ok) {
+          toast({ title: "Save Error", description: result.error || 'Failed to update user', variant: "destructive" });
+        } else {
+          toast({ title: "Success", description: "User password updated successfully." });
+          setIsEditUserDialogOpen(false);
+          fetchUsers();
+        }
+      } else {
+        // Create new user
+        const response = await fetch('/api/admin/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, username, password, role }),
+        });
+        const result = await response.json();
+
+        if (!response.ok) {
+          toast({ title: "Save Error", description: result.error || 'Failed to create user', variant: "destructive" });
+        } else {
+          toast({ title: "Success", description: "User created successfully." });
+          setIsAddUserDialogOpen(false);
+          fetchUsers();
+        }
       }
-
-      const { error: updateError } = await supabase.from('user').update(updateData).eq('user_id', editingUser.user_id);
-      error = updateError;
-    } else {
-      const insertData = { name, username, password, role };
-      const { error: insertError } = await supabase.from('user').insert([insertData]);
-      error = insertError;
+    } catch (err: any) {
+      toast({ title: "Save Error", description: err.message, variant: "destructive" });
     }
-
     setIsLoading(false);
-
-    if (error) {
-      toast({ title: "Save Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: editingUser ? "User updated successfully." : "User created successfully." });
-      setIsAddUserDialogOpen(false);
-      setIsEditUserDialogOpen(false);
-      fetchUsers();
-    }
   };
 
   const handleRoleSubmit = async () => {
-    if (!supabase || !roleUser) return;
+    if (!roleUser) return;
     if (roleUser.role === role) {
       setIsRoleDialogOpen(false);
       return;
     }
 
     setIsLoading(true);
-    const { error } = await supabase.from('user').update({ role: role }).eq('user_id', roleUser.user_id);
-    setIsLoading(false);
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: roleUser.user_id, role }),
+      });
+      const result = await response.json();
 
-    if (error) {
-      toast({ title: "Error", description: "Failed to update role.", variant: "destructive" });
-    } else {
-      toast({ title: "Access Updated", description: `Role for ${roleUser.name} has been updated.` });
-      setIsRoleDialogOpen(false);
-      fetchUsers();
+      if (!response.ok) {
+        toast({ title: "Error", description: result.error || 'Failed to update role', variant: "destructive" });
+      } else {
+        toast({ title: "Access Updated", description: `Role for ${roleUser.name} has been updated.` });
+        setIsRoleDialogOpen(false);
+        fetchUsers();
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
+    setIsLoading(false);
   };
 
   const handleDeleteUser = async () => {
-    if (!deletingUser || !supabase) return;
+    if (!deletingUser) return;
     setIsLoading(true);
-    const { error } = await supabase.from('user').delete().eq('user_id', deletingUser.user_id);
-    setIsLoading(false);
+    try {
+      const response = await fetch(`/api/admin/users?user_id=${deletingUser.user_id}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
 
-    if (error) {
-      toast({ title: "Delete Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Success", description: "User deleted successfully." });
-      setIsDeleteConfirmationOpen(false);
-      fetchUsers();
+      if (!response.ok) {
+        toast({ title: "Delete Error", description: result.error || 'Failed to delete user', variant: "destructive" });
+      } else {
+        toast({ title: "Success", description: "User deleted successfully." });
+        setIsDeleteConfirmationOpen(false);
+        fetchUsers();
+      }
+    } catch (err: any) {
+      toast({ title: "Delete Error", description: err.message, variant: "destructive" });
     }
+    setIsLoading(false);
   };
 
   const getRoleName = (roleId: number) => {
