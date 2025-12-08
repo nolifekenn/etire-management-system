@@ -285,10 +285,10 @@ export function SidebarNav({ forceExpanded = false }: SidebarNavProps) {
           bg-white text-gray-700
           shadow-xl shadow-purple-100/50 border-r border-gray-200
           transition-all duration-300 ease-in-out
-          ${isCollapsed ? 'w-20' : 'w-64'}
+          ${forceExpanded ? 'w-full' : (isCollapsed ? 'w-20' : 'w-64')}
           font-poppins
         `}
-        style={{
+        style={forceExpanded ? {} : {
           width: isCollapsed ? '5rem' : '16rem',
           minWidth: isCollapsed ? '5rem' : '16rem',
           maxWidth: isCollapsed ? '5rem' : '16rem',
