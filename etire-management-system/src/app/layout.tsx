@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { SidebarNav } from '@/components/SidebarNav';
 import { AuthProvider } from '@/hooks/useAuth';
