@@ -189,18 +189,18 @@ export default function EnhancedReportsPage() {
     fetchSummary();
   };
 
-  // Chart data calculations
+  // Chart data calculations - UPDATED COLORS
   const revenueSourcesData = [
     { 
       name: 'Sales Revenue', 
       value: Math.max(0, summary.totalRevenue - summary.serviceFees),
-      color: '#9333ea',
+      color: '#9333ea', // Purple
       description: 'Revenue from product sales'
     },
     { 
       name: 'Service Revenue', 
       value: summary.serviceFees,
-      color: '#7700ef',
+      color: '#4f46e5', // Indigo
       description: 'Revenue from service jobs'
     }
   ];
@@ -230,13 +230,13 @@ export default function EnhancedReportsPage() {
     {
       name: 'Current Value',
       value: summary.stockValue,
-      color: '#f97316',
+      color: '#3b82f6', // Blue (replaced orange)
       description: 'Total cost of inventory on hand'
     },
     {
       name: 'Potential Revenue',
       value: summary.potentialRevenue,
-      color: '#14b8a6',
+      color: '#14b8a6', // Teal
       description: 'Revenue if all inventory is sold'
     }
   ];
@@ -247,7 +247,7 @@ export default function EnhancedReportsPage() {
       value: summary.profitMargin, 
       target: 20, 
       unit: '%', 
-      color: '#10b981',
+      color: '#10b981', // Green
       description: 'Profit as percentage of revenue',
       icon: <Percent className="w-4 h-4" />
     },
@@ -256,7 +256,7 @@ export default function EnhancedReportsPage() {
       value: summary.gmroi, 
       target: 50, 
       unit: '%', 
-      color: '#3b82f6',
+      color: '#3b82f6', // Blue
       description: 'Gross Margin Return on Inventory',
       icon: <TrendingUpIcon className="w-4 h-4" />
     },
@@ -265,7 +265,7 @@ export default function EnhancedReportsPage() {
       value: Math.min((summary.completedJobs / 100) * 100, 100), 
       target: 80, 
       unit: '%', 
-      color: '#8b5cf6',
+      color: '#8b5cf6', // Violet
       description: 'Job completion rate',
       icon: <CheckCircle className="w-4 h-4" />
     }
@@ -311,14 +311,15 @@ export default function EnhancedReportsPage() {
       icon: <WrenchIcon className="h-5 w-5 text-white" />,
       change: 15.3,
       trend: "up",
-      color: "from-rose-600 to-red-600",
-      bgColor: "bg-rose-500/10",
+      color: "from-violet-600 to-purple-600", // Changed from red to violet
+      bgColor: "bg-violet-500/10", // Changed from red to violet
       description: "Revenue from service jobs",
-      iconBg: "bg-gradient-to-r from-rose-600 to-red-600"
+      iconBg: "bg-gradient-to-r from-violet-600 to-purple-600" // Changed from red to violet
     }
   ];
 
-  const COLORS = ['#9333ea', '#14b8a6', '#f97316', '#3b82f6'];
+  // UPDATED COLORS - Removed orange, using purple, blue, green, teal palette
+  const COLORS = ['#9333ea', '#3b82f6', '#10b981', '#8b5cf6'];
 
   return (
     <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
@@ -563,7 +564,7 @@ export default function EnhancedReportsPage() {
                         type="monotone" 
                         dataKey="target" 
                         name="Target"
-                        stroke="#f59e0b" 
+                        stroke="#8b5cf6" // Changed from yellow to violet
                         strokeWidth={2}
                         strokeDasharray="5 5"
                         dot={false}
@@ -596,9 +597,9 @@ export default function EnhancedReportsPage() {
                         ₱{summary.totalProfit.toLocaleString()}
                       </p>
                     </div>
-                    <div className="text-center p-3 bg-amber-50 rounded-lg">
-                      <p className="text-xs text-amber-700 font-medium">Growth</p>
-                      <p className="text-lg font-bold text-amber-900">
+                    <div className="text-center p-3 bg-violet-50 rounded-lg"> {/* Changed from amber to violet */}
+                      <p className="text-xs text-violet-700 font-medium">Growth</p>
+                      <p className="text-lg font-bold text-violet-900">
                         +{summary.revenueGrowth}%
                       </p>
                     </div>
@@ -621,7 +622,7 @@ export default function EnhancedReportsPage() {
             <Card className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-start gap-3 mb-6">
-                  <div className="p-3 bg-gradient-to-r from-orange-500 to-amber-600 rounded-xl">
+                  <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl"> {/* Changed from orange to blue */}
                     <PackageIcon className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1">
@@ -680,7 +681,7 @@ export default function EnhancedReportsPage() {
                   <div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-500 to-amber-600"></div>
+                        <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600"></div> {/* Changed from orange to blue */}
                         <span className="text-sm font-medium text-slate-800">Inventory Efficiency</span>
                       </div>
                       <div className="text-right">
@@ -694,7 +695,7 @@ export default function EnhancedReportsPage() {
                     </div>
                     <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-gradient-to-r from-orange-400 to-amber-500 rounded-full"
+                        className="h-full bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full" // Changed from orange to blue
                         style={{ 
                           width: `${Math.min(
                             summary.potentialRevenue > 0 
@@ -884,7 +885,7 @@ export default function EnhancedReportsPage() {
             <Card className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-start gap-3 mb-6">
-                  <div className="p-3 bg-gradient-to-r from-rose-500 to-red-600 rounded-xl">
+                  <div className="p-3 bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl"> {/* Changed from red to violet */}
                     <Wrench className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1">
