@@ -1077,6 +1077,9 @@ const ViewMoreDialog = ({
   isOpen: boolean;
   onClose: () => void;
 }) => {
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+
   const calculateMargin = (item: InventoryItem) => {
     if (!item.cost_price || item.cost_price === 0) return 0;
     return ((item.sale_price - item.cost_price) / item.cost_price) * 100;
@@ -1101,6 +1104,18 @@ const ViewMoreDialog = ({
       color: 'bg-green-100 text-green-700 border-green-200'
     };
   };
+
+  // Pagination logic
+  const totalPages = Math.ceil(items.length / rowsPerPage);
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage;
+    return items.slice(start, start + rowsPerPage);
+  }, [items, currentPage, rowsPerPage]);
+
+  // Reset page when rows per page changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [rowsPerPage]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -1128,6 +1143,22 @@ const ViewMoreDialog = ({
 
         {/* Table Container */}
         <div className="p-6">
+          {/* Rows Per Page Selector */}
+          <div className="mb-4 flex items-center justify-between">
+            <Label className="text-sm font-medium text-slate-700">Rows per page:</Label>
+            <Select value={String(rowsPerPage)} onValueChange={(v) => setRowsPerPage(Number(v))}>
+              <SelectTrigger className="w-24 h-9 border-slate-200 bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5</SelectItem>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="rounded-lg border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -1141,10 +1172,11 @@ const ViewMoreDialog = ({
                     <th className="text-left p-4 font-semibold text-slate-700 text-sm">Price</th>
                     <th className="text-left p-4 font-semibold text-slate-700 text-sm">Margin</th>
                     <th className="text-left p-4 font-semibold text-slate-700 text-sm">Status</th>
+                    <th className="text-left p-4 font-semibold text-slate-700 text-sm">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item) => {
+                  {paginatedItems.map((item) => {
                     const margin = calculateMargin(item);
                     const stockStatus = getStockStatusBadge(item.stock_quantity);
                     
@@ -1196,11 +1228,70 @@ const ViewMoreDialog = ({
                             {stockStatus.text}
                           </Badge>
                         </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                handleOpenEditDialog(item);
+                                onClose();
+                              }}
+                              className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              title="Edit Item"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                handleOpenDeleteDialog(item);
+                                onClose();
+                              }}
+                              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              title="Delete Item"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="mt-4 flex items-center justify-between">
+            <div className="text-sm text-slate-500">
+              Showing {items.length === 0 ? 0 : ((currentPage - 1) * rowsPerPage + 1)} to {Math.min(currentPage * rowsPerPage, items.length)} of {items.length} items
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="h-8 px-2"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-xs font-medium text-slate-700 px-3">
+                Page {currentPage} of {totalPages || 1}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="h-8 px-2"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           </div>
 
