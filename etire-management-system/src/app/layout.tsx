@@ -12,6 +12,7 @@ import { Loader2, Menu, X } from 'lucide-react';
 import { Toaster } from '@/components/ui/toaster';
 import { useNotificationListener } from '@/hooks/useNotificationListener';
 import './globals.css';
+import { logout } from "@/lib/logout";
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -23,6 +24,34 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 
   // Enable real-time notification toasts
   useNotificationListener();
+
+  useEffect(() => {
+  if (!user) return; // only run if logged in
+
+  let timeout: NodeJS.Timeout;
+
+  const resetTimer = () => {
+    clearTimeout(timeout);
+    timeout = setTimeout(async () => {
+      const confirmed = window.confirm("Your session has expired. Press OK to return to login.");
+      if (confirmed) {
+        await fetch("/api/logout"); // or supabase.auth.signOut()
+        router.replace("/login");
+      }
+    }, 30 * 60 * 1000); // 30 minutes
+  };
+
+  window.addEventListener("mousemove", resetTimer);
+  window.addEventListener("keydown", resetTimer);
+
+  resetTimer(); // start timer immediately
+
+  return () => {
+    window.removeEventListener("mousemove", resetTimer);
+    window.removeEventListener("keydown", resetTimer);
+    clearTimeout(timeout);
+  };
+}, [user, router]);
 
   // Mark as hydrated after initial render
   useEffect(() => {
