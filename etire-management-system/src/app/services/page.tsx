@@ -383,6 +383,14 @@ const CustomDateInput = ({ value, onChange, id, className = "" }: { value: strin
   );
 };
 
+// Add this helper function after the imports and before the design system constants
+const formatCurrency = (value: number): string => {
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
 // Optimized Search Input Component
 const SearchInput = ({ 
   value, 
@@ -740,7 +748,7 @@ const ServiceStats = ({ serviceJobs }: { serviceJobs: ServiceJob[] }) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-purple-100 text-sm font-medium font-poppins">Total Revenue</p>
-            <p className="text-3xl font-bold mt-2 font-poppins">₱{totalRevenue.toLocaleString()}</p>
+            <p className="text-3xl font-bold mt-2 font-poppins">₱{formatCurrency(totalRevenue)}</p>
           </div>
           <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
             <DollarSign className="h-6 w-6" />
@@ -1056,10 +1064,18 @@ const TabbedServiceForm = ({
     if (activeTab === 'review') setActiveTab('items');
     else if (activeTab === 'items') setActiveTab('basic');
   };
-
-  const isBasicValid = formData.customerId && formData.vehicleTypeId && 
-    (formData.selectedServiceType !== 'Other (Please specify below)' ? 
-      formData.jobDescription : formData.customJobDescription);
+  
+  const isBasicValid = useMemo(() => {
+    const hasCustomer = formData.customerId;
+    const hasVehicleType = formData.vehicleTypeId;
+    const hasServiceDescription = formData.selectedServiceType !== 'Other (Please specify below)' 
+      ? formData.jobDescription 
+      : formData.customJobDescription;
+    const serviceFeeValue = parseFloat(formData.serviceFee) || 0;
+    const isServiceFeeValid = serviceFeeValue > 0 && serviceFeeValue <= 100000;
+    
+    return hasCustomer && hasVehicleType && hasServiceDescription && isServiceFeeValid;
+  }, [formData]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -1262,15 +1278,41 @@ const TabbedServiceForm = ({
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="service-fee" className="text-slate-700 font-medium font-poppins">Service Fee</Label>
+                <Label htmlFor="service-fee" className="text-slate-700 font-medium font-poppins">Service Fee*</Label>
                 <Input
                   id="service-fee"
                   type="number"
                   value={formData.serviceFee}
-                  onChange={(e) => onFormDataChange({ ...formData, serviceFee: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    onFormDataChange({ ...formData, serviceFee: value });
+                  }}
+                  onBlur={(e) => {
+                    // On blur, if empty or 0, set to minimum value of 1
+                    const value = e.target.value;
+                    if (value === '' || parseFloat(value) === 0) {
+                      onFormDataChange({ ...formData, serviceFee: '1' });
+                    }
+                  }}
+                  min="1"
+                  max="100000"
+                  step="0.01"
                   disabled={isFieldsLocked}
-                  className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins ${isFieldsLocked ? 'bg-slate-100 cursor-not-allowed' : 'bg-white/80'}`}
+                  className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins ${
+                    isFieldsLocked ? 'bg-slate-100 cursor-not-allowed' : 'bg-white/80'
+                  } ${
+                    parseFloat(formData.serviceFee) > 100000 ? 'border-red-500 focus:border-red-500 focus:ring-red-200 bg-red-50' : ''
+                  }`}
                 />
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-slate-500 font-poppins">Maximum: ₱100,000.00</p>
+                  {parseFloat(formData.serviceFee) > 100000 && (
+                    <p className="text-xs text-red-600 font-semibold font-poppins flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Exceeds maximum limit
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -1580,6 +1622,7 @@ const TabbedServiceForm = ({
   );
 };
 
+// Expandable Row Component
 const ExpandableRow = ({ 
   job, 
   isExpanded, 
@@ -1672,11 +1715,11 @@ const ExpandableRow = ({
           </p>
           <div className="flex flex-col">
             <span className="text-sm font-semibold text-green-600 font-poppins">
-              ₱{grandTotal.toFixed(2)}
+              ₱{formatCurrency(grandTotal)}
             </span>
             {itemsTotal > 0 && (
               <span className="text-xs text-slate-500 font-poppins">
-                (₱{serviceFeeOnly.toFixed(2)} + ₱{itemsTotal.toFixed(2)})
+                (₱{formatCurrency(serviceFeeOnly)} + ₱{formatCurrency(itemsTotal)})
               </span>
             )}
           </div>
@@ -1756,7 +1799,7 @@ const ExpandableRow = ({
                 <div className="flex justify-between">
                   <span className="text-sm text-slate-600 font-poppins">Service Fee (Labor):</span>
                   <span className="text-sm font-semibold text-slate-800 font-poppins">
-                    ₱{serviceFeeOnly.toFixed(2)}
+                    ₱{formatCurrency(serviceFeeOnly)}
                   </span>
                 </div>
                 
@@ -1764,7 +1807,7 @@ const ExpandableRow = ({
                   <div className="flex justify-between">
                     <span className="text-sm text-slate-600 font-poppins">Items Total:</span>
                     <span className="text-sm font-semibold text-slate-800 font-poppins">
-                      ₱{itemsTotal.toFixed(2)}
+                      ₱{formatCurrency(itemsTotal)}
                     </span>
                   </div>
                 )}
@@ -1774,7 +1817,7 @@ const ExpandableRow = ({
                 <div className="flex justify-between">
                   <span className="text-sm font-semibold text-slate-800 font-poppins">Grand Total:</span>
                   <span className="text-sm font-bold text-green-600 font-poppins">
-                    ₱{grandTotal.toFixed(2)}
+                    ₱{formatCurrency(grandTotal)}
                   </span>
                 </div>
               </div>
@@ -1796,7 +1839,7 @@ const ExpandableRow = ({
                             </span>
                           </div>
                           <span className="font-semibold text-slate-800 font-poppins">
-                            ₱{inventoryItem ? (inventoryItem.sale_price * item.quantity).toFixed(2) : '0.00'}
+                            ₱{inventoryItem ? formatCurrency(inventoryItem.sale_price * item.quantity) : '0.00'}
                           </span>
                         </div>
                       );
@@ -2416,12 +2459,12 @@ export default function EnhancedServiceManagementPage() {
     // ✅ UPDATE: Enhanced Submit with Success Animation
     const handleSubmit = async () => {
       if (!supabase || !authUser) return;
-
+    
       const finalJobDescription =
         formData.selectedServiceType === 'Other (Please specify below)'
           ? formData.customJobDescription
           : formData.jobDescription;
-
+    
       if (!finalJobDescription) {
         toast({
           title: 'Validation Error',
@@ -2430,9 +2473,27 @@ export default function EnhancedServiceManagementPage() {
         });
         return;
       }
-
+    
+      // ADD THIS VALIDATION
       const feeOnly = parseFloat(formData.serviceFee) || 0;
-
+      if (feeOnly <= 0) {
+        toast({
+          title: 'Validation Error',
+          description: 'Service fee must be greater than zero.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    
+      if (feeOnly > 100000) {
+        toast({
+          title: 'Validation Error',
+          description: 'Service fee cannot exceed ₱100,000.00',
+          variant: 'destructive',
+        });
+        return;
+      }
+    
       const validItems = (formData.selectedItems || []).filter(
         (i) => i.item_id && i.quantity > 0
       );
@@ -2440,11 +2501,11 @@ export default function EnhancedServiceManagementPage() {
         const inv = inventoryItems.find((i) => i.item_id === item.item_id);
         return inv ? total + inv.sale_price * item.quantity : total;
       }, 0);
-
+    
       const isNowCompleted = formData.jobStatus === 'completed';
       const wasNotCompleted = editingJob ? formData.originalStatus !== 'completed' : true;
       const shouldCreateSale = isNowCompleted && wasNotCompleted;
-
+    
       if (shouldCreateSale && validItems.length > 0) {
         for (const item of validItems) {
           const inventoryItem = inventoryItems.find((i) => i.item_id === item.item_id);
@@ -2458,9 +2519,9 @@ export default function EnhancedServiceManagementPage() {
           }
         }
       }
-
+    
       setIsLoading(true);
-
+    
       try {
         const jobData = {
           user_id: authUser.user_id,
@@ -2473,7 +2534,7 @@ export default function EnhancedServiceManagementPage() {
           vehicle_type_id: formData.vehicleTypeId ? formData.vehicleTypeId : null,
           ...(!editingJob && { job_date: new Date().toISOString() })
         };
-
+    
         let jobId: string;
         
         if (editingJob) {
@@ -2484,7 +2545,7 @@ export default function EnhancedServiceManagementPage() {
           
           if (error) throw error;
           jobId = editingJob.job_id;
-
+    
           await supabase.from('service_job_item').delete().eq('job_id', jobId);
         } else {
           const { data, error } = await supabase
@@ -2497,7 +2558,7 @@ export default function EnhancedServiceManagementPage() {
           if (!data) throw new Error('Failed to create service job');
           jobId = data.job_id;
         }
-
+    
         if (validItems.length > 0) {
           const itemsToInsert = validItems.map(item => ({
             job_id: jobId,
@@ -2511,7 +2572,7 @@ export default function EnhancedServiceManagementPage() {
           
           if (itemsError) throw itemsError;
         }
-
+    
         if (shouldCreateSale && validItems.length > 0) {
           const saleData = {
             customer_id: formData.customerId === ANONYMOUS_CUSTOMER_ID ? null : formData.customerId,
@@ -2521,15 +2582,15 @@ export default function EnhancedServiceManagementPage() {
             user_id: authUser.user_id,
             job_id: jobId
           };
-
+    
           const { data: saleResult, error: saleError } = await supabase
             .from('sale')
             .insert([saleData])
             .select('sale_id')
             .single();
-
+    
           if (saleError) throw saleError;
-
+    
           if (saleResult) {
             const saleItems = validItems.map(item => ({
               sale_id: saleResult.sale_id,
@@ -2537,13 +2598,13 @@ export default function EnhancedServiceManagementPage() {
               quantity: item.quantity,
               price: inventoryItems.find(i => i.item_id === item.item_id)?.sale_price || 0
             }));
-
+    
             const { error: saleItemsError } = await supabase
               .from('sale_item')
               .insert(saleItems);
-
+    
             if (saleItemsError) throw saleItemsError;
-
+    
             for (const item of validItems) {
               const inventoryItem = inventoryItems.find(i => i.item_id === item.item_id);
               if (inventoryItem) {
@@ -2556,7 +2617,7 @@ export default function EnhancedServiceManagementPage() {
             }
           }
         }
-
+    
         // ✅ UPDATED: Only write tire_history if job is completed AND has a vehicle (registered customer)
         if (jobData.vehicle_id && jobData.customer_id) {
           if (formData.jobStatus === 'completed') {
@@ -2597,7 +2658,7 @@ export default function EnhancedServiceManagementPage() {
             await supabase.from('tire_history').delete().eq('history_id', jobId);
           }
         }
-
+    
         setSuccessAnimation({
           isVisible: true,
           title: editingJob ? 'Service Job Updated!' : 'Service Job Created!',
@@ -2614,7 +2675,7 @@ export default function EnhancedServiceManagementPage() {
         // ✅ Reset form and fetch data
         resetForm();
         fetchJobs();
-
+    
       } catch (error: any) {
         toast({ title: 'Error', description: error.message, variant: 'destructive' });
       } finally {
