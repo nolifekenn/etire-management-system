@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -103,6 +103,10 @@ export default function DashboardPage() {
   const [secondaryStatsOpacity, setSecondaryStatsOpacity] = useState(0);
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('7d');
   const [activeSalesCount, setActiveSalesCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Calculate top selling items from filtered recent sales
   const topSellingItems = useMemo(() => {
@@ -253,6 +257,48 @@ export default function DashboardPage() {
     { label: "View Reports", icon: FileText, href: "/reports", description: "Analytics", category: "analytics" },
     { label: "Service Jobs", icon: Wrench, href: "/services", description: "Manage jobs", category: "service" }
   ];
+
+  const searchSuggestions = [
+    { label: "Point of Sale", keywords: ["pos", "sale", "sell", "checkout"], route: "/pos", icon: DollarSign },
+    { label: "Inventory Management", keywords: ["inventory", "stock", "items", "products"], route: "/inventory", icon: Package },
+    { label: "Reports & Analytics", keywords: ["reports", "analytics", "sales report"], route: "/reports", icon: FileText },
+    { label: "Service Jobs", keywords: ["service", "jobs", "repairs"], route: "/services", icon: Wrench },
+    { label: "Customers", keywords: ["customers", "clients"], route: "/customers", icon: Users },
+    { label: "Branches", keywords: ["branches", "locations"], route: "/branches", icon: Building2 },
+    { label: "Suppliers", keywords: ["suppliers", "vendors", "purchasing"], route: "/purchasing", icon: Package },
+    { label: "Vehicles", keywords: ["vehicles", "cars", "fleet"], route: "/vehicles", icon: Car },
+  ];
+  
+  const filteredSuggestions = searchQuery.trim() 
+    ? searchSuggestions.filter(suggestion => 
+        suggestion.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        suggestion.keywords.some(keyword => keyword.toLowerCase().includes(searchQuery.toLowerCase()))
+      ).slice(0, 5)
+    : [];
+  
+  const handleSearch = (route: string, label: string) => {
+    if (!recentSearches.includes(label)) {
+      setRecentSearches(prev => [label, ...prev].slice(0, 5));
+    }
+    setSearchQuery('');
+    setShowSearchDropdown(false);
+    router.push(route);
+  };
+  
+  const clearRecentSearches = () => {
+    setRecentSearches([]);
+  };
+  
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchInputRef.current && !searchInputRef.current.contains(event.target as Node)) {
+        setShowSearchDropdown(false);
+      }
+    };
+  
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleCardClick = (cardId: string) => {
     const routes: { [key: string]: string } = {
@@ -625,6 +671,104 @@ export default function DashboardPage() {
             </Button>
           </div>
         </div>
+
+        {/* SEARCH BAR SECTION */}
+<section className="mb-8 mt-20" aria-labelledby="search-heading">
+  <div className="relative" ref={searchInputRef}>
+    <div className="relative">
+      <input
+        type="text"
+        placeholder="Search dashboard (e.g., inventory, sales, reports...)"
+        value={searchQuery}
+        onChange={(e) => {
+          setSearchQuery(e.target.value);
+          setShowSearchDropdown(true);
+        }}
+        onFocus={() => setShowSearchDropdown(true)}
+        className="w-full h-14 pl-14 pr-4 rounded-2xl border-2 border-slate-200 bg-white text-slate-800 placeholder-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 transition-all duration-300 outline-none font-medium shadow-sm hover:shadow-md"
+        aria-label="Search dashboard"
+      />
+      <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400">
+        <Package className="w-5 h-5" />
+      </div>
+    </div>
+
+    {/* Dropdown */}
+    {showSearchDropdown && (searchQuery.trim() || recentSearches.length > 0) && (
+      <div className="absolute top-full mt-2 w-full bg-white rounded-2xl border-2 border-slate-200 shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+        {/* Filtered Suggestions */}
+        {filteredSuggestions.length > 0 && (
+          <div className="p-2">
+            <p className="text-xs font-semibold text-slate-500 px-3 py-2">Suggestions</p>
+            {filteredSuggestions.map((suggestion, index) => (
+              <button
+                key={index}
+                onClick={() => handleSearch(suggestion.route, suggestion.label)}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-indigo-50 transition-all duration-200 group"
+              >
+                <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
+                  <suggestion.icon className="w-4 h-4 text-indigo-600" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="text-sm font-medium text-slate-800 group-hover:text-indigo-700">
+                    {suggestion.label}
+                  </p>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Recent Searches */}
+        {!searchQuery.trim() && recentSearches.length > 0 && (
+          <div className="p-2 border-t border-slate-100">
+            <div className="flex items-center justify-between px-3 py-2">
+              <p className="text-xs font-semibold text-slate-500">Recent Searches</p>
+              <button
+                onClick={clearRecentSearches}
+                className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+              >
+                Clear
+              </button>
+            </div>
+            {recentSearches.map((search, index) => {
+              const suggestion = searchSuggestions.find(s => s.label === search);
+              return suggestion ? (
+                <button
+                  key={index}
+                  onClick={() => handleSearch(suggestion.route, suggestion.label)}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-slate-50 transition-all duration-200 group"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center group-hover:bg-slate-200 transition-colors">
+                    <Clock className="w-4 h-4 text-slate-500" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-medium text-slate-700 group-hover:text-slate-900">
+                      {search}
+                    </p>
+                  </div>
+                  <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600" />
+                </button>
+              ) : null;
+            })}
+          </div>
+        )}
+
+        {/* No Results */}
+        {searchQuery.trim() && filteredSuggestions.length === 0 && (
+          <div className="p-8 text-center">
+            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
+              <Package className="w-6 h-6 text-slate-400" />
+            </div>
+            <p className="text-sm font-medium text-slate-600">No results found</p>
+            <p className="text-xs text-slate-500 mt-1">Try searching for "inventory", "sales", or "reports"</p>
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+</section>
 
         {/* QUICK ACTIONS SECTION */}
         <section className="mb-10 mt-20" aria-labelledby="quick-actions-heading">
@@ -1396,8 +1540,8 @@ export default function DashboardPage() {
                                   ₱{item.total_revenue.toLocaleString()}
                                 </p>
                                 <p className="text-xs text-slate-500 mt-1">
-                                  ₱{item.average_price.toFixed(2)} avg
-                                </p>
+  ₱{item.average_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} avg
+</p>
                               </div>
                             </div>
                           </div>
