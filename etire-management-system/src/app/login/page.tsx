@@ -1092,13 +1092,6 @@ export default function EnhancedLoginPage() {
                         Remember me
                       </Label>
                     </div>
-                    <Button
-                      type="button"
-                      variant="link"
-                      className="text-sm text-purple-600 hover:text-purple-700 p-0 h-auto font-semibold"
-                    >
-                      Forgot password?
-                    </Button>
                   </div>
 
                   <Button
@@ -1219,17 +1212,11 @@ export default function EnhancedLoginPage() {
             </Card>
           )}
 
-          <div className="text-center mt-6">
-            <p className="text-xs text-slate-600 mb-2">
+          <div className="w-full max-w-md mt-8">
+            {/* Copyright */}
+            <p className="text-[10px] text-center text-slate-400 mt-4">
               © 2025 eTire Manager. Designed for Queen.R Tire Supply.
             </p>
-            <div className="flex items-center justify-center gap-4 text-xs text-slate-500">
-              <button className="hover:text-purple-600 transition-colors">Privacy Policy</button>
-              <span>•</span>
-              <button className="hover:text-purple-600 transition-colors">Terms of Service</button>
-              <span>•</span>
-              <button className="hover:text-purple-600 transition-colors">Contact Support</button>
-            </div>
           </div>
         </div>
       </div>
