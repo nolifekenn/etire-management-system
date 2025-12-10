@@ -89,15 +89,22 @@ interface UserWithBranch {
   branch_id?: string;
 }
 
-export function SidebarNav() {
+interface SidebarNavProps {
+  forceExpanded?: boolean;
+}
+
+export function SidebarNav({ forceExpanded = false }: SidebarNavProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [branches, setBranches] = useState<any[]>([]);
   const [currentBranch, setCurrentBranch] = useState<any>(null);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsedState, setIsCollapsedState] = useState(false);
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState(avatarOptions[0]);
+
+  // Use forceExpanded prop to override collapsed state on mobile
+  const isCollapsed = forceExpanded ? false : isCollapsedState;
 
 
   // Enhanced color system with better visual hierarchy
@@ -182,7 +189,7 @@ export function SidebarNav() {
   useEffect(() => {
     const savedState = localStorage.getItem('sidebarCollapsed');
     if (savedState !== null) {
-      setIsCollapsed(savedState === 'true');
+      setIsCollapsedState(savedState === 'true');
     }
 
     // Load selected avatar from localStorage
@@ -235,8 +242,8 @@ export function SidebarNav() {
   };
 
   const toggleSidebar = () => {
-    const newState = !isCollapsed;
-    setIsCollapsed(newState);
+    const newState = !isCollapsedState;
+    setIsCollapsedState(newState);
     localStorage.setItem('sidebarCollapsed', String(newState));
   };
 
@@ -278,10 +285,10 @@ export function SidebarNav() {
           bg-white text-gray-700
           shadow-xl shadow-purple-100/50 border-r border-gray-200
           transition-all duration-300 ease-in-out
-          ${isCollapsed ? 'w-20' : 'w-64'}
+          ${forceExpanded ? 'w-full' : (isCollapsed ? 'w-20' : 'w-64')}
           font-poppins
         `}
-        style={{
+        style={forceExpanded ? {} : {
           width: isCollapsed ? '5rem' : '16rem',
           minWidth: isCollapsed ? '5rem' : '16rem',
           maxWidth: isCollapsed ? '5rem' : '16rem',
@@ -303,7 +310,7 @@ export function SidebarNav() {
             ) : (
               <>
                 <button
-                  onClick={toggleSidebar}
+                  onClick={!forceExpanded ? toggleSidebar : undefined}
                   className="flex items-center gap-4 cursor-pointer hover:opacity-90 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 rounded-2xl p-2 -ml-2"
                 >
                   <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center shadow-lg border border-white/30">
@@ -314,13 +321,16 @@ export function SidebarNav() {
                     <p className="text-sm text-gray-600 font-medium font-poppins">Q.R T&V Shop</p>
                   </div>
                 </button>
-                <button
-                  onClick={toggleSidebar}
-                  className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50"
-                  aria-label="Collapse sidebar"
-                >
-                  <ChevronLeft className="h-4 w-4 text-gray-600" />
-                </button>
+                {/* Only show collapse button on desktop (when not forceExpanded) */}
+                {!forceExpanded && (
+                  <button
+                    onClick={toggleSidebar}
+                    className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50"
+                    aria-label="Collapse sidebar"
+                  >
+                    <ChevronLeft className="h-4 w-4 text-gray-600" />
+                  </button>
+                )}
               </>
             )}
           </div>

@@ -148,7 +148,7 @@ const SuccessAnimation = ({
             onClick={onConfirm}
           >
             <CheckCircle className="h-5 w-5 mr-2" />
-            {actionType === 'register' ? 'Continue to Login' : 'Go to Dashboard'}
+            {actionType === 'register' ? 'Continue to Login' : 'Proceed'}
           </Button>
 
           {actionType === 'register' && onAddAnother && (
@@ -413,7 +413,7 @@ export default function EnhancedLoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
-  
+  const { user } = useAuth(); 
   const [rememberMe, setRememberMe] = useState(false);
 
   useEffect(() => {
@@ -534,7 +534,7 @@ export default function EnhancedLoginPage() {
         setShowSuccess(true);
         if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         setTimeout(() => {
-          router.push('/dashboard');
+         
         }, 3000);
       } else {
         toast({
@@ -642,17 +642,30 @@ export default function EnhancedLoginPage() {
   };
 
   const handleSuccessClose = () => {
-    setShowSuccess(false);
-    if (successType === 'register') {
-      setIsLogin(true);
-      setCurrentStep(1);
-      setSuccessUserData(null);
-      resetRegisterForm();
-      setFormKey(prev => prev + 1); 
+  setShowSuccess(false);
+
+  if (successType === "register") {
+    setIsLogin(true);
+    setCurrentStep(1);
+    setSuccessUserData(null);
+    resetRegisterForm();
+    setFormKey((prev) => prev + 1);
+  } else {
+    // ✅ Use user from useAuth
+    const role = user?.role;
+
+    if (role === 3) {
+      router.push("/admin");
+    } else if (role === 2) {
+      router.push("/dashboard");
+    } else if (role === 1) {
+      router.push("/inventory");
     } else {
-      router.push('/dashboard');
+      router.push("/");
     }
-  };
+  }
+};
+
 
   const getPasswordStrength = (password: string) => {
     let score = 0;
