@@ -18,7 +18,7 @@ The system digitalizes and automates Queen.R Tire Supply & Vulcanizing Shop oper
 - Admin Panel (Admins Only)
 
 ## Tech Stack
-- **Frontend:** HTML & CSS, TypeScript, Next.js, Tailwind CSS
-- **Backend:** TypeSCript, Next.js
+- **Frontend:** HTML5 & CSS, TypeScript, Next.js, Tailwind CSS
+- **Backend:** TypeScript, Next.js
 - **Database:** PostgreSQL
 - **Deploymnet:** Vercel (Frontend Hosting) + Supabase (Backend + Database Hosting) 
