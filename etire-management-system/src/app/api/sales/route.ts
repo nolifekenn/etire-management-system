@@ -53,7 +53,8 @@ export async function POST(request: Request) {
     const { error: itemsError } = await supabase.from('sale_item').insert(saleItemsToInsert);
 
     if (itemsError) {
-      await supabase.from('sale').delete().eq('sale_id', saleId); // Rollback
+      // Soft delete rollback - set deleted_at timestamp instead of removing
+      await supabase.from('sale').update({ deleted_at: new Date().toISOString() }).eq('sale_id', saleId);
       throw new Error(`Error saving sale items: ${itemsError.message}`);
     }
 

@@ -19,15 +19,22 @@ import {
 import {
   MoreHorizontal,
   Edit,
-  Trash2
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  Search
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Column {
   key: string;
   header: string;
   sortable?: boolean;
+  align?: 'left' | 'center' | 'right';
   render?: (value: any, item: any) => React.ReactNode;
+  accessorKey?: string; // For data access path 'user.name'
 }
 
 interface DataTableWrapperProps<T> {
@@ -38,6 +45,13 @@ interface DataTableWrapperProps<T> {
   onDelete?: (item: T) => void;
   onRowClick?: (item: T) => void;
   className?: string;
+  searchKeys?: string[];
+  rowsPerPageOptions?: number[];
+  rowsPerPage?: number;
+  onRowsPerPageChange?: (n: number) => void;
+  searchTerm?: string;
+  onSearchTermChange?: (term: string) => void;
+  showHeader?: boolean;
 }
 
 export function DataTableWrapper<T>({
@@ -48,25 +62,85 @@ export function DataTableWrapper<T>({
   onDelete,
   onRowClick,
   className,
+  searchKeys = [],
+  rowsPerPageOptions = [5, 10, 25, 50],
+  rowsPerPage: externalRowsPerPage,
+  onRowsPerPageChange,
+  searchTerm: externalSearchTerm,
+  onSearchTermChange,
+  showHeader = true,
 }: DataTableWrapperProps<T>) {
+  const [internalSearchTerm, setInternalSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [internalRowsPerPage, setInternalRowsPerPage] = useState(rowsPerPageOptions[0]);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
-  const filteredData = data;
+  // Use external props if provided, otherwise internal state
+  const rowsPerPage = typeof externalRowsPerPage === 'number' ? externalRowsPerPage : internalRowsPerPage;
+  const searchTerm = typeof externalSearchTerm === 'string' ? externalSearchTerm : internalSearchTerm;
+
+  const handleSearchChange = (term: string) => {
+    if (onSearchTermChange) {
+      onSearchTermChange(term);
+    } else {
+      setInternalSearchTerm(term);
+    }
+    setCurrentPage(1);
+  };
+
+  const handleRowsPerPageChange = (val: string) => {
+    const num = Number(val);
+    if (onRowsPerPageChange) {
+      onRowsPerPageChange(num);
+    } else {
+      setInternalRowsPerPage(num);
+    }
+    setCurrentPage(1);
+  };
+
+  // Helper to get value from key (supports dot notation)
+  const getValue = (item: any, key: string) => {
+    return key.split('.').reduce((acc, k) => acc?.[k], item);
+  };
 
   // Sorting
-  const sortedData = useMemo(() => {
-    if (!sortConfig) return filteredData;
-    const sorted = [...filteredData].sort((a, b) => {
-      const aValue = (a as any)[sortConfig.key];
-      const bValue = (b as any)[sortConfig.key];
-      if (aValue === null || aValue === undefined) return 1;
-      if (bValue === null || bValue === undefined) return -1;
-      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-    return sorted;
-  }, [filteredData, sortConfig]);
+  const processedData = useMemo(() => {
+    let filtered = [...data];
+
+    // Filter
+    if (searchTerm && searchKeys.length > 0) {
+      filtered = filtered.filter(item =>
+        searchKeys.some(key => {
+          const val = getValue(item, key);
+          return val ? String(val).toLowerCase().includes(searchTerm.toLowerCase()) : false;
+        })
+      );
+    }
+
+    // Sort
+    if (sortConfig) {
+      filtered.sort((a, b) => {
+        const aValue = getValue(a, sortConfig.key) || (a as any)[sortConfig.key];
+        const bValue = getValue(b, sortConfig.key) || (b as any)[sortConfig.key];
+
+        if (aValue === null || aValue === undefined) return 1;
+        if (bValue === null || bValue === undefined) return -1;
+
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
+  }, [data, searchTerm, searchKeys, sortConfig]);
+
+  // Pagination
+  const totalPages = Math.ceil(processedData.length / rowsPerPage);
+  const paginatedData = processedData.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
+  );
 
   const handleSort = (key: string) => {
     setSortConfig(current => {
@@ -79,87 +153,118 @@ export function DataTableWrapper<T>({
 
   return (
     <Card className={`bg-white border-slate-100 transition-all duration-300 hover:shadow-xl rounded-none overflow-hidden ${className || ''}`}>
+      {showHeader && (
+        <CardHeader className="pb-4 pt-6 px-6 flex flex-row items-center justify-between border-b border-slate-50">
+          <div className="flex flex-col gap-1">
+            {title && <CardTitle className="text-lg font-bold text-slate-800">{title}</CardTitle>}
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Search */}
+            {searchKeys.length > 0 && (
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Search..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="pl-9 h-9 text-sm bg-slate-50 border-slate-200 focus:bg-white transition-all"
+                />
+              </div>
+            )}
+          </div>
+        </CardHeader>
+      )}
+
       <CardContent className="pb-0 pt-0 px-0">
-        {/* Table - completely square with no rounding */}
+        {/* Table */}
         <div className="border-0 bg-white">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-gradient-to-r from-slate-50 to-indigo-50/20 border-b border-slate-200 hover:bg-slate-50/80">
-                  {columns.map((col) => (
-                    <TableHead
-                      key={String(col.key)}
-                      className={`text-slate-700 font-semibold text-sm uppercase tracking-wide py-3 px-6 ${col.sortable ? 'cursor-pointer hover:bg-slate-100 select-none transition-colors' : ''
-                        }`}
-                      onClick={() => col.sortable && handleSort(col.key)}
-                    >
-                      <div className="flex items-center gap-2">
-                        {col.header}
-                        {col.sortable && sortConfig?.key === col.key && (
-                          <span className="text-indigo-600 font-bold">
-                            {sortConfig.direction === 'asc' ? '↑' : '↓'}
-                          </span>
-                        )}
-                      </div>
-                    </TableHead>
-                  ))}
+                <TableRow className="bg-gradient-to-r from-slate-50 to-indigo-50/20 border-b border-slate-200">
+                  {columns.map((col) => {
+                    const sortKey = col.accessorKey || col.key;
+                    return (
+                      <TableHead
+                        key={String(col.key)}
+                        className={`text-slate-700 font-semibold text-xs uppercase tracking-wider py-3 px-4 h-10 ${col.sortable ? 'cursor-pointer hover:bg-slate-100 select-none transition-colors' : ''
+                          } ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
+                        onClick={() => col.sortable && handleSort(sortKey)}
+                      >
+                        <div className={`flex items-center gap-2 ${col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : 'justify-start'
+                          }`}>
+                          {col.header}
+                          {col.sortable && sortConfig?.key === sortKey && (
+                            <span className="text-indigo-600 font-bold">
+                              {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                            </span>
+                          )}
+                        </div>
+                      </TableHead>
+                    );
+                  })}
                   {(onEdit || onDelete) && (
-                    <TableHead className="text-right text-slate-700 font-semibold text-sm uppercase tracking-wide py-3 px-6">
+                    <TableHead className="text-right text-slate-700 font-semibold text-xs uppercase tracking-wider py-3 px-4 h-10">
                       Actions
                     </TableHead>
                   )}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedData.length === 0 ? (
+                {paginatedData.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={columns.length + ((onEdit || onDelete) ? 1 : 0)}
-                      className="text-center py-8 text-slate-500"
+                      className="text-center py-12 text-slate-500"
                     >
                       <div className="flex flex-col items-center gap-2">
-                        <div className="w-12 h-12 bg-slate-100 flex items-center justify-center">
+                        <div className="w-12 h-12 bg-slate-100 flex items-center justify-center rounded-full mb-2">
                           <MoreHorizontal className="h-6 w-6 text-slate-400" />
                         </div>
-                        <p className="text-base font-medium">
-                          No data available.
+                        <p className="text-base font-medium text-slate-600">
+                          No {title?.toLowerCase() || 'records'} found
                         </p>
                         <p className="text-xs text-slate-400">
-                          No records to display.
+                          {searchTerm ? `No matches for "${searchTerm}"` : 'Get started by adding a new record'}
                         </p>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  sortedData.map((item, index) => (
+                  paginatedData.map((item, index) => (
                     <TableRow
-                      key={(item as any).id || `row-${index}`}
+                      key={(item as any).id || (item as any).key || `row-${index}`}
                       className={`
-                        border-b border-slate-100 
-                        transition-all duration-200 
-                        hover:bg-gradient-to-r hover:from-indigo-50/50 hover:to-purple-50/30
+                        border-b border-slate-50
+                        transition-colors duration-150
+                        hover:bg-indigo-50/30
                         ${onRowClick ? 'cursor-pointer' : ''}
-                        ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}
                       `}
                       onClick={() => onRowClick?.(item)}
                     >
-                      {columns.map((col) => (
-                        <TableCell
-                          key={String(col.key)}
-                          className="py-3 px-6 text-slate-700"
-                        >
-                          {col.render
-                            ? col.render((item as any)[col.key], item)
-                            : String((item as any)[col.key] ?? '')}
-                        </TableCell>
-                      ))}
+                      {columns.map((col) => {
+                        const sortKey = col.accessorKey || col.key;
+                        const cellValue = getValue(item, sortKey) || (item as any)[col.key];
+                        return (
+                          <TableCell
+                            key={String(col.key)}
+                            className={`py-3 px-4 text-sm text-slate-600 font-medium ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
+                              }`}
+                          >
+                            {col.render
+                              ? col.render(cellValue, item)
+                              : String(cellValue ?? '')}
+                          </TableCell>
+                        );
+                      })}
                       {(onEdit || onDelete) && (
-                        <TableCell className="text-right py-3 px-6">
+                        <TableCell className="text-right py-3 px-4">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
                                 variant="ghost"
-                                className="h-8 w-8 p-0 hover:bg-indigo-100 hover:text-indigo-600 transition-all duration-200"
+                                className="h-8 w-8 p-0 hover:bg-slate-100 text-slate-500 hover:text-indigo-600 rounded-full"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <span className="sr-only">Open menu</span>
@@ -168,7 +273,7 @@ export function DataTableWrapper<T>({
                             </DropdownMenuTrigger>
                             <DropdownMenuContent
                               align="end"
-                              className="bg-white border-slate-200 shadow-xl w-48"
+                              className="bg-white border-slate-200 shadow-lg w-48"
                             >
                               {onEdit && (
                                 <DropdownMenuItem
@@ -176,10 +281,10 @@ export function DataTableWrapper<T>({
                                     e.stopPropagation();
                                     onEdit(item);
                                   }}
-                                  className="flex items-center gap-2 py-2 px-3 hover:bg-indigo-50 hover:text-indigo-600 cursor-pointer transition-all duration-200"
+                                  className="flex items-center gap-2 py-2.5 px-3 hover:bg-indigo-50 hover:text-indigo-600 cursor-pointer text-sm font-medium"
                                 >
                                   <Edit className="h-4 w-4" />
-                                  Edit Item
+                                  Edit Record
                                 </DropdownMenuItem>
                               )}
                               {onDelete && (
@@ -188,10 +293,10 @@ export function DataTableWrapper<T>({
                                     e.stopPropagation();
                                     onDelete(item);
                                   }}
-                                  className="flex items-center gap-2 py-2 px-3 hover:bg-red-50 hover:text-red-600 cursor-pointer transition-all duration-200 text-red-600"
+                                  className="flex items-center gap-2 py-2.5 px-3 hover:bg-red-50 hover:text-red-600 cursor-pointer text-sm font-medium text-red-600"
                                 >
                                   <Trash2 className="h-4 w-4" />
-                                  Delete Item
+                                  Delete Record
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>
@@ -206,6 +311,54 @@ export function DataTableWrapper<T>({
           </div>
         </div>
       </CardContent>
+
+      {/* Pagination Footer */}
+      {processedData.length > 0 && (
+        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500">Rows per page</span>
+            <Select
+              value={String(rowsPerPage)}
+              onValueChange={handleRowsPerPageChange}
+            >
+              <SelectTrigger className="h-8 w-[70px] text-xs bg-white border-slate-200">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {rowsPerPageOptions.map(opt => (
+                  <SelectItem key={opt} value={String(opt)} className="text-xs">{opt}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-slate-500">
+              Page {currentPage} of {totalPages}
+            </span>
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 hover:bg-white hover:text-indigo-600"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8 hover:bg-white hover:text-indigo-600"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

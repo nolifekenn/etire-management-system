@@ -6,10 +6,42 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+export interface ServiceReportFilters {
+  date_from: string;
+  date_to: string;
+  branch_id: string;
+  status: string;
+  vehicle_type_id: string;
+}
+
+export type ServiceReportFilterPayload = Partial<ServiceReportFilters>;
+
+export interface ServiceReportRow {
+  job_id: string;
+  job_timestamp: number | null;
+  job_date: string | null;
+  job_description: string;
+  status: string;
+  remarks: string;
+  customer: string;
+  vehicle: string;
+  vehicle_type: string;
+  service_fee_raw: number;
+  service_fee: string;
+  job_total_raw: number;
+  job_total: string;
+}
+
+export interface ServiceReportResponse {
+  jobs: ServiceReportRow[];
+}
+
 // ---------------------------------------------------
 // 🔹 FETCH SERVICE JOBS REPORT
 // ---------------------------------------------------
-export async function fetchServiceJobsReport(filters: Record<string, any>) {
+export async function fetchServiceJobsReport(
+  filters: ServiceReportFilterPayload = {}
+): Promise<ServiceReportResponse> {
   // ✅ Corrected endpoint to match route.ts
   const res = await fetch("/api/reports/service", {
     method: "POST",
@@ -24,13 +56,16 @@ export async function fetchServiceJobsReport(filters: Record<string, any>) {
     throw new Error(err.error || "Failed to fetch service jobs report");
   }
 
-  return res.json();
+  return res.json() as Promise<ServiceReportResponse>;
 }
 
 // ---------------------------------------------------
 // 🔹 PDF EXPORT
 // ---------------------------------------------------
-export function exportServiceJobsReportPDF(rows: any[], filters: Record<string, any>) {
+export function exportServiceJobsReportPDF(
+  rows: ServiceReportRow[],
+  filters: ServiceReportFilterPayload = {}
+) {
   try {
     const doc = new jsPDF("p", "mm", "a4");
     doc.setFont("Helvetica", "bold");
@@ -41,9 +76,11 @@ export function exportServiceJobsReportPDF(rows: any[], filters: Record<string, 
     doc.setFontSize(11);
     doc.setFont("Helvetica", "normal");
     const filterLines: string[] = [];
-    for (const key in filters) {
-      if (filters[key]) filterLines.push(`${key}: ${filters[key]}`);
-    }
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) {
+        filterLines.push(`${key}: ${value}`);
+      }
+    });
     if (filterLines.length > 0) {
       doc.text("Filters Applied:", 14, 26);
       filterLines.forEach((line, i) => {
@@ -52,14 +89,14 @@ export function exportServiceJobsReportPDF(rows: any[], filters: Record<string, 
     }
     const startY = filterLines.length > 0 ? 32 + filterLines.length * 6 + 4 : 26;
 
-    const tableData = rows.map((j) => [
-      j.job_date || "—",
-      j.customer?.name || "—",
-      j.vehicle?.plate_number || "—",
-      j.job_description || "—",
-      j.status || "—",
-      j.service_fee ?? 0,
-      j.job_total ?? 0,
+    const tableData = rows.map((job) => [
+      job.job_date || "—",
+      job.customer || "—",
+      job.vehicle || "—",
+      job.job_description || "—",
+      job.status || "—",
+      job.service_fee_raw ?? 0,
+      job.job_total_raw ?? 0,
     ]);
 
     autoTable(doc, {
@@ -80,18 +117,18 @@ export function exportServiceJobsReportPDF(rows: any[], filters: Record<string, 
 // ---------------------------------------------------
 // 🔹 CSV EXPORT
 // ---------------------------------------------------
-export function exportServiceJobsReportCSV(rows: any[]) {
+export function exportServiceJobsReportCSV(rows: ServiceReportRow[]) {
   try {
     const headers = ["Date", "Customer", "Vehicle", "Description", "Status", "Service Fee", "Total Revenue"];
 
-    const csvRows = rows.map((j) => [
-      j.job_date || "",
-      j.customer?.name || "",
-      j.vehicle?.plate_number || "",
-      j.job_description || "",
-      j.status || "",
-      j.service_fee ?? 0,
-      j.job_total ?? 0,
+    const csvRows = rows.map((job) => [
+      job.job_date || "",
+      job.customer || "",
+      job.vehicle || "",
+      job.job_description || "",
+      job.status || "",
+      job.service_fee_raw ?? 0,
+      job.job_total_raw ?? 0,
     ]);
 
     const csvContent = headers.join(",") + "\n" + csvRows.map((row) => row.join(",")).join("\n");

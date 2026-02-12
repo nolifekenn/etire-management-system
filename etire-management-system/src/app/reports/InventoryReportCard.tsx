@@ -40,20 +40,48 @@ const poppins = {
   className: "font-poppins"
 };
 
+interface InventoryFilters {
+  branch_id: string;
+  supplier_id: string;
+  category: string;
+}
+
+interface BranchOption {
+  branch_id: string;
+  name: string;
+}
+
+interface SupplierOption {
+  supplier_id: string;
+  name: string;
+}
+
+interface InventoryReportRow {
+  item_id?: string;
+  name: string;
+  category?: string;
+  stock_quantity?: number;
+  cost_price?: number;
+  sale_price?: number;
+  stock_value?: number;
+  potential_revenue?: number;
+  low_stock?: boolean;
+}
+
 export default function InventoryReportCard() {
   const { toast } = useToast();
   
   // --- STATE ---
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<InventoryFilters>({
     branch_id: "all",
     supplier_id: "all",
     category: "",
   });
 
   const [loading, setLoading] = useState(false);
-  const [reportData, setReportData] = useState<any[]>([]);
-  const [branches, setBranches] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [reportData, setReportData] = useState<InventoryReportRow[]>([]);
+  const [branches, setBranches] = useState<BranchOption[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [showFilters, setShowFilters] = useState(true);
 
   // Pagination state
@@ -62,7 +90,7 @@ export default function InventoryReportCard() {
   const [totalPages, setTotalPages] = useState(1);
 
   // Filter state
-  const [localFilters, setLocalFilters] = useState(filters);
+  const [localFilters, setLocalFilters] = useState<InventoryFilters>(filters);
 
   // Modal State
   const [modalState, setModalState] = useState<{
@@ -80,13 +108,13 @@ export default function InventoryReportCard() {
         .from("branch")
         .select("branch_id, name")
         .eq("is_active", true);
-      if (branchData) setBranches(branchData);
+      if (branchData) setBranches(branchData as BranchOption[]);
 
       const { data: supplierData } = await supabase
         .from("supplier")
         .select("supplier_id, name")
         .eq("is_active", true);
-      if (supplierData) setSuppliers(supplierData);
+      if (supplierData) setSuppliers(supplierData as SupplierOption[]);
     };
     fetchDropdowns();
   }, []);
@@ -112,7 +140,7 @@ export default function InventoryReportCard() {
       setLoading(true);
       setCurrentPage(1); // Reset to first page
       
-      const apiFilters = {
+      const apiFilters: InventoryFilters = {
         ...localFilters,
         branch_id: localFilters.branch_id === "all" ? "" : localFilters.branch_id,
         supplier_id: localFilters.supplier_id === "all" ? "" : localFilters.supplier_id,
@@ -131,7 +159,7 @@ export default function InventoryReportCard() {
         return;
       }
 
-      setReportData(res.inventory);
+      setReportData((res.inventory || []) as InventoryReportRow[]);
       
       // UX: Just show toast for data load
       toast({
@@ -444,7 +472,7 @@ export default function InventoryReportCard() {
                 key: "name", 
                 header: "Item", 
                 sortable: true,
-                render: (value: any) => (
+                render: (value: InventoryReportRow['name']) => (
                   <span className="font-medium text-slate-800">{value}</span>
                 )
               },
@@ -452,7 +480,7 @@ export default function InventoryReportCard() {
                 key: "category", 
                 header: "Category", 
                 sortable: true,
-                render: (value: any) => (
+                render: (value: InventoryReportRow['category']) => (
                   <span className="text-slate-600">{value}</span>
                 )
               },
@@ -460,7 +488,7 @@ export default function InventoryReportCard() {
                 key: "stock_quantity", 
                 header: "Stock", 
                 sortable: true,
-                render: (value: any, row: any) => (
+                render: (value: InventoryReportRow['stock_quantity'], row: InventoryReportRow) => (
                   <div className="flex items-center gap-2">
                     <span className={`inline-flex items-center justify-center px-2 py-1 rounded-full text-sm font-medium ${
                       row.low_stock 
@@ -477,9 +505,9 @@ export default function InventoryReportCard() {
                 key: "cost_price", 
                 header: "Cost Price", 
                 sortable: true,
-                render: (value: any) => (
+                render: (value: InventoryReportRow['cost_price']) => (
                   <span className="font-medium text-slate-700">
-                    ₱{Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    ₱{Number(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
                 )
               },
@@ -487,9 +515,9 @@ export default function InventoryReportCard() {
                 key: "sale_price", 
                 header: "Sale Price", 
                 sortable: true,
-                render: (value: any) => (
+                render: (value: InventoryReportRow['sale_price']) => (
                   <span className="font-medium text-green-600">
-                    ₱{Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    ₱{Number(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
                 )
               },
@@ -497,9 +525,9 @@ export default function InventoryReportCard() {
                 key: "stock_value", 
                 header: "Stock Value", 
                 sortable: true,
-                render: (value: any) => (
+                render: (value: InventoryReportRow['stock_value']) => (
                   <span className="font-semibold text-blue-600">
-                    ₱{Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    ₱{Number(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
                 )
               },
@@ -507,9 +535,9 @@ export default function InventoryReportCard() {
                 key: "potential_revenue", 
                 header: "Potential Revenue", 
                 sortable: true,
-                render: (value: any) => (
+                render: (value: InventoryReportRow['potential_revenue']) => (
                   <span className="font-semibold text-emerald-600">
-                    ₱{Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    ₱{Number(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
                 )
               },

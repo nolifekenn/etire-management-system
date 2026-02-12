@@ -6,45 +6,38 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
 } from '@/components/ui/dialog';
-import { supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Loader2, AlertTriangle, Download, Upload, Database, Cloud, 
-  CheckCircle, Clock, RefreshCw, Shield, HardDrive, Server,
-  Archive, FileText, CloudUpload, Settings, Check, FileCheck,
-  CloudCheck, DatabaseBackup, FileJson, FileSpreadsheet
+import {
+    Loader2, AlertTriangle, Download, Upload, Database, Cloud,
+    CheckCircle, Clock, RefreshCw, Shield, HardDrive, Server,
+    Archive, FileText, CloudUpload, Settings, Check, FileCheck,
+    CloudCheck, DatabaseBackup, FileJson, FileSpreadsheet
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { TABLE_DEPENDENCY_ORDER } from '@/lib/backupTables';
 
 // ===== DESIGN SYSTEM =====
 const buttonStyles = {
-  primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins",
-  secondary: "flex items-center gap-3 min-h-[52px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-6 py-3 rounded-xl font-medium transition-all duration-300 active:scale-95 font-poppins",
-  glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins",
-  success: "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins"
+    primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins",
+    secondary: "flex items-center gap-3 min-h-[52px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-6 py-3 rounded-xl font-medium transition-all duration-300 active:scale-95 font-poppins",
+    glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins",
+    success: "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins"
 };
 
 const microAnimations = {
-  cardHover: "transition-all duration-350 ease-spring hover:translate-y-[-6px] hover:shadow-2xl",
-  buttonHover: "transition-all duration-200 hover:scale-105 active:scale-95",
-  fadeIn: "animate-in fade-in duration-500",
-  iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
+    cardHover: "transition-all duration-350 ease-spring hover:translate-y-[-6px] hover:shadow-2xl",
+    buttonHover: "transition-all duration-200 hover:scale-105 active:scale-95",
+    fadeIn: "animate-in fade-in duration-500",
+    iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
 };
 
-// 🟢 STRICT ORDER FOR DATA INTEGRITY - From leader's version
-const TABLE_DEPENDENCY_ORDER = [
-    'vehicle_type', 'user', 'branch', 'supplier', 'inventory_item', 
-    'customer', 'vehicle', 'sale', 'sale_item', 'service_job', 
-    'purchase_order', 'purchase_order_item', 'tire_history', 
-    'delivery', 'delivery_item', 'system_setting', 'audit_log'
-];
 
 export default function EnhancedBackupPage() {
     const { toast } = useToast();
@@ -102,11 +95,11 @@ export default function EnhancedBackupPage() {
     const convertToCSV = (data: any[]) => {
         if (!data || !data.length) return "";
         const headers = Object.keys(data[0]).join(",");
-        const rows = data.map(row => 
+        const rows = data.map(row =>
             Object.values(row).map(value => {
                 // Handle strings with commas, nulls, and objects
                 if (value === null) return "";
-                if (typeof value === 'object') return JSON.stringify(value).replace(/"/g, '""'); 
+                if (typeof value === 'object') return JSON.stringify(value).replace(/"/g, '""');
                 const str = String(value);
                 return str.includes(",") ? `"${str}"` : str;
             }).join(",")
@@ -116,64 +109,56 @@ export default function EnhancedBackupPage() {
 
     // 🟢 ENHANCED EXPORT FUNCTION (from leader's version with our UI)
     const exportData = async (format: 'json' | 'csv') => {
-        if (!supabase || !authUser) return;
-        
+        if (!authUser) return;
+
         setCurrentAction('export');
         setIsLoading(true);
         setError(null);
-        setBackupProgress(0);
-        setStatusMessage("Starting export...");
+        setBackupProgress(5);
+        setStatusMessage("Requesting secure export...");
 
         try {
-            const exportData: any = {
+            const response = await fetch(`/api/backup/export`);
+            if (!response.ok) {
+                const payload = await response.json().catch(() => null);
+                throw new Error(payload?.error || 'Failed to export backup data.');
+            }
+
+            const serverPayload = await response.json();
+            const tables = serverPayload.tables || {};
+            const exportedTables = serverPayload.tableCount ?? Object.keys(tables).length;
+
+            setStatusMessage("Preparing download package...");
+            setBackupProgress(85);
+
+            const exportPayload = {
                 meta: {
                     version: "1.0",
                     exported_at: new Date().toISOString(),
                     exported_by: authUser.name
                 },
-                tables: {}
+                tables
             };
 
-            let csvContent = "";
-            const totalTables = TABLE_DEPENDENCY_ORDER.length;
-
-            // Fetch data table by table
-            for (let i = 0; i < totalTables; i++) {
-                const tableName = TABLE_DEPENDENCY_ORDER[i];
-                setStatusMessage(`Exporting ${tableName}...`);
-                
-                const { data, error } = await supabase.from(tableName).select('*');
-                
-                if (error) {
-                    console.warn(`Skipping ${tableName}: ${error.message}`);
-                } else if (data) {
-                    exportData.tables[tableName] = data;
-                    
-                    // Build CSV string if needed
-                    if (format === 'csv' && data.length > 0) {
-                        csvContent += `\n\n--- TABLE: ${tableName.toUpperCase()} ---\n`;
-                        csvContent += convertToCSV(data);
-                    }
-                }
-
-                // Update progress bar
-                const progressValue = Math.round(((i + 1) / totalTables) * 100);
-                setBackupProgress(progressValue);
-            }
-
-            // Finalize and Download
             let blob: Blob;
             let filename: string;
 
             if (format === 'json') {
-                const jsonStr = JSON.stringify(exportData, null, 2);
-                blob = new Blob([jsonStr], { type: 'application/json' });
+                blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
                 filename = `etire_backup_${new Date().toISOString().split('T')[0]}.json`;
             } else {
+                let csvContent = "";
+                for (const tableName of TABLE_DEPENDENCY_ORDER) {
+                    const tableRows = tables[tableName];
+                    if (tableRows && tableRows.length > 0) {
+                        csvContent += `\n\n--- TABLE: ${tableName.toUpperCase()} ---\n`;
+                        csvContent += convertToCSV(tableRows);
+                    }
+                }
                 blob = new Blob([csvContent], { type: 'text/csv' });
                 filename = `etire_export_${new Date().toISOString().split('T')[0]}.csv`;
             }
-            
+
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
@@ -183,20 +168,19 @@ export default function EnhancedBackupPage() {
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
 
-            // Update "Last Backup" state
             const now = new Date().toISOString();
             setLastBackup(now);
             localStorage.setItem('etire_last_backup', now);
             setLastUpdated(new Date());
 
-            showSuccess(`${format.toUpperCase()} backup downloaded successfully. ${Object.keys(exportData.tables).length} tables exported.`);
+            showSuccess(`${format.toUpperCase()} backup downloaded successfully. ${exportedTables} tables exported.`);
 
         } catch (err: any) {
             setError(`Export failed: ${err.message}`);
-            toast({ 
-                title: "Export Failed", 
-                description: err.message, 
-                variant: "destructive" 
+            toast({
+                title: "Export Failed",
+                description: err.message,
+                variant: "destructive"
             });
             setIsLoading(false);
             setBackupProgress(0);
@@ -231,48 +215,44 @@ export default function EnhancedBackupPage() {
 
         try {
             const text = await file.text();
-            const importData = JSON.parse(text);
+            const parsedBackup = JSON.parse(text);
 
-            // Validation: Check if it's a valid backup file
-            if (!importData.tables || !importData.meta) {
+            if (!parsedBackup.tables || !parsedBackup.meta) {
                 throw new Error("Invalid backup file format. Missing 'tables' or 'meta' data.");
             }
 
-            const totalTables = TABLE_DEPENDENCY_ORDER.length;
+            setStatusMessage("Uploading backup to server...");
+            setBackupProgress(35);
 
-            // 🟢 STRICT IMPORT LOOP
-            for (let i = 0; i < totalTables; i++) {
-                const tableName = TABLE_DEPENDENCY_ORDER[i];
-                const tableRows = importData.tables[tableName];
+            const response = await fetch('/api/backup/import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fileName: file.name,
+                    data: parsedBackup
+                })
+            });
 
-                if (tableRows && Array.isArray(tableRows) && tableRows.length > 0) {
-                    setStatusMessage(`Restoring ${tableName} (${tableRows.length} records)...`);
-                    
-                    // We use upsert (insert or update)
-                    const { error } = await supabase.from(tableName).upsert(tableRows);
-                    
-                    if (error) {
-                        throw new Error(`Failed to import ${tableName}: ${error.message}`);
-                    }
-                }
-                
-                const progressValue = Math.round(((i + 1) / totalTables) * 100);
-                setBackupProgress(progressValue);
+            if (!response.ok) {
+                const payload = await response.json().catch(() => null);
+                throw new Error(payload?.error || 'Failed to import backup data.');
             }
+
+            const result = await response.json();
 
             setStatusMessage("Finalizing...");
             setBackupProgress(100);
 
             setLastUpdated(new Date());
-            showSuccess(`Data successfully imported from ${file.name}. ${Object.keys(importData.tables).length} tables restored.`);
+            showSuccess(`Data successfully imported from ${file.name}. ${result.restoredTables ?? Object.keys(parsedBackup.tables).length} tables restored.`);
 
         } catch (err: any) {
             console.error(err);
             setError(`Import failed: ${err.message}`);
-            toast({ 
-                title: "Import Failed", 
-                description: err.message, 
-                variant: "destructive" 
+            toast({
+                title: "Import Failed",
+                description: err.message,
+                variant: "destructive"
             });
             setIsLoading(false);
             setBackupProgress(0);
@@ -284,81 +264,36 @@ export default function EnhancedBackupPage() {
 
     // 🟢 ENHANCED SYNC FUNCTION (from leader's version with our UI)
     const syncData = async () => {
-        if (!supabase || !authUser) return;
-        
+        if (!authUser) return;
+
         setCurrentAction('sync');
         setIsLoading(true);
         setError(null);
-        setBackupProgress(5);
-        setStatusMessage("Preparing cloud sync...");
+        setBackupProgress(15);
+        setStatusMessage("Requesting secure sync...");
 
         try {
-            // 1. Generate the JSON Data (Real Data Snapshot)
-            const exportData: any = {
-                meta: {
-                    version: "1.0",
-                    synced_at: new Date().toISOString(),
-                    synced_by: authUser.name,
-                    type: "cloud_sync"
-                },
-                tables: {}
-            };
-
-            const totalTables = TABLE_DEPENDENCY_ORDER.length;
-
-            // Loop through tables and fetch real data
-            for (let i = 0; i < totalTables; i++) {
-                const tableName = TABLE_DEPENDENCY_ORDER[i];
-                setStatusMessage(`Syncing ${tableName}...`);
-                
-                const { data, error } = await supabase.from(tableName).select('*');
-                
-                if (error) {
-                    console.warn(`Sync warning for ${tableName}:`, error.message);
-                } else if (data) {
-                    exportData.tables[tableName] = data;
-                }
-                
-                // Update progress (10% to 70%)
-                const progressValue = 10 + Math.round(((i + 1) / totalTables) * 60);
-                setBackupProgress(progressValue);
+            const response = await fetch('/api/backup/sync', { method: 'POST' });
+            if (!response.ok) {
+                const payload = await response.json().catch(() => null);
+                throw new Error(payload?.error || 'Failed to sync backup data.');
             }
 
-            setStatusMessage("Uploading to Cloud Storage...");
-            setBackupProgress(80);
-            
-            // 2. Create the File Object for Upload
-            const jsonStr = JSON.stringify(exportData, null, 2);
-            const blob = new Blob([jsonStr], { type: 'application/json' });
-            // Create a unique filename with timestamp: backup_2025-11-20_10-30-00.json
-            const fileName = `backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-            const file = new File([blob], fileName, { type: 'application/json' });
-
-            // 3. Upload to Supabase Storage
-            // NOTE: Ensure your bucket is named 'backups' in Supabase Dashboard
-            const { data, error: uploadError } = await supabase
-                .storage
-                .from('backups') 
-                .upload(fileName, file, {
-                    cacheControl: '3600',
-                    upsert: false
-                });
-
-            if (uploadError) throw uploadError;
+            const result = await response.json();
 
             setBackupProgress(100);
             setStatusMessage("Sync Complete");
 
             setLastUpdated(new Date());
-            showSuccess(`Cloud sync successful! Database backed up to cloud as ${fileName}.`);
+            showSuccess(`Cloud sync successful! Database backed up to cloud as ${result.fileName}.`);
 
         } catch (err: any) {
             console.error(err);
             setError(`Sync failed: ${err.message}`);
-            toast({ 
-                title: "Sync Failed", 
-                description: "Could not upload to cloud storage. Check your network or storage permissions.", 
-                variant: "destructive" 
+            toast({
+                title: "Sync Failed",
+                description: "Could not upload to cloud storage. Check your network or storage permissions.",
+                variant: "destructive"
             });
             setIsLoading(false);
             setBackupProgress(0);
@@ -403,66 +338,25 @@ export default function EnhancedBackupPage() {
     };
 
     return (
-        <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
-            
-            {/* Background Sections */}
-            <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
-                <div 
-                    className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
-                    style={{ 
-                        backgroundImage: "url('/images/image2.jpg')",
-                        backgroundSize: "cover",
-                        backgroundPosition: "center 30%"
-                    }}
-                ></div>
-                <div className="absolute top-0 left-0 w-32 h-32 bg-purple-300/20 rounded-br-full"></div>
-                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-300/20 rounded-bl-full"></div>
-            </div>
+        <div className="min-h-screen bg-background">
+            <div className="w-full px-3 py-4">
 
-            <div className="absolute top-64 left-0 w-full h-full bg-indigo-50/10">
-                <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-indigo-100/15 to-indigo-50/10"></div>
-            </div>
-
-            <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-                
-                {/* Header Section */}
-                <div className={`mb-8 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
-                    <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
-                        
-                        <div className="relative z-10 flex-1">
-                            <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
-                                Data Backup & Sync
-                            </h1>
-                            <div className="flex items-center gap-6 text-white/90">
-                                <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium font-poppins">
-                                    <Shield className="h-6 w-6 opacity-90" />
-                                    Secure your data with automated backups and cloud sync
-                                </p>
-                                <div className="flex items-center gap-4 text-lg">
-                                    {lastUpdated && (
-                                        <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
-                                            <Clock className="w-5 h-5" />
-                                            Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                                        </div>
-                                    )}
-                                    <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
-                                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                                        Secure connection
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <Button 
-                            onClick={handleRefresh}
-                            disabled={isLoading}
-                            className={buttonStyles.glass + " active:scale-95 font-poppins"}
-                        >
-                            <RefreshCw className={`h-6 w-6 mr-3 ${isLoading ? 'animate-spin' : ''}`} />
-                            Refresh Status
-                        </Button>
+                {/* Compact Header */}
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-4">
+                        <h1 className="text-xl font-semibold text-foreground">
+                            Data Backup & Sync
+                        </h1>
+                        {lastUpdated && (
+                            <span className="text-sm text-muted-foreground hidden sm:inline">
+                                <Clock className="inline h-3.5 w-3.5 mr-1" />
+                                Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                            </span>
+                        )}
                     </div>
+                    <Button onClick={handleRefresh} disabled={isLoading} variant="outline" size="sm">
+                        <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                    </Button>
                 </div>
 
                 {/* Hidden file input */}
@@ -506,10 +400,10 @@ export default function EnhancedBackupPage() {
                                     </span>
                                 </div>
                             </div>
-                            
+
                             {/* Enhanced Gradient Progress Bar */}
                             <div className="relative w-full h-4 bg-slate-200 rounded-full overflow-hidden">
-                                <div 
+                                <div
                                     className="h-full rounded-full bg-gradient-to-r from-purple-500 via-indigo-500 to-blue-500 transition-all duration-500 ease-out shadow-lg"
                                     style={{ width: `${backupProgress}%` }}
                                 >
@@ -552,7 +446,7 @@ export default function EnhancedBackupPage() {
                                     Export Data
                                 </h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <Button 
+                                    <Button
                                         onClick={() => exportData('json')}
                                         disabled={isLoading}
                                         className="h-14 font-poppins bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white border-0 shadow-md hover:shadow-lg transition-all duration-300"
@@ -560,7 +454,7 @@ export default function EnhancedBackupPage() {
                                         <FileJson className="h-5 w-5 mr-2" />
                                         JSON Backup
                                     </Button>
-                                    <Button 
+                                    <Button
                                         onClick={() => exportData('csv')}
                                         disabled={isLoading}
                                         className="h-14 font-poppins bg-gradient-to-r from-blue-500 to-sky-600 hover:from-blue-600 hover:to-sky-700 text-white border-0 shadow-md hover:shadow-lg transition-all duration-300"
@@ -576,7 +470,7 @@ export default function EnhancedBackupPage() {
                                     <Upload className="h-5 w-5 text-blue-600" />
                                     Restore Data
                                 </h3>
-                                <Button 
+                                <Button
                                     onClick={handleImportClick}
                                     disabled={isLoading}
                                     className="w-full h-14 font-poppins bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white border-0 shadow-md hover:shadow-lg transition-all duration-300"
@@ -641,7 +535,7 @@ export default function EnhancedBackupPage() {
                                 </div>
 
                                 <div className="pt-4">
-                                    <Button 
+                                    <Button
                                         onClick={syncData}
                                         disabled={isLoading}
                                         className="w-full h-14 font-poppins bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white border-0 shadow-md hover:shadow-lg transition-all duration-300"
@@ -735,7 +629,7 @@ export default function EnhancedBackupPage() {
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="sm:justify-center">
-                        <Button 
+                        <Button
                             onClick={() => setShowSuccessDialog(false)}
                             className={buttonStyles.success + " px-8"}
                         >

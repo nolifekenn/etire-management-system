@@ -47,21 +47,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { DataTableWrapper } from '@/components/DataTableWrapper';
+import { IndeterminateProgressBar } from '@/components/ui/indeterminate-progress';
 
-// ===== DESIGN SYSTEM =====
-const buttonStyles = {
-  primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins",
-  secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 font-poppins",
-  glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins",
-  back: "flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-slate-300 hover:border-slate-400 font-poppins"
-};
+// ===== SIMPLIFIED DESIGN SYSTEM =====
+// Note: Using Tailwind classes directly instead of gradient definitions
 
-const microAnimations = {
-  cardHover: "transition-all duration-350 ease-spring hover:translate-y-[-6px] hover:shadow-2xl",
-  buttonHover: "transition-all duration-200 hover:scale-105 active:scale-95",
-  fadeIn: "animate-in fade-in duration-500",
-  iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
-};
 
 // ===== REUSABLE PAGINATION COMPONENT =====
 const PaginationControls = ({
@@ -147,71 +138,36 @@ const SuccessAnimation = ({
 }) => {
   if (!isVisible) return null;
 
-  const getActionConfig = () => {
+  const getActionIcon = () => {
     switch (actionType) {
-      case 'add':
-        return {
-          gradient: 'from-green-500 to-emerald-600',
-          icon: PlusCircle
-        };
-      case 'edit':
-        return {
-          gradient: 'from-blue-500 to-cyan-600',
-          icon: Save
-        };
-      case 'delete':
-        return {
-          gradient: 'from-red-500 to-orange-600',
-          icon: Archive
-        };
-      case 'export':
-        return {
-          gradient: 'from-purple-500 to-indigo-600',
-          icon: Download
-        };
-      case 'create':
-        return {
-          gradient: 'from-purple-500 to-indigo-600',
-          icon: CheckCircle
-        };
-      default:
-        return {
-          gradient: 'from-purple-500 to-indigo-600',
-          icon: CheckCircle
-        };
+      case 'add': return PlusCircle;
+      case 'edit': return Save;
+      case 'delete': return Archive;
+      case 'export': return Download;
+      case 'create': return CheckCircle;
+      default: return CheckCircle;
     }
   };
 
-  const { gradient, icon: ActionIcon } = getActionConfig();
+  const ActionIcon = getActionIcon();
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300">
-      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300">
-        <div className={`w-20 h-20 bg-gradient-to-r ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500`}>
-          <ActionIcon className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-sm mx-4 text-center shadow-xl">
+        <div className="w-14 h-14 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+          <ActionIcon className="h-7 w-7 text-primary-foreground" />
         </div>
-
-        <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins">
-          {title}
-        </h3>
-
-        <p className="text-slate-600 mb-6 font-poppins">
-          {message}
-        </p>
-
-        <div className="flex gap-3 justify-center">
-          <Button
-            className={`bg-gradient-to-r ${gradient} hover:scale-105 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins`}
-            onClick={onConfirm}
-          >
-            <CheckCircle className="h-5 w-5 mr-2" />
-            Continue
-          </Button>
-        </div>
+        <h3 className="text-lg font-semibold text-foreground mb-1">{title}</h3>
+        <p className="text-sm text-muted-foreground mb-4">{message}</p>
+        <Button onClick={onConfirm} className="w-full">
+          <CheckCircle className="h-4 w-4 mr-2" />
+          Continue
+        </Button>
       </div>
     </div>
   );
 };
+
 
 // Vehicle Type Icons Mapping
 const VehicleIcons = {
@@ -704,108 +660,7 @@ interface Column {
   render?: (value: any, item: any) => React.ReactNode;
 }
 
-interface DataTableProps {
-  columns: Column[];
-  data: any[];
-  onEdit?: (item: any) => void;
-  onDelete?: (item: any) => void;
-  className?: string;
-}
-
-const CustomDataTable = ({ columns, data, onEdit, onDelete, className = '' }: DataTableProps) => {
-  const renderCell = (item: any, column: Column) => {
-    const value = item[column.key];
-
-    if (column.render) {
-      return column.render(value, item);
-    }
-
-    if (value === null || value === undefined) {
-      return <span className="text-slate-400">-</span>;
-    }
-
-    if (typeof value === 'boolean') {
-      return value ? 'Yes' : 'No';
-    }
-
-    return String(value);
-  };
-
-  return (
-    <div className={`w-full overflow-auto ${className}`}>
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-slate-50 hover:bg-slate-50">
-            {columns.map((column) => (
-              <TableHead
-                key={column.key}
-                className="font-semibold text-slate-700 whitespace-nowrap px-6 flex-1"
-              >
-                {column.header}
-              </TableHead>
-            ))}
-            {(onEdit || onDelete) && (
-              <TableHead className="font-semibold text-slate-700 text-right px-6">
-                Actions
-              </TableHead>
-            )}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.length === 0 ? (
-            <TableRow>
-              <TableCell
-                colSpan={columns.length + (onEdit || onDelete ? 1 : 0)}
-                className="h-24 text-center text-slate-500 px-6"
-              >
-                No data found.
-              </TableCell>
-            </TableRow>
-          ) : (
-            data.map((item, rowIndex) => (
-              <TableRow
-                key={item.id || rowIndex}
-                className="hover:bg-slate-50/50 transition-colors"
-              >
-                {columns.map((column) => (
-                  <TableCell key={`${rowIndex}-${column.key}`} className="px-6 flex-1">
-                    {renderCell(item, column)}
-                  </TableCell>
-                ))}
-                {(onEdit || onDelete) && (
-                  <TableCell className="text-right space-x-2 px-6">
-                    {onEdit && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onEdit(item)}
-                        className="h-8 w-8 p-0 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
-                        title="Edit"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {onDelete && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onDelete(item)}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </TableCell>
-                )}
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
-  );
-};
+// ===== CUSTOM TABLE COMPONENTS REMOVED (Replaced with DataTableWrapper) =====
 
 // Column definitions
 const customerColumns: Column[] = [
@@ -980,7 +835,7 @@ const EnhancedEmptyState = ({
       <div className="flex gap-3 justify-center">
         <Button
           onClick={onAddNew}
-          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 hover:scale-105 shadow-md font-poppins"
+          className=""
         >
           <PlusCircle className="h-4 w-4 mr-2" />
           {buttonText}
@@ -1002,7 +857,6 @@ const EnhancedEmptyState = ({
 
 // ===== StatsOverview Component =====
 const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[], vehicles: any[], tireHistory: any[] }) => {
-  // ... (keep your calculation logic here: totalCustomers, totalVehicles etc.) ...
   const totalCustomers = customers.length;
   const totalVehicles = vehicles.length;
   const recentServices = tireHistory.filter(history =>
@@ -1013,56 +867,27 @@ const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[],
     .map(history => history.vehicle_id)
   )].length;
 
-  const stats = [
-    { label: "Customers", value: totalCustomers, icon: Users, gradient: "from-purple-500 to-purple-600", description: "Total registered customers" },
-    { label: "Vehicles", value: totalVehicles, icon: Car, gradient: "from-blue-500 to-cyan-500", description: "Active vehicles in system" },
-    { label: "Monthly Services", value: recentServices, icon: Wrench, gradient: "from-indigo-500 to-blue-500", description: "Services this month" },
-    { label: "Serviced Vehicles", value: vehiclesWithRecentService, icon: CheckCircle, gradient: "from-cyan-500 to-blue-500", description: "Vehicles serviced this month" }
-  ];
-
   return (
-    <div className="mb-8"> {/* Main wrapper with margin bottom */}
-      <div className="relative rounded-2xl bg-gradient-to-br from-white to-slate-50 border border-slate-200/70 shadow-lg overflow-hidden">
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-purple-400 to-transparent rounded-full -mr-16 -mt-16"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-cyan-400 to-transparent rounded-full -ml-12 -mb-12"></div>
-        </div>
-
-        <div className="relative p-6 md:p-8">
-          <div className="space-y-2 mb-6">
-            <h2 className="text-2xl font-bold text-slate-900 font-poppins tracking-tight">
-              Business Overview
-            </h2>
-            <p className="text-slate-600 text-sm font-poppins max-w-lg">
-              Real-time insights for your tire management operations
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {stats.map((stat, index) => {
-              const Icon = stat.icon;
-              return (
-                <div key={stat.label} className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-300 hover:translate-y-[-2px] group cursor-default">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 bg-gradient-to-r ${stat.gradient} rounded-lg shadow-sm group-hover:scale-110 transition-transform duration-300`}>
-                        <Icon className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold text-slate-900 font-poppins tracking-tight">{stat.value.toLocaleString()}</p>
-                        <p className="text-sm font-medium text-slate-700 font-poppins mt-0.5">{stat.label}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-3 font-poppins">{stat.description}</p>
-                  <div className="mt-4 h-1 w-full bg-gradient-to-r from-slate-100 to-slate-100 rounded-full overflow-hidden">
-                    <div className={`h-full bg-gradient-to-r ${stat.gradient} transition-all duration-700 ease-out`} style={{ width: '100%' }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+    <div className="flex flex-wrap items-center gap-4 mb-4 text-sm">
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 text-purple-700 rounded-md">
+        <Users className="h-4 w-4" />
+        <span className="font-medium">{totalCustomers}</span>
+        <span>Customers</span>
+      </div>
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-md">
+        <Car className="h-4 w-4" />
+        <span className="font-medium">{totalVehicles}</span>
+        <span>Vehicles</span>
+      </div>
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-md">
+        <Wrench className="h-4 w-4" />
+        <span className="font-medium">{recentServices}</span>
+        <span>Monthly Services</span>
+      </div>
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-cyan-50 text-cyan-700 rounded-md">
+        <CheckCircle className="h-4 w-4" />
+        <span className="font-medium">{vehiclesWithRecentService}</span>
+        <span>Serviced This Month</span>
       </div>
     </div>
   );
@@ -1074,49 +899,20 @@ const QuickActions = ({ onAddCustomer, onAddVehicle, onExportData }: {
   onAddVehicle: () => void,
   onExportData: () => void
 }) => {
-  const actions = [
-    {
-      label: "Add Customer",
-      description: "Create new customer",
-      icon: UserPlus,
-      onClick: onAddCustomer,
-      gradient: "linear-gradient(90deg,#7c3aed 0%,#4f46e5 100%)"
-    },
-    {
-      label: "Add Vehicle",
-      description: "Register vehicle",
-      icon: Car,
-      onClick: onAddVehicle,
-      gradient: "linear-gradient(90deg,#0ea5e9 0%,#0284c7 100%)"
-    },
-    {
-      label: "Export Data",
-      description: "Download to Excel",
-      icon: Download,
-      onClick: onExportData,
-      gradient: "linear-gradient(90deg,#10b981 0%,#06b6d4 100%)"
-    }
-  ];
-
   return (
-    <div className="flex flex-col sm:flex-row gap-4 mb-8">
-      {actions.map((action, index) => (
-        <button
-          key={action.label}
-          type="button"
-          onClick={action.onClick}
-          className="min-w-[220px] flex-1 sm:flex-auto flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1 font-poppins"
-          style={{ background: action.gradient }}
-        >
-          <div className="text-left">
-            <div className="text-lg font-semibold">{action.label}</div>
-            <div className="text-sm opacity-90">{action.description}</div>
-          </div>
-          <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
-            <action.icon className="h-5 w-5 text-white" />
-          </div>
-        </button>
-      ))}
+    <div className="flex flex-wrap gap-2 mb-4">
+      <Button onClick={onAddCustomer} size="sm" className="gap-2">
+        <UserPlus className="h-4 w-4" />
+        Add Customer
+      </Button>
+      <Button onClick={onAddVehicle} variant="outline" size="sm" className="gap-2">
+        <Car className="h-4 w-4" />
+        Add Vehicle
+      </Button>
+      <Button onClick={onExportData} variant="outline" size="sm" className="gap-2">
+        <Download className="h-4 w-4" />
+        Export
+      </Button>
     </div>
   );
 };
@@ -1154,7 +950,7 @@ const EnhancedTabs = ({ value, onValueChange, children }: any) => {
 
 export default function EnhancedCustomersPage() {
   const { toast } = useToast();
-  const { user: authUser } = useAuth();
+  const { user: authUser, activeBranchId } = useAuth();
   const [activeTab, setActiveTab] = useState('customers');
   const [mounted, setMounted] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -1247,7 +1043,7 @@ export default function EnhancedCustomersPage() {
   useEffect(() => {
     setMounted(true);
     fetchData();
-  }, []);
+  }, [activeBranchId]);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -1274,16 +1070,37 @@ export default function EnhancedCustomersPage() {
     if (!supabase) return;
     setIsCustomerLoading(true);
 
-    const { data, error } = await supabase
-      .rpc('get_customers_with_vehicles');
+    try {
+      let query = supabase
+        .from('customer')
+        .select(`
+          *,
+          vehicles:vehicle(count)
+        `)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      setCustomerError(`Could not fetch customers: ${error.message}`);
-      setCustomers([]);
-    } else {
-      setCustomers((data || []) as Customer[]);
-      setCustomerError(null);
+      if (activeBranchId) {
+        query = query.eq('branch_id', activeBranchId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        setCustomerError(`Could not fetch customers: ${error.message}`);
+        setCustomers([]);
+      } else {
+        const mappedData = (data || []).map((item: any) => ({
+          ...item,
+          vehicle_count: item.vehicles?.[0]?.count || 0
+        }));
+        setCustomers(mappedData as Customer[]);
+        setCustomerError(null);
+      }
+    } catch (err: any) {
+      setCustomerError(err.message);
     }
+
     setIsCustomerLoading(false);
     setLastUpdated(new Date());
   };
@@ -1292,15 +1109,32 @@ export default function EnhancedCustomersPage() {
     if (!supabase) return;
     setIsVehicleLoading(true);
 
-    const { data, error } = await supabase
-      .rpc('get_vehicles_complete');
+    try {
+      let query = supabase
+        .from('vehicle')
+        .select(`
+          *,
+          customer!inner(*),
+          vehicle_type(*)
+        `)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      setVehicleError(`Could not fetch vehicles: ${error.message}`);
-      setVehicles([]);
-    } else {
-      setVehicles((data || []) as Vehicle[]);
-      setVehicleError(null);
+      if (activeBranchId) {
+        query = query.eq('customer.branch_id', activeBranchId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        setVehicleError(`Could not fetch vehicles: ${error.message}`);
+        setVehicles([]);
+      } else {
+        setVehicles((data || []) as Vehicle[]);
+        setVehicleError(null);
+      }
+    } catch (err: any) {
+      setVehicleError(err.message);
     }
     setIsVehicleLoading(false);
   };
@@ -1335,9 +1169,29 @@ export default function EnhancedCustomersPage() {
   const fetchSupportingData = async () => {
     if (!supabase) return;
 
+    let inventoryQuery = supabase
+      .from('view_branch_inventory')
+      .select('item_id, name, category')
+      .eq('category', 'tire')
+      .is('deleted_at', null);
+
+    if (activeBranchId) {
+      inventoryQuery = inventoryQuery.eq('branch_id', activeBranchId);
+    }
+
+    let usersQuery = supabase
+      .from('user')
+      .select('user_id, name')
+      .in('role', ['staff', 'branch_manager'])
+      .is('deleted_at', null);
+
+    if (activeBranchId) {
+      usersQuery = usersQuery.eq('branch_id', activeBranchId);
+    }
+
     const [inventoryRes, usersRes] = await Promise.all([
-      supabase.from('inventory_item').select('item_id, name, category').eq('category', 'tire'),
-      supabase.from('user').select('user_id, name').in('role', [1, 2])
+      inventoryQuery,
+      usersQuery
     ]);
 
     if (inventoryRes.data) setInventory(inventoryRes.data as InventoryItem[]);
@@ -1721,9 +1575,17 @@ export default function EnhancedCustomersPage() {
       return;
     }
 
+    const targetBranchId = editingCustomer?.branch_id ?? activeBranchId ?? authUser.branch_id ?? null;
+
+    if (!targetBranchId) {
+      toast({ title: "Branch Required", description: "Select a branch before saving customers.", variant: "destructive" });
+      return;
+    }
+
     setIsCustomerLoading(true);
 
     const customerData = {
+      branch_id: targetBranchId,
       name: customerName,
       phone: customerPhone || null,
     };
@@ -1901,9 +1763,10 @@ export default function EnhancedCustomersPage() {
       }
     }
 
+    // Soft delete: set deleted_at timestamp instead of removing the record
     const { error } = await supabase
       .from(tableName)
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq(idField, deletingItem[idField]);
 
     if (error) {
@@ -1941,66 +1804,30 @@ export default function EnhancedCustomersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white text-slate-800 font-poppins relative overflow-hidden">
+    <div className="min-h-screen bg-background">
+      <div className="w-full px-3 py-4">
 
-      {/* Background Sections */}
-      <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
-        <div
-          className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
-          style={{
-            backgroundImage: "url('/images/image2.jpg')",
-            backgroundSize: "cover",
-            backgroundPosition: "center 30%"
-          }}
-        ></div>
-        <div className="absolute top-0 left-0 w-32 h-32 bg-purple-300/20 rounded-br-full"></div>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-300/20 rounded-bl-full"></div>
-      </div>
-
-      <div className="absolute top-64 left-0 w-full bottom-0 bg-indigo-50/10">
-        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-indigo-100/15 to-indigo-50/10"></div>
-      </div>
-
-      <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-
-        {/* Header Section */}
-        <div className={`mb-12 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
-          <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
-
-            <div className="relative z-10 flex-1">
-              <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
-                Customer & Vehicle Management
-              </h1>
-              <div className="flex items-center gap-6 text-white/90">
-                <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium font-poppins">
-                  <Users className="h-6 w-6 opacity-90" />
-                  Manage customers, vehicles, and tire service history
-                </p>
-                <div className="flex items-center gap-4 text-lg hidden sm:flex">
-                  {lastUpdated && (
-                    <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
-                      <Clock className="w-5 h-5" />
-                      Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                    Live data
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <Button
-              onClick={handleRefresh}
-              disabled={isCustomerLoading || isVehicleLoading || isHistoryLoading}
-              className={buttonStyles.glass + " active:scale-95 font-poppins hidden sm:flex"}
-            >
-              <RefreshCw className={`h-6 w-6 mr-3 ${isCustomerLoading || isVehicleLoading || isHistoryLoading ? 'animate-spin' : ''}`} />
-              Refresh Data
-            </Button>
+        {/* Compact Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-semibold text-foreground">
+              Customer & Vehicle Management
+            </h1>
+            {lastUpdated && (
+              <span className="text-sm text-muted-foreground hidden sm:inline">
+                <Clock className="inline h-3.5 w-3.5 mr-1" />
+                Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+              </span>
+            )}
           </div>
+          <Button
+            onClick={handleRefresh}
+            disabled={isCustomerLoading || isVehicleLoading || isHistoryLoading}
+            variant="outline"
+            size="sm"
+          >
+            <RefreshCw className={`h-4 w-4 ${isCustomerLoading || isVehicleLoading || isHistoryLoading ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
 
         {/* Stats Overview */}
@@ -2013,6 +1840,7 @@ export default function EnhancedCustomersPage() {
           onExportData={handleExportData}
         />
 
+
         <div className="mb-4">
           <EnhancedTabs value={activeTab} onValueChange={handleTabChange}>
 
@@ -2020,68 +1848,66 @@ export default function EnhancedCustomersPage() {
             <TabsContent value="customers" className="space-y-6 animate-in fade-in duration-500">
               {isCustomerLoading ? (
                 <div className="flex flex-col justify-center items-center h-64 space-y-4">
-                  <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
-                  <p className="text-slate-500 font-poppins">Loading customers...</p>
+                  <IndeterminateProgressBar className="w-1/3 max-w-xs" />
+                  <p className="text-slate-500 font-poppins animate-pulse text-sm">Loading customers...</p>
                 </div>
               ) : (
-                <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
-                  <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 text-white p-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="p-2 bg-white/20 rounded-lg">
-                        <Users className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                        <div className="text-xl font-bold font-poppins">Customer Management</div>
-                        <div className="text-sm opacity-90 hidden sm:block">Manage customer information and their vehicles</div>
-                        <div className="text-sm text-white/90 mt-1">
+                <Card>
+                  <CardHeader className="py-2 px-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium">
+                        Customer Management
+                        <span className="ml-2 text-muted-foreground font-normal">
                           {customerFilters.search ? (
-                            <>Filtered: <strong>{filteredCustomers.length}</strong> of <strong>{customers.length}</strong> customers</>
+                            <>({filteredCustomers.length} of {customers.length})</>
                           ) : (
-                            <>Total: <strong>{customers.length}</strong> customers</>
+                            <>({customers.length} customers)</>
                           )}
-                        </div>
-                      </div>
+                        </span>
+                      </CardTitle>
                     </div>
-                  </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
 
-                  <CustomerAdvancedFilters
-                    filters={customerFilters}
-                    onFiltersChange={setCustomerFilters}
-                    onClearFilters={clearCustomerFilters}
-                    rowsPerPage={customerRowsPerPage}
-                    onRowsPerPageChange={setCustomerRowsPerPage}
-                  />
-
-                  {filteredCustomers.length === 0 ? (
-                    <EnhancedEmptyState
-                      type="customers"
-                      onAddNew={handleOpenCustomerDialog}
+                    <CustomerAdvancedFilters
+                      filters={customerFilters}
+                      onFiltersChange={setCustomerFilters}
                       onClearFilters={clearCustomerFilters}
+                      rowsPerPage={customerRowsPerPage}
+                      onRowsPerPageChange={setCustomerRowsPerPage}
                     />
-                  ) : (
-                    <>
-                      <CustomDataTable
-                        className="w-full"
-                        columns={customerColumns}
-                        data={displayedCustomers.map(customer => ({
-                          ...customer,
-                          id: customer.customer_id
-                        }))}
-                        onEdit={handleEditCustomer}
-                        onDelete={(item) => handleDeleteItem(item, 'customer')}
-                      />
 
-                      {/* NEW PAGINATION CONTROLS */}
-                      <PaginationControls
-                        currentPage={customerCurrentPage}
-                        totalPages={Math.ceil(filteredCustomers.length / customerRowsPerPage)}
-                        onPageChange={setCustomerCurrentPage}
-                        totalItems={filteredCustomers.length}
-                        rowsPerPage={customerRowsPerPage}
+                    {filteredCustomers.length === 0 ? (
+                      <EnhancedEmptyState
+                        type="customers"
+                        onAddNew={handleOpenCustomerDialog}
+                        onClearFilters={clearCustomerFilters}
                       />
-                    </>
-                  )}
-                </div>
+                    ) : (
+                      <>
+                        <DataTableWrapper
+                          className="w-full"
+                          columns={customerColumns}
+                          data={displayedCustomers.map(customer => ({
+                            ...customer,
+                            id: customer.customer_id
+                          }))}
+                          onEdit={handleEditCustomer}
+                          onDelete={(item) => handleDeleteItem(item, 'customer')}
+                        />
+
+                        {/* NEW PAGINATION CONTROLS */}
+                        <PaginationControls
+                          currentPage={customerCurrentPage}
+                          totalPages={Math.ceil(filteredCustomers.length / customerRowsPerPage)}
+                          onPageChange={setCustomerCurrentPage}
+                          totalItems={filteredCustomers.length}
+                          rowsPerPage={customerRowsPerPage}
+                        />
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
               )}
             </TabsContent>
 
@@ -2089,70 +1915,68 @@ export default function EnhancedCustomersPage() {
             <TabsContent value="vehicles" className="space-y-6 animate-in fade-in duration-500">
               {isVehicleLoading ? (
                 <div className="flex flex-col justify-center items-center h-64 space-y-4">
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                  <p className="text-slate-500 font-poppins">Loading vehicles...</p>
+                  <IndeterminateProgressBar className="w-1/3 max-w-xs" />
+                  <p className="text-slate-500 font-poppins animate-pulse text-sm">Loading vehicles...</p>
                 </div>
               ) : (
-                <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
-                  <div className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white p-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="p-2 bg-white/20 rounded-lg">
-                        <Car className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                        <div className="text-xl font-bold font-poppins">Vehicle Management</div>
-                        <div className="text-sm opacity-90 hidden sm:block">Manage vehicle information and service history</div>
-                        <div className="text-sm text-white/90 mt-1">
+                <Card>
+                  <CardHeader className="py-2 px-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium">
+                        Vehicle Management
+                        <span className="ml-2 text-muted-foreground font-normal">
                           {vehicleFilters.search || vehicleFilters.customer !== 'all' || vehicleFilters.vehicleType !== 'all' ? (
-                            <>Filtered: <strong>{filteredVehicles.length}</strong> of <strong>{vehicles.length}</strong> vehicles</>
+                            <>({filteredVehicles.length} of {vehicles.length})</>
                           ) : (
-                            <>Total: <strong>{vehicles.length}</strong> vehicles</>
+                            <>({vehicles.length} vehicles)</>
                           )}
-                        </div>
-                      </div>
+                        </span>
+                      </CardTitle>
                     </div>
-                  </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
 
-                  <VehicleAdvancedFilters
-                    filters={vehicleFilters}
-                    onFiltersChange={setVehicleFilters}
-                    onClearFilters={clearVehicleFilters}
-                    customers={customers}
-                    vehicleTypes={vehicleTypes}
-                    rowsPerPage={vehicleRowsPerPage}
-                    onRowsPerPageChange={setVehicleRowsPerPage}
-                  />
-
-                  {filteredVehicles.length === 0 ? (
-                    <EnhancedEmptyState
-                      type="vehicles"
-                      onAddNew={handleOpenVehicleDialog}
+                    <VehicleAdvancedFilters
+                      filters={vehicleFilters}
+                      onFiltersChange={setVehicleFilters}
                       onClearFilters={clearVehicleFilters}
+                      customers={customers}
+                      vehicleTypes={vehicleTypes}
+                      rowsPerPage={vehicleRowsPerPage}
+                      onRowsPerPageChange={setVehicleRowsPerPage}
                     />
-                  ) : (
-                    <>
-                      <CustomDataTable
-                        className="w-full"
-                        columns={vehicleColumns}
-                        data={displayedVehicles.map(vehicle => ({
-                          ...vehicle,
-                          id: vehicle.vehicle_id
-                        }))}
-                        onEdit={handleEditVehicle}
-                        onDelete={(item) => handleDeleteItem(item, 'vehicle')}
-                      />
 
-                      {/* NEW PAGINATION CONTROLS */}
-                      <PaginationControls
-                        currentPage={vehicleCurrentPage}
-                        totalPages={Math.ceil(filteredVehicles.length / vehicleRowsPerPage)}
-                        onPageChange={setVehicleCurrentPage}
-                        totalItems={filteredVehicles.length}
-                        rowsPerPage={vehicleRowsPerPage}
+                    {filteredVehicles.length === 0 ? (
+                      <EnhancedEmptyState
+                        type="vehicles"
+                        onAddNew={handleOpenVehicleDialog}
+                        onClearFilters={clearVehicleFilters}
                       />
-                    </>
-                  )}
-                </div>
+                    ) : (
+                      <>
+                        <DataTableWrapper
+                          className="w-full"
+                          columns={vehicleColumns}
+                          data={displayedVehicles.map(vehicle => ({
+                            ...vehicle,
+                            id: vehicle.vehicle_id
+                          }))}
+                          onEdit={handleEditVehicle}
+                          onDelete={(item) => handleDeleteItem(item, 'vehicle')}
+                        />
+
+                        {/* NEW PAGINATION CONTROLS */}
+                        <PaginationControls
+                          currentPage={vehicleCurrentPage}
+                          totalPages={Math.ceil(filteredVehicles.length / vehicleRowsPerPage)}
+                          onPageChange={setVehicleCurrentPage}
+                          totalItems={filteredVehicles.length}
+                          rowsPerPage={vehicleRowsPerPage}
+                        />
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
               )}
             </TabsContent>
 
@@ -2160,90 +1984,88 @@ export default function EnhancedCustomersPage() {
             <TabsContent value="history" className="space-y-6 animate-in fade-in duration-500">
               {isHistoryLoading ? (
                 <div className="flex flex-col justify-center items-center h-64 space-y-4">
-                  <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-                  <p className="text-slate-500 font-poppins">Loading service history...</p>
+                  <IndeterminateProgressBar className="w-1/3 max-w-xs" />
+                  <p className="text-slate-500 font-poppins animate-pulse text-sm">Loading service history...</p>
                 </div>
               ) : (
-                <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
-                  <div className="w-full bg-gradient-to-r from-green-600 via-cyan-600 to-blue-600 text-white p-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="p-2 bg-white/20 rounded-lg">
-                        <History className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                        <div className="text-xl font-bold font-poppins">Tire Service History</div>
-                        <div className="text-sm opacity-90 hidden sm:block">Track tire services and maintenance records</div>
-                        <div className="text-sm text-white/90 mt-1">
+                <Card>
+                  <CardHeader className="py-2 px-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium">
+                        Tire Service History
+                        <span className="ml-2 text-muted-foreground font-normal">
                           {historyFilters.search || historyFilters.serviceType !== 'all' ? (
-                            <>Filtered: <strong>{filteredHistory.length}</strong> of <strong>{tireHistory.length}</strong> service records</>
+                            <>({filteredHistory.length} of {tireHistory.length})</>
                           ) : (
-                            <>Total: <strong>{tireHistory.length}</strong> service records</>
+                            <>({tireHistory.length} records)</>
                           )}
-                        </div>
-                      </div>
+                        </span>
+                      </CardTitle>
                     </div>
-                  </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
 
-                  <HistoryAdvancedFilters
-                    filters={historyFilters}
-                    onFiltersChange={setHistoryFilters}
-                    onClearFilters={clearHistoryFilters}
-                    rowsPerPage={historyRowsPerPage}
-                    onRowsPerPageChange={setHistoryRowsPerPage}
-                  />
-
-                  {filteredHistory.length === 0 ? (
-                    <EnhancedEmptyState
-                      type="history"
-                      onAddNew={() => { }}
+                    <HistoryAdvancedFilters
+                      filters={historyFilters}
+                      onFiltersChange={setHistoryFilters}
                       onClearFilters={clearHistoryFilters}
+                      rowsPerPage={historyRowsPerPage}
+                      onRowsPerPageChange={setHistoryRowsPerPage}
                     />
-                  ) : (
-                    <>
-                      <CustomDataTable
-                        className="w-full"
-                        columns={historyColumns}
-                        data={displayedHistory.map((h, idx) => ({
-                          ...h,
-                          id: `${h.history_id}-${idx}`,
-                          plate_number: h.vehicle?.plate_number ?? '',
-                          items: h.items ?? undefined,
-                          created_by_name: h.user?.name ?? '',
-                        }))}
-                        onDelete={(item) => handleDeleteItem(item, 'history')}
-                      />
 
-                      {/* NEW PAGINATION CONTROLS */}
-                      <PaginationControls
-                        currentPage={historyCurrentPage}
-                        totalPages={Math.ceil(filteredHistory.length / historyRowsPerPage)}
-                        onPageChange={setHistoryCurrentPage}
-                        totalItems={filteredHistory.length}
-                        rowsPerPage={historyRowsPerPage}
+                    {filteredHistory.length === 0 ? (
+                      <EnhancedEmptyState
+                        type="history"
+                        onAddNew={() => { }}
+                        onClearFilters={clearHistoryFilters}
                       />
-                    </>
-                  )}
-                </div>
+                    ) : (
+                      <>
+                        <DataTableWrapper
+                          className="w-full"
+                          columns={historyColumns}
+                          data={displayedHistory.map((h, idx) => ({
+                            ...h,
+                            id: `${h.history_id}-${idx}`,
+                            plate_number: h.vehicle?.plate_number ?? '',
+                            items: h.items ?? undefined,
+                            created_by_name: h.user?.name ?? '',
+                          }))}
+                          onDelete={(item) => handleDeleteItem(item, 'history')}
+                        />
+
+                        {/* NEW PAGINATION CONTROLS */}
+                        <PaginationControls
+                          currentPage={historyCurrentPage}
+                          totalPages={Math.ceil(filteredHistory.length / historyRowsPerPage)}
+                          onPageChange={setHistoryCurrentPage}
+                          totalItems={filteredHistory.length}
+                          rowsPerPage={historyRowsPerPage}
+                        />
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
               )}
             </TabsContent>
           </EnhancedTabs>
         </div>
 
 
-{/* Success Animation */}
-<SuccessAnimation 
-          isVisible={successAnimation.isVisible} 
-          title={successAnimation.title} 
-          message={successAnimation.message} 
-          actionType={successAnimation.actionType} 
-          onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))} 
+        {/* Success Animation */}
+        <SuccessAnimation
+          isVisible={successAnimation.isVisible}
+          title={successAnimation.title}
+          message={successAnimation.message}
+          actionType={successAnimation.actionType}
+          onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))}
         />
 
         {/* Customer Dialog */}
         <Dialog open={isCustomerDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) { setIsCustomerDialogOpen(false); resetCustomerForm(); } }}>
           <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl font-poppins animate-in zoom-in duration-300">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
+              <DialogTitle className="text-2xl font-bold text-foreground">
                 {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
               </DialogTitle>
               <DialogDescription className="text-slate-600 font-poppins">
@@ -2264,12 +2086,12 @@ export default function EnhancedCustomersPage() {
             </div>
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="outline" className={buttonStyles.back}>
+                <Button type="button" variant="outline" className="">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Cancel
                 </Button>
               </DialogClose>
-              <Button onClick={handleSubmitCustomer} disabled={isCustomerLoading} className={buttonStyles.primary}>
+              <Button onClick={handleSubmitCustomer} disabled={isCustomerLoading} className="">
                 {isCustomerLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editingCustomer ? 'Save Changes' : 'Create Customer'}
               </Button>
@@ -2281,7 +2103,7 @@ export default function EnhancedCustomersPage() {
         <Dialog open={isVehicleDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) { setIsVehicleDialogOpen(false); resetVehicleForm(); } }}>
           <DialogContent className="sm:max-w-lg bg-white border border-slate-200 shadow-xl font-poppins animate-in zoom-in duration-300">
             <DialogHeader>
-              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
+              <DialogTitle className="text-2xl font-bold text-foreground">
                 {editingVehicle ? 'Edit Vehicle' : 'Add New Vehicle'}
               </DialogTitle>
               <DialogDescription className="text-slate-600 font-poppins">
@@ -2342,12 +2164,12 @@ export default function EnhancedCustomersPage() {
             </div>
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="outline" className={buttonStyles.back}>
+                <Button type="button" variant="outline" className="">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Cancel
                 </Button>
               </DialogClose>
-              <Button onClick={handleSubmitVehicle} disabled={isVehicleLoading} className={buttonStyles.primary}>
+              <Button onClick={handleSubmitVehicle} disabled={isVehicleLoading} className="">
                 {isVehicleLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editingVehicle ? 'Save Changes' : 'Create Vehicle'}
               </Button>
@@ -2365,7 +2187,7 @@ export default function EnhancedCustomersPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel className={buttonStyles.back}>
+              <AlertDialogCancel className="">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Cancel
               </AlertDialogCancel>

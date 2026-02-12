@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/PageHeader';
 import { DataTableWrapper } from '@/components/DataTableWrapper';
 import {
-  Archive, Coins, AlertTriangle, PlusCircle, PackageSearch, Loader2, Filter,
+  Archive, Coins, AlertTriangle, PlusCircle, PackageSearch, Filter,
   TrendingUp, Clock, RefreshCw, Plus, Search, X, Download, SlidersHorizontal,
   ArrowUpDown, Eye, Save, CheckCircle, ListFilter, ChevronLeft, ChevronRight,
-  Pencil, Trash2
+  Pencil, Trash2, Loader2
 } from 'lucide-react';
+import { IndeterminateProgressBar } from '@/components/ui/indeterminate-progress';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -36,6 +37,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
@@ -83,6 +85,25 @@ interface FilterState {
   sortOrder: 'asc' | 'desc';
 }
 
+type AlertFilterType = 'all' | 'out' | 'critical' | 'low';
+type AlertSortType = 'severity' | 'vehicle' | 'name';
+
+interface BranchInventoryRow {
+  item_id: string;
+  name: string;
+  category: InventoryItem['category'];
+  vehicle_type_name?: InventoryItem['vehicle_type'] | null;
+  vehicle_type_id?: InventoryItem['vehicle_type'] | null;
+  quantity: number;
+  cost_price: number;
+  sale_price: number;
+  reorder_level: number;
+  branch_id: string;
+  branch_name?: string | null;
+  supplier_id?: string | null;
+  supplier_name?: string | null;
+}
+
 const quickFilters = [
   { label: "All Items", value: "all", icon: PackageSearch },
   { label: "Low Stock", value: "lowStock", icon: AlertTriangle },
@@ -103,19 +124,9 @@ const vehicleTypeConfig: Record<'car' | 'motor' | 'truck', { label: string; colo
   truck: { label: 'Truck', color: 'bg-orange-100 text-orange-700 border-orange-200' }
 };
 
-// ===== ENHANCED DESIGN SYSTEM =====
-const buttonStyles = {
-  primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl",
-  secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95",
-  glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg"
-};
+// ===== SIMPLIFIED DESIGN SYSTEM =====
+// Note: Using Tailwind classes directly instead of gradient definitions
 
-const microAnimations = {
-  cardHover: "transition-all duration-350 ease-spring hover:translate-y-[-6px] hover:shadow-2xl",
-  buttonHover: "transition-all duration-200 hover:scale-105 active:scale-95",
-  fadeIn: "animate-in fade-in duration-500",
-  iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
-};
 
 // Stock Level Indicator Component
 const StockLevelIndicator = ({ quantity, reorderLevel = 5 }: { quantity: number; reorderLevel?: number }) => {
@@ -178,7 +189,7 @@ const VehicleTypeBadge = ({ type }: { type: 'car' | 'motor' | 'truck' }) => {
 };
 
 // ============================================
-// SUCCESS ANIMATION COMPONENT
+// SUCCESS ANIMATION COMPONENT (Simplified)
 // ============================================
 const SuccessAnimation = ({
   isVisible,
@@ -195,36 +206,31 @@ const SuccessAnimation = ({
 }) => {
   if (!isVisible) return null;
 
-  const getActionConfig = () => {
+  const getActionIcon = () => {
     switch (actionType) {
-      case 'add': return { gradient: 'from-green-500 to-emerald-600', icon: PlusCircle };
-      case 'edit': return { gradient: 'from-blue-500 to-cyan-600', icon: Save };
-      case 'delete': return { gradient: 'from-red-500 to-orange-600', icon: Archive };
-      case 'export': return { gradient: 'from-purple-500 to-indigo-600', icon: Download };
-      case 'adjust': return { gradient: 'from-amber-500 to-yellow-600', icon: ArrowUpDown };
-      default: return { gradient: 'from-purple-500 to-indigo-600', icon: CheckCircle };
+      case 'add': return PlusCircle;
+      case 'edit': return Save;
+      case 'delete': return Archive;
+      case 'export': return Download;
+      case 'adjust': return ArrowUpDown;
+      default: return CheckCircle;
     }
   };
 
-  const { gradient, icon: ActionIcon } = getActionConfig();
+  const ActionIcon = getActionIcon();
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-300">
-      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300 font-poppins">
-        <div className={`w-20 h-20 bg-gradient-to-r ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500`}>
-          <ActionIcon className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-sm mx-4 text-center shadow-xl">
+        <div className="w-14 h-14 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+          <ActionIcon className="h-7 w-7 text-primary-foreground" />
         </div>
-        <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins">{title}</h3>
-        <p className="text-slate-600 mb-6 font-poppins">{message}</p>
-        <div className="flex gap-3 justify-center">
-          <Button
-            className={`bg-gradient-to-r ${gradient} hover:scale-105 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins`}
-            onClick={onConfirm}
-          >
-            <CheckCircle className="h-5 w-5 mr-2" />
-            Confirm
-          </Button>
-        </div>
+        <h3 className="text-lg font-semibold text-foreground mb-1">{title}</h3>
+        <p className="text-sm text-muted-foreground mb-4">{message}</p>
+        <Button onClick={onConfirm} className="w-full">
+          <CheckCircle className="h-4 w-4 mr-2" />
+          Confirm
+        </Button>
       </div>
     </div>
   );
@@ -364,7 +370,7 @@ const AdvancedFilters = ({
             <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Sort By</Label>
             <Select
               value={filters.sortBy}
-              onValueChange={(value) => onFiltersChange({ ...filters, sortBy: value as any })}
+              onValueChange={(value) => onFiltersChange({ ...filters, sortBy: value as FilterState['sortBy'] })}
             >
               <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
                 <SelectValue placeholder="Sort..." />
@@ -382,7 +388,7 @@ const AdvancedFilters = ({
             <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Order</Label>
             <Select
               value={filters.sortOrder}
-              onValueChange={(value) => onFiltersChange({ ...filters, sortOrder: value as any })}
+              onValueChange={(value) => onFiltersChange({ ...filters, sortOrder: value as FilterState['sortOrder'] })}
             >
               <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
                 <SelectValue placeholder="Order" />
@@ -458,8 +464,8 @@ const AdvancedFilters = ({
                       px-3 py-1.5 text-xs font-medium rounded-md border transition-all duration-300
                       flex items-center justify-center whitespace-nowrap
                       ${isActive
-                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-transparent shadow-md transform scale-[1.02]'
-                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm'
+                        ? 'bg-primary text-primary-foreground border-transparent shadow-sm'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                       }
                     `}
                   >
@@ -530,7 +536,7 @@ const EnhancedEmptyState = ({
       </p>
       <Button
         onClick={onAddItem}
-        className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 hover:scale-105"
+        className=""
       >
         <Plus className="h-4 w-4 mr-2" />
         Add First Item
@@ -780,7 +786,7 @@ const StockAdjustmentForm = ({
         <Button
           onClick={handleSubmit}
           disabled={isLoading || !adjustment || !reason || newQuantity < 0}
-          className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 flex items-center gap-2"
+          className="flex items-center gap-2"
         >
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Apply Adjustment
@@ -805,18 +811,27 @@ const StockAdjustmentForm = ({
 const CriticalStockDetails = ({
   items,
   isOpen,
-  onClose
+  onClose,
+  onExport
 }: {
   items: InventoryItem[];
   isOpen: boolean;
   onClose: () => void;
+  onExport: () => void;
 }) => {
-  const [filterType, setFilterType] = useState<'all' | 'out' | 'critical' | 'low'>('all');
-  const [sortType, setSortType] = useState<'severity' | 'name' | 'vehicle'>('severity');
+  const [filterType, setFilterType] = useState<AlertFilterType>('all');
+  const [sortType, setSortType] = useState<AlertSortType>('severity');
 
   // Added pagination state
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+
+  const alertTabs: Array<{ id: AlertFilterType; label: string }> = [
+    { id: 'all', label: 'All Alerts' },
+    { id: 'out', label: 'Out of Stock' },
+    { id: 'critical', label: 'Critical' },
+    { id: 'low', label: 'Low Stock' }
+  ];
 
   // Reset page when filters change
   useEffect(() => {
@@ -933,27 +948,30 @@ const CriticalStockDetails = ({
       <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl p-0 gap-0 font-poppins">
 
         {/* Gradient Header with X Close Button */}
-        <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 sticky top-0 z-20 text-white relative">
+        <div className="sticky top-0 z-20 bg-destructive">
+          <div className="p-6 border-b border-slate-100 text-white relative">
 
-          {/* X Close Button */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
+            {/* X Close Button */}
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
 
-          <DialogHeader className="mb-4">
-            <DialogTitle className="text-2xl font-bold flex items-center gap-3">
-              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm border border-white/10">
-                <AlertTriangle className="h-6 w-6 text-white" />
-              </div>
-              Stock Attention Required
-            </DialogTitle>
-            <DialogDescription className="text-white/90 font-medium ml-0 sm:ml-14 text-base">
-              Review {allAlertItems.length} items below safety stock levels.
-            </DialogDescription>
-          </DialogHeader>
+            <DialogHeader className="mb-4">
+              <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm border border-white/10">
+                  <AlertTriangle className="h-6 w-6 text-white" />
+                </div>
+                Stock Attention Required
+              </DialogTitle>
+              <DialogDescription className="text-white/90 font-medium ml-0 sm:ml-14 text-base">
+                Review {allAlertItems.length} items below safety stock levels.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+        </div>
 
           {/* Filter & Sort Toolbar */}
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-end bg-white p-4 rounded-xl border border-slate-200 shadow-lg mt-2 text-slate-800">
@@ -962,15 +980,10 @@ const CriticalStockDetails = ({
             <div className="flex flex-col w-full sm:w-auto flex-1 gap-2">
               <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Filter Alerts</Label>
               <div className="flex w-full gap-1 p-1 bg-slate-100 rounded-lg border border-slate-200">
-                {[
-                  { id: 'all', label: 'All Alerts' },
-                  { id: 'out', label: 'Out of Stock' },
-                  { id: 'critical', label: 'Critical' },
-                  { id: 'low', label: 'Low Stock' }
-                ].map(tab => (
+                {alertTabs.map(tab => (
                   <button
                     key={tab.id}
-                    onClick={() => setFilterType(tab.id as any)}
+                    onClick={() => setFilterType(tab.id)}
                     className={`flex-1 px-2 py-1.5 text-xs font-bold rounded-md transition-all text-center whitespace-nowrap ${filterType === tab.id
                       ? 'bg-white text-slate-900 shadow-sm border border-slate-200'
                       : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
@@ -986,7 +999,7 @@ const CriticalStockDetails = ({
             <div className="flex gap-3 w-full sm:w-auto">
               <div className="flex flex-col gap-1.5 flex-1 sm:flex-none">
                 <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sort By</Label>
-                <Select value={sortType} onValueChange={(v: any) => setSortType(v)}>
+                <Select value={sortType} onValueChange={(value) => setSortType(value as AlertSortType)}>
                   <SelectTrigger className="h-9 min-w-[140px] text-xs font-medium bg-white border-slate-200">
                     <SelectValue />
                   </SelectTrigger>
@@ -1013,8 +1026,6 @@ const CriticalStockDetails = ({
               </div>
             </div>
           </div>
-        </div>
-
         {/* Scrollable Content Area */}
         <div className="p-6 space-y-8 bg-slate-50/30 min-h-[400px]">
           <div className="space-y-3">
@@ -1105,9 +1116,9 @@ const ViewMoreDialog = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl font-poppins p-0">
-        
-        {/* Gradient Header */}
-        <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-400 text-white p-6">
+
+        {/* Header */}
+        <div className="bg-primary text-primary-foreground p-4">
           <div className="flex items-center justify-between">
             <div>
               <DialogTitle className="text-2xl font-bold text-white">
@@ -1147,10 +1158,10 @@ const ViewMoreDialog = ({
                   {items.map((item) => {
                     const margin = calculateMargin(item);
                     const stockStatus = getStockStatusBadge(item.stock_quantity);
-                    
+
                     return (
-                      <tr 
-                        key={item.item_id} 
+                      <tr
+                        key={item.item_id}
                         className="hover:bg-slate-50/50 border-b border-slate-100 last:border-0 transition-colors"
                       >
                         <td className="p-4">
@@ -1158,8 +1169,8 @@ const ViewMoreDialog = ({
                           <div className="text-xs text-slate-500 mt-1">ID: {item.item_id}</div>
                         </td>
                         <td className="p-4">
-                          <Badge 
-                            variant="outline" 
+                          <Badge
+                            variant="outline"
                             className="capitalize bg-slate-100 text-slate-700 border-slate-200"
                           >
                             {item.category}
@@ -1185,8 +1196,8 @@ const ViewMoreDialog = ({
                             variant="outline"
                             className={
                               margin >= 30 ? 'bg-green-100 text-green-700 border-green-200' :
-                              margin >= 15 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
-                              'bg-red-100 text-red-700 border-red-200'
+                                margin >= 15 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                                  'bg-red-100 text-red-700 border-red-200'
                             }
                           >
                             {margin.toFixed(1)}%
@@ -1210,22 +1221,22 @@ const ViewMoreDialog = ({
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="text-sm text-slate-600">
-                  <span className="font-medium">Total Value:</span> 
+                  <span className="font-medium">Total Value:</span>
                   <span className="ml-2 font-bold text-slate-800">
                     ₱{items.reduce((acc, item) => acc + (item.sale_price * item.stock_quantity), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="h-4 w-px bg-slate-300"></div>
                 <div className="text-sm text-slate-600">
-                  <span className="font-medium">Average Margin:</span> 
+                  <span className="font-medium">Average Margin:</span>
                   <span className="ml-2 font-bold text-slate-800">
-                    {items.length > 0 
-                      ? (items.reduce((acc, item) => acc + calculateMargin(item), 0) / items.length).toFixed(1) 
+                    {items.length > 0
+                      ? (items.reduce((acc, item) => acc + calculateMargin(item), 0) / items.length).toFixed(1)
                       : '0.0'}%
                   </span>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">
                   In Stock: {items.filter(i => i.stock_quantity > 5).length}
@@ -1256,10 +1267,10 @@ const ViewMoreDialog = ({
           </Button>
           <Button
             onClick={() => {
-              handleExportExcel();
+              onExport();
               onClose();
             }}
-            className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white flex items-center gap-2"
+            className=""
           >
             <Download className="h-4 w-4" />
             Export This List
@@ -1273,6 +1284,7 @@ const ViewMoreDialog = ({
 
 export default function EnhancedInventoryPage() {
   const { toast } = useToast();
+  const { user, activeBranchId } = useAuth();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -1344,18 +1356,52 @@ export default function EnhancedInventoryPage() {
       return;
     }
 
+    if (!user) return;
+
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase
-        .rpc('get_inventory_complete');
+      let query = supabase
+        .from('view_branch_inventory')
+        .select('*')
+        .is('deleted_at', null);
+
+      // Filter by active branch
+      if (activeBranchId) {
+        query = query.eq('branch_id', activeBranchId);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching inventory:', error.message);
         setFetchError(`Could not fetch inventory: ${error.message}`);
         setItems([]);
       } else {
-        setItems((data || []) as InventoryItem[]);
+        // Map view data to InventoryItem interface
+        const typedRows = (data || []) as BranchInventoryRow[];
+        const mappedItems: InventoryItem[] = typedRows.map((item) => ({
+          item_id: item.item_id,
+          name: item.name,
+          category: item.category,
+          vehicle_type: item.vehicle_type_name || item.vehicle_type_id || 'car', // Use view columns directly
+          stock_quantity: item.quantity,
+          cost_price: item.cost_price,
+          sale_price: item.sale_price,
+          reorder_level: item.reorder_level,
+          created_at: undefined, // View might not have this or different name
+          updated_at: undefined,
+          branch: {
+            branch_id: item.branch_id,
+            name: item.branch_name || 'Unknown Branch'
+          },
+          supplier: item.supplier_name ? {
+            supplier_id: item.supplier_id || '',
+            name: item.supplier_name
+          } : undefined
+        }));
+
+        setItems(mappedItems);
         setFetchError(null);
         setLastUpdated(new Date());
       }
@@ -1366,7 +1412,7 @@ export default function EnhancedInventoryPage() {
     }
 
     setIsLoading(false);
-  }, []);
+  }, [user, activeBranchId]);
 
   useEffect(() => {
     fetchProducts();
@@ -1408,7 +1454,8 @@ export default function EnhancedInventoryPage() {
     }
 
     filtered.sort((a, b) => {
-      let aValue: any, bValue: any;
+      let aValue: number | string;
+      let bValue: number | string;
 
       switch (filters.sortBy) {
         case 'name':
@@ -1428,8 +1475,8 @@ export default function EnhancedInventoryPage() {
           bValue = b.vehicle_type;
           break;
         case 'updated':
-          aValue = new Date(a.updated_at || a.created_at || '');
-          bValue = new Date(b.updated_at || b.created_at || '');
+          aValue = new Date(a.updated_at || a.created_at || 0).getTime();
+          bValue = new Date(b.updated_at || b.created_at || 0).getTime();
           break;
         default:
           return 0;
@@ -1465,27 +1512,31 @@ export default function EnhancedInventoryPage() {
     {
       key: 'category',
       header: 'Category',
-      render: (value: any, item: any) => (
+      render: (value: InventoryItem['category']) => (
         <Badge variant="outline" className="capitalize bg-slate-100 text-slate-700 border-slate-300">
-          {String(value)}
+          {value}
         </Badge>
       )
     },
     {
       key: 'vehicle_type',
       header: 'Vehicle Type',
-      render: (value: any, item: any) => <VehicleTypeBadge type={item.vehicle_type} />
+      render: (_value: InventoryItem['vehicle_type'], item: InventoryItem) => (
+        <VehicleTypeBadge type={item.vehicle_type} />
+      )
     },
     {
       key: 'stock_quantity',
       header: 'Stock Level',
       sortable: true,
-      render: (value: any, item: any) => <StockLevelIndicator quantity={Number(value)} reorderLevel={item.reorder_level} />
+      render: (value: InventoryItem['stock_quantity'], item: InventoryItem) => (
+        <StockLevelIndicator quantity={value} reorderLevel={item.reorder_level} />
+      )
     },
     {
       key: 'adjust_stock',
       header: 'Adjust Stock',
-      render: (value: any, item: any) => (
+      render: (_value: unknown, item: InventoryItem) => (
         <Button
           variant="outline"
           size="sm"
@@ -1501,18 +1552,20 @@ export default function EnhancedInventoryPage() {
       key: 'cost_price',
       header: 'Cost (₱)',
       sortable: true,
-      render: (value: any) => `₱${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      align: 'right' as const,
+      render: (value: number) => `₱${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     },
     {
       key: 'sale_price',
       header: 'Price (₱)',
       sortable: true,
-      render: (value: any) => `₱${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      align: 'right' as const,
+      render: (value: number) => `₱${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     },
     {
       key: 'profit_margin',
       header: 'Margin %',
-      render: (value: any, item: any) => {
+      render: (_value: unknown, item: InventoryItem) => {
         const margin = calculateMargin(item);
         return (
           <Badge
@@ -1532,7 +1585,7 @@ export default function EnhancedInventoryPage() {
     {
       key: 'actions',
       header: 'Actions',
-      render: (value: any, item: any) => (
+      render: (_value: unknown, item: InventoryItem) => (
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
@@ -1613,6 +1666,16 @@ export default function EnhancedInventoryPage() {
   const handleSubmit = async () => {
     if (!supabase) return;
 
+    const targetBranchId = editingItem?.branch?.branch_id ?? activeBranchId;
+    if (!targetBranchId) {
+      toast({
+        title: "Missing Branch Context",
+        description: "Select an active branch before saving inventory items.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const stockQuantity = parseInt(itemStockQuantity || '0');
     const costPrice = parseFloat(itemCostPrice || '0');
     const salePrice = parseFloat(itemSalePrice || '0');
@@ -1644,6 +1707,7 @@ export default function EnhancedInventoryPage() {
       cost_price: costPrice,
       sale_price: salePrice,
       stock_quantity: stockQuantity,
+      branch_id: targetBranchId
     };
 
     setIsLoading(true);
@@ -1654,7 +1718,7 @@ export default function EnhancedInventoryPage() {
     if (editingItem) {
       const { data, error: updateError } = await supabase
         .from('inventory_item')
-        // @ts-ignore
+        // @ts-expect-error Supabase types don't align with inventory_item updates yet
         .update(itemData as any)
         .eq('item_id', editingItem.item_id)
         .select();
@@ -1663,7 +1727,7 @@ export default function EnhancedInventoryPage() {
     } else {
       const { data, error: insertError } = await supabase
         .from('inventory_item')
-        // @ts-ignore
+        // @ts-expect-error Supabase types don't align with inventory_item inserts yet
         .insert([itemData] as any)
         .select();
       error = insertError;
@@ -1712,7 +1776,7 @@ export default function EnhancedInventoryPage() {
     setIsLoading(true);
     const { error } = await supabase
       .from('inventory_item')
-      // @ts-ignore
+      // @ts-expect-error Supabase types don't expose stock adjustment fields
       .update({
         stock_quantity: newQuantity,
         updated_at: new Date().toISOString()
@@ -1741,9 +1805,10 @@ export default function EnhancedInventoryPage() {
   const handleDeleteItem = async () => {
     if (!deletingItem || !supabase) return;
     setIsLoading(true);
+    // Soft delete: set deleted_at timestamp instead of removing the record
     const { error } = await supabase
       .from('inventory_item')
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq('item_id', deletingItem.item_id);
     setIsLoading(false);
 
@@ -1832,66 +1897,30 @@ export default function EnhancedInventoryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
+    <div className="min-h-screen bg-background">
+      <div className="w-full px-3 py-4">
 
-      {/* Background Sections */}
-      <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
-        <div
-          className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
-          style={{
-            backgroundImage: "url('/images/image2.jpg')",
-            backgroundSize: "cover",
-            backgroundPosition: "center 30%"
-          }}
-        ></div>
-        <div className="absolute top-0 left-0 w-32 h-32 bg-purple-300/20 rounded-br-full"></div>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-teal-300/20 rounded-bl-full"></div>
-      </div>
-
-      <div className="absolute top-64 left-0 w-full h-full bg-indigo-50/10">
-        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-indigo-100/15 to-indigo-50/10"></div>
-      </div>
-
-      <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-
-        {/* Header Section */}
-        <div className={`mb-12 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
-          <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
-
-            <div className="relative z-10 flex-1">
-              <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
-                Inventory Management
-              </h1>
-              <div className="flex items-center gap-6 text-white/90">
-                <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium">
-                  <PackageSearch className="h-6 w-6 opacity-90" />
-                  Track all products, stock levels, and pricing
-                </p>
-                <div className="flex items-center gap-4 text-lg">
-                  {lastUpdated && (
-                    <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">
-                      <Clock className="w-5 h-5" />
-                      Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                    Live data
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <Button
-              onClick={handleRefresh}
-              disabled={isLoading}
-              className={buttonStyles.glass + " active:scale-95"}
-            >
-              <RefreshCw className={`h-6 w-6 mr-3 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh Data
-            </Button>
+        {/* Compact Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-semibold text-foreground">
+              Inventory Management
+            </h1>
+            {lastUpdated && (
+              <span className="text-sm text-muted-foreground hidden sm:inline">
+                <Clock className="inline h-3.5 w-3.5 mr-1" />
+                Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+              </span>
+            )}
           </div>
+          <Button
+            onClick={handleRefresh}
+            disabled={isLoading}
+            variant="outline"
+            size="sm"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
 
         {/* Stock Alerts */}
@@ -1902,176 +1931,136 @@ export default function EnhancedInventoryPage() {
           onShowDetails={() => setIsCriticalDetailsOpen(true)}
         />
 
-<div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-  {/* Add New Item */}
-  <button
-    type="button"
-    onClick={handleOpenAddDialog}
-    className="flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1 min-h-[100px] w-full"
-    style={{ background: 'linear-gradient(90deg,#7c3aed 0%,#4f46e5 100%)' }}
-  >
-    <div className="text-left">
-      <div className="text-lg font-semibold">Add New Item</div>
-      <div className="text-sm opacity-90">Create a new inventory item</div>
-    </div>
-    <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
-      <Plus className="h-5 w-5 text-white" />
-    </div>
-  </button>
-
-  {/* Export Excel */}
-  <button
-    type="button"
-    onClick={handleExportExcel}
-    className="flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1 min-h-[100px] w-full"
-    style={{ background: 'linear-gradient(90deg,#0ea5e9 0%,#0284c7 100%)' }}
-  >
-    <div className="text-left">
-      <div className="text-lg font-semibold">Export Excel</div>
-      <div className="text-sm opacity-90">Download filtered items</div>
-    </div>
-    <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
-      <Download className="h-5 w-5 text-white" />
-    </div>
-  </button>
-
-  {/* View More */}
-  <button
-    type="button"
-    onClick={() => setIsViewMoreOpen(true)}
-    className="flex items-center justify-between gap-4 p-4 rounded-xl shadow-lg text-white transition-transform hover:-translate-y-1 min-h-[100px] w-full"
-    style={{ background: 'linear-gradient(90deg,#10b981 0%,#06b6d4 100%)' }}
-  >
-    <div className="text-left">
-      <div className="text-lg font-semibold">View More</div>
-      <div className="text-sm opacity-90">Open detailed list</div>
-    </div>
-    <div className="w-10 h-10 flex items-center justify-center bg-white/20 rounded-lg">
-      <Eye className="h-5 w-5 text-white" />
-    </div>
-  </button>
-</div>
-
-        {/* Enhanced Inventory Table using DataTableWrapper */}
-        <section aria-labelledby="inventory-list-heading">
-  {isLoading && items.length === 0 && !fetchError ? (
-    <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl border border-slate-200 p-8">
-      <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mb-4" />
-      <p className="text-slate-600">Loading inventory items...</p>
-    </div>
-  ) : (
-    <>
-      {/* Single rounded card: gradient header + table */}
-      <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
-        <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-400 text-white p-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <PackageSearch className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <div className="text-xl font-bold font-poppins">Inventory Items</div>
-              <div className="text-sm opacity-90">Track products, stock levels and pricing</div>
-              <div className="text-sm text-white/90 mt-1">
-                {filters.search || filters.category !== 'all' || filters.stockStatus !== 'all' || filters.vehicleType !== 'all' ? (
-                  <>Filtered: <strong>{processedItems.length}</strong> of <strong>{items.length}</strong> items</>
-                ) : (
-                  <>Total: <strong>{items.length}</strong> items</>
-                )}
-              </div>
-            </div>
-          </div>
+        {/* Quick Actions - Compact horizontal bar like Dashboard */}
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+          <Button onClick={handleOpenAddDialog} size="sm" className="shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Plus className="h-4 w-4 mr-1" />Add Item
+          </Button>
+          <Button onClick={handleExportExcel} size="sm" className="shrink-0 bg-blue-500 hover:bg-blue-600 text-white">
+            <Download className="h-4 w-4 mr-1" />Export
+          </Button>
+          <Button onClick={() => setIsViewMoreOpen(true)} variant="outline" size="sm" className="shrink-0">
+            <Eye className="h-4 w-4 mr-1" />View More
+          </Button>
         </div>
 
-        {/* Advanced Filters - ALWAYS VISIBLE */}
-        <AdvancedFilters
-          filters={filters}
-          onFiltersChange={setFilters}
-          onClearFilters={handleClearFilters}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={setRowsPerPage}
-        />
-
-        {/* Show empty state ONLY when there are no items, but keep it inside the table card */}
-        {processedItems.length === 0 ? (
-          <div className="p-8">
-            <EnhancedEmptyState
-              filters={filters}
-              onClearFilters={handleClearFilters}
-              onAddItem={handleOpenAddDialog}
-              variant="table"
-              />
-          </div>
-        ) : (
-          <>
-            <DataTableWrapper
-              className="w-full"
-              columns={enhancedColumns}
-              data={displayedItems.map(i => ({ ...i, id: i.item_id }))}
-            />
-
-            {/* Footer: Showing X of Y + Pager - UPDATED PAGINATION */}
-            <div className="px-6 py-4 border-t border-slate-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-sm text-slate-500">
-                Showing <span className="text-slate-500 font-xs">{processedItems.length === 0 ? 0 : ((currentPage - 1) * rowsPerPage + 1)}</span> to <span className="text-slate-500 font-xs">{Math.min(currentPage * rowsPerPage, processedItems.length)}</span> of <span className="text-slate-500 font-xs">{processedItems.length}</span> entries
-              </div>
-
-              <div className="flex items-center gap-2">
-                {/* First Page Button */}
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
-                  title="First Page"
-                >
-                  <span className="text-lg">«</span>
-                </Button>
-
-                {/* Previous Page Button */}
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
-                  title="Previous Page"
-                >
-                  <span className="text-lg">‹</span>
-                </Button>
-
-                {/* Page Indicator Text */}
-                <div className="text-sm font-xs text-slate-500 px-2 min-w-[80px] text-center select-none">
-                  Page {currentPage} of {Math.max(1, Math.ceil(processedItems.length / rowsPerPage))}
-                </div>
-
-                {/* Next Page Button */}
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentPage(p => Math.min(Math.ceil(processedItems.length / rowsPerPage) || 1, p + 1))}
-                  disabled={currentPage >= Math.ceil(processedItems.length / rowsPerPage)}
-                  className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
-                  title="Next Page"
-                >
-                  <span className="text-lg">›</span>
-                </Button>
-
-                {/* Last Page Button */}
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentPage(Math.max(1, Math.ceil(processedItems.length / rowsPerPage)))}
-                  disabled={currentPage >= Math.ceil(processedItems.length / rowsPerPage)}
-                  className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
-                  title="Last Page"
-                >
-                  <span className="text-lg">»</span>
-                </Button>
-              </div>
+        {/* Inventory Table */}
+        <section aria-labelledby="inventory-list-heading">
+          {isLoading && items.length === 0 && !fetchError ? (
+            <div className="flex flex-col items-center justify-center h-64 bg-card rounded-lg border p-8 space-y-4">
+              <IndeterminateProgressBar className="w-1/3 max-w-xs" />
+              <p className="text-muted-foreground animate-pulse text-sm">Loading inventory items...</p>
             </div>
-          </>
-        )}
-      </div>
-    </>
-  )}
-</section>
+          ) : (
+            <>
+              <Card>
+                <CardHeader className="py-2 px-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium">
+                      Inventory Items
+                      <span className="ml-2 text-muted-foreground font-normal">
+                        {filters.search || filters.category !== 'all' || filters.stockStatus !== 'all' || filters.vehicleType !== 'all' ? (
+                          <>({processedItems.length} of {items.length})</>
+                        ) : (
+                          <>({items.length} items)</>
+                        )}
+                      </span>
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+
+
+                  {/* Advanced Filters - ALWAYS VISIBLE */}
+                  <AdvancedFilters
+                    filters={filters}
+                    onFiltersChange={setFilters}
+                    onClearFilters={handleClearFilters}
+                    rowsPerPage={rowsPerPage}
+                    onRowsPerPageChange={setRowsPerPage}
+                  />
+
+                  {/* Show empty state ONLY when there are no items, but keep it inside the table card */}
+                  {processedItems.length === 0 ? (
+                    <div className="p-8">
+                      <EnhancedEmptyState
+                        filters={filters}
+                        onClearFilters={handleClearFilters}
+                        onAddItem={handleOpenAddDialog}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <DataTableWrapper
+                        className="w-full"
+                        columns={enhancedColumns}
+                        data={displayedItems.map(i => ({ ...i, id: i.item_id }))}
+                      />
+
+                      {/* Footer: Showing X of Y + Pager - UPDATED PAGINATION */}
+                      <div className="px-6 py-4 border-t border-slate-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="text-sm text-slate-500">
+                          Showing <span className="text-slate-500 font-xs">{processedItems.length === 0 ? 0 : ((currentPage - 1) * rowsPerPage + 1)}</span> to <span className="text-slate-500 font-xs">{Math.min(currentPage * rowsPerPage, processedItems.length)}</span> of <span className="text-slate-500 font-xs">{processedItems.length}</span> entries
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {/* First Page Button */}
+                          <Button
+                            variant="outline"
+                            onClick={() => setCurrentPage(1)}
+                            disabled={currentPage === 1}
+                            className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+                            title="First Page"
+                          >
+                            <span className="text-lg">«</span>
+                          </Button>
+
+                          {/* Previous Page Button */}
+                          <Button
+                            variant="outline"
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+                            title="Previous Page"
+                          >
+                            <span className="text-lg">‹</span>
+                          </Button>
+
+                          {/* Page Indicator Text */}
+                          <div className="text-sm font-xs text-slate-500 px-2 min-w-[80px] text-center select-none">
+                            Page {currentPage} of {Math.max(1, Math.ceil(processedItems.length / rowsPerPage))}
+                          </div>
+
+                          {/* Next Page Button */}
+                          <Button
+                            variant="outline"
+                            onClick={() => setCurrentPage(p => Math.min(Math.ceil(processedItems.length / rowsPerPage) || 1, p + 1))}
+                            disabled={currentPage >= Math.ceil(processedItems.length / rowsPerPage)}
+                            className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+                            title="Next Page"
+                          >
+                            <span className="text-lg">›</span>
+                          </Button>
+
+                          {/* Last Page Button */}
+                          <Button
+                            variant="outline"
+                            onClick={() => setCurrentPage(Math.max(1, Math.ceil(processedItems.length / rowsPerPage)))}
+                            disabled={currentPage >= Math.ceil(processedItems.length / rowsPerPage)}
+                            className="h-9 w-9 p-0 border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md"
+                            title="Last Page"
+                          >
+                            <span className="text-lg">»</span>
+                          </Button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </section>
       </div>
 
       {/* === DIALOGS / MODALS === */}
@@ -2312,7 +2301,7 @@ export default function EnhancedInventoryPage() {
                 handleSubmit();
               }}
               disabled={isLoading}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg hover:shadow-xl min-w-[100px]"
+              className="min-w-[100px]"
             >
               {isLoading ? (
                 <>
@@ -2331,7 +2320,7 @@ export default function EnhancedInventoryPage() {
       </Dialog>
 
       <Dialog open={isStockAdjustmentOpen} onOpenChange={(open) => { if (!open) { setIsStockAdjustmentOpen(false); setAdjustingItem(null); } }}>
-      <DialogContent className="sm:max-w-xl bg-white border border-slate-200 shadow-2xl font-poppins">
+        <DialogContent className="sm:max-w-xl bg-white border border-slate-200 shadow-2xl font-poppins">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold">Adjust Stock</DialogTitle>
             <DialogDescription>Modify stock quantity for the selected item</DialogDescription>
@@ -2350,7 +2339,7 @@ export default function EnhancedInventoryPage() {
 
       {/* === ADDED MISSING DELETE CONFIRMATION DIALOG === */}
       <AlertDialog open={isDeleteConfirmationOpen} onOpenChange={setIsDeleteConfirmationOpen}>
-      <AlertDialogContent className="bg-white border border-slate-200 shadow-xl rounded-xl font-poppins">
+        <AlertDialogContent className="bg-white border border-slate-200 shadow-xl rounded-xl font-poppins">
           <AlertDialogHeader>
             <div className="mx-auto w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
               <Trash2 className="h-6 w-6 text-red-600" />
@@ -2359,7 +2348,7 @@ export default function EnhancedInventoryPage() {
               Delete Item?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-center text-slate-600">
-              Are you sure you want to delete <span className="font-semibold text-slate-900">"{deletingItem?.name}"</span>?
+              Are you sure you want to delete <span className="font-semibold text-slate-900">&quot;{deletingItem?.name}&quot;</span>?
               <br />
               This action cannot be undone.
             </AlertDialogDescription>
@@ -2391,6 +2380,7 @@ export default function EnhancedInventoryPage() {
         items={items}
         isOpen={isCriticalDetailsOpen}
         onClose={() => setIsCriticalDetailsOpen(false)}
+        onExport={handleExportExcel}
       />
 
       {/* View More Dialog */}
@@ -2429,7 +2419,7 @@ export default function EnhancedInventoryPage() {
         </div>
       )}
 
-<style jsx global>{`
+      <style jsx global>{`
   @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
   
   /* Apply Poppins globally for form elements */

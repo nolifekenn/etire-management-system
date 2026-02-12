@@ -7,6 +7,8 @@ import {
   fetchServiceJobsReport,
   exportServiceJobsReportPDF,
   exportServiceJobsReportCSV,
+  type ServiceReportFilters,
+  type ServiceReportRow,
 } from "@/lib/serviceReportService";
 import { useToast } from "@/hooks/use-toast";
 import { StatCard } from "@/components/StatCard";
@@ -41,22 +43,32 @@ const poppins = {
   className: "font-poppins"
 };
 
+interface BranchOption {
+  branch_id: string;
+  name: string;
+}
+
+interface VehicleTypeOption {
+  vehicle_type_id: string;
+  name: string;
+}
+
+const initialFilters: ServiceReportFilters = {
+  date_from: "",
+  date_to: "",
+  branch_id: "all",
+  status: "all",
+  vehicle_type_id: "all",
+};
+
 export default function ServiceReportCard() {
   const { toast } = useToast();
   
   // --- STATE ---
-  const [filters, setFilters] = useState({
-    date_from: "",
-    date_to: "",
-    branch_id: "all",
-    status: "all",
-    vehicle_type_id: "all",
-  });
-
   const [loading, setLoading] = useState(false);
-  const [reportData, setReportData] = useState<any[]>([]);
-  const [branches, setBranches] = useState<any[]>([]);
-  const [vehicleTypes, setVehicleTypes] = useState<any[]>([]);
+  const [reportData, setReportData] = useState<ServiceReportRow[]>([]);
+  const [branches, setBranches] = useState<BranchOption[]>([]);
+  const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeOption[]>([]);
   const [showFilters, setShowFilters] = useState(true);
 
   // Pagination state
@@ -65,7 +77,7 @@ export default function ServiceReportCard() {
   const [totalPages, setTotalPages] = useState(1);
 
   // Enhanced filter state
-  const [localFilters, setLocalFilters] = useState(filters);
+  const [localFilters, setLocalFilters] = useState<ServiceReportFilters>(initialFilters);
 
   // Modal State
   const [modalState, setModalState] = useState<{
@@ -79,16 +91,21 @@ export default function ServiceReportCard() {
   // --- EFFECTS ---
   useEffect(() => {
     const fetchDropdowns = async () => {
+      if (!supabase) {
+        console.error("Supabase client not initialized");
+        return;
+      }
+
       const { data: branchData } = await supabase
         .from("branch")
         .select("branch_id, name")
         .eq("is_active", true);
-      if (branchData) setBranches(branchData);
+      if (branchData) setBranches(branchData as BranchOption[]);
 
       const { data: vehicleTypeData } = await supabase
         .from("vehicle_type")
         .select("vehicle_type_id, name");
-      if (vehicleTypeData) setVehicleTypes(vehicleTypeData);
+      if (vehicleTypeData) setVehicleTypes(vehicleTypeData as VehicleTypeOption[]);
     };
     fetchDropdowns();
   }, []);
@@ -114,17 +131,16 @@ export default function ServiceReportCard() {
       setLoading(true);
       setCurrentPage(1); // Reset to first page
       
-      const apiFilters = {
+      const apiFilters: ServiceReportFilters = {
         ...localFilters,
         branch_id: localFilters.branch_id === "all" ? "" : localFilters.branch_id,
         status: localFilters.status === "all" ? "" : localFilters.status,
         vehicle_type_id: localFilters.vehicle_type_id === "all" ? "" : localFilters.vehicle_type_id,
       };
       
-      setFilters(apiFilters);
-      const res = await fetchServiceJobsReport(apiFilters);
+      const { jobs } = await fetchServiceJobsReport(apiFilters);
 
-      if (!res || !res.jobs) {
+      if (!jobs?.length) {
         toast({
           title: "No Data",
           description: "No service jobs found for the given filters.",
@@ -134,12 +150,12 @@ export default function ServiceReportCard() {
         return;
       }
 
-      setReportData(res.jobs);
+      setReportData(jobs);
 
       // UX: Toast only for data load
       toast({
         title: "✅ Report Generated",
-        description: `Found ${res.jobs.length} service records.`,
+        description: `Found ${jobs.length} service records.`,
       });
     } catch (err) {
       toast({
@@ -183,13 +199,7 @@ export default function ServiceReportCard() {
   };
 
   const clearFilters = () => {
-    setLocalFilters({
-      date_from: "",
-      date_to: "",
-      branch_id: "all",
-      status: "all",
-      vehicle_type_id: "all",
-    });
+    setLocalFilters({ ...initialFilters });
     toast({
       title: "Filters Cleared",
       description: "All filters have been reset to default.",
@@ -501,74 +511,105 @@ export default function ServiceReportCard() {
                 key: "job_timestamp",
                 header: "Date",
                 sortable: true,
-                render: (_v: any, row: any) => (
-                  <span className="font-medium text-slate-700">
-                    {row.job_date ? new Date(row.job_date).toLocaleDateString() : "—"}
-                  </span>
-                ),
+                render: (_value, row) => {
+                  const job = row as ServiceReportRow;
+                  const formattedDate = job.job_timestamp
+                    ? new Date(job.job_timestamp).toLocaleDateString()
+                    : job.job_date && job.job_date !== "—"
+                      ? new Date(job.job_date).toLocaleDateString()
+                      : "—";
+
+                  return (
+                    <span className="font-medium text-slate-700">
+                      {formattedDate}
+                    </span>
+                  );
+                },
               },
               { 
                 key: "customer", 
                 header: "Customer",
-                render: (value: any) => (
-                  <span className="text-slate-600">{value || "—"}</span>
-                )
+                render: (_value, row) => {
+                  const job = row as ServiceReportRow;
+                  return <span className="text-slate-600">{job.customer || "—"}</span>;
+                }
               },
               { 
                 key: "vehicle", 
                 header: "Vehicle",
-                render: (value: any) => (
-                  <span className="font-medium text-slate-800">{value || "—"}</span>
-                )
+                render: (_value, row) => {
+                  const job = row as ServiceReportRow;
+                  return <span className="font-medium text-slate-800">{job.vehicle || "—"}</span>;
+                }
               },
               { 
                 key: "vehicle_type", 
                 header: "Vehicle Type",
-                render: (value: any) => (
-                  <span className="text-slate-600">{value || "—"}</span>
-                )
+                render: (_value, row) => {
+                  const job = row as ServiceReportRow;
+                  return <span className="text-slate-600">{job.vehicle_type || "—"}</span>;
+                }
               },
               { 
                 key: "job_description", 
                 header: "Description",
-                render: (value: any) => (
-                  <span className="text-slate-600">{value || "—"}</span>
-                )
+                render: (_value, row) => {
+                  const job = row as ServiceReportRow;
+                  return <span className="text-slate-600">{job.job_description || "—"}</span>;
+                }
               },
               { 
                 key: "status", 
                 header: "Status", 
                 sortable: true,
-                render: (value: any) => (
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    value === 'completed' ? 'bg-green-100 text-green-800 border border-green-200' :
-                    value === 'in-progress' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                    value === 'pending' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
-                    'bg-red-100 text-red-800 border border-red-200'
-                  }`}>
-                    {value?.charAt(0).toUpperCase() + value?.slice(1) || "—"}
-                  </span>
-                )
+                render: (_value, row) => {
+                  const job = row as ServiceReportRow;
+                  const statusValue = (job.status || "").toLowerCase();
+                  const badgeClass = statusValue === "completed"
+                    ? "bg-green-100 text-green-800 border border-green-200"
+                    : statusValue === "in-progress"
+                      ? "bg-blue-100 text-blue-800 border border-blue-200"
+                      : statusValue === "pending"
+                        ? "bg-yellow-100 text-yellow-800 border border-yellow-200"
+                        : "bg-red-100 text-red-800 border border-red-200";
+                  const statusLabel = job.status
+                    ? job.status.charAt(0).toUpperCase() + job.status.slice(1)
+                    : "—";
+
+                  return (
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${badgeClass}`}>
+                      {statusLabel}
+                    </span>
+                  );
+                }
               },
               { 
                 key: "service_fee", 
                 header: "Service Fee", 
                 sortable: true,
-                render: (value: any) => (
-                  <span className="font-semibold text-green-600">
-                    ₱{Number(value?.replace('₱', '') || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </span>
-                )
+                render: (_value, row) => {
+                  const job = row as ServiceReportRow;
+                  const amount = job.service_fee_raw ?? 0;
+                  return (
+                    <span className="font-semibold text-green-600">
+                      ₱{amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                  );
+                }
               },
               { 
                 key: "job_total", 
                 header: "Total Revenue", 
                 sortable: true,
-                render: (value: any) => (
-                  <span className="font-semibold text-blue-600">
-                    ₱{Number(value?.replace('₱', '') || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </span>
-                )
+                render: (_value, row) => {
+                  const job = row as ServiceReportRow;
+                  const amount = job.job_total_raw ?? 0;
+                  return (
+                    <span className="font-semibold text-blue-600">
+                      ₱{amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                  );
+                }
               },
             ]}
             data={paginatedData}

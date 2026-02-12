@@ -233,6 +233,7 @@ export default function SettingsPage() {
       .from('notification') as any)
       .select('*')
       .eq('user_id', user.user_id)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -248,7 +249,7 @@ export default function SettingsPage() {
   useEffect(() => {
     fetchSystemSettings();
     fetchNotifications();
-    if (user?.role === 2 || user?.role === 3) { // Only admins and managers can see audit logs
+    if (user?.role === 'super_admin' || user?.role === 'branch_manager') { // Only admins and managers can see audit logs
       fetchAuditLogs();
     }
   }, [fetchSystemSettings, fetchAuditLogs, fetchNotifications, user]);
@@ -440,9 +441,10 @@ export default function SettingsPage() {
 
   const deleteNotification = async (notificationId: string) => {
     if (!supabase) return;
+    // Soft delete: set deleted_at timestamp instead of removing the record
     const { error } = await (supabase
       .from('notification') as any)
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq('notification_id', notificationId);
 
     if (error) {
@@ -471,7 +473,7 @@ export default function SettingsPage() {
   const refreshData = () => {
     fetchSystemSettings();
     fetchNotifications();
-    if (user?.role === 2) {
+    if (user?.role === 'super_admin' || user?.role === 'branch_manager') {
       fetchAuditLogs();
     }
   };
@@ -689,7 +691,7 @@ export default function SettingsPage() {
                         onChange={(e) => setCompanyName(e.target.value)}
                         placeholder="Q.R Tire Supply & Vulcanizing Shop"
                         className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
-                        disabled={user?.role !== 3}
+                        disabled={user?.role !== 'super_admin'}
                       />
                     </div>
                     <div className="space-y-2">
@@ -700,7 +702,7 @@ export default function SettingsPage() {
                         onChange={(e) => setCompanyAddress(e.target.value)}
                         placeholder="123 Main Street, City"
                         className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
-                        disabled={user?.role !== 3}
+                        disabled={user?.role !== 'super_admin'}
                       />
                     </div>
                     <div className="space-y-2">
@@ -711,12 +713,12 @@ export default function SettingsPage() {
                         onChange={(e) => setCompanyPhone(e.target.value)}
                         placeholder="+1-555-0101"
                         className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
-                        disabled={user?.role !== 3}
+                        disabled={user?.role !== 'super_admin'}
                       />
                     </div>
                   </div>
 
-                  {user?.role === 3 && (
+                  {user?.role === 'super_admin' && (
                     <div className="flex justify-end">
                       <Button
                         onClick={handleSaveSystemSettings}
@@ -812,7 +814,7 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
 
-              {(user?.role === 2 || user?.role === 3) && (
+              {(user?.role === 'super_admin' || user?.role === 'branch_manager') && (
                 <Card className={`bg-white border-slate-200 shadow-lg ${microAnimations.cardHover}`}>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
