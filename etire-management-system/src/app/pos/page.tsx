@@ -19,10 +19,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import {
-  ChevronLeft,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Search,
   Eye,
   DollarSign,
@@ -49,7 +46,6 @@ import {
   Ban,
   Lock,
   X,
-  ArrowUpDown,
   Save,
   Archive,
   Printer,
@@ -57,6 +53,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { SecureVoidModal } from '@/components/SecureVoidModal';
 import {
   Dialog,
   DialogContent,
@@ -100,11 +97,24 @@ interface SaleItem {
   };
 }
 
-interface EnhancedSale extends Sale {
+// EnhancedSale uses Omit to remove conflicting properties from Sale, then redefines them
+interface EnhancedSale extends Omit<Sale, 'customer' | 'user'> {
   customer?: { name: string; phone?: string };
   sale_item?: SaleItem[];
   user?: { name: string };
 }
+
+type SaleItemWithInventoryRecord = {
+  item_id: string;
+  quantity: number;
+  price_at_sale: number;
+  inventory_item: InventoryItem;
+};
+
+type IncrementStockParams = {
+  item_id_param: string;
+  quantity_param: number;
+};
 
 const ANONYMOUS_CUSTOMER_ID = "anonymous_customer";
 
@@ -120,7 +130,6 @@ const TireIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
     strokeWidth="2"
   >
     <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" />
-    <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5" />
     <circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="1" strokeDasharray="2 2" />
     <line x1="12" y1="4" x2="12" y2="8" stroke="currentColor" strokeWidth="1" />
     <line x1="12" y1="16" x2="12" y2="20" stroke="currentColor" strokeWidth="1" />
@@ -136,19 +145,21 @@ const TireIcon = ({ className = "h-4 w-4" }: { className?: string }) => (
 // ============================================
 // DATATABLE WRAPPER COMPONENT
 // ============================================
-interface Column {
-  key: string;
+type DataRow = Record<string, unknown>;
+
+interface Column<TData extends DataRow> {
+  key: keyof TData | string;
   label: string;
   sortable?: boolean;
-  render?: (value: any, row: any) => React.ReactNode;
+  render?: (value: unknown, row: TData) => React.ReactNode;
 }
 
-interface DataTableProps {
-  data: any[];
-  columns: Column[];
-  searchKeys?: string[];
+interface DataTableProps<TData extends DataRow> {
+  data: TData[];
+  columns: Column<TData>[];
+  searchKeys?: Array<keyof TData | string>;
   rowsPerPageOptions?: number[];
-  onRowClick?: (row: any) => void;
+  onRowClick?: (row: TData) => void;
   showHeader?: boolean;
   rowsPerPage?: number;
   onRowsPerPageChange?: (n: number) => void;
@@ -157,7 +168,23 @@ interface DataTableProps {
   className?: string;
 }
 
-function DataTableWrapper({
+const getNestedValue = (row: DataRow, path: string): unknown => {
+  return path.split('.').reduce<unknown>((acc, keyPart) => {
+    if (acc && typeof acc === 'object' && keyPart in (acc as DataRow)) {
+      return (acc as DataRow)[keyPart];
+    }
+    return undefined;
+  }, row);
+};
+
+const toComparableValue = (value: unknown): string | number => {
+  if (typeof value === 'number') return value;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'boolean') return value ? 1 : 0;
+  return String(value ?? '').toLowerCase();
+};
+
+function DataTableWrapper<TData extends DataRow>({
   data,
   columns,
   searchKeys = [],
@@ -169,7 +196,7 @@ function DataTableWrapper({
   searchTerm: externalSearchTerm,
   onSearchTermChange,
   className
-}: DataTableProps) {
+}: DataTableProps<TData>) {
   const [internalSearchTerm, setInternalSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [internalRowsPerPage, setInternalRowsPerPage] = useState(rowsPerPageOptions[0]);
@@ -178,7 +205,7 @@ function DataTableWrapper({
   const rowsPerPage = typeof externalRowsPerPage === 'number' ? externalRowsPerPage : internalRowsPerPage;
   const searchTerm = typeof externalSearchTerm === 'string' ? externalSearchTerm : internalSearchTerm;
 
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: keyof TData | string; direction: 'asc' | 'desc' } | null>(null);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -188,7 +215,7 @@ function DataTableWrapper({
     if (!searchTerm) return data;
     return data.filter(row => {
       return searchKeys.some(key => {
-        const value = key.split('.').reduce((acc: any, k) => acc?.[k], row);
+        const value = getNestedValue(row, String(key));
         if (value === null || value === undefined) return false;
         return String(value).toLowerCase().includes(searchTerm.toLowerCase());
       });
@@ -198,12 +225,15 @@ function DataTableWrapper({
   const sortedData = useMemo(() => {
     if (!sortConfig) return filteredData;
     const sorted = [...filteredData].sort((a, b) => {
-      const aValue = a[sortConfig.key];
-      const bValue = b[sortConfig.key];
+      const keyPath = String(sortConfig.key);
+      const aValue = getNestedValue(a, keyPath);
+      const bValue = getNestedValue(b, keyPath);
       if (aValue === null || aValue === undefined) return 1;
       if (bValue === null || bValue === undefined) return -1;
-      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      const aComparable = toComparableValue(aValue);
+      const bComparable = toComparableValue(bValue);
+      if (aComparable < bComparable) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aComparable > bComparable) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
     return sorted;
@@ -385,9 +415,9 @@ const CustomerSearch = ({
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-md bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl mt-20 font-poppins">
+        <DialogContent className="sm:max-w-md bg-white border-0 shadow-2xl mt-20">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
+            <DialogTitle className="text-xl font-bold text-foreground">
               Select Customer
             </DialogTitle>
             <DialogDescription className="text-slate-600 font-poppins">
@@ -446,7 +476,7 @@ const CustomerSearch = ({
 
               {filteredCustomers.length === 0 && searchTerm && (
                 <div className="text-center py-4 text-slate-500">
-                  No customers found matching "{searchTerm}"
+                  No customers found matching &quot;{searchTerm}&quot;
                 </div>
               )}
             </div>
@@ -455,7 +485,7 @@ const CustomerSearch = ({
           <DialogFooter>
             <Button
               onClick={() => setIsOpen(false)}
-              className="flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 border border-slate-300 hover:border-slate-400 font-poppins"
+              className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors border border-slate-300"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Close
@@ -468,7 +498,7 @@ const CustomerSearch = ({
 };
 
 // ============================================
-// SUCCESS ANIMATION COMPONENT (PORTAL)
+// SUCCESS ANIMATION COMPONENT (PORTAL) - Simplified
 // ============================================
 const SuccessAnimation = ({
   isVisible,
@@ -485,73 +515,32 @@ const SuccessAnimation = ({
 }) => {
   if (!isVisible) return null;
 
-  // Different icons and colors based on action type
-  const getActionConfig = () => {
+  const getActionIcon = () => {
     switch (actionType) {
-      case 'sale':
-        return {
-          gradient: 'from-green-500 to-emerald-600',
-          icon: CheckCircle
-        };
-      case 'receipt':
-        return {
-          gradient: 'from-blue-500 to-cyan-600',
-          icon: Printer
-        };
-      case 'void':
-        return {
-          gradient: 'from-red-500 to-orange-600',
-          icon: Archive
-        };
-      case 'access':
-        return {
-          gradient: 'from-purple-500 to-indigo-600',
-          icon: Lock
-        };
-      case 'edit':
-        return {
-          gradient: 'from-amber-500 to-yellow-600',
-          icon: Save
-        };
-      case 'export':
-        return {
-          gradient: 'from-teal-500 to-green-600',
-          icon: Download
-        };
-      default:
-        return {
-          gradient: 'from-purple-500 to-indigo-600',
-          icon: CheckCircle
-        };
+      case 'sale': return CheckCircle;
+      case 'receipt': return Printer;
+      case 'void': return Archive;
+      case 'access': return Lock;
+      case 'edit': return Save;
+      case 'export': return Download;
+      default: return CheckCircle;
     }
   };
 
-  const { gradient, icon: ActionIcon } = getActionConfig();
+  const ActionIcon = getActionIcon();
 
   const content = (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] animate-in fade-in duration-300">
-      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-in zoom-in duration-300">
-        <div className={`w-20 h-20 bg-gradient-to-r ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 animate-in zoom-in duration-500`}>
-          <ActionIcon className="h-12 w-12 text-white animate-in scale-in duration-700 delay-300" />
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999]">
+      <div className="bg-white rounded-lg p-6 max-w-sm mx-4 text-center shadow-xl">
+        <div className="w-14 h-14 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+          <ActionIcon className="h-7 w-7 text-primary-foreground" />
         </div>
-
-        <h3 className="text-2xl font-bold text-slate-800 mb-2 font-poppins">
-          {title}
-        </h3>
-
-        <p className="text-slate-600 mb-6 font-poppins">
-          {message}
-        </p>
-
-        <div className="flex gap-3 justify-center">
-          <Button
-            className={`bg-gradient-to-r ${gradient} hover:scale-105 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins`}
-            onClick={onConfirm}
-          >
-            <CheckCircle className="h-5 w-5 mr-2" />
-            Confirm
-          </Button>
-        </div>
+        <h3 className="text-lg font-semibold text-foreground mb-1">{title}</h3>
+        <p className="text-sm text-muted-foreground mb-4">{message}</p>
+        <Button onClick={onConfirm} className="w-full">
+          <CheckCircle className="h-4 w-4 mr-2" />
+          Confirm
+        </Button>
       </div>
     </div>
   );
@@ -564,6 +553,7 @@ const SuccessAnimation = ({
   return null;
 };
 
+
 // ============================================
 // PRICE FORMATTING UTILITY
 // ============================================
@@ -572,6 +562,20 @@ const formatPrice = (price: number): string => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(price);
+};
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
 };
 
 // ============================================
@@ -594,29 +598,29 @@ const vehicleTypeVisuals = {
   all: {
     label: 'All',
     icon: Package,
-    buttonActive: 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg border-transparent',
+    buttonActive: 'bg-primary text-primary-foreground shadow-sm border-transparent',
     buttonInactive: 'bg-white text-slate-700 hover:text-slate-900 border-slate-200 hover:border-slate-400 hover:bg-slate-50',
     badge: 'bg-slate-100 text-slate-700 border-slate-200'
   },
   car: {
     label: 'Car',
     icon: Car,
-    buttonActive: 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg border-transparent',
-    buttonInactive: 'bg-white text-slate-700 hover:text-purple-700 border-slate-200 hover:border-purple-300 hover:bg-purple-50/70',
+    buttonActive: 'bg-primary text-primary-foreground shadow-sm border-transparent',
+    buttonInactive: 'bg-white text-slate-700 hover:text-primary border-slate-200 hover:border-primary/30 hover:bg-primary/5',
     badge: 'bg-purple-50 text-purple-700 border-purple-200'
   },
   motor: {
     label: 'Motorcycle',
     icon: Bike,
-    buttonActive: 'bg-gradient-to-r from-violet-500 to-cyan-500 text-white shadow-lg border-transparent',
-    buttonInactive: 'bg-white text-slate-700 hover:text-violet-700 border-slate-200 hover:border-violet-300 hover:bg-violet-50/70',
+    buttonActive: 'bg-primary text-primary-foreground shadow-sm border-transparent',
+    buttonInactive: 'bg-white text-slate-700 hover:text-primary border-slate-200 hover:border-primary/30 hover:bg-primary/5',
     badge: 'bg-violet-50 text-violet-700 border-violet-200'
   },
   truck: {
     label: 'Truck',
     icon: Truck,
-    buttonActive: 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg border-transparent',
-    buttonInactive: 'bg-white text-slate-700 hover:text-pink-700 border-slate-200 hover:border-pink-300 hover:bg-pink-50/70',
+    buttonActive: 'bg-primary text-primary-foreground shadow-sm border-transparent',
+    buttonInactive: 'bg-white text-slate-700 hover:text-primary border-slate-200 hover:border-primary/30 hover:bg-primary/5',
     badge: 'bg-pink-50 text-pink-700 border-pink-200'
   }
 } as const;
@@ -633,33 +637,34 @@ const vehicleTypes = Object.entries(vehicleTypeVisuals)
 const categoryVisuals = {
   all: {
     label: 'All',
-    buttonActive: 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg border-transparent',
+    buttonActive: 'bg-primary text-primary-foreground shadow-sm border-transparent',
     buttonInactive: 'bg-white text-slate-700 hover:text-slate-900 border-slate-200 hover:border-slate-400 hover:bg-slate-50',
     badge: 'bg-slate-100 text-slate-700 border-slate-200',
     dot: 'bg-slate-400'
   },
   tire: {
     label: 'Tires',
-    buttonActive: 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg border-transparent',
-    buttonInactive: 'bg-white text-slate-700 hover:text-purple-700 border-slate-200 hover:border-purple-300 hover:bg-purple-50/70',
+    buttonActive: 'bg-primary text-primary-foreground shadow-sm border-transparent',
+    buttonInactive: 'bg-white text-slate-700 hover:text-primary border-slate-200 hover:border-primary/30 hover:bg-primary/5',
     badge: 'bg-purple-50 text-purple-700 border-purple-100',
     dot: 'bg-purple-500'
   },
   tool: {
     label: 'Tools',
-    buttonActive: 'bg-gradient-to-r from-violet-500 to-cyan-500 text-white shadow-lg border-transparent',
-    buttonInactive: 'bg-white text-slate-700 hover:text-violet-700 border-slate-200 hover:border-violet-300 hover:bg-violet-50/70',
+    buttonActive: 'bg-primary text-primary-foreground shadow-sm border-transparent',
+    buttonInactive: 'bg-white text-slate-700 hover:text-primary border-slate-200 hover:border-primary/30 hover:bg-primary/5',
     badge: 'bg-violet-50 text-violet-700 border-violet-100',
     dot: 'bg-violet-500'
   },
   accessory: {
     label: 'Accessories',
-    buttonActive: 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg border-transparent',
-    buttonInactive: 'bg-white text-slate-700 hover:text-pink-700 border-slate-200 hover:border-pink-300 hover:bg-pink-50/70',
+    buttonActive: 'bg-primary text-primary-foreground shadow-sm border-transparent',
+    buttonInactive: 'bg-white text-slate-700 hover:text-primary border-slate-200 hover:border-primary/30 hover:bg-primary/5',
     badge: 'bg-pink-50 text-pink-700 border-pink-100',
     dot: 'bg-pink-500'
   }
 } as const;
+
 
 // ✅ UPDATED: Filter out 'all' so the button doesn't show up in the map
 const categories = Object.entries(categoryVisuals)
@@ -778,7 +783,7 @@ const ProductsCell: React.FC<{ items?: SaleItem[] }> = ({ items = [] }) => {
 // ============================================
 export default function POSPage() {
   const { toast } = useToast();
-  const { user: authUser } = useAuth();
+  const { user: authUser, activeBranchId } = useAuth();
 
   // State for POS
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -788,7 +793,6 @@ export default function POSPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVehicleType, setSelectedVehicleType] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [mounted, setMounted] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // State for Sales History
@@ -820,9 +824,13 @@ export default function POSPage() {
   const [showVoidManagement, setShowVoidManagement] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [managerPassword, setManagerPassword] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [voidSearchTerm, setVoidSearchTerm] = useState('');
+
+
+  // Void Modal State
+  const [isVoidModalOpen, setIsVoidModalOpen] = useState(false);
+  const [itemToVoid, setItemToVoid] = useState<string | null>(null);
   const [rowsPerPageVoid, setRowsPerPageVoid] = useState(5);
 
   // State for Void Confirmation Dialog
@@ -838,10 +846,6 @@ export default function POSPage() {
 
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const fetchInitialData = useCallback(async () => {
     if (!supabase) {
       setFetchError("Supabase client not available. Please check your .env.local file.");
@@ -851,22 +855,46 @@ export default function POSPage() {
     setIsLoading(true);
     setFetchError(null);
     try {
+      let invQuery = supabase.from('view_branch_inventory')
+        .select('*, stock_quantity:quantity')
+        .gt('quantity', 0)
+        .is('deleted_at', null);
+
+      if (activeBranchId) {
+        invQuery = invQuery.eq('branch_id', activeBranchId);
+      }
+
+      let custQuery = supabase.from('customer')
+        .select('customer_id, name, phone, email')
+        .is('deleted_at', null);
+
+      if (activeBranchId) {
+        custQuery = custQuery.eq('branch_id', activeBranchId);
+      }
+
+      let salesQuery = supabase
+        .from('sale')
+        .select(`
+          *,
+          customer (name),
+          sale_item (
+            quantity, 
+            price_at_sale,
+            inventory_item (name)
+          )
+        `)
+        .is('deleted_at', null)
+        .order('sale_date', { ascending: false })
+        .limit(50);
+
+      if (activeBranchId) {
+        salesQuery = salesQuery.eq('branch_id', activeBranchId);
+      }
+
       const [inventoryRes, customersRes, salesRes] = await Promise.all([
-        supabase.from('inventory_item').select('*').gt('stock_quantity', 0),
-        supabase.from('customer').select('customer_id, name, phone, email'),
-        supabase
-          .from('sale')
-          .select(`
-            *,
-            customer (name),
-            sale_item (
-              quantity, 
-              price_at_sale,
-              inventory_item (name)
-            )
-          `)
-          .order('sale_date', { ascending: false })
-          .limit(50)
+        invQuery,
+        custQuery,
+        salesQuery
       ]);
 
       if (inventoryRes.error) throw inventoryRes.error;
@@ -877,14 +905,14 @@ export default function POSPage() {
       setCustomers(customersRes.data);
       setSales(salesRes.data);
       setLastUpdated(new Date());
-    } catch (error: any) {
-      let errorMessage = `Failed to load data: ${error.message}.`;
+    } catch (error) {
+      const errorMessage = `Failed to load data: ${getErrorMessage(error)}.`;
       setFetchError(errorMessage);
       toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [toast, activeBranchId]);
 
   useEffect(() => {
     fetchInitialData();
@@ -904,13 +932,13 @@ export default function POSPage() {
 
   // Sorted Sales Logic
   const sortedSales = useMemo(() => {
-    let sorted = [...sales];
+    const sorted = [...sales];
     switch (sortOption) {
       case 'date-desc':
-        sorted.sort((a, b) => new Date(b.sale_date).getTime() - new Date(a.sale_date).getTime());
+        sorted.sort((a, b) => new Date(b.sale_date || 0).getTime() - new Date(a.sale_date || 0).getTime());
         break;
       case 'date-asc':
-        sorted.sort((a, b) => new Date(a.sale_date).getTime() - new Date(b.sale_date).getTime());
+        sorted.sort((a, b) => new Date(a.sale_date || 0).getTime() - new Date(b.sale_date || 0).getTime());
         break;
       case 'amount-desc':
         sorted.sort((a, b) => (b.total_amount || 0) - (a.total_amount || 0));
@@ -1038,19 +1066,38 @@ export default function POSPage() {
     }
   };
 
-  const removeFromCart = (itemId: string) => {
-    const cartItem = cart.find(item => item.item_id === itemId);
-    if (cartItem) {
-      // Restore the stock when removing from cart
-      setInventory(prevInventory =>
-        prevInventory.map(invItem =>
-          invItem.item_id === itemId
-            ? { ...invItem, stock_quantity: invItem.stock_quantity + cartItem.quantity }
-            : invItem
-        )
-      );
+  const handleRequestVoid = (itemId: string) => {
+    setItemToVoid(itemId);
+    setIsVoidModalOpen(true);
+  };
+
+  const handleVoidAuthorized = () => {
+    if (itemToVoid) {
+      const itemId = itemToVoid;
+      const cartItem = cart.find(item => item.item_id === itemId);
+
+      if (cartItem) {
+        // Restore the stock when removing from cart
+        setInventory(prevInventory =>
+          prevInventory.map(invItem =>
+            invItem.item_id === itemId
+              ? { ...invItem, stock_quantity: invItem.stock_quantity + cartItem.quantity }
+              : invItem
+          )
+        );
+      }
+      setCart(cart.filter(item => item.item_id !== itemId));
+      setItemToVoid(null);
+      toast({
+        title: "Item Removed",
+        description: "Manager authorized item removal.",
+        variant: "default"
+      });
     }
-    setCart(cart.filter(item => item.item_id !== itemId));
+  };
+
+  const removeFromCart = (itemId: string) => {
+    handleRequestVoid(itemId);
   };
 
   const subtotal = cart.reduce((acc, item) => acc + (item.sale_price * item.quantity) + (item.installationFee || 0), 0);
@@ -1071,24 +1118,36 @@ export default function POSPage() {
       return;
     }
 
+    const saleBranchId = activeBranchId || authUser.branch_id || null;
+    if (!saleBranchId) {
+      toast({
+        title: "Missing Branch",
+        description: "Select an active branch before processing a sale.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // If editing a sale, void the original first
+      // If editing a sale, void the original first (soft delete)
       if (editingSale) {
-        const { error: deleteItemsError } = await supabase
+        // Soft delete sale items
+        const { error: softDeleteItemsError } = await supabase
           .from('sale_item')
-          .delete()
+          .update({ deleted_at: new Date().toISOString() })
           .eq('sale_id', editingSale.sale_id);
 
-        if (deleteItemsError) throw deleteItemsError;
+        if (softDeleteItemsError) throw softDeleteItemsError;
 
-        const { error: deleteSaleError } = await supabase
+        // Soft delete the sale
+        const { error: softDeleteSaleError } = await supabase
           .from('sale')
-          .delete()
+          .update({ deleted_at: new Date().toISOString() })
           .eq('sale_id', editingSale.sale_id);
 
-        if (deleteSaleError) throw deleteSaleError;
+        if (softDeleteSaleError) throw softDeleteSaleError;
       }
 
       const response = await fetch("/api/sales", {
@@ -1099,7 +1158,7 @@ export default function POSPage() {
           cartItems: cart,
           paymentMethod: "cash",
           userId: authUser.user_id,
-          branchId: null,
+          branchId: saleBranchId,
         }),
       });
 
@@ -1130,6 +1189,7 @@ export default function POSPage() {
 
         const newSaleObject: Sale = {
           sale_id: data.sale_id,
+          branch_id: authUser.branch_id || '', // Fallback to empty string if not found
           sale_date: new Date().toISOString(),
           customer_id: selectedCustomerId === ANONYMOUS_CUSTOMER_ID ? undefined : selectedCustomerId,
           user_id: authUser.user_id,
@@ -1150,9 +1210,10 @@ export default function POSPage() {
         const html = generateHtmlReceipt(receiptData);
         printReceipt(html);
 
-      } catch (receiptError: any) {
+      } catch (receiptError) {
+        const receiptMessage = getErrorMessage(receiptError);
         console.error('Receipt generation failed:', receiptError);
-        toast({ title: 'Receipt Error', description: `Sale was saved (ID: ${data.sale_id}), but receipt failed to print: ${receiptError.message}`, variant: 'destructive' });
+        toast({ title: 'Receipt Error', description: `Sale was saved (ID: ${data.sale_id}), but receipt failed to print: ${receiptMessage}`, variant: 'destructive' });
       }
 
       // Show success animation
@@ -1212,10 +1273,10 @@ export default function POSPage() {
       // Run low stock check in background after a short delay
       setTimeout(() => checkLowStock(), 1000);
 
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Checkout Failed ❌",
-        description: err.message,
+        description: getErrorMessage(err),
         variant: "destructive",
       });
     } finally {
@@ -1272,7 +1333,7 @@ export default function POSPage() {
       footerMessage: 'Thank You!',
     };
 
-    const receiptItems: ReceiptItem[] = (saleData.sale_item || []).map((item: any) => ({
+    const receiptItems: ReceiptItem[] = (saleData.sale_item || []).map((item: SaleItem) => ({
       name: item.inventory_item?.name || 'Unknown Item',
       quantity: item.quantity,
       price: item.price_at_sale,
@@ -1283,7 +1344,7 @@ export default function POSPage() {
       : undefined;
 
     const receiptData: ReceiptData = {
-      sale: saleData,
+      sale: saleData as unknown as Sale,
       items: receiptItems,
       cashier: saleData.user as AppUser,
       customer: receiptCustomer,
@@ -1300,10 +1361,10 @@ export default function POSPage() {
       const html = await generateReceiptHtmlString(saleId);
       setViewReceiptHtml(html);
       setViewReceiptModalOpen(true);
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "View Failed",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     } finally {
@@ -1337,10 +1398,10 @@ export default function POSPage() {
         description: "Receipt saved to your device.",
         className: "bg-green-600 text-white border-none"
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Download Failed",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     } finally {
@@ -1386,7 +1447,6 @@ export default function POSPage() {
       }
 
       if (matchedUser) {
-        setIsAuthenticated(true);
         setShowVoidManagement(true);
         setShowPasswordDialog(false);
         setManagerPassword('');
@@ -1407,9 +1467,9 @@ export default function POSPage() {
           variant: "destructive",
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Unexpected auth error:', error);
-      setPasswordError('An unexpected error occurred. Please try again.');
+      setPasswordError(`An unexpected error occurred: ${getErrorMessage(error)}`);
     }
   };
 
@@ -1425,19 +1485,22 @@ export default function POSPage() {
           *,
           inventory_item (*)
         `)
-        .eq('sale_id', sale.sale_id);
+        .eq('sale_id', sale.sale_id)
+        .returns<SaleItemWithInventoryRecord[] | null>();
 
       if (error) throw error;
 
-      const cartItems: CartItem[] = saleItems.map((item: any) => ({
-        ...item.inventory_item,
-        quantity: item.quantity,
-        installationFee: 0,
-      }));
+      const cartItems: CartItem[] = (saleItems || [])
+        .filter((item): item is SaleItemWithInventoryRecord => Boolean(item.inventory_item))
+        .map(item => ({
+          ...item.inventory_item,
+          quantity: item.quantity,
+          installationFee: 0,
+        }));
 
       setCart(cartItems);
       setSelectedCustomerId(sale.customer_id || ANONYMOUS_CUSTOMER_ID);
-      setEditingSale(sale);
+      setEditingSale(sale as unknown as Sale);
       setShowVoidManagement(false);
       setShowSalesHistory(false);
 
@@ -1448,10 +1511,10 @@ export default function POSPage() {
         message: `Sale ${sale.sale_id} has been loaded into the cart. Make your changes and process the sale again.`,
         actionType: 'edit'
       });
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error Loading Sale",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     } finally {
@@ -1510,10 +1573,11 @@ export default function POSPage() {
       if (fetchError) throw fetchError;
 
       for (const item of saleItems) {
-        const { error: updateError } = await supabase.rpc('increment_stock', {
+        const incrementPayload: IncrementStockParams = {
           item_id_param: item.item_id,
           quantity_param: item.quantity
-        } as any);
+        };
+        const { error: updateError } = await supabase.rpc('increment_stock', incrementPayload);
 
         if (updateError) {
           // Fallback if RPC fails
@@ -1525,26 +1589,28 @@ export default function POSPage() {
 
           if (!currentItem) continue;
 
-          await (supabase
-            .from('inventory_item') as any)
-            .update({ stock_quantity: currentItem.stock_quantity + item.quantity } as any)
+          await supabase
+            .from('inventory_item')
+            .update({ stock_quantity: currentItem.stock_quantity + item.quantity })
             .eq('item_id', item.item_id);
         }
       }
 
-      const { error: deleteItemsError } = await supabase
+      // Soft delete sale items
+      const { error: softDeleteItemsError } = await supabase
         .from('sale_item')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq('sale_id', saleToVoid);
 
-      if (deleteItemsError) throw deleteItemsError;
+      if (softDeleteItemsError) throw softDeleteItemsError;
 
-      const { error: deleteSaleError } = await supabase
+      // Soft delete the sale
+      const { error: softDeleteSaleError } = await supabase
         .from('sale')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq('sale_id', saleToVoid);
 
-      if (deleteSaleError) throw deleteSaleError;
+      if (softDeleteSaleError) throw softDeleteSaleError;
 
       setSuccessAnimation({
         isVisible: true,
@@ -1554,10 +1620,10 @@ export default function POSPage() {
       });
 
       fetchInitialData();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Void Failed",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     } finally {
@@ -1573,16 +1639,16 @@ export default function POSPage() {
   };
 
   // CLEANED SALES TABLE COLUMNS
-  const salesColumns: Column[] = [
+  const salesColumns: Column<EnhancedSale>[] = [
     {
       key: 'sale_id',
       label: 'Sale ID',
       sortable: true,
-      render: (value: any) => (
+      render: (value) => (
         // tightened spacing and smaller text for compact Sale ID display
         <div className="inline-block px-0 py-0">
           <span className="font-mono text-xs font-medium text-indigo-600 tracking-tight">
-            {value}
+            {String(value ?? '')}
           </span>
         </div>
       )
@@ -1591,8 +1657,8 @@ export default function POSPage() {
       key: 'sale_date',
       label: 'Date & Time',
       sortable: true,
-      render: (value: any) => {
-        const date = new Date(value);
+      render: (value) => {
+        const date = new Date(value as string | number | Date);
         return (
           <div>
             <div className="font-medium">{date.toLocaleDateString()}</div>
@@ -1605,7 +1671,7 @@ export default function POSPage() {
       key: 'customer',
       label: 'Customer',
       sortable: true,
-      render: (value: any, row: EnhancedSale) => (
+      render: (_value, row) => (
         <span className={!row.customer ? 'text-slate-500 italic' : 'font-medium'}>
           {row.customer?.name || 'Walk-in Customer'}
         </span>
@@ -1616,7 +1682,7 @@ export default function POSPage() {
       key: 'products',
       label: 'Products Sold',
       sortable: false,
-      render: (_: any, row: EnhancedSale) => {
+      render: (_value, row) => {
         return <ProductsCell items={row.sale_item || []} />;
       }
     },
@@ -1624,7 +1690,7 @@ export default function POSPage() {
       key: 'total_items',
       label: 'Total Items',
       sortable: true,
-      render: (_: any, row: EnhancedSale) => {
+      render: (_value, row) => {
         const totalQuantity = (row.sale_item || []).reduce((sum: number, item: SaleItem) => sum + item.quantity, 0);
         return (
           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
@@ -1637,7 +1703,7 @@ export default function POSPage() {
       key: 'total_amount',
       label: 'Total Amount',
       sortable: true,
-      render: (value: any) => (
+      render: (value) => (
         <span className="font-semibold text-green-600">
           ₱{formatPrice(Number(value) || 0)}
         </span>
@@ -1646,7 +1712,7 @@ export default function POSPage() {
     {
       key: 'actions',
       label: 'Actions',
-      render: (_: any, row: any) => (
+      render: (_value, row) => (
         // reduced gap and compact button padding for tighter actions column
         <div className="flex gap-1 items-center">
           {/* VIEW BUTTON - Opens Modal */}
@@ -1676,27 +1742,40 @@ export default function POSPage() {
           >
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2 py-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEditSale(row);
+            }}
+            disabled={isSubmitting}
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
         </div>
       )
     }
   ];
 
   // CLEANED VOID MANAGEMENT TABLE COLUMNS
-  const voidManagementColumns: Column[] = [
+  const voidManagementColumns: Column<EnhancedSale>[] = [
     {
       key: 'sale_id',
       label: 'Sale ID',
       sortable: true,
-      render: (value: any) => (
-        <span className="font-mono text-sm font-medium text-indigo-600">{value}</span>
+      render: (value) => (
+        <span className="font-mono text-sm font-medium text-indigo-600">{String(value ?? '')}</span>
       )
     },
     {
       key: 'sale_date',
       label: 'Date & Time',
       sortable: true,
-      render: (value: any) => {
-        const date = new Date(value);
+      render: (value) => {
+        const date = new Date(value as string | number | Date);
         return (
           <div>
             <div className="font-medium">{date.toLocaleDateString()}</div>
@@ -1709,7 +1788,7 @@ export default function POSPage() {
       key: 'customer',
       label: 'Customer',
       sortable: true,
-      render: (value: any, row: EnhancedSale) => (
+      render: (_value, row) => (
         <span className={!row.customer ? 'text-slate-500 italic' : 'font-medium'}>
           {row.customer?.name || 'Walk-in Customer'}
         </span>
@@ -1719,7 +1798,7 @@ export default function POSPage() {
       key: 'products',
       label: 'Products Sold',
       sortable: false,
-      render: (_: any, row: EnhancedSale) => {
+      render: (_value, row) => {
         const saleItems = row.sale_item || [];
         const productNames = saleItems.map((item: SaleItem) =>
           item.inventory_item?.name || 'Unknown Product'
@@ -1745,7 +1824,7 @@ export default function POSPage() {
       key: 'total_amount',
       label: 'Total Amount',
       sortable: true,
-      render: (value: any) => (
+      render: (value) => (
         <span className="font-semibold text-green-600">
           ₱{formatPrice(Number(value) || 0)}
         </span>
@@ -1754,7 +1833,7 @@ export default function POSPage() {
     {
       key: 'actions',
       label: 'Actions',
-      render: (_: any, row: any) => (
+      render: (_value, row) => (
         <div className="flex gap-2">
           <Button
             variant="destructive"
@@ -1774,7 +1853,7 @@ export default function POSPage() {
 
   // Calculate summary statistics
   const totalSalesAmount = sales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
-  const todaySales = sales.filter(s => new Date(s.sale_date).toDateString() === new Date().toDateString());
+  const todaySales = sales.filter(s => new Date(s.sale_date || 0).toDateString() === new Date().toDateString());
   const todayRevenue = todaySales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
 
   if (fetchError) {
@@ -1792,76 +1871,36 @@ export default function POSPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
-      {/* Background Sections */}
-      <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
-        <div
-          className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
-          style={{
-            backgroundImage: "url('/images/image2.jpg')",
-            backgroundSize: "cover",
-            backgroundPosition: "center 30%"
-          }}
-        ></div>
-      </div>
+    <div className="min-h-screen bg-background">
+      <div className="w-full px-3 py-4">
 
-      <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-
-        {/* Header Section */}
-        <div className={`mb-12 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
-          <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
-
-            <div className="relative z-10 flex-1">
-              <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
-                Point of Sale (POS)
-              </h1>
-              <div className="flex items-center gap-6 text-white/90">
-                <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium font-poppins">
-                  <ShoppingCart className="h-6 w-6 opacity-90" />
-                  Quick and easy sales transactions
-                </p>
-                <div className="flex items-center gap-4 text-lg">
-                  {lastUpdated && (
-                    <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
-                      <Clock className="w-5 h-5" />
-                      Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm font-poppins">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse-glow"></div>
-                    Live data
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              {editingSale && (
-                <Button
-                  onClick={handleCancelEditSale}
-                  className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins"
-                >
-                  <XCircle className="h-5 w-5 mr-2" />
-                  Cancel Edit
-                </Button>
-              )}
-              <Button
-                onClick={() => setShowSalesHistory(!showSalesHistory)}
-                className="bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins active:scale-95"
-              >
-                <Receipt className="h-5 w-5 mr-2" />
-                {showSalesHistory ? 'Show POS' : 'Sales History'}
+        {/* Compact Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-semibold text-foreground">
+              Point of Sale
+            </h1>
+            {lastUpdated && (
+              <span className="text-sm text-muted-foreground hidden sm:inline">
+                <Clock className="inline h-3.5 w-3.5 mr-1" />
+                Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {editingSale && (
+              <Button onClick={handleCancelEditSale} variant="outline" size="sm" className="text-amber-600 border-amber-300">
+                <XCircle className="h-4 w-4 mr-1" />
+                Cancel Edit
               </Button>
-              <Button
-                onClick={fetchInitialData}
-                disabled={isLoading}
-                className="bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins active:scale-95"
-              >
-                <RefreshCw className={`h-5 w-5 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-            </div>
+            )}
+            <Button onClick={() => setShowSalesHistory(!showSalesHistory)} variant="outline" size="sm">
+              <Receipt className="h-4 w-4 mr-1" />
+              {showSalesHistory ? 'Show POS' : 'History'}
+            </Button>
+            <Button onClick={fetchInitialData} disabled={isLoading} variant="outline" size="sm">
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </div>
 
@@ -1958,7 +1997,7 @@ export default function POSPage() {
                 Close
               </Button>
               <Button
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white"
+                className=""
                 onClick={() => {
                   // Allow downloading directly from the view modal if they want
                   const blob = new Blob([viewReceiptHtml], { type: 'text/html' });
@@ -2033,7 +2072,7 @@ export default function POSPage() {
               </Button>
               <Button
                 type="button"
-                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins"
+                className=""
                 onClick={(e) => { e.preventDefault(); handlePasswordSubmit(); }}
               >
                 Authenticate
@@ -2048,7 +2087,7 @@ export default function POSPage() {
             <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-200">
 
               {/* 1. Custom Gradient Header */}
-              <div className="w-full bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 text-white p-5 flex items-center justify-between shrink-0">
+              <div className="w-full bg-destructive text-white p-4 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-4">
                   <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-xl shadow-inner border border-white/10">
                     <Lock className="h-6 w-6 text-white" />
@@ -2170,7 +2209,7 @@ export default function POSPage() {
                 Skip
               </Button>
               <Button
-                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins"
+                className=""
                 onClick={handleConfirmInstallation}
               >
                 Confirm Fee
@@ -2329,7 +2368,7 @@ export default function POSPage() {
                             className="group relative bg-white border border-slate-200 rounded-[20px] p-5 shadow-sm hover:border-indigo-100 transition-all duration-300 flex flex-col justify-between h-full"
                           >
                             {/* Hover Glow Effect */}
-                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-purple-500/10 to-emerald-500/5 blur-2xl"></div>
+                            <div className="absolute inset-0 bg-primary/5 blur-2xl"></div>
 
                             <div className="relative z-10">
                               {/* Header: Icon + Title (same row/column, smaller sizes) */}
@@ -2379,7 +2418,7 @@ export default function POSPage() {
                                 className={`
                                   h-10 px-5 font-semibold shadow-lg shadow-indigo-500/20 transition-all duration-300
                                   ${currentStock > 0
-                                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:scale-105 hover:shadow-indigo-500/40 text-white'
+                                    ? 'bg-primary text-primary-foreground'
                                     : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                                   }
                                 `}
@@ -2400,7 +2439,7 @@ export default function POSPage() {
                           </div>
                           <h3 className="text-lg font-semibold text-slate-900">No products found</h3>
                           <p className="text-slate-500 max-w-xs mx-auto mt-2">
-                            We couldn't find anything matching your filters. Try adjusting your search.
+                            We could not find anything matching your filters. Try adjusting your search.
                           </p>
                           <Button variant="outline" onClick={clearFilters} className="mt-6 border-dashed border-slate-300 text-slate-600">
                             Clear Filters
@@ -2416,7 +2455,7 @@ export default function POSPage() {
             {/* Cart & Checkout - Right Side */}
             <div className="lg:col-span-1">
               <Card className="bg-white/95 backdrop-blur-sm border-slate-200/80 shadow-[0_30px_50px_-28px_rgba(79,70,229,0.7)] rounded-3xl overflow-hidden border-0 sticky top-8 min-h-[720px] flex flex-col">
-                <CardHeader className="pb-5 bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-500 text-white border-b border-white/10 relative overflow-hidden">
+                <CardHeader className="pb-4 bg-primary text-primary-foreground border-b relative overflow-hidden">
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.25),_transparent_60%)]"></div>
                   <div className="relative z-10 flex-1">
                     <CardTitle className="flex items-center text-2xl font-bold text-white font-poppins">
@@ -2484,7 +2523,7 @@ export default function POSPage() {
                           return (
                             <div key={item.item_id} className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm hover:border-indigo-200 hover:shadow-lg transition-all duration-300">
                               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
-                                <div className="absolute -inset-8 bg-gradient-to-r from-indigo-500/5 via-purple-500/10 to-emerald-500/5 blur-2xl"></div>
+                                <div className="absolute -inset-8 bg-primary/5 blur-2xl"></div>
                               </div>
                               <div className="relative z-10 space-y-3">
                                 <div className="flex items-start justify-between gap-4">
@@ -2574,11 +2613,19 @@ export default function POSPage() {
                 </CardContent>
 
                 <CardFooter className="flex flex-col gap-3 p-6 bg-slate-50/80 border-t border-slate-200/60">
+<<<<<<< HEAD
                     <Button
                       className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins shadow-purple-500/30 w-full"
                       onClick={handleProcessSale}
                       disabled={cart.length === 0 || isSubmitting}
                     >
+=======
+                  <Button
+                    className="w-full"
+                    onClick={handleProcessSale}
+                    disabled={cart.length === 0 || isSubmitting}
+                  >
+>>>>>>> c03110cc0793ebf079ffd322583886433148916e
                     {isSubmitting ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
@@ -2607,14 +2654,14 @@ export default function POSPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-poppins">
 
               {/* Card 1: Today's Sales (Purple/Pink Gradient) */}
-              <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-r from-purple-600 to-pink-600 p-6 shadow-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-purple-500/25 group">
+              <div className="relative overflow-hidden rounded-xl bg-primary p-5 shadow-lg transition-all duration-200 hover:shadow-xl">
                 {/* Abstract Background Shapes */}
                 <div className="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full bg-white/10 blur-2xl group-hover:bg-white/20 transition-all"></div>
                 <div className="absolute bottom-0 left-0 -mb-4 -ml-4 h-20 w-20 rounded-full bg-black/10 blur-2xl"></div>
 
                 <div className="relative z-10 flex justify-between items-start">
                   <div>
-                    <p className="text-sm font-medium text-white/80 tracking-wide">Today's Sales</p>
+                    <p className="text-sm font-medium text-white/80 tracking-wide">Today&apos;s Sales</p>
                     <h3 className="text-3xl font-bold text-white mt-1">₱{formatPrice(todayRevenue)}</h3>
                   </div>
                   <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md border border-white/10 shadow-inner">
@@ -2631,7 +2678,7 @@ export default function POSPage() {
               </div>
 
               {/* Card 2: Total Sales (Blue/Cyan Gradient) */}
-              <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-r from-blue-600 to-cyan-500 p-6 shadow-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-blue-500/25 group">
+              <div className="relative overflow-hidden rounded-xl bg-blue-600 p-5 shadow-lg transition-all duration-200 hover:shadow-xl">
                 <div className="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full bg-white/10 blur-2xl group-hover:bg-white/20 transition-all"></div>
                 <div className="absolute bottom-0 left-0 -mb-4 -ml-4 h-20 w-20 rounded-full bg-black/10 blur-2xl"></div>
 
@@ -2654,7 +2701,7 @@ export default function POSPage() {
               </div>
 
               {/* Card 3: Average Order (Teal/Emerald Gradient) */}
-              <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-r from-teal-500 to-emerald-500 p-6 shadow-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-teal-500/25 group">
+              <div className="relative overflow-hidden rounded-xl bg-teal-600 p-5 shadow-lg transition-all duration-200 hover:shadow-xl">
                 <div className="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full bg-white/10 blur-2xl group-hover:bg-white/20 transition-all"></div>
                 <div className="absolute bottom-0 left-0 -mb-4 -ml-4 h-20 w-20 rounded-full bg-black/10 blur-2xl"></div>
 
@@ -2684,7 +2731,7 @@ export default function POSPage() {
             <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-xl font-poppins">
 
               {/* 1. Gradient Header (Title + Total like Inventory page) */}
-              <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-400 text-white p-5 flex items-center justify-between">
+              <div className="w-full bg-primary text-primary-foreground p-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-xl shadow-inner">
                     <Receipt className="h-6 w-6 text-white" />
@@ -2792,6 +2839,14 @@ export default function POSPage() {
           </div>
         )}
       </div>
+
+      {/* Secure Void Modal for POS */}
+      <SecureVoidModal
+        isOpen={isVoidModalOpen}
+        onClose={() => setIsVoidModalOpen(false)}
+        onAuthorized={handleVoidAuthorized}
+        actionDescription="Manager authorization required to void item from cart."
+      />
 
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');

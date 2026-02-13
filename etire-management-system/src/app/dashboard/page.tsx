@@ -4,26 +4,32 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
 import {
-  BarChart, Blocks, DollarSign, AlertTriangle, Users, Wrench, Loader2, Bell,
-  Building2, Package, Car, TrendingUp, FileText, Download, ArrowUpRight,
-  Calendar, Clock, RefreshCw, Plus, ChevronDown, ChevronUp, TrendingDown,
-  BarChart3, ShoppingBag, Star, User, Filter, Zap, Flame, Rocket
+  BarChart, Blocks, DollarSign, AlertTriangle, Users, Wrench, Loader2,
+  Building2, Package, Car, TrendingUp, RefreshCw, Plus, ChevronDown, ChevronUp,
+  ArrowUpRight, Calendar, Settings2, Eye, EyeOff, LayoutGrid
 } from 'lucide-react';
+import { useDashboardAnalytics } from '@/hooks/useDashboardAnalytics';
+import { RevenueSplitChart } from '@/components/dashboard/widgets/RevenueSplitChart';
+import { AROCard } from '@/components/dashboard/widgets/AROCard';
+import { TopBrandsChart } from '@/components/dashboard/widgets/TopBrandsChart';
+import { InventoryHealthTable } from '@/components/dashboard/widgets/InventoryHealthTable';
+import { BayUtilizationGauge } from '@/components/dashboard/widgets/BayUtilizationGauge';
 import { ResponsiveContainer, AreaChart, XAxis, YAxis, Tooltip, Area, ReferenceLine, BarChart as RechartsBarChart, Bar, Cell } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { fetchSalesReport } from "@/lib/salesReportService";
 
 interface DashboardStats {
   total_sales: number;
@@ -41,7 +47,6 @@ interface SalesDataPoint {
   date: string;
   sales: number;
   average: number;
-  trend: 'up' | 'down';
 }
 
 interface RecentSale {
@@ -53,7 +58,6 @@ interface RecentSale {
   item_category: string;
   user_name: string;
   total_amount: number;
-  sale_date?: string;
 }
 
 interface LowStockItem {
@@ -65,7 +69,6 @@ interface LowStockItem {
 }
 
 interface TopSellingItem {
-  item_id?: string;
   name: string;
   category: string;
   total_quantity: number;
@@ -76,8 +79,56 @@ interface TopSellingItem {
 
 type TimeFrame = '1d' | '3d' | '7d';
 
+// Widget visibility configuration
+interface WidgetVisibility {
+  quickActions: boolean;
+  keyMetrics: boolean;
+  secondaryMetrics: boolean;
+  salesChart: boolean;
+  lowStock: boolean;
+  revenueSplit: boolean;
+  aroCard: boolean;
+  bayUtilization: boolean;
+  topBrands: boolean;
+  inventoryHealth: boolean;
+  recentSales: boolean;
+  topSelling: boolean;
+}
+
+const WIDGET_STORAGE_KEY = 'dashboard_widget_visibility';
+
+const DEFAULT_VISIBILITY: WidgetVisibility = {
+  quickActions: true,
+  keyMetrics: true,
+  secondaryMetrics: false,
+  salesChart: true,
+  lowStock: true,
+  revenueSplit: true,
+  aroCard: true,
+  bayUtilization: true,
+  topBrands: true,
+  inventoryHealth: true,
+  recentSales: true,
+  topSelling: true,
+};
+
+const WIDGET_LABELS: Record<keyof WidgetVisibility, string> = {
+  quickActions: 'Quick Actions',
+  keyMetrics: 'Key Metrics',
+  secondaryMetrics: 'Secondary Metrics',
+  salesChart: 'Sales Performance Chart',
+  lowStock: 'Low Stock Alerts',
+  revenueSplit: 'Revenue Split',
+  aroCard: 'Average Repair Order',
+  bayUtilization: 'Bay Utilization',
+  topBrands: 'Top Brands',
+  inventoryHealth: 'Inventory Health',
+  recentSales: 'Recent Sales',
+  topSelling: 'Top Selling Items',
+};
+
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, activeBranchId } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState<DashboardStats>({
     total_sales: 0,
@@ -90,30 +141,77 @@ export default function DashboardPage() {
     unread_notifications: 0,
     low_stock_count: 0,
   });
+
+  const { data: analyticsData, isLoading: isAnalyticsLoading, refetch: refetchAnalytics } = useDashboardAnalytics();
   const [salesData, setSalesData] = useState<SalesDataPoint[]>([]);
   const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([]);
   const [recentSales, setRecentSales] = useState<RecentSale[]>([]);
   const [filteredRecentSales, setFilteredRecentSales] = useState<RecentSale[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [showSecondaryStats, setShowSecondaryStats] = useState(false);
-  const [secondaryStatsHeight, setSecondaryStatsHeight] = useState('0px');
-  const [secondaryStatsOpacity, setSecondaryStatsOpacity] = useState(0);
   const [timeFrame, setTimeFrame] = useState<TimeFrame>('7d');
+<<<<<<< HEAD
   const [activeSalesCount, setActiveSalesCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
+=======
+>>>>>>> c03110cc0793ebf079ffd322583886433148916e
 
-  // Calculate top selling items from filtered recent sales
+  // Widget visibility state with localStorage persistence
+  const [widgetVisibility, setWidgetVisibility] = useState<WidgetVisibility>(DEFAULT_VISIBILITY);
+
+  // Load widget visibility from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(WIDGET_STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setWidgetVisibility({ ...DEFAULT_VISIBILITY, ...parsed });
+      } catch (e) {
+        console.error('Failed to parse widget visibility:', e);
+      }
+    }
+  }, []);
+
+  // Save widget visibility to localStorage
+  const toggleWidget = (widget: keyof WidgetVisibility) => {
+    setWidgetVisibility(prev => {
+      const updated = { ...prev, [widget]: !prev[widget] };
+      localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const showAllWidgets = () => {
+    const allVisible = Object.keys(DEFAULT_VISIBILITY).reduce((acc, key) => {
+      acc[key as keyof WidgetVisibility] = true;
+      return acc;
+    }, {} as WidgetVisibility);
+    setWidgetVisibility(allVisible);
+    localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(allVisible));
+  };
+
+  const hideAllWidgets = () => {
+    const allHidden = Object.keys(DEFAULT_VISIBILITY).reduce((acc, key) => {
+      acc[key as keyof WidgetVisibility] = false;
+      return acc;
+    }, {} as WidgetVisibility);
+    setWidgetVisibility(allHidden);
+    localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(allHidden));
+  };
+
+  const resetWidgets = () => {
+    setWidgetVisibility(DEFAULT_VISIBILITY);
+    localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(DEFAULT_VISIBILITY));
+  };
+
+  // Calculate top selling items
   const topSellingItems = useMemo(() => {
     if (!filteredRecentSales || filteredRecentSales.length === 0) return [];
-    
     const itemMap = new Map<string, TopSellingItem>();
-    
+
     filteredRecentSales.forEach(sale => {
       const existing = itemMap.get(sale.item_name);
       if (existing) {
@@ -132,75 +230,21 @@ export default function DashboardPage() {
         });
       }
     });
-    
-    // Sort by total revenue (descending) and take top 6
+
     return Array.from(itemMap.values())
       .sort((a, b) => b.total_revenue - a.total_revenue)
       .slice(0, 6);
   }, [filteredRecentSales]);
 
-  const buttonStyles = {
-    primary: "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-md hover:shadow-lg",
-    secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95",
-    glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg",
-    inventory: "flex items-center gap-2 min-h-[44px] bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 shadow-md hover:shadow-lg",
-    sales: "flex items-center gap-2 min-h-[44px] bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 shadow-md hover:shadow-lg"
-  };
-
-  const microAnimations = {
-    cardHover: "transition-all duration-350 ease-spring hover:translate-y-[-6px] hover:shadow-2xl",
-    iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
-  };
-
-  const springEasing = "cubic-bezier(0.34, 1.56, 0.64, 1)";
-
-  const iconCategories = {
-    financial: { background: 'rgba(16, 185, 129, 0.1)', icon: '#10b981' },
-    inventory: { background: 'rgba(6, 182, 212, 0.1)', icon: '#06b6d4' },
-    analytics: { background: 'rgba(99, 102, 241, 0.1)', icon: '#6366f1' },
-    service: { background: 'rgba(139, 92, 246, 0.1)', icon: '#8b5cf6' },
-    customers: { background: 'rgba(59, 130, 246, 0.1)', icon: '#3b82f6' },
-    branches: { background: 'rgba(16, 185, 129, 0.1)', icon: '#10b981' },
-    suppliers: { background: 'rgba(6, 182, 212, 0.1)', icon: '#06b6d4' },
-    vehicles: { background: 'rgba(59, 130, 246, 0.1)', icon: '#3b82f6' }
-  };
-
-  const getChartColor = (timeframe: TimeFrame) => {
-    switch (timeframe) {
-      case '1d': return '#f59e0b'; // amber
-      case '3d': return '#06b6d4'; // teal
-      case '7d': return '#8b5cf6'; // purple
-      default: return '#8b5cf6';
-    }
-  };
-
-  const getTimeFrameIcon = (timeframe: TimeFrame) => {
-    switch (timeframe) {
-      case '1d': return Zap;
-      case '3d': return Flame;
-      case '7d': return Rocket;
-      default: return TrendingUp;
-    }
-  };
-
-  const getTimeFrameLabel = (timeframe: TimeFrame) => {
-    switch (timeframe) {
-      case '1d': return '1 Day';
-      case '3d': return '3 Days';
-      case '7d': return '7 Days';
-      default: return '7 Days';
-    }
-  };
-
-  const getTimeFrameDays = (timeframe: TimeFrame): number => {
-    switch (timeframe) {
+  const getTimeFrameDays = (tf: TimeFrame): number => {
+    switch (tf) {
       case '1d': return 1;
       case '3d': return 3;
       case '7d': return 7;
-      default: return 7;
     }
   };
 
+<<<<<<< HEAD
   const MetricSkeleton = () => (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
       {Array(4).fill(0).map((_, i) => (
@@ -326,92 +370,61 @@ export default function DashboardPage() {
   const filterRecentSalesByTimeFrame = useCallback((sales: RecentSale[], timeframe: TimeFrame) => {
     if (!sales || sales.length === 0) return [];
     
+=======
+  const filterRecentSalesByTimeFrame = useCallback((sales: RecentSale[], tf: TimeFrame) => {
+>>>>>>> c03110cc0793ebf079ffd322583886433148916e
     const now = new Date();
     const cutoffDate = new Date();
-    const days = getTimeFrameDays(timeframe);
-    cutoffDate.setDate(now.getDate() - days);
-    
-    const filtered = sales.filter(sale => {
-      const saleDate = new Date(sale.created_at);
-      return saleDate >= cutoffDate;
-    });
-    
-    setActiveSalesCount(filtered.length);
-    return filtered;
+    cutoffDate.setDate(now.getDate() - getTimeFrameDays(tf));
+    return sales.filter(sale => new Date(sale.created_at) >= cutoffDate);
   }, []);
 
-  // Calculate sales chart data from filtered sales
-  const calculateSalesChartData = useCallback((sales: RecentSale[], timeframe: TimeFrame) => {
+  const calculateSalesChartData = useCallback((sales: RecentSale[], tf: TimeFrame) => {
     const chartDataMap = new Map<string, number>();
     const now = new Date();
-    
-    // 1. PRE-FILL TIME SLOTS (Fixes "12am to 12am" visibility issue)
-    if (timeframe === '1d') {
-      // Create 24 hour slots (0, 1, ... 23)
+
+    if (tf === '1d') {
       for (let i = 0; i < 24; i++) {
         chartDataMap.set(`${i}:00`, 0);
       }
     } else {
-      // Create day slots for 3d or 7d
-      const daysToShow = timeframe === '3d' ? 3 : 7;
+      const daysToShow = tf === '3d' ? 3 : 7;
       for (let i = daysToShow - 1; i >= 0; i--) {
         const d = new Date();
         d.setDate(now.getDate() - i);
-        const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        chartDataMap.set(dateStr, 0);
+        chartDataMap.set(d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }), 0);
       }
     }
-    
-    // 2. FILL ACTUAL DATA
-    if (sales && sales.length > 0) {
-      sales.forEach(sale => {
-        const saleDate = new Date(sale.created_at);
-        let key: string;
-        
-        if (timeframe === '1d') {
-          // Group by hour for 1 day
-          const hour = saleDate.getHours();
-          key = `${hour}:00`;
-        } else {
-          // Group by day for 3d and 7d
-          const dateStr = saleDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-          key = dateStr;
-        }
-        
-        // Only add to existing keys (ensures we stick to the timeframe)
-        if (chartDataMap.has(key)) {
-          const currentTotal = chartDataMap.get(key) || 0;
-          chartDataMap.set(key, currentTotal + sale.total_amount);
-        }
-      });
-    }
-    
-    // 3. CONVERT & SORT
+
+    sales.forEach(sale => {
+      const saleDate = new Date(sale.created_at);
+      let key: string;
+      if (tf === '1d') {
+        key = `${saleDate.getHours()}:00`;
+      } else {
+        key = saleDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      }
+      if (chartDataMap.has(key)) {
+        chartDataMap.set(key, (chartDataMap.get(key) || 0) + sale.total_amount);
+      }
+    });
+
     const chartData = Array.from(chartDataMap.entries()).map(([date, sales]) => ({
       date,
       sales,
-      average: 0, // Will calculate below
-      trend: 'up' as const
+      average: 0
     }));
 
-    // Sort specifically for 1d to ensure 0:00 -> 23:00 order
-    if (timeframe === '1d') {
+    if (tf === '1d') {
       chartData.sort((a, b) => parseInt(a.date.split(':')[0]) - parseInt(b.date.split(':')[0]));
     }
-    // Note: 3d/7d are generated in order by the loop above, so they are already correct.
-    
-    // 4. CALCULATE AVERAGE
+
     if (chartData.length > 0) {
       const totalSales = chartData.reduce((sum, day) => sum + day.sales, 0);
       const average = totalSales / chartData.length;
-      
-      return chartData.map(item => ({
-        ...item,
-        average,
-        trend: item.sales > average ? 'up' : 'down'
-      }));
+      return chartData.map(item => ({ ...item, average }));
     }
-    
+
     return chartData;
   }, []);
 
@@ -425,11 +438,35 @@ export default function DashboardPage() {
     setError(null);
 
     try {
-      const statsPromise = supabase
-        .rpc('get_dashboard_stats', { user_uuid: user.user_id } as any);
+      const salesReportPromise = fetchSalesReport({
+        date_from: "",
+        date_to: "",
+        branch_id: activeBranchId || ""
+      });
 
-      // Fetch recent sales (last 50 is fine for 7 days)
-      const recentSalesPromise = supabase
+      let inventoryCountQuery = supabase.from('view_branch_inventory')
+        .select('quantity, deleted_at')
+        .is('deleted_at', null);
+      if (activeBranchId) inventoryCountQuery = inventoryCountQuery.eq('branch_id', activeBranchId);
+
+      let customerCountQuery = supabase.from('customer').select('customer_id', { count: 'exact', head: true }).is('deleted_at', null);
+      if (activeBranchId) customerCountQuery = customerCountQuery.eq('branch_id', activeBranchId);
+
+      let jobQuery = supabase.from('service_job').select('status').is('deleted_at', null);
+      if (activeBranchId) jobQuery = jobQuery.eq('branch_id', activeBranchId);
+
+      let branchCountQuery = supabase.from('branch').select('branch_id', { count: 'exact', head: true }).is('deleted_at', null);
+      let supplierCountQuery = supabase.from('supplier').select('supplier_id', { count: 'exact', head: true }).is('deleted_at', null);
+
+      let vehicleCountQuery = supabase
+        .from('vehicle')
+        .select('vehicle_id, customer!inner(branch_id)', { count: 'exact', head: true })
+        .is('deleted_at', null);
+      if (activeBranchId) vehicleCountQuery = vehicleCountQuery.eq('customer.branch_id', activeBranchId);
+
+      let notifCountQuery = supabase.from('notification').select('notification_id', { count: 'exact', head: true }).eq('user_id', user.user_id).eq('is_read', false);
+
+      let recentSalesQuery = supabase
         .from('sale_item')
         .select(`
           sale_item_id,
@@ -440,35 +477,68 @@ export default function DashboardPage() {
             sale_id,
             sale_date,
             user:user_id(name),
-            total_amount
+            total_amount,
+            branch_id
           ),
           inventory_item!inner(name, category)
         `)
         .order('created_at', { ascending: false })
         .limit(50);
+      if (activeBranchId) recentSalesQuery = recentSalesQuery.eq('sale.branch_id', activeBranchId);
 
-      const lowStockPromise = supabase
-        .from('inventory_item')
-        .select('*')
-        .lte('stock_quantity', 5)
-        .order('created_at', { ascending: false })
+      let lowStockListQuery = supabase
+        .from('view_branch_inventory')
+        .select('*, stock_quantity:quantity')
+        .is('deleted_at', null)
+        .lte('quantity', 5)
+        .order('quantity', { ascending: true })
         .limit(10);
+      if (activeBranchId) lowStockListQuery = lowStockListQuery.eq('branch_id', activeBranchId);
 
       const [
-        { data: statsData, error: statsError },
+        salesRes,
+        invRes,
+        custRes,
+        jobRes,
+        branchRes,
+        suppRes,
+        vehRes,
+        notifRes,
         { data: recentSalesData, error: recentSalesError },
-        { data: lowStockData, error: lowStockError }
+        { data: lowStockData, error: lowStockListError }
       ] = await Promise.all([
-        statsPromise,
-        recentSalesPromise,
-        lowStockPromise
+        salesReportPromise,
+        inventoryCountQuery,
+        customerCountQuery,
+        jobQuery,
+        branchCountQuery,
+        supplierCountQuery,
+        vehicleCountQuery,
+        notifCountQuery,
+        recentSalesQuery,
+        lowStockListQuery
       ]);
 
-      if (statsError) throw statsError;
       if (recentSalesError) throw recentSalesError;
-      if (lowStockError) throw lowStockError;
+      if (lowStockListError) throw lowStockListError;
 
-      // Format recent sales
+      const totalSales = (salesRes.sales || []).reduce((sum: number, sale: any) => sum + (sale.total_amount || 0), 0);
+      const inventoryCount = invRes.data?.length || 0;
+      const lowStockCount = invRes.data?.filter((i: any) => i.quantity <= 5).length || 0;
+      const pendingJobs = jobRes.data?.filter((j: any) => j.status === 'pending').length || 0;
+
+      setStats({
+        total_sales: totalSales,
+        total_items: inventoryCount,
+        total_customers: custRes.count || 0,
+        pending_jobs: pendingJobs,
+        total_branches: branchRes.count || 0,
+        total_suppliers: suppRes.count || 0,
+        total_vehicles: vehRes.count || 0,
+        unread_notifications: notifRes.count || 0,
+        low_stock_count: lowStockCount
+      });
+
       const formattedRecentSales: RecentSale[] = (recentSalesData as any[] || []).map(item => ({
         sale_item_id: item.sale_item_id,
         quantity: item.quantity,
@@ -478,21 +548,15 @@ export default function DashboardPage() {
         item_category: item.inventory_item?.category || 'Unknown',
         user_name: item.sale?.user?.name || 'Unknown',
         total_amount: item.quantity * item.price_at_sale,
-        sale_date: item.sale?.sale_date || item.created_at
       }));
 
-      // Filter sales based on current time frame
       const filtered = filterRecentSalesByTimeFrame(formattedRecentSales, timeFrame);
-      
-      // Calculate chart data from filtered sales
       const chartData = calculateSalesChartData(filtered, timeFrame);
 
-      setStats(statsData as any as DashboardStats);
       setRecentSales(formattedRecentSales);
       setFilteredRecentSales(filtered);
       setSalesData(chartData);
       setLowStockItems(lowStockData as LowStockItem[] || []);
-      setLastUpdated(new Date());
 
     } catch (err: any) {
       console.error('Dashboard data fetch error:', err);
@@ -500,7 +564,7 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user, timeFrame, filterRecentSalesByTimeFrame, calculateSalesChartData]);
+  }, [user, activeBranchId, timeFrame, filterRecentSalesByTimeFrame, calculateSalesChartData]);
 
   useEffect(() => {
     if (user?.user_id) {
@@ -508,11 +572,6 @@ export default function DashboardPage() {
     }
   }, [fetchDashboardData, user]);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Recalculate when time frame changes
   useEffect(() => {
     if (recentSales.length > 0) {
       const filtered = filterRecentSalesByTimeFrame(recentSales, timeFrame);
@@ -522,156 +581,113 @@ export default function DashboardPage() {
     }
   }, [timeFrame, recentSales, filterRecentSalesByTimeFrame, calculateSalesChartData]);
 
-  // Animation for show more button
-  useEffect(() => {
-    if (showSecondaryStats) {
-      setSecondaryStatsHeight('auto');
-      setSecondaryStatsOpacity(1);
-    } else {
-      setSecondaryStatsHeight('0px');
-      setSecondaryStatsOpacity(0);
-    }
-  }, [showSecondaryStats]);
-
   const handleRefresh = () => {
     fetchDashboardData();
-  };
-
-  const handleTimeFrameChange = (value: string) => {
-    setTimeFrame(value as TimeFrame);
+    refetchAnalytics();
   };
 
   const primaryStats = [
-    { id: 'sales', title: "Total Sales", value: `₱${stats.total_sales.toLocaleString()} `, icon: DollarSign, desc: "Last 7 days", category: "financial" },
-    { id: 'inventory', title: "Inventory Items", value: stats.total_items.toLocaleString(), icon: Blocks, desc: "In stock", category: "inventory" },
-    { id: 'customers', title: "Customers", value: stats.total_customers.toLocaleString(), icon: Users, desc: "Registered", category: "customers" },
-    { id: 'jobs', title: "Pending Jobs", value: stats.pending_jobs.toLocaleString(), icon: Wrench, desc: "Needs attention", category: "service" }
+    { id: 'sales', title: "Total Sales", value: `₱${stats.total_sales.toLocaleString()}`, icon: DollarSign, href: '/reports/sales', color: 'bg-green-500' },
+    { id: 'inventory', title: "Inventory Items", value: stats.total_items.toLocaleString(), icon: Blocks, href: '/inventory', color: 'bg-primary' },
+    { id: 'customers', title: "Customers", value: stats.total_customers.toLocaleString(), icon: Users, href: '/customers', color: 'bg-purple-500' },
+    { id: 'jobs', title: "Pending Jobs", value: stats.pending_jobs.toLocaleString(), icon: Wrench, href: '/services', color: 'bg-orange-500' }
   ];
 
   const secondaryStats = [
-    { id: 'branches', title: "Active Branches", value: stats.total_branches.toLocaleString(), icon: Building2, category: "branches" },
-    { id: 'suppliers', title: "Suppliers", value: stats.total_suppliers.toLocaleString(), icon: Package, category: "suppliers" },
-    { id: 'vehicles', title: "Vehicles", value: stats.total_vehicles.toLocaleString(), icon: Car, category: "vehicles" }
+    { title: "Branches", value: stats.total_branches.toLocaleString(), icon: Building2, color: 'bg-blue-500' },
+    { title: "Suppliers", value: stats.total_suppliers.toLocaleString(), icon: Package, color: 'bg-teal-500' },
+    { title: "Vehicles", value: stats.total_vehicles.toLocaleString(), icon: Car, color: 'bg-indigo-500' }
   ];
 
-  const focusStyles = "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2";
-
-  // Color palette for top selling items chart
-  const chartColors = [
-    '#8b5cf6', // Purple
-    '#06b6d4', // Cyan
-    '#3b82f6', // Blue
-    '#ec4899', // Pink
-    '#a855f7', // Purple variant
-    '#14b8a6', // Teal
-  ];
-
-  // Color palette for avatars
-  const avatarColors = [
-    'bg-gradient-to-br from-purple-500 to-purple-700',
-    'bg-gradient-to-br from-blue-500 to-blue-700',
-    'bg-gradient-to-br from-green-500 to-green-700',
-    'bg-gradient-to-br from-red-500 to-red-700',
-    'bg-gradient-to-br from-yellow-500 to-yellow-700',
-    'bg-gradient-to-br from-pink-500 to-pink-700',
-  ];
-
-  const getAvatarColor = (name: string) => {
-    const index = name.charCodeAt(0) % avatarColors.length;
-    return avatarColors[index];
-  };
-
-  const getInitials = (name: string) => {
-    return name.charAt(0).toUpperCase();
-  };
-
-  const TimeFrameIcon = getTimeFrameIcon(timeFrame);
+  const chartColors = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4'];
 
   const chartConfig = useMemo(() => {
     const maxVal = Math.max(...salesData.map(d => d.sales), 0);
-    
-    if (maxVal === 0) {
-      return { 
-        domain: [0, 10000], 
-        ticks: [0, 2000, 4000, 6000, 8000, 10000] 
-      };
-    }
-
-    const steps = 5;
-    const rawStep = maxVal / steps;
-    const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep))); 
-    
-    const niceStep = Math.ceil(rawStep / magnitude) * magnitude;
+    if (maxVal === 0) return { domain: [0, 10000], ticks: [0, 2500, 5000, 7500, 10000] };
+    const steps = 4;
+    const niceStep = Math.ceil(maxVal / steps / 1000) * 1000;
     const upperLimit = niceStep * steps;
-    
-    const ticks = Array.from({ length: steps + 1 }, (_, i) => i * niceStep);
-    
-    return { domain: [0, upperLimit], ticks };
+    return { domain: [0, upperLimit], ticks: Array.from({ length: steps + 1 }, (_, i) => i * niceStep) };
   }, [salesData]);
 
+  const getInitials = (name: string) => name.charAt(0).toUpperCase();
+
+  const visibleWidgetCount = Object.values(widgetVisibility).filter(Boolean).length;
+
   return (
-    <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
+    <div className="min-h-screen bg-background">
+      {/* Full-width container with minimal padding */}
+      <div className="w-full px-3 py-4">
 
-      {/* TOP BACKGROUND SECTION */}
-      <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
-        <div
-          className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
-          style={{
-            backgroundImage: "url('/images/image2.jpg')",
-            backgroundSize: "cover",
-            backgroundPosition: "center 30%"
-          }}
-        ></div>
+        {/* Compact Header with Widget Filter */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-semibold text-foreground">
+              Dashboard
+            </h1>
+            <span className="text-sm text-muted-foreground hidden sm:inline">
+              <Calendar className="inline h-3.5 w-3.5 mr-1" />
+              {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+            </span>
+          </div>
 
-        <div className="absolute top-0 left-0 w-32 h-32 bg-green-300/20 rounded-br-full"></div>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-teal-300/20 rounded-bl-full"></div>
-        <div className="absolute bottom-10 left-20 w-16 h-16 bg-white/20 rounded-2xl rotate-45"></div>
-        <div className="absolute bottom-16 right-24 w-12 h-12 bg-white/15 rounded-full"></div>
-      </div>
-
-      <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-
-        {/* PROFILE HEADER SECTION */}
-        <div className={`mb-12 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
-          <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
-
-            <div className="relative z-10 flex-1">
-              <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
-                Welcome back, {user?.name ?? 'User'}
-              </h1>
-              <div className="flex items-center gap-6 text-white/90">
-                <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium">
-                  <Calendar className="h-6 w-6 opacity-90" />
-                  {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                </p>
-                <div className="flex items-center gap-4 text-lg">
-                  {lastUpdated && (
-                    <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">
-                      <Clock className="w-5 h-5" />
-                      Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse-glow"></div>
-                    Live data • {activeSalesCount} sales
+          <div className="flex items-center gap-2">
+            {/* Widget Filter Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <LayoutGrid className="h-4 w-4" />
+                  <span className="hidden sm:inline">Widgets</span>
+                  <Badge variant="secondary" className="ml-1 text-xs">
+                    {visibleWidgetCount}/{Object.keys(widgetVisibility).length}
+                  </Badge>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel className="flex items-center justify-between">
+                  <span>Dashboard Widgets</span>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={showAllWidgets}>
+                      <Eye className="h-3 w-3 mr-1" />All
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={hideAllWidgets}>
+                      <EyeOff className="h-3 w-3 mr-1" />None
+                    </Button>
                   </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <div className="max-h-80 overflow-y-auto py-1">
+                  {(Object.keys(WIDGET_LABELS) as Array<keyof WidgetVisibility>).map((key) => (
+                    <div
+                      key={key}
+                      className="flex items-center gap-2 px-2 py-1.5 hover:bg-accent rounded cursor-pointer"
+                      onClick={() => toggleWidget(key)}
+                    >
+                      <Checkbox
+                        checked={widgetVisibility[key]}
+                        onCheckedChange={() => toggleWidget(key)}
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm flex-1">{WIDGET_LABELS[key]}</span>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            </div>
+                <DropdownMenuSeparator />
+                <div className="p-2">
+                  <Button variant="ghost" size="sm" className="w-full text-xs" onClick={resetWidgets}>
+                    <Settings2 className="h-3 w-3 mr-1" />Reset to Default
+                  </Button>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-            <Button
-              onClick={handleRefresh}
-              disabled={isLoading}
-              className={buttonStyles.glass + " active:scale-95"}
-              aria-label="Refresh dashboard data"
-            >
-              <RefreshCw className={`h-6 w-6 mr-3 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh Data
+            <Button onClick={handleRefresh} disabled={isLoading} variant="outline" size="sm">
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </div>
 
+<<<<<<< HEAD
         {/* SEARCH BAR SECTION */}
 <section className="mb-8 mt-20" aria-labelledby="search-heading">
   <div className="relative" ref={searchInputRef}>
@@ -933,608 +949,236 @@ export default function DashboardPage() {
                   Show More
                 </>
               )}
+=======
+        {/* Quick Actions - Compact horizontal bar */}
+        {widgetVisibility.quickActions && (
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+            <Button asChild size="sm" className="shrink-0 bg-green-500 hover:bg-green-600 text-white">
+              <Link href="/pos"><Plus className="h-4 w-4 mr-1" />New Sale</Link>
+            </Button>
+            <Button asChild size="sm" className="shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Link href="/inventory"><Package className="h-4 w-4 mr-1" />Inventory</Link>
+            </Button>
+            <Button asChild size="sm" className="shrink-0 bg-orange-500 hover:bg-orange-600 text-white">
+              <Link href="/services"><Wrench className="h-4 w-4 mr-1" />Services</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm" className="shrink-0">
+              <Link href="/reports"><BarChart className="h-4 w-4 mr-1" />Reports</Link>
+>>>>>>> c03110cc0793ebf079ffd322583886433148916e
             </Button>
           </div>
+        )}
 
-          <div 
-            id="secondary-stats-section"
-            className="overflow-hidden transition-all duration-700 ease-spring"
-            style={{
-              maxHeight: showSecondaryStats ? '500px' : '0px',
-              opacity: showSecondaryStats ? 1 : 0,
-            }}
-          >
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-              {secondaryStats.map((stat, i) => (
-                <div
-                  key={i}
-                  className={`group bg-white border border-slate-200 rounded-2xl p-5 cursor-pointer shadow-sm hover:border-indigo-300/25 active:scale-[0.98] ${microAnimations.cardHover} ${focusStyles}`}
-                  onClick={() => handleCardClick(stat.id)}
-                  onKeyDown={(e) => handleCardKeyPress(e, stat.id)}
-                  tabIndex={0}
-                  role="button"
-                  aria-label={`View ${stat.title} details. Current value: ${stat.value}`}
-                  style={{ transitionTimingFunction: springEasing }}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center ${microAnimations.iconHover}`}
-                      style={{
-                        backgroundColor: (iconCategories as any)[stat.category]?.background || 'rgba(99, 102, 241, 0.1)',
-                        transitionTimingFunction: springEasing
-                      }}
-                    >
-                      <stat.icon
-                        className="w-5 h-5"
-                        style={{ color: (iconCategories as any)[stat.category]?.icon || '#6366f1' }}
-                      />
-                    </div>
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-400 scale-90 translate-y-1 group-hover:scale-100 group-hover:translate-y-0"
-                      style={{
-                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                        transitionTimingFunction: springEasing,
-                        transitionDelay: '0.1s'
-                      }}
-                    >
-                      <TrendingUp className="w-4 h-4 text-green-600" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <p
-                      className={`text-3xl font-extrabold tracking-tight tabular-nums leading-none ${stat.value === '0' ? 'text-slate-300' : 'text-slate-800'
-                        }`}
-                      style={{ letterSpacing: '-0.03em' }}
-                    >
-                      {stat.value}
-                    </p>
-                    <p className="text-sm font-semibold text-slate-700">{stat.title}</p>
-                  </div>
-
-                  {stat.value === '0' ? (
-                    <div className="mt-3 p-2 bg-slate-50 rounded-lg border border-slate-200">
-                      <p className="text-xs text-slate-400 opacity-70 italic">No data available</p>
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Performance & Analytics Section */}
-        <section className="mb-8" aria-labelledby="performance-heading">
-          <div className="flex items-center justify-between mb-6">
-            <h2 id="performance-heading" className="text-xl font-bold text-slate-800">Performance & Analytics</h2>
-            <div className="flex items-center gap-4">
-              <Badge variant="secondary" className="bg-gradient-to-r from-green-100 to-emerald-100 text-green-700">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                {activeSalesCount} Active Sales
-              </Badge>
-              
-              {/* Time Frame Filter - Beautiful Tabs */}
-              <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-xl p-1.5 border border-slate-200 shadow-sm">
-                <Filter className="w-4 h-4 text-slate-500 ml-2" />
-                <Tabs defaultValue="7d" value={timeFrame} onValueChange={handleTimeFrameChange} className="w-auto">
-                  <TabsList className="bg-transparent p-0 gap-1">
-                    <TabsTrigger 
-                      value="1d" 
-                      className="relative px-4 py-2 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg group transition-all duration-300"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Zap className="w-3.5 h-3.5" />
-                        <span>1 Day</span>
-                      </div>
-                      <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-orange-500/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="3d" 
-                      className="relative px-4 py-2 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-500 data-[state=active]:to-cyan-500 data-[state=active]:text-white data-[state=active]:shadow-lg group transition-all duration-300"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Flame className="w-3.5 h-3.5" />
-                        <span>3 Days</span>
-                      </div>
-                      <div className="absolute inset-0 bg-gradient-to-r from-teal-500/10 to-cyan-500/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="7d" 
-                      className="relative px-4 py-2 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white data-[state=active]:shadow-lg group transition-all duration-300"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Rocket className="w-3.5 h-3.5" />
-                        <span>7 Days</span>
-                      </div>
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-            </div>
-          </div>
-          <div className="grid lg:grid-cols-3 gap-6 mb-8">
-            {/* Sales Chart - Dynamic based on time frame */}
-            <Card
-              className="lg:col-span-2 bg-white border-slate-200 shadow-lg transition-all duration-300 hover:shadow-xl group"
-              role="region"
-              aria-labelledby="sales-chart-title"
-            >
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-gradient-to-br from-slate-50 to-white border border-slate-100">
-                      <TimeFrameIcon className="h-6 w-6" style={{ color: getChartColor(timeFrame) }} />
-                    </div>
+        {/* Key Metrics - Compact stat cards */}
+        {widgetVisibility.keyMetrics && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+            {isLoading ? (
+              [1, 2, 3, 4].map(i => <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />)
+            ) : (
+              primaryStats.map((stat) => (
+                <Card key={stat.id} className="cursor-pointer hover:bg-accent/50 transition-all" onClick={() => router.push(stat.href)}>
+                  <CardContent className="p-3 flex items-center justify-between">
                     <div>
-                      <CardTitle id="sales-chart-title" className="text-xl font-bold text-slate-800">
-                        Sales Performance
-                      </CardTitle>
-                      <CardDescription className="mt-1 text-slate-600">
-                        <span className="flex items-center gap-2">
-                          <span className="font-medium" style={{ color: getChartColor(timeFrame) }}>
-                            {getTimeFrameLabel(timeFrame)} View
-                          </span>
-                          • {timeFrame === '1d' ? 'Hourly sales breakdown' : 'Daily sales trend'}
-                        </span>
-                      </CardDescription>
+                      <p className="text-xs text-muted-foreground">{stat.title}</p>
+                      <p className="text-lg font-semibold">{stat.value}</p>
                     </div>
-                  </div>
-                  <Badge className="bg-gradient-to-r from-slate-100 to-slate-50 text-slate-700 border border-slate-200">
-                    <TrendingUp className="w-3 h-3 mr-1" />
-                    Real-time
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="p-4">
-                {isLoading ? (
-                  <div className="flex justify-center items-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin" style={{ color: getChartColor(timeFrame) }} aria-hidden="true" />
-                    <span className="sr-only">Loading sales chart</span>
-                  </div>
-                ) : salesData.length > 0 ? (
-                  <div className="h-72 w-full" aria-label={`Sales chart showing ${getTimeFrameLabel(timeFrame).toLowerCase()} performance`}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={salesData}>
-                        <defs>
-                          <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={getChartColor(timeFrame)} stopOpacity={0.8} />
-                            <stop offset="95%" stopColor={getChartColor(timeFrame)} stopOpacity={0.1} />
-                          </linearGradient>
-                        </defs>
-                        <XAxis
-                          dataKey="date"
-                          stroke="#64748b"
-                          fontSize={11}
-                          tickLine={false}
-                          axisLine={false}
-                          interval={timeFrame === '1d' ? 3 : 0} // Show fewer labels on 1d to avoid clutter
-                          tickFormatter={(value) => {
-                            if (timeFrame === '1d') {
-                              // Convert 13:00 to 1pm
-                              const hour = parseInt(value.split(':')[0]);
-                              if (hour === 0) return '12am';
-                              if (hour === 12) return '12pm';
-                              return hour > 12 ? `${hour - 12}pm` : `${hour}am`;
-                            }
-                            return value;
-                          }}
-                        />
-                        <YAxis
-                          stroke="#64748b"
-                          fontSize={12}
-                          tickLine={false}
-                          axisLine={false}
-                          tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
-                          // UPDATED: Now uses the dynamic config calculated above
-                          domain={chartConfig.domain}
-                          ticks={chartConfig.ticks}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: "rgba(255, 255, 255, 0.98)",
-                            backdropFilter: "blur(16px)",
-                            border: `2px solid ${getChartColor(timeFrame)}30`,
-                            borderRadius: "12px",
-                            boxShadow: `0 8px 32px ${getChartColor(timeFrame)}15`,
-                            color: "#1e293b",
-                            padding: "12px 16px"
-                          }}
-                          formatter={(value, name) => {
-                            if (name === 'sales') return [`₱${Number(value).toLocaleString()}`, 'Sales Amount'];
-                            if (name === 'average') return [`₱${Number(value).toLocaleString()}`, 'Period Average'];
-                            return [value, name];
-                          }}
-                          labelFormatter={(label) => {
-                            if (timeFrame === '1d') return `Time: ${label}`;
-                            return `Date: ${label}`;
-                          }}
-                        />
-                        <ReferenceLine
-                          y={salesData[0]?.average}
-                          stroke="#64748b"
-                          strokeWidth={1}
-                          strokeDasharray="3 3"
-                          label={{
-                            value: 'Average',
-                            position: 'right',
-                            fill: '#64748b',
-                            fontSize: 10
-                          }}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="sales"
-                          stroke={getChartColor(timeFrame)}
-                          strokeWidth={3}
-                          fillOpacity={1}
-                          fill="url(#colorSales)"
-                          activeDot={{
-                            r: 6,
-                            fill: getChartColor(timeFrame),
-                            stroke: '#fff',
-                            strokeWidth: 2
-                          }}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <EmptyState
-                    icon={BarChart}
-                    title={`No Sales in ${getTimeFrameLabel(timeFrame)}`}
-                    description="Start making sales to see your performance analytics"
-                    action="Create First Sale"
-                  />
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Low Stock Alerts */}
-            <Card
-              className="bg-white border-slate-200 shadow-lg transition-all duration-300 hover:shadow-xl"
-              role="region"
-              aria-labelledby="low-stock-title"
-            >
-              <CardHeader>
-                <CardTitle id="low-stock-title" className="flex items-center text-lg font-bold text-slate-800">
-                  <div className="p-2 mr-2 rounded-lg bg-gradient-to-br from-amber-100 to-orange-100 border border-amber-200">
-                    <AlertTriangle className="h-5 w-5 text-amber-600" aria-hidden="true" />
-                  </div>
-                  Low Stock Alerts
-                </CardTitle>
-                <CardDescription className="text-slate-600 ml-12">
-                  {lowStockItems.length} items need immediate attention
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 max-h-96 overflow-y-auto overflow-x-hidden">
-                  {lowStockItems.length > 0 ? lowStockItems.slice(0, 5).map((item) => (
-                    <div
-                      key={item.item_id}
-                      className="p-4 rounded-xl border border-slate-200 hover:shadow-lg transition-all duration-300 cursor-pointer group bg-gradient-to-r from-white to-amber-50/30 hover:from-amber-50 hover:to-amber-100/30 hover:scale-[1.02]"
-                      onClick={() => router.push('/inventory')}
-                      onKeyDown={(e) => e.key === 'Enter' && router.push('/inventory')}
-                      tabIndex={0}
-                      role="button"
-                      aria-label={`Low stock item: ${item.name}, only ${item.stock_quantity} units left`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="font-semibold text-slate-800 group-hover:text-amber-800 transition-colors">
-                            {item.name}
-                          </p>
-                          <p className="text-xs text-slate-600 mt-1">{item.category}</p>
-                          <div className="mt-2">
-                            <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-500"
-                                style={{ width: `${Math.min(100, (item.stock_quantity / (item.reorder_level * 2)) * 100)}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right ml-4">
-                          <p className="text-2xl font-bold text-amber-600 transition-transform duration-300 group-hover:scale-110">{item.stock_quantity}</p>
-                          <p className="text-xs text-slate-500">of {item.reorder_level * 2}</p>
-                        </div>
-                      </div>
+                    <div className={`p-2 rounded-lg ${stat.color} text-white`}>
+                      <stat.icon className="h-4 w-4" />
                     </div>
-                  )) : (
-                    <div className="p-6 rounded-xl border-2 border-dashed border-green-200 bg-gradient-to-br from-green-50 to-emerald-50/50 text-center">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-100 to-emerald-100 flex items-center justify-center mx-auto mb-3">
-                        <Package className="w-6 h-6 text-green-600" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-green-800 mb-1">All Items Stocked</h3>
-                      <p className="text-green-600 text-sm">Your inventory is well maintained!</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
-        </section>
+        )}
 
-        {/* Recent Activity Section */}
-        <section aria-labelledby="recent-activity-heading">
-          <h2 id="recent-activity-heading" className="text-xl font-bold mb-6 text-slate-800">Recent Activity</h2>
-          <div className="grid lg:grid-cols-12 gap-6">
-            {/* Recent Sales - SLIMMER (4 columns) */}
-            <Card
-              className="lg:col-span-4 bg-white border-slate-200 shadow-lg transition-all duration-300 hover:shadow-xl"
-              role="region"
-              aria-labelledby="recent-sales-title"
-            >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
+        {/* Secondary Metrics */}
+        {widgetVisibility.secondaryMetrics && (
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            {secondaryStats.map((stat, i) => (
+              <Card key={i}>
+                <CardContent className="p-3 flex items-center gap-3">
+                  <div className={`p-1.5 rounded ${stat.color} text-white`}>
+                    <stat.icon className="h-3.5 w-3.5" />
+                  </div>
                   <div>
-                    <div className="flex items-center mb-1">
-                      <div className="p-1.5 mr-2 rounded-lg bg-gradient-to-br from-green-100 to-emerald-100 border border-green-200">
-                        <TrendingUp className="h-4 w-4 text-green-600" aria-hidden="true" />
-                      </div>
-                      <CardTitle id="recent-sales-title" className="text-lg font-bold text-slate-800">
-                        Recent Sales
-                      </CardTitle>
-                    </div>
-                    <CardDescription className="text-slate-600 ml-7">
-                      {getTimeFrameLabel(timeFrame)} • {filteredRecentSales.length} transactions
-                    </CardDescription>
+                    <p className="text-xs text-muted-foreground">{stat.title}</p>
+                    <p className="text-base font-semibold">{stat.value}</p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push('/sales')}
-                    className="text-slate-600 border-slate-300 hover:bg-slate-50 hover:border-green-300 hover:text-green-700 transition-all duration-300"
-                  >
-                    View All
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0 pb-3">
-                <div className="space-y-8 max-h-[800px] overflow-y-auto pr-1">
-                  {filteredRecentSales.length > 0 ? filteredRecentSales.slice(0, 5).map((sale, index) => (
-                    <div
-                      key={sale.sale_item_id}
-                      className="p-4 rounded-xl border border-slate-200 hover:shadow-lg transition-all duration-300 cursor-pointer group bg-gradient-to-r from-white to-slate-50/50 hover:from-green-50/30 hover:to-emerald-50/30"
-                      onClick={() => router.push('/pos')}
-                      onKeyDown={(e) => e.key === 'Enter' && router.push('/pos')}
-                      tabIndex={0}
-                      role="button"
-                      aria-label={`Recent sale: ${sale.item_name || 'Unknown Item'}, amount: ₱${sale.total_amount.toLocaleString()}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        {/* Colored Avatar */}
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-md ${getAvatarColor(sale.user_name)} group-hover:scale-110 transition-transform duration-300`}>
-                          {getInitials(sale.user_name)}
-                        </div>
-                        
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-start justify-between">
-                            <p className="font-semibold text-slate-800 text-sm group-hover:text-green-700 transition-colors truncate max-w-[120px]">
-                              {sale.item_name || 'Unknown Item'}
-                            </p>
-                            <p className="text-lg font-bold bg-gradient-to-br from-green-600 to-emerald-600 bg-clip-text text-transparent transition-all duration-300 group-hover:scale-110">
-                              ₱{sale.total_amount.toLocaleString()}
-                            </p>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <p className="text-xs text-slate-600">
-                              {sale.quantity} × ₱{sale.price_at_sale?.toLocaleString() || '0'}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {sale.created_at ? new Date(sale.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Unknown date'}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600 group-hover:bg-green-100 group-hover:text-green-700 transition-all duration-300">
-                              {sale.user_name}
-                            </span>
-                            <span className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600 group-hover:bg-slate-200 transition-all duration-300">
-                              {sale.item_category}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )) : (
-                    <div className="p-6 rounded-xl border-2 border-dashed border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100/50 text-center">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center mx-auto mb-3">
-                        <TrendingUp className="w-6 h-6 text-slate-400" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-slate-600 mb-1">No Recent Sales</h3>
-                      <p className="text-slate-500 text-sm mb-4">No sales recorded in the last {getTimeFrameLabel(timeFrame).toLowerCase()}</p>
-                      <Button
-                        onClick={() => router.push('/pos')}
-                        className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Create Sale
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
-            {/* Top Selling Items - WIDER (8 columns) */}
-            <Card
-              className="lg:col-span-8 bg-gradient-to-br from-white via-white to-purple-50/30 border-slate-200 shadow-lg transition-all duration-300 hover:shadow-2xl"
-              role="region"
-              aria-labelledby="top-selling-title"
-            >
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-100">
-                      <TrendingUp className="h-6 w-6 text-purple-600" aria-hidden="true" />
+        {/* Main Grid - Sales Chart & Low Stock side by side */}
+        {(widgetVisibility.salesChart || widgetVisibility.lowStock) && (
+          <div className="grid lg:grid-cols-4 gap-3 mb-4">
+            {/* Sales Chart - Takes 3/4 width */}
+            {widgetVisibility.salesChart && (
+              <Card className={widgetVisibility.lowStock ? "lg:col-span-3" : "lg:col-span-4"}>
+                <CardHeader className="py-2 px-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium">Sales Performance</CardTitle>
+                    <Select value={timeFrame} onValueChange={(v) => setTimeFrame(v as TimeFrame)}>
+                      <SelectTrigger className="w-20 h-7 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1d">1 Day</SelectItem>
+                        <SelectItem value="3d">3 Days</SelectItem>
+                        <SelectItem value="7d">7 Days</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardHeader>
+                <CardContent className="px-2 pb-2">
+                  {isLoading ? (
+                    <div className="flex justify-center items-center h-48">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
-                    <div>
-                      <CardTitle id="top-selling-title" className="text-lg font-bold text-slate-800">
-                        Top Selling Items
-                      </CardTitle>
-                      <CardDescription className="text-slate-600">
-                        Best performers in the last {getTimeFrameLabel(timeFrame).toLowerCase()}
-                      </CardDescription>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs border-purple-200 text-purple-700">
-                      {topSellingItems.length} top items
-                    </Badge>
-                    <Button
-                      asChild
-                      size="sm"
-                      className={buttonStyles.inventory}
-                    >
-                      <Link href="/inventory">
-                        View Inventory
-                        <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="flex justify-center items-center h-80">
-                    <Loader2 className="h-8 w-8 animate-spin text-purple-600" aria-hidden="true" />
-                    <span className="sr-only">Loading top selling items</span>
-                  </div>
-                ) : topSellingItems.length > 0 ? (
-                  <div className="space-y-6">
-                    {/* Vertical Bar Chart - Beautiful UI */}
-                    <div className="h-64 bg-gradient-to-br from-white to-purple-50/20 rounded-2xl p-4 border border-slate-100 shadow-inner" aria-label="Vertical bar chart showing top selling items by revenue">
+                  ) : salesData.length > 0 ? (
+                    <div className="h-48">
                       <ResponsiveContainer width="100%" height="100%">
-                        <RechartsBarChart
-                          data={topSellingItems}
-                          margin={{ top: 20, right: 30, left: 0, bottom: 10 }}
-                        >
+                        <AreaChart data={salesData}>
                           <defs>
-                            {chartColors.map((color, idx) => (
-                              <linearGradient key={idx} id={`gradient-${idx}`} x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor={color} stopOpacity={0.9} />
-                                <stop offset="100%" stopColor={color} stopOpacity={0.3} />
-                              </linearGradient>
-                            ))}
+                            <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                            </linearGradient>
                           </defs>
                           <XAxis
-                            dataKey="name"
-                            stroke="#94a3b8"
-                            fontSize={11}
+                            dataKey="date"
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={10}
                             tickLine={false}
                             axisLine={false}
-                            angle={-45}
-                            textAnchor="end"
-                            height={60}
-                            tickFormatter={(value) => value.length > 10 ? value.substring(0, 8) + '...' : value}
+                            interval={timeFrame === '1d' ? 4 : 0}
+                            tickFormatter={(value) => {
+                              if (timeFrame === '1d') {
+                                const hour = parseInt(value.split(':')[0]);
+                                return hour % 12 === 0 ? (hour === 0 ? '12a' : '12p') : `${hour % 12}`;
+                              }
+                              return value.split(',')[0];
+                            }}
                           />
                           <YAxis
-                            stroke="#64748b"
-                            fontSize={12}
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={10}
                             tickLine={false}
                             axisLine={false}
+                            width={40}
                             tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
+                            domain={chartConfig.domain}
+                            ticks={chartConfig.ticks}
                           />
                           <Tooltip
                             contentStyle={{
-                              backgroundColor: "rgba(255, 255, 255, 0.98)",
-                              backdropFilter: "blur(16px)",
-                              border: `2px solid rgba(139, 92, 246, 0.2)`,
-                              borderRadius: "16px",
-                              boxShadow: "0 12px 40px rgba(139, 92, 246, 0.15)",
-                              color: "#1e293b",
-                              padding: "12px 16px"
+                              backgroundColor: "hsl(var(--background))",
+                              border: "1px solid hsl(var(--border))",
+                              borderRadius: "6px",
+                              fontSize: "12px"
                             }}
-                            cursor={{ fill: 'rgba(139, 92, 246, 0.05)' }}
-                            formatter={(value: any, name: string) => {
-                              if (name === 'total_revenue') {
-                                return [
-                                  <span className="font-bold text-purple-600">₱{Number(value).toLocaleString()}</span>,
-                                  'Total Revenue'
-                                ];
-                              }
-                              return [value, name];
-                            }}
-                            labelFormatter={(label) => <span className="font-semibold text-slate-800">{label}</span>}
+                            formatter={(value) => [`₱${Number(value).toLocaleString()}`, 'Sales']}
                           />
-                          <Bar
-                            dataKey="total_revenue"
-                            radius={[8, 8, 0, 0]}
-                            background={{ fill: 'rgba(226, 232, 240, 0.3)', radius: 8 }}
-                          >
-                            {topSellingItems.map((entry, index) => (
-                              <Cell
-                                key={`cell-${index}`}
-                                fill={`url(#gradient-${index % chartColors.length})`}
-                              />
-                            ))}
-                          </Bar>
-                        </RechartsBarChart>
+                          <ReferenceLine y={salesData[0]?.average} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                          <Area
+                            type="monotone"
+                            dataKey="sales"
+                            stroke="hsl(var(--primary))"
+                            strokeWidth={2}
+                            fillOpacity={1}
+                            fill="url(#colorSales)"
+                          />
+                        </AreaChart>
                       </ResponsiveContainer>
                     </div>
+                  ) : (
+                    <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">
+                      No sales data for this period
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
-                    {/* Enhanced Item Details List */}
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                        <Package className="w-4 h-4 text-purple-600" />
-                        Detailed Breakdown
-                      </h3>
-                      <div className="grid md:grid-cols-2 gap-3">
-                        {topSellingItems.map((item, index) => (
-                          <div
-                            key={item.name}
-                            className="group relative p-4 rounded-xl border border-slate-200 hover:border-purple-300 hover:shadow-lg transition-all duration-300 cursor-pointer bg-white overflow-hidden"
-                            onClick={() => router.push('/inventory')}
-                            onKeyDown={(e) => e.key === 'Enter' && router.push('/inventory')}
-                            tabIndex={0}
-                            role="button"
-                            aria-label={`Top selling item: ${item.name}, revenue: ₱${item.total_revenue.toLocaleString()}`}
-                          >
-                            {/* Gradient background on hover */}
-                            <div 
-                              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                              style={{
-                                background: `linear-gradient(135deg, ${chartColors[index % chartColors.length]}08 0%, ${chartColors[index % chartColors.length]}03 100%)`
-                              }}
-                            />
-                            
-                            <div className="relative flex items-start justify-between gap-3">
-                              <div className="flex items-start gap-3 flex-1 min-w-0">
-                                <div
-                                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm group-hover:shadow-md transition-shadow duration-300"
-                                  style={{
-                                    background: `linear-gradient(135deg, ${chartColors[index % chartColors.length]}20 0%, ${chartColors[index % chartColors.length]}10 100%)`,
-                                  }}
-                                >
-                                  {index === 0 ? (
-                                    <TrendingUp className="w-5 h-5" style={{ color: chartColors[index % chartColors.length] }} />
-                                  ) : (
-                                    <Package className="w-5 h-5" style={{ color: chartColors[index % chartColors.length] }} />
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <p className="font-semibold text-slate-800 text-sm truncate group-hover:text-purple-700 transition-colors">
-                                      {item.name}
-                                    </p>
-                                    {index === 0 && (
-                                      <Badge className="text-[10px] px-2 py-0.5 bg-gradient-to-r from-yellow-400 to-orange-400 text-white border-0 shadow-sm">
-                                        #1 TOP
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <p className="text-xs text-slate-500 mb-2">{item.category}</p>
-                                  <div className="flex items-center gap-3 text-xs">
-                                    <span className="text-slate-600 flex items-center gap-1">
-                                      <span className="font-medium">{item.total_quantity}</span> units
-                                    </span>
-                                    <span className="text-slate-300">•</span>
-                                    <span className="text-slate-600 flex items-center gap-1">
-                                      <span className="font-medium">{item.sales_count}</span> sales
-                                    </span>
-                                  </div>
-                                </div>
+            {/* Low Stock Alerts - Takes 1/4 width */}
+            {widgetVisibility.lowStock && (
+              <Card className={widgetVisibility.salesChart ? "" : "lg:col-span-4"}>
+                <CardHeader className="py-2 px-3">
+                  <CardTitle className="text-sm font-medium flex items-center gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                    Low Stock ({lowStockItems.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-2 pb-2">
+                  <div className="space-y-1 max-h-44 overflow-y-auto">
+                    {lowStockItems.length > 0 ? lowStockItems.slice(0, 6).map((item) => (
+                      <div key={item.item_id} className="flex items-center justify-between py-1.5 px-1 hover:bg-accent/50 rounded text-sm">
+                        <span className="truncate flex-1">{item.name}</span>
+                        <Badge variant="destructive" className="text-xs ml-2 shrink-0">
+                          {item.stock_quantity}
+                        </Badge>
+                      </div>
+                    )) : (
+                      <div className="text-center py-6 text-muted-foreground text-xs">
+                        <Package className="h-6 w-6 mx-auto mb-1 opacity-50" />
+                        All stock healthy
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* Advanced Analytics Grid - Full width, compact cards */}
+        {analyticsData && (widgetVisibility.revenueSplit || widgetVisibility.aroCard || widgetVisibility.bayUtilization || widgetVisibility.topBrands || widgetVisibility.inventoryHealth) && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            {widgetVisibility.revenueSplit && (
+              <div className="h-56"><RevenueSplitChart data={analyticsData.revenueSplit} /></div>
+            )}
+            {(widgetVisibility.aroCard || widgetVisibility.bayUtilization) && (
+              <div className="space-y-3">
+                {widgetVisibility.aroCard && <div className="h-[106px]"><AROCard data={analyticsData.averageRepairOrder} /></div>}
+                {widgetVisibility.bayUtilization && <div className="h-[106px]"><BayUtilizationGauge data={analyticsData.bayUtilization} /></div>}
+              </div>
+            )}
+            {widgetVisibility.topBrands && (
+              <div className="h-56"><TopBrandsChart data={analyticsData.topBrands} /></div>
+            )}
+            {widgetVisibility.inventoryHealth && (
+              <div className="h-56"><InventoryHealthTable data={analyticsData.inventoryHealth} /></div>
+            )}
+          </div>
+        )}
+
+        {/* Recent Sales & Top Selling - Full width */}
+        {(widgetVisibility.recentSales || widgetVisibility.topSelling) && (
+          <div className="grid lg:grid-cols-3 gap-3">
+            {/* Recent Sales */}
+            {widgetVisibility.recentSales && (
+              <Card>
+                <CardHeader className="py-2 px-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium">Recent Sales</CardTitle>
+                    <Button asChild variant="ghost" size="sm" className="h-6 text-xs">
+                      <Link href="/pos">View all</Link>
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="max-h-52 overflow-y-auto">
+                    {filteredRecentSales.length > 0 ? (
+                      <div className="divide-y divide-border">
+                        {filteredRecentSales.slice(0, 6).map((sale) => (
+                          <div key={sale.sale_item_id} className="px-3 py-2 flex items-center justify-between hover:bg-accent/50 text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium">
+                                {getInitials(sale.user_name)}
                               </div>
+<<<<<<< HEAD
                               <div className="text-right flex-shrink-0">
                                 <p className="text-xl font-bold bg-gradient-to-br from-purple-600 to-blue-600 bg-clip-text text-transparent">
                                   ₱{item.total_revenue.toLocaleString()}
@@ -1542,109 +1186,99 @@ export default function DashboardPage() {
                                 <p className="text-xs text-slate-500 mt-1">
   ₱{item.average_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} avg
 </p>
+=======
+                              <div>
+                                <p className="text-sm font-medium truncate max-w-24">{sale.item_name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(sale.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </p>
+>>>>>>> c03110cc0793ebf079ffd322583886433148916e
                               </div>
                             </div>
+                            <p className="text-sm font-semibold">₱{sale.total_amount.toLocaleString()}</p>
                           </div>
                         ))}
                       </div>
-                    </div>
+                    ) : (
+                      <div className="p-6 text-center text-muted-foreground text-sm">No recent sales</div>
+                    )}
                   </div>
-                ) : (
-                  <div className="p-8 rounded-xl border-2 border-dashed border-slate-200 bg-gradient-to-br from-slate-50 to-purple-50/30 text-center">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center mx-auto mb-4">
-                      <Package className="w-8 h-8 text-purple-500" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-slate-700 mb-2">No Sales Data</h3>
-                    <p className="text-slate-500 mb-6 max-w-md mx-auto">
-                      No sales recorded in the last {getTimeFrameLabel(timeFrame).toLowerCase()}. 
-                      Start selling to see your top performing items here.
-                    </p>
-                    <Button
-                      onClick={() => router.push('/pos')}
-                      className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create First Sale
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Top Selling */}
+            {widgetVisibility.topSelling && (
+              <Card className={widgetVisibility.recentSales ? "lg:col-span-2" : "lg:col-span-3"}>
+                <CardHeader className="py-2 px-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium">Top Selling Items</CardTitle>
+                    <Button asChild variant="ghost" size="sm" className="h-6 text-xs">
+                      <Link href="/inventory">View all <ArrowUpRight className="h-3 w-3 ml-1" /></Link>
                     </Button>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent className="px-2 pb-2">
+                  {topSellingItems.length > 0 ? (
+                    <div className="grid lg:grid-cols-5 gap-2">
+                      <div className="lg:col-span-2 h-44">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsBarChart data={topSellingItems.slice(0, 5)} layout="vertical">
+                            <XAxis type="number" hide />
+                            <YAxis dataKey="name" type="category" width={70} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                            <Tooltip />
+                            <Bar dataKey="total_revenue" radius={[0, 4, 4, 0]}>
+                              {topSellingItems.slice(0, 5).map((_, i) => (
+                                <Cell key={i} fill={chartColors[i % chartColors.length]} />
+                              ))}
+                            </Bar>
+                          </RechartsBarChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="lg:col-span-3">
+                        <div className="divide-y divide-border">
+                          {topSellingItems.slice(0, 5).map((item, i) => (
+                            <div key={item.name} className="py-1.5 flex items-center justify-between text-sm">
+                              <div className="flex items-center gap-2">
+                                <span className={`w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center ${i < 3 ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground'}`}>
+                                  {i + 1}
+                                </span>
+                                <div>
+                                  <p className="text-sm font-medium truncate max-w-32">{item.name}</p>
+                                  <p className="text-xs text-muted-foreground">{item.category}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-semibold text-primary">₱{item.total_revenue.toLocaleString()}</p>
+                                <p className="text-xs text-muted-foreground">{item.total_quantity} sold</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-44 flex items-center justify-center text-muted-foreground text-sm">
+                      No sales data yet
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
-        </section>
+        )}
 
-      </div>
-
-      {/* ERROR DISPLAY */}
-      {error && (
-        <div className="w-full bg-gradient-to-r from-red-50 to-orange-50 border-t border-red-200 py-4">
-          <div className="container mx-auto px-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-br from-red-100 to-orange-100 border border-red-200">
-                  <AlertTriangle className="h-5 w-5 text-red-600" />
-                </div>
-                <span className="text-red-800 font-medium">{error}</span>
-              </div>
-              <button
-                onClick={() => setError(null)}
-                className="text-red-600 hover:text-red-800 transition-colors duration-300"
-              >
-                ×
-              </button>
+        {/* Error Display */}
+        {error && (
+          <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <span className="text-sm text-destructive">{error}</span>
             </div>
+            <Button variant="ghost" size="sm" onClick={() => setError(null)}>Dismiss</Button>
           </div>
-        </div>
-      )}
-
-      <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
-        
-        .font-poppins {
-          font-family: 'Poppins', sans-serif;
-        }
-
-        .ease-spring {
-          transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        @keyframes pulse-glow {
-          0%, 100% {
-            opacity: 1;
-            transform: scale(1);
-            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-          }
-          50% {
-            opacity: 0.8;
-            transform: scale(0.95);
-            box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
-          }
-        }
-        
-        .animate-pulse-glow {
-          animation: pulse-glow 2s infinite ease-in-out;
-        }
-
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-          width: 6px;
-          height: 6px;
-        }
-
-        ::-webkit-scrollbar-track {
-          background: rgba(226, 232, 240, 0.3);
-          border-radius: 10px;
-        }
-
-        ::-webkit-scrollbar-thumb {
-          background: rgba(148, 163, 184, 0.5);
-          border-radius: 10px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-          background: rgba(148, 163, 184, 0.7);
-        }
-      `}</style>
+        )}
+      </div>
     </div>
   );
 }

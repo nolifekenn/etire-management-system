@@ -2,31 +2,32 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import SalesReportCard from "./SalesReportCard";
-import InventoryReportCard from "./InventoryReportCard";
-import ServiceReportCard from "./ServiceReportCard";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
-import { fetchSalesReport } from "@/lib/salesReportService";
-import { 
-  DollarSign, 
-  TrendingUp, 
-  Package, 
-  Rocket, 
-  CheckCircle, 
+import { fetchSalesReport, exportSalesReportPDF, exportSalesReportCSV } from "@/lib/salesReportService";
+import { fetchInventoryReport, exportInventoryReportPDF, exportInventoryReportCSV } from "@/lib/inventoryReportService";
+import { fetchServiceJobsReport, exportServiceJobsReportPDF, exportServiceJobsReportCSV } from "@/lib/serviceReportService";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  DollarSign,
+  TrendingUp,
+  CheckCircle,
   Wrench,
-  BarChart3,
   ShoppingCart,
   RefreshCw,
   Download,
-  Calendar,
   Clock,
   TrendingDown,
   Zap,
-  Layers,
   Target,
   Percent,
-  BarChart,
   PieChart as PieChartIcon,
   LineChart as LineChartIcon,
   TrendingUp as TrendingUpIcon,
@@ -35,35 +36,44 @@ import {
   Wrench as WrenchIcon
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { 
-  PieChart, 
-  Pie, 
-  BarChart as RechartsBarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
+import {
+  PieChart,
+  Pie,
+  BarChart as RechartsBarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   Cell,
-  LineChart,
   Line,
   AreaChart,
   Area,
   RadialBarChart,
-  RadialBar,
-  Label
+  RadialBar
 } from "recharts";
 
-// Design System from branches page
-const buttonStyles = {
-  primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins ripple",
-  secondary: "flex items-center gap-2 min-h-[44px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-4 py-2 rounded-lg font-medium transition-all duration-300 active:scale-95 font-poppins ripple",
-  glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins ripple",
+import { useAuth } from "@/hooks/useAuth";
+
+type JobSummaryRow = {
+  status: string | null;
+  job_id: string;
+  service_fee?: number | null;
+};
+
+type ServiceRevenueRecord = {
+  quantity?: number | null;
+  price_at_sale?: number | null;
+};
+
+type PieLabelData = {
+  name?: string | number;
+  percent?: number;
 };
 
 export default function EnhancedReportsPage() {
+  const { activeBranchId } = useAuth();
   const [summary, setSummary] = useState({
     totalRevenue: 0,
     totalProfit: 0,
@@ -88,12 +98,12 @@ export default function EnhancedReportsPage() {
   const fetchSummary = useCallback(async () => {
     try {
       setIsLoading(true);
-      
+
       // 🔹 SALES SUMMARY
       const res = await fetchSalesReport({
         date_from: "",
         date_to: "",
-        branch_id: "",
+        branch_id: activeBranchId || "",
         vehicle_type_id: "",
       });
 
@@ -117,9 +127,16 @@ export default function EnhancedReportsPage() {
       }
 
       // 🔹 INVENTORY SUMMARY
-      const { data: inventory, error: invError } = await supabase
-        .from("inventory_item")
-        .select("stock_quantity, cost_price, sale_price");
+      let invQuery = supabase
+        .from("view_branch_inventory")
+        .select("stock_quantity:quantity, cost_price, sale_price")
+        .is("deleted_at", null);
+
+      if (activeBranchId) {
+        invQuery = invQuery.eq('branch_id', activeBranchId);
+      }
+
+      const { data: inventory, error: invError } = await invQuery;
 
       if (invError) console.error("Inventory summary error:", invError);
 
@@ -135,27 +152,102 @@ export default function EnhancedReportsPage() {
           0
         ) || 0;
 
+      // Helper: derive service revenue from recorded sales when service_fee column is unavailable
+      const deriveServiceRevenueFromSales = async () => {
+        let serviceRevenueQuery = supabase
+          .from('sale_item')
+          .select(`
+            quantity,
+            price_at_sale,
+            inventory_item!inner (
+              category
+            ),
+            sale!inner (
+              branch_id,
+              deleted_at
+            )
+          `)
+          .eq('inventory_item.category', 'service')
+          .is('sale.deleted_at', null);
+
+        if (activeBranchId) {
+          serviceRevenueQuery = serviceRevenueQuery.eq('sale.branch_id', activeBranchId);
+        }
+
+        const { data, error } = await serviceRevenueQuery;
+
+        if (error) {
+          console.error('Service revenue summary error:', error);
+          return 0;
+        }
+
+        return data?.reduce((sum: number, item: ServiceRevenueRecord) => (
+          sum + (item.price_at_sale || 0) * (item.quantity || 0)
+        ), 0) || 0;
+      };
+
       // 🔹 SERVICE JOBS SUMMARY
-      const { data: jobs, error: jobsError } = await supabase
+      let jobsQuery = supabase
         .from("service_job")
-        .select("status, service_fee, job_id");
+        .select("status, service_fee, job_id")
+        .is("deleted_at", null);
 
-      if (jobsError) console.error("Service jobs summary error:", jobsError);
+      if (activeBranchId) {
+        jobsQuery = jobsQuery.eq('branch_id', activeBranchId);
+      }
 
-      const completedJobs =
-        jobs?.filter((j) => j.status === "completed").length || 0;
+      const jobsResult = await jobsQuery;
+      let jobs: JobSummaryRow[] = (jobsResult.data as JobSummaryRow[]) ?? [];
+      let serviceFees = 0;
+      let completedJobs = 0;
+      let serviceRevenueFallbackNeeded = false;
 
-      const serviceFees =
-        jobs
-          ?.filter((j) => j.status === "completed")
-          .reduce((sum, j) => sum + (j.service_fee || 0), 0) || 0;
+      if (jobsResult.error) {
+        console.error("Service jobs summary error:", jobsResult.error);
+
+        if (jobsResult.error.message?.toLowerCase().includes('service_fee')) {
+          serviceRevenueFallbackNeeded = true;
+
+          let fallbackQuery = supabase
+            .from('service_job')
+            .select('status, job_id')
+            .is('deleted_at', null);
+
+          if (activeBranchId) {
+            fallbackQuery = fallbackQuery.eq('branch_id', activeBranchId);
+          }
+
+          const fallbackResult = await fallbackQuery;
+
+          if (fallbackResult.error) {
+            console.error('Service jobs fallback summary error:', fallbackResult.error);
+          } else {
+            jobs = (fallbackResult.data ?? []).map((job) => ({
+              ...job,
+              service_fee: null,
+            }));
+          }
+        }
+      }
+
+      const completedRecords = jobs.filter((job) => job?.status === "completed");
+      completedJobs = completedRecords.length;
+
+      if (serviceRevenueFallbackNeeded) {
+        serviceFees = await deriveServiceRevenueFromSales();
+      } else {
+        serviceFees = completedRecords.reduce(
+          (sum, job) => sum + (job.service_fee ?? 0),
+          0
+        );
+      }
 
       // 🔹 CALCULATE METRICS
       const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-      
+
       // CALCULATE GMROI (Gross Margin Return on Inventory)
       const gmroi = stockValue > 0 ? (totalProfit / stockValue) * 100 : 0;
-      
+
       // Mock revenue growth (in real app, compare with previous period)
       const revenueGrowth = 12.5; // Example growth percentage
 
@@ -179,7 +271,7 @@ export default function EnhancedReportsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeBranchId]);
 
   useEffect(() => {
     fetchSummary();
@@ -191,14 +283,14 @@ export default function EnhancedReportsPage() {
 
   // Chart data calculations - UPDATED COLORS
   const revenueSourcesData = [
-    { 
-      name: 'Sales Revenue', 
+    {
+      name: 'Sales Revenue',
       value: Math.max(0, summary.totalRevenue - summary.serviceFees),
       color: '#9333ea', // Purple
       description: 'Revenue from product sales'
     },
-    { 
-      name: 'Service Revenue', 
+    {
+      name: 'Service Revenue',
       value: summary.serviceFees,
       color: '#4f46e5', // Indigo
       description: 'Revenue from service jobs'
@@ -242,29 +334,29 @@ export default function EnhancedReportsPage() {
   ];
 
   const performanceMetricsData = [
-    { 
-      metric: 'Profit Margin', 
-      value: summary.profitMargin, 
-      target: 20, 
-      unit: '%', 
+    {
+      metric: 'Profit Margin',
+      value: summary.profitMargin,
+      target: 20,
+      unit: '%',
       color: '#10b981', // Green
       description: 'Profit as percentage of revenue',
       icon: <Percent className="w-4 h-4" />
     },
-    { 
-      metric: 'GMROI', 
-      value: summary.gmroi, 
-      target: 50, 
-      unit: '%', 
+    {
+      metric: 'GMROI',
+      value: summary.gmroi,
+      target: 50,
+      unit: '%',
       color: '#3b82f6', // Blue
       description: 'Gross Margin Return on Inventory',
       icon: <TrendingUpIcon className="w-4 h-4" />
     },
-    { 
-      metric: 'Service Efficiency', 
-      value: Math.min((summary.completedJobs / 100) * 100, 100), 
-      target: 80, 
-      unit: '%', 
+    {
+      metric: 'Service Efficiency',
+      value: Math.min((summary.completedJobs / 100) * 100, 100),
+      target: 80,
+      unit: '%',
       color: '#8b5cf6', // Violet
       description: 'Job completion rate',
       icon: <CheckCircle className="w-4 h-4" />
@@ -322,75 +414,83 @@ export default function EnhancedReportsPage() {
   const COLORS = ['#9333ea', '#3b82f6', '#10b981', '#8b5cf6'];
 
   return (
-    <div className="min-h-screen bg-white text-slate-800 font-poppins relative overflow-hidden">
-      
-      {/* Background Sections */}
-      <div className="absolute top-0 left-0 w-full h-64 rounded-b-[40px] overflow-hidden">
-        <div
-          className="absolute inset-0 rounded-b-[40px] bg-cover bg-center"
-          style={{
-            backgroundImage: "url('/images/image2.jpg')",
-            backgroundSize: "cover",
-            backgroundPosition: "center 30%"
-          }}
-        ></div>
-        <div className="absolute top-0 left-0 w-32 h-32 bg-purple-300/20 rounded-br-full"></div>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-teal-300/20 rounded-bl-full"></div>
-      </div>
+    <div className="min-h-screen bg-background">
+      <div className="w-full px-3 py-4">
 
-      <div className="absolute top-64 left-0 w-full h-full bg-gradient-to-b from-indigo-50/10 to-white">
-        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-indigo-100/15 to-indigo-50/10"></div>
-      </div>
-
-      <div className="container mx-auto p-6 sm:p-8 lg:p-10 relative z-10">
-
-        {/* Header Section */}
-        <div className={`mb-8 pt-7 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
-          <div className="bg-white/20 backdrop-blur-md rounded-2xl border border-white/30 p-8 flex items-center justify-between shadow-xl relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-black/10 rounded-2xl"></div>
-
-            <div className="relative z-10 flex-1">
-              <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-2xl font-poppins tracking-tight">
-                Reports and Analytics
-              </h1>
-              <div className="flex items-center gap-6 text-white/90">
-                <p className="flex items-center gap-3 drop-shadow-md text-xl font-medium">
-                  <BarChart3 className="w-6 h-6" />
-                  Visual Analytics & Performance Insights
-                </p>
-                <div className="flex items-center gap-4 text-lg">
-                  {lastUpdated && (
-                    <div className="flex items-center gap-2 text-white/90 bg-black/30 px-4 py-2 rounded-full backdrop-blur-sm">
-                      <Clock className="w-5 h-5" />
-                      Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-green-300 bg-green-900/40 px-4 py-2 rounded-full backdrop-blur-sm">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                    Live data
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="relative z-10 flex gap-3">
-              <Button
-                onClick={handleRefresh}
-                disabled={isLoading}
-                className={buttonStyles.glass + " active:scale-95"}
-              >
-                <RefreshCw className={`h-5 w-5 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                Refresh Data
-              </Button>
-              
-            </div>
+        {/* Compact Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-semibold text-foreground">
+              Reports & Analytics
+            </h1>
+            {lastUpdated && (
+              <span className="text-sm text-muted-foreground hidden sm:inline">
+                <Clock className="inline h-3.5 w-3.5 mr-1" />
+                Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Download Reports
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Sales Report</DropdownMenuLabel>
+                <DropdownMenuItem onClick={async () => {
+                  const data = await fetchSalesReport({});
+                  exportSalesReportPDF(data, {});
+                }}>
+                  <Download className="h-4 w-4 mr-2" /> PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={async () => {
+                  const data = await fetchSalesReport({});
+                  exportSalesReportCSV(data);
+                }}>
+                  <Download className="h-4 w-4 mr-2" /> CSV
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Inventory Report</DropdownMenuLabel>
+                <DropdownMenuItem onClick={async () => {
+                  const data = await fetchInventoryReport({});
+                  exportInventoryReportPDF(data, {});
+                }}>
+                  <Download className="h-4 w-4 mr-2" /> PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={async () => {
+                  const data = await fetchInventoryReport({});
+                  exportInventoryReportCSV(data);
+                }}>
+                  <Download className="h-4 w-4 mr-2" /> CSV
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Service Jobs Report</DropdownMenuLabel>
+                <DropdownMenuItem onClick={async () => {
+                  const { jobs } = await fetchServiceJobsReport({});
+                  exportServiceJobsReportPDF(jobs, {});
+                }}>
+                  <Download className="h-4 w-4 mr-2" /> PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={async () => {
+                  const { jobs } = await fetchServiceJobsReport({});
+                  exportServiceJobsReportCSV(jobs);
+                }}>
+                  <Download className="h-4 w-4 mr-2" /> CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button onClick={handleRefresh} disabled={isLoading} variant="outline" size="sm">
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </div>
 
         {/* KPI Cards - Minimal Overview */}
-        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 transition-all duration-700 ${
-          mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
-        }`}>
+        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
+          }`}>
           {kpiCardsData.map((card, index) => (
             <Card key={index} className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300 hover:border-slate-300">
               <CardContent className="p-5">
@@ -398,9 +498,8 @@ export default function EnhancedReportsPage() {
                   <div className={`p-3 rounded-xl ${card.iconBg}`}>
                     {card.icon}
                   </div>
-                  <div className={`flex items-center gap-1 text-sm font-medium px-2.5 py-1 rounded-full ${
-                    card.trend === 'up' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                  }`}>
+                  <div className={`flex items-center gap-1 text-sm font-medium px-2.5 py-1 rounded-full ${card.trend === 'up' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    }`}>
                     {card.trend === 'up' ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
                     {card.change}%
                   </div>
@@ -417,9 +516,8 @@ export default function EnhancedReportsPage() {
         <div className="space-y-8">
 
           {/* Revenue Analysis Row */}
-          <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 transition-all duration-700 ${
-            mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
-          }`}>
+          <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
+            }`}>
             {/* Revenue Sources Pie Chart */}
             <Card className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
               <CardContent className="p-6">
@@ -434,7 +532,7 @@ export default function EnhancedReportsPage() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="h-64 mb-6">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -446,19 +544,19 @@ export default function EnhancedReportsPage() {
                         outerRadius={90}
                         paddingAngle={2}
                         dataKey="value"
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                        label={({ name, percent }: PieLabelData) => `${name}: ${((percent || 0) * 100).toFixed(1)}%`}
                         animationDuration={800}
                       >
                         {revenueSourcesData.map((entry, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
+                          <Cell
+                            key={`cell-${index}`}
                             fill={COLORS[index % COLORS.length]}
                             stroke="white"
                             strokeWidth={2}
                           />
                         ))}
                       </Pie>
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value, name, props) => {
                           const { payload } = props;
                           return [
@@ -476,7 +574,7 @@ export default function EnhancedReportsPage() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                
+
                 <div className="space-y-3">
                   {revenueSourcesData.map((source, index) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
@@ -513,7 +611,7 @@ export default function EnhancedReportsPage() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="h-64 mb-6">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
@@ -521,18 +619,18 @@ export default function EnhancedReportsPage() {
                       margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis 
-                        dataKey="month" 
+                      <XAxis
+                        dataKey="month"
                         tick={{ fill: '#64748b', fontSize: 12 }}
                       />
-                      <YAxis 
+                      <YAxis
                         tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
                         tick={{ fill: '#64748b', fontSize: 12 }}
                       />
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value, name) => {
-                          const label = name === 'revenue' ? 'Revenue' : 
-                                       name === 'profit' ? 'Profit' : 'Target';
+                          const label = name === 'revenue' ? 'Revenue' :
+                            name === 'profit' ? 'Profit' : 'Target';
                           return [`₱${Number(value).toLocaleString()}`, label];
                         }}
                         contentStyle={{
@@ -542,27 +640,27 @@ export default function EnhancedReportsPage() {
                           fontFamily: "'Poppins', sans-serif",
                         }}
                       />
-                      <Area 
-                        type="monotone" 
-                        dataKey="revenue" 
+                      <Area
+                        type="monotone"
+                        dataKey="revenue"
                         name="Revenue"
-                        stroke="#9333ea" 
-                        fill="url(#colorRevenue)" 
+                        stroke="#9333ea"
+                        fill="url(#colorRevenue)"
                         fillOpacity={0.3}
                         strokeWidth={2}
                       />
-                      <Area 
-                        type="monotone" 
-                        dataKey="profit" 
+                      <Area
+                        type="monotone"
+                        dataKey="profit"
                         name="Profit"
-                        stroke="#10b981" 
-                        fill="url(#colorProfit)" 
+                        stroke="#10b981"
+                        fill="url(#colorProfit)"
                         fillOpacity={0.3}
                         strokeWidth={2}
                       />
-                      <Line 
-                        type="monotone" 
-                        dataKey="target" 
+                      <Line
+                        type="monotone"
+                        dataKey="target"
                         name="Target"
                         stroke="#8b5cf6" // Changed from yellow to violet
                         strokeWidth={2}
@@ -571,18 +669,18 @@ export default function EnhancedReportsPage() {
                       />
                       <defs>
                         <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#9333ea" stopOpacity={0.4}/>
-                          <stop offset="95%" stopColor="#9333ea" stopOpacity={0}/>
+                          <stop offset="5%" stopColor="#9333ea" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#9333ea" stopOpacity={0} />
                         </linearGradient>
                         <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
-                
+
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-4">
                     <div className="text-center p-3 bg-purple-50 rounded-lg">
@@ -605,8 +703,8 @@ export default function EnhancedReportsPage() {
                     </div>
                   </div>
                   <div className="text-xs text-slate-500">
-                    <span className="font-medium">Insight:</span> {summary.profitMargin >= 15 
-                      ? "Strong profit margins with consistent growth" 
+                    <span className="font-medium">Insight:</span> {summary.profitMargin >= 15
+                      ? "Strong profit margins with consistent growth"
                       : "Focus on improving profit margins through cost optimization"}
                   </div>
                 </div>
@@ -615,9 +713,8 @@ export default function EnhancedReportsPage() {
           </div>
 
           {/* Inventory & Performance Row */}
-          <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 transition-all duration-700 ${
-            mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5 delay-200'
-          }`}>
+          <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5 delay-200'
+            }`}>
             {/* Inventory Analysis */}
             <Card className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
               <CardContent className="p-6">
@@ -632,7 +729,7 @@ export default function EnhancedReportsPage() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="h-64 mb-6">
                   <ResponsiveContainer width="100%" height="100%">
                     <RechartsBarChart
@@ -640,15 +737,15 @@ export default function EnhancedReportsPage() {
                       margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis 
-                        dataKey="name" 
+                      <XAxis
+                        dataKey="name"
                         tick={{ fill: '#64748b', fontSize: 12 }}
                       />
-                      <YAxis 
+                      <YAxis
                         tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
                         tick={{ fill: '#64748b', fontSize: 12 }}
                       />
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value, name, props) => {
                           const { payload } = props;
                           return [
@@ -663,8 +760,8 @@ export default function EnhancedReportsPage() {
                           fontFamily: "'Poppins', sans-serif",
                         }}
                       />
-                      <Bar 
-                        dataKey="value" 
+                      <Bar
+                        dataKey="value"
                         radius={[6, 6, 0, 0]}
                         animationDuration={1000}
                       >
@@ -675,7 +772,7 @@ export default function EnhancedReportsPage() {
                     </RechartsBarChart>
                   </ResponsiveContainer>
                 </div>
-                
+
                 <div className="space-y-4">
                   {/* 1. Inventory Efficiency Bar */}
                   <div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl">
@@ -686,7 +783,7 @@ export default function EnhancedReportsPage() {
                       </div>
                       <div className="text-right">
                         <span className="text-xl font-bold text-slate-900">
-                          {summary.potentialRevenue > 0 
+                          {summary.potentialRevenue > 0
                             ? ((summary.totalRevenue - summary.serviceFees) / summary.potentialRevenue * 100).toFixed(1)
                             : '0'}%
                         </span>
@@ -694,15 +791,15 @@ export default function EnhancedReportsPage() {
                       </div>
                     </div>
                     <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full" // Changed from orange to blue
-                        style={{ 
+                        style={{
                           width: `${Math.min(
-                            summary.potentialRevenue > 0 
+                            summary.potentialRevenue > 0
                               ? ((summary.totalRevenue - summary.serviceFees) / summary.potentialRevenue * 100)
-                              : 0, 
+                              : 0,
                             100
-                          )}%` 
+                          )}%`
                         }}
                       />
                     </div>
@@ -717,7 +814,7 @@ export default function EnhancedReportsPage() {
                       </div>
                       <div className="text-right">
                         <span className="text-xl font-bold text-slate-900">
-                          {summary.potentialRevenue > 0 
+                          {summary.potentialRevenue > 0
                             ? (((summary.potentialRevenue - summary.stockValue) / summary.potentialRevenue) * 100).toFixed(1)
                             : '0'}%
                         </span>
@@ -725,15 +822,15 @@ export default function EnhancedReportsPage() {
                       </div>
                     </div>
                     <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full"
-                        style={{ 
+                        style={{
                           width: `${Math.min(
-                            summary.potentialRevenue > 0 
+                            summary.potentialRevenue > 0
                               ? (((summary.potentialRevenue - summary.stockValue) / summary.potentialRevenue) * 100)
-                              : 0, 
+                              : 0,
                             100
-                          )}%` 
+                          )}%`
                         }}
                       />
                     </div>
@@ -748,7 +845,7 @@ export default function EnhancedReportsPage() {
                       </div>
                       <div className="text-right">
                         <span className="text-xl font-bold text-slate-900">
-                          {summary.potentialRevenue > 0 
+                          {summary.potentialRevenue > 0
                             ? ((summary.stockValue / summary.potentialRevenue) * 100).toFixed(1)
                             : '0'}%
                         </span>
@@ -756,15 +853,15 @@ export default function EnhancedReportsPage() {
                       </div>
                     </div>
                     <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full"
-                        style={{ 
+                        style={{
                           width: `${Math.min(
-                            summary.potentialRevenue > 0 
+                            summary.potentialRevenue > 0
                               ? ((summary.stockValue / summary.potentialRevenue) * 100)
-                              : 0, 
+                              : 0,
                             100
-                          )}%` 
+                          )}%`
                         }}
                       />
                     </div>
@@ -791,33 +888,33 @@ export default function EnhancedReportsPage() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="h-64 mb-6">
                   <ResponsiveContainer width="100%" height="100%">
-                    <RadialBarChart 
-                      innerRadius="25%" 
-                      outerRadius="95%" 
+                    <RadialBarChart
+                      innerRadius="25%"
+                      outerRadius="95%"
                       data={performanceMetricsData}
                       startAngle={180}
                       endAngle={0}
                       barSize={24}
                     >
-                      <RadialBar 
-                        minAngle={15} 
+                      <RadialBar
+
                         background={{ fill: '#f8fafc', fillOpacity: 0.8 }}
-                        dataKey="value" 
+                        dataKey="value"
                         cornerRadius={8}
                         label={false}
                       >
                         {performanceMetricsData.map((entry, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
+                          <Cell
+                            key={`cell-${index}`}
                             fill={entry.color}
                             fillOpacity={0.8}
                           />
                         ))}
                       </RadialBar>
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value, name, props) => {
                           const { payload } = props;
                           return [
@@ -835,7 +932,7 @@ export default function EnhancedReportsPage() {
                     </RadialBarChart>
                   </ResponsiveContainer>
                 </div>
-                
+
                 <div className="space-y-4">
                   {performanceMetricsData.map((metric, index) => (
                     <div key={index} className="p-3 bg-gradient-to-r from-slate-50 to-slate-100 rounded-lg">
@@ -857,9 +954,9 @@ export default function EnhancedReportsPage() {
                         </div>
                       </div>
                       <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className="h-full rounded-full transition-all duration-700"
-                          style={{ 
+                          style={{
                             width: `${Math.min((metric.value / metric.target) * 100, 100)}%`,
                             backgroundColor: metric.color
                           }}
@@ -879,9 +976,8 @@ export default function EnhancedReportsPage() {
           </div>
 
           {/* Service Performance */}
-          <div className={`transition-all duration-700 ${
-            mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5 delay-300'
-          }`}>
+          <div className={`transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5 delay-300'
+            }`}>
             <Card className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-start gap-3 mb-6">
@@ -895,7 +991,7 @@ export default function EnhancedReportsPage() {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="p-5 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl hover:shadow-md transition-all duration-300">
                     <div className="flex items-center gap-4 mb-4">
@@ -909,13 +1005,13 @@ export default function EnhancedReportsPage() {
                     </div>
                     <p className="text-xs text-slate-500 mb-3">Total service jobs successfully completed</p>
                     <div className="h-2 bg-emerald-100 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-gradient-to-r from-emerald-400 to-green-500 rounded-full transition-all duration-700"
                         style={{ width: `${Math.min((summary.completedJobs / 100) * 100, 100)}%` }}
                       />
                     </div>
                   </div>
-                  
+
                   <div className="p-5 bg-gradient-to-r from-blue-50 to-sky-50 rounded-xl hover:shadow-md transition-all duration-300">
                     <div className="flex items-center gap-4 mb-4">
                       <div className="p-3 bg-gradient-to-r from-blue-500 to-sky-600 rounded-xl">
@@ -930,20 +1026,20 @@ export default function EnhancedReportsPage() {
                     </div>
                     <p className="text-xs text-slate-500 mb-3">Total income generated from service operations</p>
                     <div className="h-2 bg-blue-100 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-gradient-to-r from-blue-400 to-sky-500 rounded-full transition-all duration-700"
-                        style={{ 
+                        style={{
                           width: `${Math.min(
-                            summary.totalRevenue > 0 
-                              ? (summary.serviceFees / summary.totalRevenue * 100) 
-                              : 0, 
+                            summary.totalRevenue > 0
+                              ? (summary.serviceFees / summary.totalRevenue * 100)
+                              : 0,
                             100
-                          )}%` 
+                          )}%`
                         }}
                       />
                     </div>
                   </div>
-                  
+
                   <div className="p-5 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl hover:shadow-md transition-all duration-300">
                     <div className="flex items-center gap-4 mb-4">
                       <div className="p-3 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl">
@@ -952,23 +1048,23 @@ export default function EnhancedReportsPage() {
                       <div>
                         <p className="text-sm font-medium text-slate-700">Service Contribution</p>
                         <p className="text-2xl font-bold text-slate-900">
-                          {summary.totalRevenue > 0 
-                            ? ((summary.serviceFees / summary.totalRevenue) * 100).toFixed(1) 
+                          {summary.totalRevenue > 0
+                            ? ((summary.serviceFees / summary.totalRevenue) * 100).toFixed(1)
                             : '0'}%
                         </p>
                       </div>
                     </div>
                     <p className="text-xs text-slate-500 mb-3">Percentage of total revenue from services</p>
                     <div className="h-2 bg-purple-100 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-gradient-to-r from-purple-400 to-indigo-500 rounded-full transition-all duration-700"
-                        style={{ 
+                        style={{
                           width: `${Math.min(
-                            summary.totalRevenue > 0 
-                              ? (summary.serviceFees / summary.totalRevenue * 100) 
-                              : 0, 
+                            summary.totalRevenue > 0
+                              ? (summary.serviceFees / summary.totalRevenue * 100)
+                              : 0,
                             100
-                          )}%` 
+                          )}%`
                         }}
                       />
                     </div>
@@ -981,10 +1077,10 @@ export default function EnhancedReportsPage() {
                     <span className="text-sm font-medium text-slate-800">Service Department Insights</span>
                   </div>
                   <p className="text-xs text-slate-600">
-                    {summary.serviceFees > summary.totalRevenue * 0.3 
-                      ? "Services are a significant revenue driver. Consider expanding service offerings." 
+                    {summary.serviceFees > summary.totalRevenue * 0.3
+                      ? "Services are a significant revenue driver. Consider expanding service offerings."
                       : "Services have growth potential. Focus on upselling and marketing service packages."}
-                    {" "}Average revenue per job: ₱{summary.completedJobs > 0 
+                    {" "}Average revenue per job: ₱{summary.completedJobs > 0
                       ? (summary.serviceFees / summary.completedJobs).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                       : '0'}.
                   </p>
@@ -994,14 +1090,7 @@ export default function EnhancedReportsPage() {
           </div>
         </div>
 
-        {/* REPORT CARDS */}
-        <div className={`mt-12 space-y-8 transition-all duration-700 ${
-          mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5 delay-400'
-        }`}>
-          <SalesReportCard />
-          <InventoryReportCard />
-          <ServiceReportCard />
-        </div>
+        {/* Report downloads available in header dropdown */}
       </div>
 
       <style jsx global>{`

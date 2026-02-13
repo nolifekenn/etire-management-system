@@ -3,12 +3,14 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
+import { UserRole } from "@/lib/types";
 
 interface ExtendedUser {
   user_id: string;
   name: string;
   username: string;
-  role: number;
+  role: UserRole;
+  branch_id?: string;
 }
 
 interface AuthContextType {
@@ -16,6 +18,8 @@ interface AuthContextType {
   isLoading: boolean;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
+  activeBranchId: string | null;
+  setActiveBranchId: (id: string | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -23,13 +27,27 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   login: async () => false,
   logout: () => { },
+  activeBranchId: null,
+  setActiveBranchId: () => { },
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<ExtendedUser | null>(null);
+  const [activeBranchId, setActiveBranchIdState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const setActiveBranchId = (id: string | null) => {
+    setActiveBranchIdState(id);
+    if (user?.role === 'super_admin') {
+      if (id) {
+        localStorage.setItem('etire_active_branch', id);
+      } else {
+        localStorage.removeItem('etire_active_branch');
+      }
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -51,88 +69,107 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     }, 10000);
 
-    // Fetch user profile with timeout
+    // Fetch user profile with timeout and retry
     const fetchUserProfile = async (authUserId: string): Promise<ExtendedUser | null> => {
       console.log("[useAuth] fetchUserProfile called with authUserId:", authUserId);
 
       // Small delay to let session fully sync
-      await new Promise(resolve => setTimeout(resolve, 300));
-      console.log("[useAuth] Delay complete, now querying...");
+      await new Promise(resolve => setTimeout(resolve, 200));
 
-      // Timeout promise
-      const timeout = new Promise<null>((resolve) => {
-        setTimeout(() => {
-          console.error("[useAuth] Profile query timed out after 8 seconds");
-          resolve(null);
-        }, 8000);
-      });
+      const fetchWithTimeout = async (attempt: number): Promise<ExtendedUser | null> => {
+        const timeoutMs = attempt === 1 ? 5000 : 3000; // Shorter timeout on retry
 
-      // Query promise
-      const query = (async (): Promise<ExtendedUser | null> => {
-        try {
-          console.log("[useAuth] Querying user table...");
-          const { data: profile, error } = await supabase
-            .from("user")
-            .select("user_id, name, username, role")
-            .eq("uuid", authUserId)
-            .maybeSingle();
+        const timeout = new Promise<null>((resolve) => {
+          setTimeout(() => {
+            console.warn(`[useAuth] Profile query attempt ${attempt} timed out after ${timeoutMs}ms`);
+            resolve(null);
+          }, timeoutMs);
+        });
 
-          console.log("[useAuth] Query result - profile:", profile, "error:", error);
+        const query = (async (): Promise<ExtendedUser | null> => {
+          try {
+            console.log(`[useAuth] Attempt ${attempt}: Querying user table...`);
 
-          if (profile && !error) {
-            console.log("[useAuth] Profile found:", (profile as any).username);
-            return profile as ExtendedUser;
-          } else if (error) {
-            console.error("[useAuth] Failed to fetch user profile. Error:", JSON.stringify(error));
-            return null;
-          } else {
-            console.warn("[useAuth] No profile found for uuid:", authUserId);
+            // First try with deleted_at filter
+            let result = await supabase
+              .from("user")
+              .select("user_id, name, username, role, branch_id")
+              .eq("auth_id", authUserId)
+              .is("deleted_at", null)
+              .maybeSingle();
+
+            // If no result, try without deleted_at filter as fallback
+            if (!result.data && !result.error) {
+              console.log("[useAuth] No result with deleted_at filter, trying without...");
+              result = await supabase
+                .from("user")
+                .select("user_id, name, username, role, branch_id")
+                .eq("auth_id", authUserId)
+                .maybeSingle();
+            }
+
+            if (result.data && !result.error) {
+              console.log("[useAuth] Profile found:", result.data.username);
+              return result.data as ExtendedUser;
+            } else if (result.error) {
+              console.error("[useAuth] Profile query error:", result.error.message);
+              return null;
+            } else {
+              console.warn("[useAuth] No profile found for auth_id:", authUserId);
+              return null;
+            }
+          } catch (err) {
+            console.error("[useAuth] Exception fetching user profile:", err);
             return null;
           }
-        } catch (err) {
-          console.error("[useAuth] Exception fetching user profile:", err);
-          return null;
-        }
-      })();
+        })();
 
-      return Promise.race([query, timeout]);
+        return Promise.race([query, timeout]);
+      };
+
+      // Try up to 2 times
+      let profile = await fetchWithTimeout(1);
+      if (!profile) {
+        console.log("[useAuth] Retrying profile fetch...");
+        profile = await fetchWithTimeout(2);
+      }
+
+      return profile;
     };
 
     const initializeAuth = async () => {
-      console.log("[useAuth] initializeAuth started");
       try {
-        // Get session - this is the primary source of truth
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-        if (sessionError) {
-          console.error("[useAuth] getSession error:", sessionError);
-        }
+        if (sessionError) console.error("[useAuth] getSession error:", sessionError);
 
         if (session?.user) {
-          console.log("[useAuth] Session found, validating with server...");
-
-          // Validate session is still valid on server
           const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
 
           if (userError || !authUser) {
-            console.log("[useAuth] Session invalid on server:", userError?.message);
             await supabase.auth.signOut();
             if (mounted) {
               setUser(null);
               setIsLoading(false);
               hasInitialized = true;
-              if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
             }
             return;
           }
 
-          // Session is valid, fetch user profile
           const profile = await fetchUserProfile(authUser.id);
           if (mounted) {
             if (profile) {
               setUser(profile);
+
+              // Initialize active branch
+              if (profile.role === 'super_admin') {
+                const savedBranch = localStorage.getItem('etire_active_branch');
+                setActiveBranchIdState(savedBranch || profile.branch_id || null);
+              } else {
+                setActiveBranchIdState(profile.branch_id || null);
+              }
+
             } else {
-              console.warn("[useAuth] No user profile found. Logging out.");
               await supabase.auth.signOut();
               setUser(null);
               router.push("/login?error=missing_profile");
@@ -142,8 +179,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
           }
         } else {
-          // No session found - user is not logged in
-          console.log("[useAuth] No session found");
           if (mounted) {
             setUser(null);
             setIsLoading(false);
@@ -156,8 +191,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (mounted) {
           setUser(null);
           setIsLoading(false);
-          hasInitialized = true;
-          if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
         }
       }
     };
@@ -165,19 +198,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     initializeAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("[useAuth] Auth State Change:", event, session?.user?.email);
-
-      // Clear safety timeout when we get any auth state change
       if (safetyTimeoutRef.current) {
         clearTimeout(safetyTimeoutRef.current);
         safetyTimeoutRef.current = null;
       }
 
-      // Handle sign out
       if (event === 'SIGNED_OUT') {
         if (mounted) {
-          console.log("[useAuth] Handling SIGNED_OUT");
           setUser(null);
+          setActiveBranchIdState(null);
+          localStorage.removeItem('etire_active_branch');
           setIsLoading(false);
           hasInitialized = true;
           router.push("/login");
@@ -185,39 +215,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      // For INITIAL_SESSION, skip if we've already initialized via getSession
-      if (event === 'INITIAL_SESSION' && hasInitialized) {
-        console.log("[useAuth] Skipping INITIAL_SESSION - already initialized via getSession");
-        return;
-      }
+      if (event === 'INITIAL_SESSION' && hasInitialized) return;
 
-      // Handle session events (SIGNED_IN, TOKEN_REFRESHED, INITIAL_SESSION)
       if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') && session?.user && mounted) {
-        console.log(`[useAuth] Handling ${event} - fetching profile`);
-
         const profile = await fetchUserProfile(session.user.id);
-        console.log(`[useAuth] After fetchUserProfile - got profile:`, !!profile, "mounted:", mounted);
-
         if (mounted) {
           if (profile) {
-            console.log("[useAuth] Setting user to profile");
             setUser(profile);
-          } else {
-            console.log("[useAuth] No profile found, user will be null");
+            // Re-sync active branch on refresh/signin
+            if (profile.role === 'super_admin') {
+              const savedBranch = localStorage.getItem('etire_active_branch');
+              setActiveBranchIdState(savedBranch || profile.branch_id || null);
+            } else {
+              setActiveBranchIdState(profile.branch_id || null);
+            }
           }
-          console.log("[useAuth] Setting isLoading to false");
           setIsLoading(false);
           hasInitialized = true;
-        } else {
-          console.log("[useAuth] Component unmounted, not updating state");
         }
         return;
       }
 
-      // Handle other events or no session
       if (!session?.user && mounted) {
-        console.log("[useAuth] AuthStateChange: No user in session");
         setUser(null);
+        setActiveBranchIdState(null);
         setIsLoading(false);
         hasInitialized = true;
       }
@@ -225,54 +246,61 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     return () => {
       mounted = false;
-      if (safetyTimeoutRef.current) {
-        clearTimeout(safetyTimeoutRef.current);
-      }
+      if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
       subscription.unsubscribe();
     };
   }, [router]);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
-    console.log("useAuth: login called");
+  // ... login and logout (modified to clear local storage on logout) ...
 
-    if (!supabase) {
-      console.error("[useAuth] Login failed: Supabase client not available");
-      return false;
-    }
+  const login = async (username: string, password: string): Promise<boolean> => {
+    if (!supabase) return false;
 
     try {
-      const email = `${username}@etire-system.local`;
-
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const response = await fetch("/api/auth/verify-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
       });
 
-      if (error) {
-        console.error("Login Error:", error.message);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        console.error("[useAuth] Credential verification failed:", payload?.message ?? response.statusText);
         return false;
       }
 
-      console.log("Login successful");
+      const payload = await response.json().catch(() => null);
+      const email = payload?.email as string | undefined;
+
+      if (!email) {
+        console.error("[useAuth] Credential verification response missing email.");
+        return false;
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        console.error("[useAuth] Supabase sign-in failed:", error.message);
+        return false;
+      }
       return true;
     } catch (err) {
-      console.error("Login Exception:", err);
+      console.error("[useAuth] Unexpected login error:", err);
       return false;
     }
   };
 
   const logout = async () => {
     if (!supabase) {
-      console.error("[useAuth] Logout failed: Supabase client not available");
       setUser(null);
+      setActiveBranchIdState(null);
       setIsLoading(false);
       router.push("/login");
       return;
     }
-
     setIsLoading(true);
     try {
       await supabase.auth.signOut();
+      localStorage.removeItem('etire_active_branch'); // Clear specific branch pref
     } catch (error) {
       console.error("Logout Error:", error);
       setIsLoading(false);
@@ -280,7 +308,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, activeBranchId, setActiveBranchId }}>
       {children}
     </AuthContext.Provider>
   );

@@ -11,6 +11,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Loader2, Menu, X } from 'lucide-react';
 import { Toaster } from '@/components/ui/toaster';
 import { useNotificationListener } from '@/hooks/useNotificationListener';
+import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary';
 import './globals.css';
 import { logout } from "@/lib/logout";
 
@@ -81,15 +82,8 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     }
 
     if (user) {
-      // Handle role-based redirects
-      if (user.role === 0 && pathname !== '/guest-access') {
-        // Guest users should only see the guest access page
-        router.push('/guest-access');
-        return;
-      }
-
-      if (user.role !== 0 && pathname === '/guest-access') {
-        // Non-guest users shouldn't see guest access page
+      // If on login page, redirect to dashboard
+      if (pathname === '/login') {
         router.push('/dashboard');
         return;
       }
@@ -216,12 +210,14 @@ export default function AppLayout({
   return (
     <html lang="en">
       <body suppressHydrationWarning={true}>
-        <AuthProvider>
-          <AuthWrapper>
-            {children}
-          </AuthWrapper>
-          <Toaster />
-        </AuthProvider>
+        <GlobalErrorBoundary>
+          <AuthProvider>
+            <AuthWrapper>
+              {children}
+            </AuthWrapper>
+            <Toaster />
+          </AuthProvider>
+        </GlobalErrorBoundary>
       </body>
     </html>
   );

@@ -4,7 +4,7 @@ import { Notification } from './types';
 /**
  * Notification Service
  * Comprehensive notification system using custom authentication (public.user table)
- * Role-based distribution: Staff (1), Manager (2), Admin (3)
+ * Role-based distribution: staff, branch_manager, super_admin
  */
 
 // ============================
@@ -124,7 +124,7 @@ export async function notifyLowStock(itemId: string): Promise<void> {
             const { data: users, error: usersError } = await (supabase
                 .from('user') as any)
                 .select('user_id')
-                .in('role', [1, 2, 3]);
+                .in('role', ['staff', 'branch_manager', 'super_admin']);
 
             if (usersError || !users || users.length === 0) {
                 console.error('Error fetching users for low stock notification:', usersError);
@@ -172,7 +172,7 @@ export async function notifyStockReplenishment(itemId: string, previousQuantity:
             const { data: users, error: usersError } = await (supabase
                 .from('user') as any)
                 .select('user_id')
-                .in('role', [1, 2, 3]);
+                .in('role', ['staff', 'branch_manager', 'super_admin']);
 
             if (usersError || !users || users.length === 0) {
                 console.error('Error fetching users for replenishment notification:', usersError);
@@ -210,7 +210,7 @@ export async function notifyNewSale(saleId: string, totalAmount: number, creator
         const { data: users, error: usersError } = await (supabase
             .from('user') as any)
             .select('user_id')
-            .in('role', [1, 2, 3]);
+            .in('role', ['staff', 'branch_manager', 'super_admin']);
 
         if (usersError || !users || users.length === 0) {
             console.error('Error fetching users for sale notification:', usersError);
@@ -257,7 +257,7 @@ export async function notifyDailySalesHigh(): Promise<void> {
             const { data: admins, error: adminsError } = await (supabase
                 .from('user') as any)
                 .select('user_id')
-                .eq('role', 3);
+                .eq('role', 'super_admin');
 
             if (adminsError || !admins || admins.length === 0) {
                 console.error('Error fetching admins for sales high notification:', adminsError);
@@ -357,7 +357,7 @@ export async function notifyNewServiceJob(jobId: string, customerId?: string): P
         // Get job details
         const { data: job, error: jobError } = await (supabase
             .from('service_job') as any)
-            .select('job_id, job_description, service_fee, user_id')
+            .select('job_id, job_description, user_id')
             .eq('job_id', jobId)
             .single();
 
@@ -384,7 +384,7 @@ export async function notifyNewServiceJob(jobId: string, customerId?: string): P
         const { data: users, error: usersError } = await (supabase
             .from('user') as any)
             .select('user_id')
-            .in('role', [1, 2, 3]);
+            .in('role', ['staff', 'branch_manager', 'super_admin']);
 
         if (usersError || !users || users.length === 0) {
             console.log('No users to notify for new service job');
@@ -453,7 +453,7 @@ export async function notifyPODeadlineApproaching(poId: string): Promise<void> {
             const { data: users, error: usersError } = await (supabase
                 .from('user') as any)
                 .select('user_id')
-                .in('role', [1, 2, 3]);
+                .in('role', ['staff', 'branch_manager', 'super_admin']);
 
             if (usersError || !users || users.length === 0) {
                 console.error('Error fetching users for PO deadline notification:', usersError);
@@ -520,7 +520,7 @@ export async function notifyPOOverdue(poId: string): Promise<void> {
                 const { data: users, error: usersError } = await (supabase
                     .from('user') as any)
                     .select('user_id')
-                    .in('role', [1, 2, 3]);
+                    .in('role', ['staff', 'branch_manager', 'super_admin']);
 
                 if (usersError || !users || users.length === 0) {
                     console.error('Error fetching users for PO overdue notification:', usersError);
@@ -601,7 +601,7 @@ export async function notifyNewCustomer(customerId: string): Promise<void> {
         const { data: users, error: usersError } = await (supabase
             .from('user') as any)
             .select('user_id')
-            .in('role', [1, 2, 3]);
+            .in('role', ['staff', 'branch_manager', 'super_admin']);
 
         if (usersError || !users || users.length === 0) {
             console.error('Error fetching users for new customer notification:', usersError);
@@ -639,7 +639,7 @@ export async function notifyNewUserRegistration(newUserId: string, newUserName: 
         const { data: admins, error: adminsError } = await (supabase
             .from('user') as any)
             .select('user_id')
-            .eq('role', 3);
+            .eq('role', 'super_admin');
 
         if (adminsError || !admins || admins.length === 0) {
             console.error('Error fetching admins for user registration notification:', adminsError);
@@ -676,7 +676,7 @@ export async function notifyWeeklyBackup(): Promise<void> {
         const { data: admins, error: adminsError } = await (supabase
             .from('user') as any)
             .select('user_id')
-            .eq('role', 3);
+            .eq('role', 'super_admin');
 
         if (adminsError || !admins || admins.length === 0) {
             console.error('Error fetching admins for backup reminder:', adminsError);
@@ -737,14 +737,18 @@ export async function markAllNotificationsAsRead(userId: string): Promise<{ erro
 /**
  * Delete a notification
  */
+/**
+ * Soft delete a notification by setting deleted_at timestamp
+ */
 export async function deleteNotification(notificationId: string): Promise<{ error: any }> {
     if (!supabase) {
         return { error: 'Supabase client not initialized' };
     }
 
+    // Soft delete: set deleted_at timestamp instead of removing the record
     const { error } = await supabase
         .from('notification')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq('notification_id', notificationId);
 
     return { error };

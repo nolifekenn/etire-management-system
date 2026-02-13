@@ -3,9 +3,9 @@
 
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom"; // <--- ADDED THIS IMPORT
-import { 
-  FileText, 
-  Sparkles, 
+import {
+  FileText,
+  Sparkles,
   Download,
   Filter,
   BarChart3,
@@ -40,11 +40,58 @@ const poppins = {
   className: "font-poppins"
 };
 
+interface SalesFilters {
+  date_from: string;
+  date_to: string;
+  branch_id: string;
+  vehicle_type_id: string;
+}
+
+interface BranchOption {
+  branch_id: string;
+  name: string;
+}
+
+interface VehicleTypeOption {
+  vehicle_type_id: string;
+  name: string;
+}
+
+interface SaleItemDetail {
+  inventory_item?: { name?: string };
+  quantity?: number;
+  price_at_sale?: number;
+  line_total?: number;
+  profit?: number;
+}
+
+interface SalesReportItem {
+  sale_id?: string;
+  sale_date?: string;
+  customer?: { name?: string };
+  sale_item?: SaleItemDetail[];
+  total_amount?: number;
+  branch?: { name?: string };
+  vehicle_type?: { name?: string };
+}
+
+interface SalesReportRow {
+  sale_date: string;
+  customer: string;
+  item: string;
+  quantity: number;
+  price: number;
+  line_total: number;
+  profit: number;
+  branch: string;
+  vehicle_type: string;
+}
+
 export default function SalesReportCard() {
   const { toast } = useToast();
-  
+
   // --- STATE MANAGEMENT ---
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<SalesFilters>({
     date_from: "",
     date_to: "",
     branch_id: "all",
@@ -52,18 +99,18 @@ export default function SalesReportCard() {
   });
 
   const [loading, setLoading] = useState(false);
-  const [reportData, setReportData] = useState<any[]>([]);
-  const [branches, setBranches] = useState<any[]>([]);
-  const [vehicleTypes, setVehicleTypes] = useState<any[]>([]);
+  const [reportData, setReportData] = useState<SalesReportItem[]>([]);
+  const [branches, setBranches] = useState<BranchOption[]>([]);
+  const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeOption[]>([]);
   const [showFilters, setShowFilters] = useState(true);
-  
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
 
   // Filter state
-  const [localFilters, setLocalFilters] = useState(filters);
+  const [localFilters, setLocalFilters] = useState<SalesFilters>(filters);
 
   // Modal State
   const [modalState, setModalState] = useState<{
@@ -86,26 +133,26 @@ export default function SalesReportCard() {
         .from("branch")
         .select("branch_id, name")
         .eq("is_active", true);
-      if (branchData) setBranches(branchData);
+      if (branchData) setBranches(branchData as BranchOption[]);
 
       const { data: vehicleTypeData } = await supabase
         .from("vehicle_type")
         .select("vehicle_type_id, name");
-      if (vehicleTypeData) setVehicleTypes(vehicleTypeData);
+      if (vehicleTypeData) setVehicleTypes(vehicleTypeData as VehicleTypeOption[]);
     };
     fetchDropdowns();
   }, []);
 
   // --- DATA PROCESSING ---
-  const flattenedData = reportData.flatMap((sale) =>
-    sale.sale_item?.map((item: any) => ({
+  const flattenedData: SalesReportRow[] = reportData.flatMap((sale) =>
+    sale.sale_item?.map((item: SaleItemDetail) => ({
       sale_date: sale.sale_date?.substring(0, 10) || "—",
       customer: sale.customer?.name || "—",
       item: item.inventory_item?.name || "—",
-      quantity: item.quantity || 0,
-      price: item.price_at_sale || 0,
-      line_total: item.line_total || 0,
-      profit: item.profit || 0,
+      quantity: item.quantity ?? 0,
+      price: item.price_at_sale ?? 0,
+      line_total: item.line_total ?? 0,
+      profit: item.profit ?? 0,
       branch: sale.branch?.name || "—",
       vehicle_type: sale.vehicle_type?.name || "—",
     })) || []
@@ -119,7 +166,7 @@ export default function SalesReportCard() {
   useEffect(() => {
     const pages = Math.ceil(totalRows / rowsPerPage);
     setTotalPages(pages || 1);
-    
+
     if (currentPage > pages && pages > 0) {
       setCurrentPage(pages);
     }
@@ -129,9 +176,9 @@ export default function SalesReportCard() {
   const handleFetch = async () => {
     try {
       setLoading(true);
-      setCurrentPage(1); 
-      
-      const apiFilters = {
+      setCurrentPage(1);
+
+      const apiFilters: SalesFilters = {
         ...localFilters,
         branch_id: localFilters.branch_id === "all" ? "" : localFilters.branch_id,
         vehicle_type_id: localFilters.vehicle_type_id === "all" ? "" : localFilters.vehicle_type_id,
@@ -150,7 +197,7 @@ export default function SalesReportCard() {
         return;
       }
 
-      setReportData(res.sales);
+      setReportData((res.sales || []) as SalesReportItem[]);
 
       // UX: Just show toast for data load, no modal
       toast({
@@ -179,7 +226,7 @@ export default function SalesReportCard() {
 
     const formattedRows = formatSalesReportData(reportData);
     exportSalesReportPDF(formattedRows, localFilters);
-    
+
     // Trigger Success Modal
     setModalState({ isOpen: true, type: "pdf" });
   };
@@ -219,10 +266,10 @@ export default function SalesReportCard() {
 
   // Calculate stats
   const totalRevenue = reportData.reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
-  const totalProfit = reportData.flatMap((sale) => sale.sale_item || [])
-    .reduce((sum: number, item: any) => sum + (item.profit || 0), 0);
-  const itemsSold = reportData.flatMap((sale) => sale.sale_item || [])
-    .reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
+  const totalProfit = reportData.flatMap((sale) => sale.sale_item ?? [])
+    .reduce((sum, item) => sum + (item.profit ?? 0), 0);
+  const itemsSold = reportData.flatMap((sale) => sale.sale_item ?? [])
+    .reduce((sum, item) => sum + (item.quantity ?? 0), 0);
 
   // Pagination handlers
   const handleFirstPage = () => setCurrentPage(1);
@@ -268,7 +315,7 @@ export default function SalesReportCard() {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <Button
               variant="outline"
               className="bg-white/20 text-white border-white/30 hover:bg-white/30 h-10"
@@ -487,7 +534,7 @@ export default function SalesReportCard() {
                 key: "sale_date",
                 header: "Date",
                 sortable: true,
-                render: (value: any) => (
+                render: (value: SalesReportRow['sale_date']) => (
                   <span className="font-medium text-slate-700">
                     {value ? new Date(value).toLocaleDateString() : "—"}
                   </span>
@@ -496,14 +543,14 @@ export default function SalesReportCard() {
               {
                 key: "customer",
                 header: "Customer",
-                render: (value: any) => (
+                render: (value: SalesReportRow['customer']) => (
                   <span className="text-slate-600">{value || "—"}</span>
                 )
               },
               {
                 key: "item",
                 header: "Item",
-                render: (value: any) => (
+                render: (value: SalesReportRow['item']) => (
                   <span className="font-medium text-slate-800">{value || "—"}</span>
                 )
               },
@@ -511,7 +558,7 @@ export default function SalesReportCard() {
                 key: "quantity",
                 header: "Quantity",
                 sortable: true,
-                render: (value: any) => (
+                render: (value: SalesReportRow['quantity']) => (
                   <span className="inline-flex items-center justify-center px-2 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-medium">
                     {value}
                   </span>
@@ -521,9 +568,10 @@ export default function SalesReportCard() {
                 key: "price",
                 header: "Unit Price",
                 sortable: true,
-                render: (value: any) => (
+                align: "right",
+                render: (value: SalesReportRow['price']) => (
                   <span className="font-medium text-slate-700">
-                    ₱{Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    ₱{Number(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
                 )
               },
@@ -531,9 +579,10 @@ export default function SalesReportCard() {
                 key: "line_total",
                 header: "Line Total",
                 sortable: true,
-                render: (value: any) => (
+                align: "right",
+                render: (value: SalesReportRow['line_total']) => (
                   <span className="font-semibold text-green-600">
-                    ₱{Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    ₱{Number(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
                 )
               },
@@ -541,23 +590,24 @@ export default function SalesReportCard() {
                 key: "profit",
                 header: "Profit",
                 sortable: true,
-                render: (value: any) => (
-                  <span className={`font-semibold ${Number(value) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                    ₱{Number(value).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                align: "right",
+                render: (value: SalesReportRow['profit']) => (
+                  <span className={`font-semibold ${Number(value ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    ₱{Number(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
                 )
               },
             ]}
             data={paginatedData}
           />
-          
+
           {/* Pagination Controls */}
           <div className="flex items-center justify-between mt-6 pt-6 border-t border-slate-200">
             <div className="text-sm text-slate-500">
               Showing <span className="font-medium">{startIndex + 1}</span> to <span className="font-medium">{endIndex}</span> of{" "}
               <span className="font-medium">{totalRows}</span> results
             </div>
-            
+
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-2 mr-4">
                 <span className="text-sm text-slate-600">Rows:</span>
@@ -580,7 +630,7 @@ export default function SalesReportCard() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="flex items-center gap-1">
                 <Button
                   variant="outline"
@@ -600,14 +650,14 @@ export default function SalesReportCard() {
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                
+
                 <div className="flex items-center gap-1 mx-2">
                   <span className="text-sm text-slate-700">
                     Page <span className="font-medium">{currentPage}</span> of{" "}
                     <span className="font-medium">{totalPages}</span>
                   </span>
                 </div>
-                
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -649,7 +699,7 @@ export default function SalesReportCard() {
       )}
 
       {/* --- RENDER SUCCESS MODAL --- */}
-      <SuccessModal 
+      <SuccessModal
         isOpen={modalState.isOpen}
         type={modalState.type}
         onClose={() => setModalState({ ...modalState, isOpen: false })}
@@ -741,25 +791,25 @@ const SuccessModal: React.FC<SuccessModalProps> = ({ isOpen, onClose, type }) =>
             <div className="relative inline-flex items-center justify-center mb-8">
               <div className={`absolute inset-0 w-28 h-28 rounded-full ${currentConfig.lightBg} animate-ping opacity-75`}></div>
               <div className={`absolute inset-0 w-28 h-28 rounded-full ${currentConfig.lightBg} animate-pulse`}></div>
-              
+
               <div className={`relative flex items-center justify-center w-28 h-28 rounded-full bg-gradient-to-br ${currentConfig.bgGradient} shadow-2xl animate-scaleIn`}>
                 <CheckCircle className="h-16 w-16 text-white animate-checkmark" strokeWidth={2.5} />
               </div>
-              
+
               <Sparkles className="absolute -top-2 -right-2 h-6 w-6 text-yellow-400 animate-spin-slow" />
             </div>
-            
+
             {/* Text */}
             <div className="animate-slideUp space-y-3">
               <h3 className={`text-4xl font-bold bg-gradient-to-r ${currentConfig.gradient} bg-clip-text text-transparent`}>
                 {currentConfig.title}
               </h3>
-              
+
               <p className="text-slate-600 text-lg leading-relaxed">
                 {currentConfig.desc}
               </p>
             </div>
-            
+
             {/* Badge */}
             <div className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl bg-slate-50 border border-slate-100 mt-6 mb-6 animate-slideUp shadow-sm" style={{ animationDelay: '0.2s' }}>
               <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-white shadow-sm">
@@ -770,12 +820,12 @@ const SuccessModal: React.FC<SuccessModalProps> = ({ isOpen, onClose, type }) =>
                 <div className="text-xs text-slate-500">Ready to view</div>
               </div>
             </div>
-            
+
             {/* Progress Bar */}
             <div className="w-full bg-slate-100 rounded-full h-2 mb-8 overflow-hidden">
               <div className={`bg-gradient-to-r ${currentConfig.buttonGradient} h-2 rounded-full animate-progress`}></div>
             </div>
-            
+
             {/* Button */}
             <div className="flex gap-3 justify-center animate-slideUp" style={{ animationDelay: '0.3s' }}>
               <button
@@ -785,7 +835,7 @@ const SuccessModal: React.FC<SuccessModalProps> = ({ isOpen, onClose, type }) =>
                 Continue
               </button>
             </div>
-            
+
             <p className="text-xs text-slate-400 mt-6 animate-slideUp" style={{ animationDelay: '0.4s' }}>
               This will close automatically
             </p>
