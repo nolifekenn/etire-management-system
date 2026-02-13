@@ -254,17 +254,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // ... login and logout (modified to clear local storage on logout) ...
 
   const login = async (username: string, password: string): Promise<boolean> => {
-    // ... same login logic ...
-    // But wait, I need to preserve the implementation.
-    // I'll copy the existing implementation or rely on the fact that I can't easily partially replace within useEffect.
-    // So I'm rewriting huge chunk.
     if (!supabase) return false;
+
     try {
-      const email = `${username}@etire-system.local`;
+      const response = await fetch("/api/auth/verify-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        console.error("[useAuth] Credential verification failed:", payload?.message ?? response.statusText);
+        return false;
+      }
+
+      const payload = await response.json().catch(() => null);
+      const email = payload?.email as string | undefined;
+
+      if (!email) {
+        console.error("[useAuth] Credential verification response missing email.");
+        return false;
+      }
+
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return false;
+      if (error) {
+        console.error("[useAuth] Supabase sign-in failed:", error.message);
+        return false;
+      }
       return true;
-    } catch (err) { return false; }
+    } catch (err) {
+      console.error("[useAuth] Unexpected login error:", err);
+      return false;
+    }
   };
 
   const logout = async () => {
