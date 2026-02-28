@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   PackageX,
   Filter,
+  FileText,
 } from "lucide-react";
 import { Button }  from "@/components/ui/button";
 import { Input }   from "@/components/ui/input";
@@ -37,6 +38,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { listProducts } from "@/lib/actions/inventory";
 import { CreateProductDialog } from "@/app/inventory/components/CreateProductDialog";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -120,6 +123,153 @@ export default function ProductListPage() {
   const fmt = (n: unknown) =>
     Number(n).toLocaleString("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 });
 
+  const BRAND_COLOR: [number, number, number] = [113, 75, 103];
+
+  const getStockStatus = (item: AnyRecord): 'out' | 'low' | 'ok' => {
+    const qty = Number(item.stock_quantity);
+    const reorder = Number(item.reorder_level ?? 5);
+    if (qty === 0) return 'out';
+    if (qty < reorder) return 'low';
+    return 'ok';
+  };
+
+  const handleExportPDF = async () => {
+    toast({ title: "Preparing PDF…", description: "Fetching all products, please wait." });
+
+    let allItems: AnyRecord[] = [];
+    try {
+      const res = await listProducts({
+        search:    search || undefined,
+        category:  category !== 'all' ? category : undefined,
+        low_stock: filter === 'low_stock',
+        page:      1,
+        page_size: 9999,
+      });
+      allItems = res.items as AnyRecord[];
+      if (filter === 'out_of_stock') {
+        allItems = allItems.filter(i => Number(i.stock_quantity) === 0);
+      }
+    } catch {
+      toast({ title: "Failed to fetch products", variant: "destructive" });
+      return;
+    }
+
+    if (allItems.length === 0) {
+      toast({ title: "No Data", description: "No products to export.", variant: "destructive" });
+      return;
+    }
+
+    // Sort: out of stock first → low stock → in stock, then by name
+    const statusOrder = { out: 0, low: 1, ok: 2 };
+    const sorted = [...allItems].sort((a, b) => {
+      const sa = statusOrder[getStockStatus(a)];
+      const sb = statusOrder[getStockStatus(b)];
+      if (sa !== sb) return sa - sb;
+      return String(a.name).localeCompare(String(b.name));
+    });
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    // Header
+    doc.setFillColor(...BRAND_COLOR);
+    doc.rect(0, 0, pageW, 22, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('eTire MIS', 14, 10);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Inventory Products — Stock Level Report', 14, 16);
+    doc.text(today, pageW - 14, 16, { align: 'right' });
+    doc.setDrawColor(...BRAND_COLOR);
+    doc.setLineWidth(0.5);
+    doc.line(0, 22, pageW, 22);
+
+    // Summary
+    const outCount  = sorted.filter(i => getStockStatus(i) === 'out').length;
+    const lowCount  = sorted.filter(i => getStockStatus(i) === 'low').length;
+    const okCount   = sorted.filter(i => getStockStatus(i) === 'ok').length;
+    doc.setFontSize(9);
+    doc.setTextColor(80, 80, 80);
+    doc.text(
+      `Total: ${sorted.length}   Out of Stock: ${outCount}   Low Stock: ${lowCount}   In Stock: ${okCount}`,
+      14, 29
+    );
+
+    const fmtNum = (n: unknown) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const tableBody = sorted.map(item => {
+      const brandName = (item.tire_brand as AnyRecord)?.name;
+      const sizeName  = (item.tire_size  as AnyRecord)?.label;
+      const subtitle  = [brandName, sizeName].filter(Boolean).join(' / ');
+      const nameStr   = subtitle ? `${String(item.name)}\n${subtitle}` : String(item.name);
+      const catStr    = String(item.category ?? '');
+      const vehStr    = item.vehicle_type ? (VEHICLE_LABELS[String(item.vehicle_type)] ?? String(item.vehicle_type)) : '-';
+      const saleStr   = fmtNum(item.sale_price);
+      const costStr   = fmtNum(item.cost_price);
+      const qtyStr    = String(item.stock_quantity ?? 0);
+      const reorderStr = String(item.reorder_level ?? 5);
+      const status    = getStockStatus(item);
+      const statusStr = status === 'out' ? 'Out of Stock' : status === 'low' ? 'Low Stock' : 'In Stock';
+      return [nameStr, catStr, vehStr, saleStr, costStr, qtyStr, reorderStr, statusStr];
+    });
+
+    autoTable(doc, {
+      startY: 33,
+      head: [['Product', 'Category', 'Vehicle', 'Sale Price', 'Cost', 'On Hand', 'Reorder', 'Status']],
+      body: tableBody,
+      foot: [[
+        { content: `Total: ${sorted.length} product(s)`, colSpan: 5, styles: { halign: 'left', fontStyle: 'bold' } },
+        { content: `Out: ${outCount}  Low: ${lowCount}  OK: ${okCount}`, colSpan: 3, styles: { halign: 'right', fontStyle: 'bold' } }
+      ]],
+      headStyles: { fillColor: BRAND_COLOR, textColor: 255, fontStyle: 'bold', fontSize: 9 },
+      alternateRowStyles: { fillColor: [251, 248, 252] },
+      footStyles: { fillColor: [240, 235, 245], textColor: [60, 40, 55], fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 65 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 28, halign: 'right' },
+        4: { cellWidth: 28, halign: 'right' },
+        5: { cellWidth: 18, halign: 'right' },
+        6: { cellWidth: 18, halign: 'right' },
+        7: { cellWidth: 28 },
+      },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      didParseCell: (data: Parameters<NonNullable<Parameters<typeof autoTable>[1]['didParseCell']>>[0]) => {
+        if (data.section === 'body' && data.column.index === 7) {
+          const val = data.cell.raw as string;
+          if (val === 'Out of Stock') {
+            data.cell.styles.textColor = [153, 27, 27];
+            data.cell.styles.fontStyle = 'bold';
+          } else if (val === 'Low Stock') {
+            data.cell.styles.textColor = [146, 64, 14];
+            data.cell.styles.fontStyle = 'bold';
+          } else {
+            data.cell.styles.textColor = [22, 101, 52];
+          }
+        }
+        // Highlight entire row for critical items
+        if (data.section === 'body') {
+          const rowData = data.row.raw as string[];
+          const statusCell = rowData[7];
+          if (statusCell === 'Out of Stock') {
+            data.cell.styles.fillColor = [254, 242, 242];
+          } else if (statusCell === 'Low Stock') {
+            data.cell.styles.fillColor = [255, 251, 235];
+          }
+        }
+      },
+      margin: { left: 14, right: 14 },
+    });
+
+    const datePart = new Date().toISOString().split('T')[0];
+    doc.save(`inventory-stock-report-${datePart}.pdf`);
+    toast({ title: "PDF Exported!", description: `${sorted.length} products saved as PDF.` });
+  };
+
   return (
     <div className="flex flex-col gap-4 p-6 h-full">
       {/* Header bar */}
@@ -132,14 +282,25 @@ export default function ProductListPage() {
           </nav>
           <h1 className="text-xl font-bold text-foreground">Products</h1>
         </div>
-        <Button
-          onClick={() => setShowCreate(true)}
-          className="bg-[#714B67] hover:bg-[#5a3c53] text-white"
-          size="sm"
-        >
-          <Plus className="h-4 w-4 mr-1" />
-          New Product
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handleExportPDF}
+            variant="outline"
+            size="sm"
+            className="border-[#714B67] text-[#714B67] hover:bg-[#714B67] hover:text-white"
+          >
+            <FileText className="h-4 w-4 mr-1" />
+            Export PDF
+          </Button>
+          <Button
+            onClick={() => setShowCreate(true)}
+            className="bg-[#714B67] hover:bg-[#5a3c53] text-white"
+            size="sm"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            New Product
+          </Button>
+        </div>
       </div>
 
       {/* Toolbar: search + filters */}

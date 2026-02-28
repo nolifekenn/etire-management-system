@@ -31,7 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import { validateShortText, validatePhone, validateLongText, type FieldError } from '@/lib/validation';
 import {
   Loader2, PlusCircle, AlertTriangle, Users, Car, History,
-  RefreshCw, Clock, Edit, Trash2, Search, X, ArrowLeft, Download,
+  RefreshCw, Clock, Edit, Trash2, Search, X, ArrowLeft, Download, FileText,
   Eye, TrendingUp, CheckCircle, UserPlus, Calendar, Wrench,
   Save, ArrowUpDown, Archive, PackageSearch,
   Star, Bell, MessageSquare, Award, TrendingDown, PhoneCall,
@@ -53,6 +53,8 @@ import {
 } from '@/components/ui/table';
 import { DataTableWrapper } from '@/components/DataTableWrapper';
 import { IndeterminateProgressBar } from '@/components/ui/indeterminate-progress';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // ===== SIMPLIFIED DESIGN SYSTEM =====
 // Note: Using Tailwind classes directly instead of gradient definitions
@@ -898,10 +900,11 @@ const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[],
 };
 
 // ===== UPDATED QuickActions Component - Matching Inventory Page Design =====
-const QuickActions = ({ onAddCustomer, onAddVehicle, onExportData }: {
+const QuickActions = ({ onAddCustomer, onAddVehicle, onExportData, onExportPDF }: {
   onAddCustomer: () => void,
   onAddVehicle: () => void,
-  onExportData: () => void
+  onExportData: () => void,
+  onExportPDF: () => void
 }) => {
   return (
     <div className="flex flex-wrap gap-2 mb-4">
@@ -915,7 +918,11 @@ const QuickActions = ({ onAddCustomer, onAddVehicle, onExportData }: {
       </Button>
       <Button onClick={onExportData} variant="outline" size="sm" className="gap-2">
         <Download className="h-4 w-4" />
-        Export
+        CSV
+      </Button>
+      <Button onClick={onExportPDF} size="sm" className="gap-2 bg-[#714B67] hover:bg-[#5a3c53] text-white">
+        <FileText className="h-4 w-4" />
+        PDF
       </Button>
     </div>
   );
@@ -1819,6 +1826,135 @@ export default function EnhancedCustomersPage() {
     });
   };
 
+  const BRAND_COLOR_C: [number, number, number] = [113, 75, 103];
+
+  const handleExportPDF = () => {
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+
+    const pdfHeader = (title: string, subtitle: string) => {
+      doc.setFillColor(...BRAND_COLOR_C);
+      doc.rect(0, 0, pageW, 22, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('eTire MIS', 14, 10);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(subtitle, 14, 16);
+      doc.text(today, pageW - 14, 16, { align: 'right' });
+      doc.setDrawColor(...BRAND_COLOR_C);
+      doc.setLineWidth(0.5);
+      doc.line(0, 22, pageW, 22);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...BRAND_COLOR_C);
+      doc.text(title, 14, 30);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(80, 80, 80);
+    };
+
+    if (activeTab === 'customers') {
+      if (filteredCustomers.length === 0) {
+        toast({ title: 'No Data', description: 'No customer data to export.', variant: 'destructive' });
+        return;
+      }
+      pdfHeader('Customers List', 'Customers Report');
+      doc.setFontSize(9);
+      doc.text(`Total: ${filteredCustomers.length} customer(s)`, 14, 37);
+
+      autoTable(doc, {
+        startY: 41,
+        head: [['Customer Name', 'Phone', 'Vehicles']],
+        body: filteredCustomers.map(c => [c.name ?? '', c.phone ?? '', String(c.vehicle_count ?? 0)]),
+        foot: [[{ content: `Total: ${filteredCustomers.length} customer(s)`, colSpan: 3, styles: { halign: 'right', fontStyle: 'bold' } }]],
+        headStyles: { fillColor: BRAND_COLOR_C, textColor: 255, fontStyle: 'bold', fontSize: 10 },
+        alternateRowStyles: { fillColor: [251, 248, 252] },
+        footStyles: { fillColor: [240, 235, 245], textColor: [60, 40, 55], fontStyle: 'bold' },
+        columnStyles: { 2: { halign: 'right' } },
+        styles: { fontSize: 9, cellPadding: 3 },
+        margin: { left: 14, right: 14 },
+      });
+    } else if (activeTab === 'vehicles') {
+      if (filteredVehicles.length === 0) {
+        toast({ title: 'No Data', description: 'No vehicle data to export.', variant: 'destructive' });
+        return;
+      }
+      pdfHeader('Vehicles List', 'Vehicles Report');
+      doc.setFontSize(9);
+      doc.text(`Total: ${filteredVehicles.length} vehicle(s)`, 14, 37);
+
+      autoTable(doc, {
+        startY: 41,
+        head: [['Plate Number', 'Customer', 'Vehicle Type', 'Make', 'Model', 'Color']],
+        body: filteredVehicles.map(v => [
+          v.plate_number ?? '',
+          (v as any).customer?.name ?? '',
+          (v as any).vehicle_type?.name ?? '',
+          (v as any).make ?? '',
+          (v as any).model ?? '',
+          (v as any).color ?? '',
+        ]),
+        foot: [[{ content: `Total: ${filteredVehicles.length} vehicle(s)`, colSpan: 6, styles: { halign: 'right', fontStyle: 'bold' } }]],
+        headStyles: { fillColor: BRAND_COLOR_C, textColor: 255, fontStyle: 'bold', fontSize: 10 },
+        alternateRowStyles: { fillColor: [251, 248, 252] },
+        footStyles: { fillColor: [240, 235, 245], textColor: [60, 40, 55], fontStyle: 'bold' },
+        styles: { fontSize: 9, cellPadding: 3 },
+        margin: { left: 14, right: 14 },
+      });
+    } else {
+      if (filteredHistory.length === 0) {
+        toast({ title: 'No Data', description: 'No tire history to export.', variant: 'destructive' });
+        return;
+      }
+      pdfHeader('Tire Service History', 'Tire History Report');
+      doc.setFontSize(9);
+      doc.text(`Total: ${filteredHistory.length} service record(s)`, 14, 37);
+
+      const toTitle = (str: string) => str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : '';
+
+      autoTable(doc, {
+        startY: 41,
+        head: [['Vehicle', 'Item(s)', 'Service Type', 'Date', 'Notes', 'Service By']],
+        body: filteredHistory.map(h => {
+          const itemsList = Array.isArray((h as any).items) && (h as any).items.length
+            ? (h as any).items.map((it: any) => {
+                const name = it?.name ?? '';
+                const qty = it?.quantity && it.quantity > 1 ? ` (x${it.quantity})` : '';
+                return `${name}${qty}`;
+              }).join('; ')
+            : '';
+          return [
+            (h as any).vehicle?.plate_number ?? '',
+            itemsList,
+            toTitle((h as any).service_type ?? ''),
+            (h as any).service_date ? (h as any).service_date.slice(0, 10) : '',
+            (h as any).notes ?? '',
+            (h as any).user?.name ?? '',
+          ];
+        }),
+        foot: [[{ content: `Total: ${filteredHistory.length} record(s)`, colSpan: 6, styles: { halign: 'right', fontStyle: 'bold' } }]],
+        headStyles: { fillColor: BRAND_COLOR_C, textColor: 255, fontStyle: 'bold', fontSize: 10 },
+        alternateRowStyles: { fillColor: [251, 248, 252] },
+        footStyles: { fillColor: [240, 235, 245], textColor: [60, 40, 55], fontStyle: 'bold' },
+        columnStyles: { 1: { cellWidth: 55 }, 4: { cellWidth: 50 } },
+        styles: { fontSize: 8, cellPadding: 3 },
+        margin: { left: 14, right: 14 },
+      });
+    }
+
+    const tabLabel = activeTab === 'tire_history' ? 'tire-history' : activeTab;
+    doc.save(`customers-${tabLabel}-report-${new Date().toISOString().split('T')[0]}.pdf`);
+
+    setSuccessAnimation({
+      isVisible: true,
+      title: "PDF Exported!",
+      message: `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} report saved as PDF.`,
+      actionType: 'export'
+    });
+  };
+
   const handleSubmitCustomer = async () => {
     if (!supabase || !authUser) return;
 
@@ -2161,6 +2297,7 @@ export default function EnhancedCustomersPage() {
           onAddCustomer={handleOpenCustomerDialog}
           onAddVehicle={handleOpenVehicleDialog}
           onExportData={handleExportData}
+          onExportPDF={handleExportPDF}
         />
 
 

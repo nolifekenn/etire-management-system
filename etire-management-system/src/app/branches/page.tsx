@@ -31,9 +31,11 @@ import { validateShortText, validatePhone, validateLongText, type FieldError } f
 import {
   Loader2, PlusCircle, AlertTriangle, Building2, MapPin, Phone,
   RefreshCw, Clock, Edit, Trash2, Search, X, Eye, CheckCircle,
-  ArrowLeft, Save, Archive, Download,
+  ArrowLeft, Save, Archive, Download, FileText,
   Plus, Download as DownloadIcon, Eye as EyeIcon
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
@@ -588,6 +590,84 @@ export default function EnhancedBranchesPage() {
     });
   };
 
+  const BRAND_COLOR: [number, number, number] = [113, 75, 103];
+
+  const handleExportPDF = () => {
+    if (branches.length === 0) {
+      toast({ title: "No Data", description: "No branch data available to export.", variant: "destructive" });
+      return;
+    }
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    // Header
+    doc.setFillColor(...BRAND_COLOR);
+    doc.rect(0, 0, pageW, 22, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('eTire MIS', 14, 10);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Branches Report', 14, 16);
+    doc.text(today, pageW - 14, 16, { align: 'right' });
+
+    // Separator
+    doc.setDrawColor(...BRAND_COLOR);
+    doc.setLineWidth(0.5);
+    doc.line(0, 22, pageW, 22);
+
+    // Summary row
+    const active = branches.filter(b => b.is_active).length;
+    const inactive = branches.length - active;
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(9);
+    doc.text(`Total Branches: ${branches.length}   Active: ${active}   Inactive: ${inactive}`, 14, 29);
+
+    const tableData = branches.map(b => [
+      b.name,
+      b.address || '',
+      b.phone || '',
+      b.is_active ? 'Active' : 'Inactive',
+    ]);
+
+    autoTable(doc, {
+      startY: 33,
+      head: [['Branch Name', 'Address', 'Phone', 'Status']],
+      body: tableData,
+      foot: [[{ content: `Total: ${branches.length} branch(es)`, colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } }]],
+      headStyles: { fillColor: BRAND_COLOR, textColor: 255, fontStyle: 'bold', fontSize: 10 },
+      alternateRowStyles: { fillColor: [251, 248, 252] },
+      footStyles: { fillColor: [240, 235, 245], textColor: [60, 40, 55], fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 60 },
+        1: { cellWidth: 100 },
+        2: { cellWidth: 40 },
+        3: { cellWidth: 30 },
+      },
+      styles: { fontSize: 9, cellPadding: 3 },
+      didParseCell: (data: any) => {
+        if (data.section === 'body' && data.column.index === 3) {
+          const val = data.cell.raw as string;
+          if (val === 'Active') data.cell.styles.textColor = [22, 101, 52];
+          else if (val === 'Inactive') data.cell.styles.textColor = [153, 27, 27];
+        }
+      },
+      margin: { left: 14, right: 14 },
+    });
+
+    doc.save(`branches-report-${new Date().toISOString().split('T')[0]}.pdf`);
+
+    setSuccessAnimation({
+      isVisible: true,
+      title: "PDF Exported!",
+      message: `Branches report saved as PDF.`,
+      actionType: 'export'
+    });
+  };
+
   const clearFilters = () => {
     setSearchTerm('');
     setStatusFilter('all');
@@ -726,7 +806,10 @@ export default function EnhancedBranchesPage() {
             <Plus className="h-4 w-4 mr-1" />Add Branch
           </Button>
           <Button onClick={handleExportExcel} size="sm" variant="outline" className="shrink-0">
-            <DownloadIcon className="h-4 w-4 mr-1" />Export
+            <DownloadIcon className="h-4 w-4 mr-1" />CSV
+          </Button>
+          <Button onClick={handleExportPDF} size="sm" className="shrink-0 bg-[#714B67] hover:bg-[#5a3c53] text-white">
+            <FileText className="h-4 w-4 mr-1" />PDF
           </Button>
           <Button onClick={() => setIsViewMoreOpen(true)} size="sm" variant="outline" className="shrink-0">
             <EyeIcon className="h-4 w-4 mr-1" />View More

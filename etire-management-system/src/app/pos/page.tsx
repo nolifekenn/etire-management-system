@@ -41,7 +41,7 @@ import {
   Search, ShoppingCart, Plus, Minus, Trash2,
   CreditCard, Banknote, CircleDollarSign,
   Percent, ReceiptText, UserCircle2, Loader2,
-  Package, RefreshCw,
+  Package, RefreshCw, History, X,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import type { InventoryItem } from '@/lib/types';
@@ -334,6 +334,206 @@ const PaymentModal: React.FC<{
 };
 
 // ──────────────────────────────────────────────────────────────────────────────
+// SalesHistoryDrawer
+// ──────────────────────────────────────────────────────────────────────────────
+
+interface SaleRecord {
+  sale_id:         string;
+  sale_number:     string | null;
+  total_amount:    number;
+  payment_method:  string;
+  sale_date:       string;
+  discount_amount: number;
+  tax_amount:      number;
+  customer?: { name: string } | null;
+  sale_item?: { quantity: number; price_at_sale: number; item?: { name: string } | null }[];
+}
+
+const SalesHistoryDrawer: React.FC<{
+  open:     boolean;
+  onClose:  () => void;
+  branchId: string | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any;
+}> = ({ open, onClose, branchId, supabase }) => {
+  const [sales,   setSales]   = useState<SaleRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [search,  setSearch]  = useState('');
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !branchId) return;
+    setLoading(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from('sale')
+      .select(`
+        sale_id,
+        sale_number,
+        total_amount,
+        payment_method,
+        sale_date,
+        discount_amount,
+        tax_amount,
+        customer:customer_id ( name ),
+        sale_item (
+          quantity,
+          price_at_sale,
+          installation_fee,
+          item:item_id ( name )
+        )
+      `)
+      .eq('branch_id', branchId)
+      .eq('state', 'done')
+      .order('sale_date', { ascending: false })
+      .limit(100)
+      .then(({ data, error }: { data: SaleRecord[] | null; error: unknown }) => {
+        if (!error && data) setSales(data);
+        setLoading(false);
+      });
+  }, [open, branchId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtered = sales.filter(s =>
+    !search ||
+    (s.sale_number ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (s.customer?.name ?? '').toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const payBadge = (method: string) => {
+    const map: Record<string, string> = {
+      cash:   'bg-green-100 text-green-700',
+      card:   'bg-blue-100 text-blue-700',
+      check:  'bg-amber-100 text-amber-700',
+      credit: 'bg-purple-100 text-purple-700',
+    };
+    return map[method] ?? 'bg-gray-100 text-gray-700';
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-5 pt-5 pb-3 border-b">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <History className="h-5 w-5 text-[#714B67]" />
+              <DialogTitle className="text-lg font-bold text-[#714B67]">Sales History</DialogTitle>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <input
+                className="w-full rounded-md border border-gray-200 pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#714B67]/30"
+                placeholder="Search by sale # or customer…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+              {search && (
+                <button onClick={() => setSearch('')} className="absolute right-2.5 top-2.5">
+                  <X className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600" />
+                </button>
+              )}
+            </div>
+            <span className="text-xs text-gray-400 whitespace-nowrap">{filtered.length} records</span>
+          </div>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-[#714B67]" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-300">
+              <History className="h-12 w-12 mb-2 opacity-40" />
+              <p className="text-sm text-gray-400">No sales found</p>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="px-4 py-2.5 text-left font-medium text-gray-500 text-xs">Sale #</th>
+                  <th className="px-4 py-2.5 text-left font-medium text-gray-500 text-xs">Customer</th>
+                  <th className="px-4 py-2.5 text-left font-medium text-gray-500 text-xs">Payment</th>
+                  <th className="px-4 py-2.5 text-right font-medium text-gray-500 text-xs">Total</th>
+                  <th className="px-4 py-2.5 text-right font-medium text-gray-500 text-xs">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(sale => (
+                  <React.Fragment key={sale.sale_id}>
+                    <tr
+                      className="border-t border-gray-100 hover:bg-purple-50/40 cursor-pointer transition-colors"
+                      onClick={() => setExpanded(prev => prev === sale.sale_id ? null : sale.sale_id)}
+                    >
+                      <td className="px-4 py-2.5 font-semibold text-[#714B67]">
+                        {sale.sale_number ?? '—'}
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-700">
+                        {sale.customer?.name ?? <span className="text-gray-400 italic">Walk-in</span>}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${payBadge(sale.payment_method)}`}>
+                          {sale.payment_method}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-gray-800">
+                        {formatCurrency(sale.total_amount)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-gray-500 text-xs">
+                        {new Date(sale.sale_date).toLocaleString('en-PH', {
+                          month: 'short', day: 'numeric', year: 'numeric',
+                          hour: 'numeric', minute: '2-digit',
+                        })}
+                      </td>
+                    </tr>
+                    {expanded === sale.sale_id && (
+                      <tr className="bg-purple-50/30">
+                        <td colSpan={5} className="px-6 pb-3 pt-1">
+                          <div className="text-xs text-gray-500 font-medium mb-1.5 mt-1">Items</div>
+                          <div className="space-y-1">
+                            {(sale.sale_item ?? []).map((si, idx) => (
+                              <div key={idx} className="flex justify-between text-xs text-gray-700">
+                                <span>{si.item?.name ?? 'Item'} × {si.quantity}</span>
+                                <span>{formatCurrency(si.price_at_sale * si.quantity)}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {(sale.discount_amount > 0 || sale.tax_amount > 0) && (
+                            <div className="mt-2 pt-2 border-t border-purple-100 space-y-0.5">
+                              {sale.discount_amount > 0 && (
+                                <div className="flex justify-between text-xs text-red-500">
+                                  <span>Discount</span>
+                                  <span>-{formatCurrency(sale.discount_amount)}</span>
+                                </div>
+                              )}
+                              {sale.tax_amount > 0 && (
+                                <div className="flex justify-between text-xs text-gray-500">
+                                  <span>VAT</span>
+                                  <span>{formatCurrency(sale.tax_amount)}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <div className="flex justify-between text-xs font-bold text-[#714B67] mt-1.5 pt-1.5 border-t border-purple-100">
+                            <span>Total</span>
+                            <span>{formatCurrency(sale.total_amount)}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Main Page
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -356,6 +556,7 @@ export default function POSPage() {
   const [applyTax,    setApplyTax]    = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   // ── branch load ────────────────────────────────────────────────────────────
 
@@ -583,6 +784,14 @@ export default function POSPage() {
           >
             <RefreshCw className="h-4 w-4" />
           </button>
+          <button
+            onClick={() => setShowHistory(true)}
+            className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm font-medium text-[#714B67] border border-[#714B67]/30 hover:bg-[#714B67]/10 transition-colors"
+            title="Sales History"
+          >
+            <History className="h-4 w-4" />
+            <span className="hidden sm:inline">History</span>
+          </button>
           <p className="text-xs text-gray-400 hidden sm:block">
             {filteredProducts.length} items
           </p>
@@ -777,6 +986,14 @@ export default function POSPage() {
         onValidate={handleValidate}
         onClose={() => setShowPayment(false)}
         submitting={submitting}
+      />
+
+      {/* Sales History drawer */}
+      <SalesHistoryDrawer
+        open={showHistory}
+        onClose={() => setShowHistory(false)}
+        branchId={branch?.branch_id ?? activeBranchId ?? undefined}
+        supabase={supabase}
       />
     </div>
   );
