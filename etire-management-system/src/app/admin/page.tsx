@@ -47,7 +47,7 @@ const buttonStyles = {
 
 export default function AdminPage() {
   const { toast } = useToast();
-  const { user, isLoading: isAuthLoading } = useAuth();
+  const { user, isLoading: isAuthLoading, refreshUser } = useAuth();
   const [mounted, setMounted] = useState(false);
 
   const [users, setUsers] = useState<User[]>([]);
@@ -268,6 +268,11 @@ export default function AdminPage() {
           toast({ title: "Success", description: "User updated successfully." });
           setIsEditUserDialogOpen(false);
           fetchUsers();
+          // If branch_id was changed, refresh the current user's auth context
+          // so activeBranchId updates immediately without requiring re-login
+          if (updatePayload.branch_id !== undefined && user?.user_id === editingUser.user_id) {
+            await refreshUser();
+          }
         }
       } else {
         const response = await fetch('/api/admin/users', {
@@ -421,22 +426,22 @@ export default function AdminPage() {
 
         {/* Table */}
         <div className={`transition-all duration-500 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-          <div className="rounded-2xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-            <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm"><Users className="h-6 w-6 text-white" /></div>
+          <div className="rounded-lg overflow-hidden border border-border">
+            <div className="w-full bg-muted/50 border-b border-border p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Users className="h-5 w-5 text-muted-foreground" />
                 <div>
-                  <div className="text-xl font-bold font-poppins">User Management</div>
-                  <div className="text-sm opacity-90">View and manage system access</div>
+                  <div className="text-sm font-semibold text-foreground">User Management</div>
+                  <div className="text-xs text-muted-foreground">View and manage system access</div>
                 </div>
               </div>
-              <Button onClick={handleOpenAddDialog} className={buttonStyles.glass}>
+              <Button onClick={handleOpenAddDialog} className="bg-[#714B67] hover:bg-[#5a3c53] text-white" size="sm">
                 <UserPlus className="h-4 w-4 mr-2" /> Add New User
               </Button>
             </div>
 
             {/* Filters */}
-            <div className="p-4 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row gap-4 items-end">
+            <div className="p-4 bg-background border-b border-border flex flex-col sm:flex-row gap-4 items-end">
               <div className="flex-1 w-full">
                 <Label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 block">Search Users</Label>
                 <div className="relative">

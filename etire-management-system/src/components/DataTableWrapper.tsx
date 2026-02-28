@@ -39,6 +39,7 @@ interface Column {
 
 interface DataTableWrapperProps<T> {
   title?: string;
+  description?: string;
   columns: Column[];
   data: T[];
   onEdit?: (item: T) => void;
@@ -56,6 +57,7 @@ interface DataTableWrapperProps<T> {
 
 export function DataTableWrapper<T>({
   title,
+  description,
   columns,
   data,
   onEdit,

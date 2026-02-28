@@ -28,11 +28,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/hooks/use-toast";
+import { validateShortText, validatePhone, validateLongText, type FieldError } from '@/lib/validation';
 import {
   Loader2, PlusCircle, AlertTriangle, Users, Car, History,
   RefreshCw, Clock, Edit, Trash2, Search, X, ArrowLeft, Download,
   Eye, TrendingUp, CheckCircle, UserPlus, Calendar, Wrench,
-  Save, ArrowUpDown, Archive, PackageSearch
+  Save, ArrowUpDown, Archive, PackageSearch,
+  Star, Bell, MessageSquare, Award, TrendingDown, PhoneCall,
+  Mail, AlertCircle, Heart, Activity, UserCheck, Target, Gift,
+  ChevronUp, ChevronDown, Check, DollarSign, Zap, RotateCcw
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -920,7 +924,7 @@ const QuickActions = ({ onAddCustomer, onAddVehicle, onExportData }: {
 const EnhancedTabs = ({ value, onValueChange, children }: any) => {
   return (
     <Tabs value={value} onValueChange={onValueChange} className="w-full font-poppins">
-      <TabsList className="grid w-full grid-cols-3 p-1 bg-slate-100 rounded-2xl">
+      <TabsList className="grid w-full grid-cols-4 p-1 bg-slate-100 rounded-2xl">
         <TabsTrigger
           value="customers"
           className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins"
@@ -942,11 +946,83 @@ const EnhancedTabs = ({ value, onValueChange, children }: any) => {
           <History className="h-4 w-4 mr-2" />
           Tire History
         </TabsTrigger>
+        <TabsTrigger
+          value="crm"
+          className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-purple-700 transition-all duration-300 font-poppins"
+        >
+          <Heart className="h-4 w-4 mr-2" />
+          CRM
+        </TabsTrigger>
       </TabsList>
       {children}
     </Tabs>
   );
 };
+
+// ===== CRM TYPES & HELPERS =====
+interface CRMSalesSummary {
+  customer_id: string;
+  totalSpend: number;
+  purchaseCount: number;
+  lastPurchaseDate: string | null;
+}
+interface CRMServiceSummary {
+  customer_id: string;
+  totalServices: number;
+  lastServiceDate: string | null;
+}
+type CustomerSegmentType = 'vip' | 'regular' | 'new' | 'at_risk' | 'churned';
+
+const SEGMENT_CONFIG: Record<CustomerSegmentType, { label: string; color: string; icon: any; bg: string }> = {
+  vip:     { label: 'VIP',      color: 'text-yellow-800 border-yellow-400', bg: 'bg-yellow-50',  icon: Star },
+  regular: { label: 'Regular',  color: 'text-green-800  border-green-400',  bg: 'bg-green-50',   icon: UserCheck },
+  new:     { label: 'New',      color: 'text-blue-800   border-blue-400',   bg: 'bg-blue-50',    icon: UserPlus },
+  at_risk: { label: 'At-Risk',  color: 'text-orange-800 border-orange-400', bg: 'bg-orange-50',  icon: AlertCircle },
+  churned: { label: 'Churned',  color: 'text-red-800    border-red-400',    bg: 'bg-red-50',     icon: TrendingDown },
+};
+
+function getCustomerSegment(
+  customer: Customer,
+  sales: CRMSalesSummary | undefined,
+  services: CRMServiceSummary | undefined,
+): CustomerSegmentType {
+  const totalSpend    = sales?.totalSpend ?? 0;
+  const visitCount    = (sales?.purchaseCount ?? 0) + (services?.totalServices ?? 0);
+  const lastVisitStr  = sales?.lastPurchaseDate && services?.lastServiceDate
+    ? (sales.lastPurchaseDate > services.lastServiceDate ? sales.lastPurchaseDate : services.lastServiceDate)
+    : (sales?.lastPurchaseDate ?? services?.lastServiceDate ?? null);
+  const daysSinceLast = lastVisitStr
+    ? Math.floor((Date.now() - new Date(lastVisitStr).getTime()) / 86_400_000)
+    : null;
+  const daysSinceCreated = customer.created_at
+    ? Math.floor((Date.now() - new Date(customer.created_at).getTime()) / 86_400_000)
+    : 9999;
+
+  if (totalSpend >= 10000 || visitCount >= 10)                          return 'vip';
+  if (daysSinceLast !== null && daysSinceLast > 90)                     return 'churned';
+  if (daysSinceLast !== null && daysSinceLast > 30)                     return 'at_risk';
+  if (daysSinceLast !== null && daysSinceLast <= 30 && visitCount >= 2) return 'regular';
+  if (daysSinceCreated <= 30 || visitCount === 0)                       return 'new';
+  return 'regular';
+}
+
+function computeLoyaltyPoints(totalSpend: number): number {
+  return Math.floor(totalSpend / 100); // 1 point per ₱100
+}
+
+function getLoyaltyTier(points: number): { tier: string; color: string; next: number | null } {
+  if (points >= 1000) return { tier: 'Platinum', color: 'text-purple-700', next: null };
+  if (points >= 500)  return { tier: 'Gold',     color: 'text-yellow-600', next: 1000 };
+  if (points >= 200)  return { tier: 'Silver',   color: 'text-slate-500',  next: 500 };
+  return                     { tier: 'Bronze',   color: 'text-amber-700',  next: 200 };
+}
+
+const ACTIVITY_TYPES = [
+  { value: 'todo',     label: 'To-Do',    Icon: CheckCircle },
+  { value: 'call',     label: 'Call',     Icon: PhoneCall   },
+  { value: 'email',    label: 'Email',    Icon: Mail        },
+  { value: 'meeting',  label: 'Meeting',  Icon: Calendar    },
+];
 
 export default function EnhancedCustomersPage() {
   const { toast } = useToast();
@@ -1040,6 +1116,30 @@ export default function EnhancedCustomersPage() {
   const [color, setColor] = useState('');
   const [selectedVehicleType, setSelectedVehicleType] = useState('');
 
+  // Form validation errors
+  const [customerFormErrors, setCustomerFormErrors] = useState<{ name?: FieldError; phone?: FieldError }>({});
+  const [vehicleFormErrors,  setVehicleFormErrors]  = useState<{ plateNumber?: FieldError; make?: FieldError; model?: FieldError; color?: FieldError }>({});
+  const [activityFormErrors, setActivityFormErrors] = useState<{ summary?: FieldError; note?: FieldError }>({}); 
+
+  // ===== CRM States =====
+  const [crmSalesData, setCrmSalesData] = useState<CRMSalesSummary[]>([]);
+  const [crmServicesData, setCrmServicesData] = useState<CRMServiceSummary[]>([]);
+  const [isCrmLoading, setIsCrmLoading] = useState(false);
+  const [crmActivities, setCrmActivities] = useState<any[]>([]);
+  const [selectedCrmCustomer, setSelectedCrmCustomer] = useState<Customer | null>(null);
+  const [isCustomer360Open, setIsCustomer360Open] = useState(false);
+  const [isAddActivityOpen, setIsAddActivityOpen] = useState(false);
+  const [activityForm, setActivityForm] = useState({ activityType: 'todo', summary: '', note: '', dueDate: '', assignedTo: '' });
+  const [customerChatter, setCustomerChatter] = useState<any[]>([]);
+  const [newNoteText, setNewNoteText] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
+  const [isSavingActivity, setIsSavingActivity] = useState(false);
+  const [winBackDays, setWinBackDays] = useState(60);
+  const [crmSearch, setCrmSearch] = useState('');
+  const [crmSegmentFilter, setCrmSegmentFilter] = useState<CustomerSegmentType | 'all'>('all');
+  const [customer360Sales, setCustomer360Sales] = useState<any[]>([]);
+  const [customer360Services, setCustomer360Services] = useState<any[]>([]);
+
   useEffect(() => {
     setMounted(true);
     fetchData();
@@ -1054,7 +1154,47 @@ export default function EnhancedCustomersPage() {
     setCustomerFilters({ search: '', sortBy: 'name', sortOrder: 'asc' });
     setVehicleFilters({ search: '', customer: 'all', vehicleType: 'all', sortBy: 'plate_number', sortOrder: 'asc' });
     setHistoryFilters({ search: '', serviceType: 'all', sortBy: 'service_date', sortOrder: 'desc' });
+    if (tab === 'crm') fetchCRMData();
   };
+
+  const fetchCRMData = useCallback(async () => {
+    if (!supabase) return;
+    setIsCrmLoading(true);
+    try {
+      const [salesRes, servicesRes, activitiesRes] = await Promise.all([
+        supabase.from('sale').select('customer_id, total_amount, sale_date').not('customer_id', 'is', null),
+        supabase.from('service_job').select('customer_id, job_date, status').not('customer_id', 'is', null).eq('status', 'completed'),
+        supabase.from('record_activity').select('*, assigned_to_user:assigned_to(name)').eq('record_table', 'customer').eq('is_done', false).order('date_deadline', { ascending: true }),
+      ]);
+
+      // Build per-customer sales map
+      const salesMap: Record<string, CRMSalesSummary> = {};
+      (salesRes.data || []).forEach((sale: any) => {
+        if (!sale.customer_id) return;
+        const m = salesMap[sale.customer_id] ??= { customer_id: sale.customer_id, totalSpend: 0, purchaseCount: 0, lastPurchaseDate: null };
+        m.totalSpend += sale.total_amount ?? 0;
+        m.purchaseCount += 1;
+        if (!m.lastPurchaseDate || sale.sale_date > m.lastPurchaseDate) m.lastPurchaseDate = sale.sale_date;
+      });
+      setCrmSalesData(Object.values(salesMap));
+
+      // Build per-customer services map
+      const svcMap: Record<string, CRMServiceSummary> = {};
+      (servicesRes.data || []).forEach((svc: any) => {
+        if (!svc.customer_id) return;
+        const m = svcMap[svc.customer_id] ??= { customer_id: svc.customer_id, totalServices: 0, lastServiceDate: null };
+        m.totalServices += 1;
+        if (!m.lastServiceDate || svc.job_date > m.lastServiceDate) m.lastServiceDate = svc.job_date;
+      });
+      setCrmServicesData(Object.values(svcMap));
+
+      setCrmActivities(activitiesRes.data || []);
+    } catch (e: any) {
+      toast({ title: 'CRM Error', description: e.message, variant: 'destructive' });
+    } finally {
+      setIsCrmLoading(false);
+    }
+  }, [supabase, toast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchData = async () => {
     await Promise.all([
@@ -1418,6 +1558,7 @@ export default function EnhancedCustomersPage() {
     setCustomerName('');
     setCustomerPhone('');
     setEditingCustomer(null);
+    setCustomerFormErrors({});
   };
 
   const resetVehicleForm = () => {
@@ -1428,6 +1569,7 @@ export default function EnhancedCustomersPage() {
     setColor('');
     setSelectedVehicleType('');
     setEditingVehicle(null);
+    setVehicleFormErrors({});
   };
 
   const handleOpenCustomerDialog = () => {
@@ -1465,6 +1607,115 @@ export default function EnhancedCustomersPage() {
 
   const handleRefresh = () => {
     fetchData();
+  };
+
+  // ===== CRM Handlers =====
+  const handleOpenCustomer360 = useCallback(async (customer: Customer) => {
+    setSelectedCrmCustomer(customer);
+    setIsCustomer360Open(true);
+    if (!supabase) return;
+    // Load sales history
+    const { data: salData } = await supabase
+      .from('sale')
+      .select('sale_id, total_amount, sale_date, payment_method, sale_item(quantity, price_at_sale, inventory_item(name))')
+      .eq('customer_id', customer.customer_id)
+      .order('sale_date', { ascending: false })
+      .limit(20);
+    setCustomer360Sales(salData || []);
+    // Load service history
+    const { data: svcData } = await supabase
+      .from('service_job')
+      .select('job_id, job_description, job_date, status, service_fee')
+      .eq('customer_id', customer.customer_id)
+      .order('job_date', { ascending: false })
+      .limit(20);
+    setCustomer360Services(svcData || []);
+    // Load chatter notes
+    const { data: chatData } = await supabase
+      .from('chatter_messages')
+      .select('*, user:user_id(name)')
+      .eq('related_table', 'customer')
+      .eq('related_record_id', customer.customer_id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    setCustomerChatter(chatData || []);
+  }, [supabase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSaveNote = async () => {
+    if (!supabase || !selectedCrmCustomer || !newNoteText.trim() || !authUser) return;
+    setIsSavingNote(true);
+    try {
+      const { error } = await supabase.from('chatter_messages').insert([{
+        related_table: 'customer',
+        related_record_id: selectedCrmCustomer.customer_id,
+        user_id: authUser.user_id,
+        type: 'note',
+        message: newNoteText.trim(),
+        is_internal: false,
+      }]);
+      if (error) throw error;
+      setNewNoteText('');
+      // Refresh chatter
+      const { data: chatData } = await supabase
+        .from('chatter_messages')
+        .select('*, user:user_id(name)')
+        .eq('related_table', 'customer')
+        .eq('related_record_id', selectedCrmCustomer.customer_id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      setCustomerChatter(chatData || []);
+      toast({ title: 'Note saved' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
+
+  const handleSaveActivity = async () => {
+    if (!supabase || !selectedCrmCustomer || !authUser) return;
+
+    // Inline validation
+    const errs: typeof activityFormErrors = {
+      summary: validateShortText(activityForm.summary, { label: 'Summary', required: true, minLength: 2, maxLength: 200 }),
+      note:    validateLongText(activityForm.note,     { label: 'Notes',   maxLength: 500 }),
+    };
+    setActivityFormErrors(errs);
+    if (errs.summary || errs.note) return;
+    if (!activityForm.dueDate) {
+      toast({ title: 'Due date is required', variant: 'destructive' });
+      return;
+    }
+    setIsSavingActivity(true);
+    try {
+      const { error } = await supabase.from('record_activity').insert([{
+        record_table: 'customer',
+        record_id: selectedCrmCustomer.customer_id,
+        activity_type: activityForm.activityType,
+        summary: activityForm.summary,
+        note: activityForm.note || null,
+        date_deadline: activityForm.dueDate,
+        assigned_to: activityForm.assignedTo || authUser.user_id,
+        created_by: authUser.user_id,
+        is_done: false,
+      }]);
+      if (error) throw error;
+      setIsAddActivityOpen(false);
+      setActivityForm({ activityType: 'todo', summary: '', note: '', dueDate: '', assignedTo: '' });
+      toast({ title: 'Follow-up scheduled' });
+      fetchCRMData();
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally {
+      setIsSavingActivity(false);
+    }
+  };
+
+  const handleMarkActivityDone = async (activityId: string) => {
+    if (!supabase) return;
+    await supabase.from('record_activity').update({ is_done: true, done_at: new Date().toISOString() }).eq('id', activityId);
+    fetchCRMData();
+    toast({ title: 'Activity marked as done' });
   };
 
   // Export Data Functionality
@@ -1570,10 +1821,14 @@ export default function EnhancedCustomersPage() {
 
   const handleSubmitCustomer = async () => {
     if (!supabase || !authUser) return;
-    if (!customerName) {
-      toast({ title: "Validation Error", description: "Customer name is required.", variant: "destructive" });
-      return;
-    }
+
+    // Inline validation
+    const errs = {
+      name:  validateShortText(customerName,  { label: 'Customer name', required: true,  minLength: 2, maxLength: 100 }),
+      phone: validatePhone(customerPhone,     { label: 'Phone' }),
+    };
+    setCustomerFormErrors(errs);
+    if (errs.name || errs.phone) return;
 
     const targetBranchId = editingCustomer?.branch_id ?? activeBranchId ?? authUser.branch_id ?? null;
 
@@ -1626,8 +1881,19 @@ export default function EnhancedCustomersPage() {
 
   const handleSubmitVehicle = async () => {
     if (!supabase || !authUser) return;
-    if (!selectedCustomer || !plateNumber) {
-      toast({ title: "Validation Error", description: "Customer and plate number are required.", variant: "destructive" });
+
+    // Inline validation
+    const errs: typeof vehicleFormErrors = {
+      plateNumber: validateShortText(plateNumber, { label: 'Plate number', required: true,  minLength: 3, maxLength: 20,  blockDangerousChars: false }),
+      make:        validateShortText(make,        { label: 'Make',         required: false, minLength: 2, maxLength: 50  }),
+      model:       validateShortText(model,       { label: 'Model',        required: false, minLength: 1, maxLength: 50  }),
+      color:       validateShortText(color,       { label: 'Color',        required: false, minLength: 2, maxLength: 30  }),
+    };
+    setVehicleFormErrors(errs);
+    if (Object.values(errs).some(Boolean)) return;
+
+    if (!selectedCustomer) {
+      toast({ title: "Validation Error", description: "Customer is required.", variant: "destructive" });
       return;
     }
 
@@ -1802,6 +2068,63 @@ export default function EnhancedCustomersPage() {
       }
     }
   };
+
+  // ===== CRM Computed Data =====
+  const salesByCust = useMemo(() => Object.fromEntries(crmSalesData.map(s => [s.customer_id, s])), [crmSalesData]);
+  const svcByCust   = useMemo(() => Object.fromEntries(crmServicesData.map(s => [s.customer_id, s])), [crmServicesData]);
+
+  const crmCustomers = useMemo(() => {
+    return customers
+      .filter(c => {
+        const seg = getCustomerSegment(c, salesByCust[c.customer_id], svcByCust[c.customer_id]);
+        const matchSearch = !crmSearch ||
+          c.name.toLowerCase().includes(crmSearch.toLowerCase()) ||
+          (c.phone ?? '').includes(crmSearch);
+        const matchSeg = crmSegmentFilter === 'all' || seg === crmSegmentFilter;
+        return matchSearch && matchSeg;
+      })
+      .map(c => {
+        const s = salesByCust[c.customer_id];
+        const sv = svcByCust[c.customer_id];
+        const seg = getCustomerSegment(c, s, sv);
+        const lastVisit = s?.lastPurchaseDate && sv?.lastServiceDate
+          ? (s.lastPurchaseDate > sv.lastServiceDate ? s.lastPurchaseDate : sv.lastServiceDate)
+          : (s?.lastPurchaseDate ?? sv?.lastServiceDate ?? null);
+        const daysSinceVisit = lastVisit ? Math.floor((Date.now() - new Date(lastVisit).getTime()) / 86_400_000) : null;
+        return { ...c, seg, lastVisit, daysSinceVisit, totalSpend: s?.totalSpend ?? 0, visitCount: (s?.purchaseCount ?? 0) + (sv?.totalServices ?? 0) };
+      })
+      .sort((a, b) => b.totalSpend - a.totalSpend);
+  }, [customers, salesByCust, svcByCust, crmSearch, crmSegmentFilter]);
+
+  const segmentCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: customers.length, vip: 0, regular: 0, new: 0, at_risk: 0, churned: 0 };
+    customers.forEach(c => { const seg = getCustomerSegment(c, salesByCust[c.customer_id], svcByCust[c.customer_id]); counts[seg]++; });
+    return counts;
+  }, [customers, salesByCust, svcByCust]);
+
+  const winBackCustomers = useMemo(() => {
+    return customers
+      .map(c => {
+        const s = salesByCust[c.customer_id];
+        const sv = svcByCust[c.customer_id];
+        const lastVisit = s?.lastPurchaseDate && sv?.lastServiceDate
+          ? (s.lastPurchaseDate > sv.lastServiceDate ? s.lastPurchaseDate : sv.lastServiceDate)
+          : (s?.lastPurchaseDate ?? sv?.lastServiceDate ?? null);
+        const daysSinceVisit = lastVisit ? Math.floor((Date.now() - new Date(lastVisit).getTime()) / 86_400_000) : null;
+        const totalSpend = s?.totalSpend ?? 0;
+        return { ...c, lastVisit, daysSinceVisit, totalSpend };
+      })
+      .filter(c => c.daysSinceVisit !== null && c.daysSinceVisit >= winBackDays)
+      .sort((a, b) => (b.daysSinceVisit ?? 0) - (a.daysSinceVisit ?? 0));
+  }, [customers, salesByCust, svcByCust, winBackDays]);
+
+  const topCustomers = useMemo(() => {
+    return customers
+      .map(c => ({ ...c, totalSpend: (salesByCust[c.customer_id]?.totalSpend ?? 0) + 0 }))  
+      .filter(c => c.totalSpend > 0)
+      .sort((a, b) => b.totalSpend - a.totalSpend)
+      .slice(0, 10);
+  }, [customers, salesByCust]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -2048,6 +2371,309 @@ export default function EnhancedCustomersPage() {
                 </Card>
               )}
             </TabsContent>
+
+            {/* ===== CRM TAB ===== */}
+            <TabsContent value="crm" className="space-y-6 animate-in fade-in duration-500">
+              {isCrmLoading ? (
+                <div className="flex flex-col justify-center items-center h-64 space-y-4">
+                  <IndeterminateProgressBar className="w-1/3 max-w-xs" />
+                  <p className="text-slate-500 font-poppins animate-pulse text-sm">Loading CRM data...</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+
+                  {/* ── Segment Overview ── */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                    {(Object.keys(SEGMENT_CONFIG) as CustomerSegmentType[]).map(seg => {
+                      const cfg = SEGMENT_CONFIG[seg];
+                      const SegIcon = cfg.icon;
+                      return (
+                        <button
+                          key={seg}
+                          onClick={() => setCrmSegmentFilter(crmSegmentFilter === seg ? 'all' : seg)}
+                          className={`rounded-xl p-3 border-2 text-left transition-all duration-200 hover:shadow-md ${
+                            crmSegmentFilter === seg
+                              ? `${cfg.bg} ${cfg.color} shadow-inner`
+                              : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <SegIcon className="h-4 w-4 shrink-0" />
+                            <span className="text-xs font-semibold uppercase tracking-wide font-poppins">{cfg.label}</span>
+                          </div>
+                          <p className="text-2xl font-bold font-poppins">{segmentCounts[seg] ?? 0}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* ── Search + Segment filter row ── */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <Input
+                        placeholder="Search customers by name or phone..."
+                        value={crmSearch}
+                        onChange={e => setCrmSearch(e.target.value)}
+                        className="pl-9 bg-white border-slate-200 font-poppins"
+                      />
+                    </div>
+                    {crmSegmentFilter !== 'all' && (
+                      <Button variant="outline" size="sm" onClick={() => setCrmSegmentFilter('all')} className="gap-2 font-poppins">
+                        <X className="h-3.5 w-3.5" />
+                        Clear filter
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* ── Customer CRM List ── */}
+                  <Card>
+                    <CardHeader className="py-2 px-4">
+                      <CardTitle className="text-sm font-medium font-poppins">
+                        Customer Overview
+                        <span className="ml-2 text-muted-foreground font-normal">({crmCustomers.length} customers)</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm font-poppins">
+                          <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Customer</th>
+                              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Segment</th>
+                              <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Lifetime Value</th>
+                              <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Visits</th>
+                              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Last Visit</th>
+                              <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Points</th>
+                              <th className="px-4 py-3"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {crmCustomers.length === 0 ? (
+                              <tr>
+                                <td colSpan={7} className="text-center py-10 text-slate-400 font-poppins">
+                                  No customers match your filters.
+                                </td>
+                              </tr>
+                            ) : crmCustomers.map(c => {
+                              const cfg = SEGMENT_CONFIG[c.seg];
+                              const pts = computeLoyaltyPoints(c.totalSpend);
+                              const loyalty = getLoyaltyTier(pts);
+                              return (
+                                <tr key={c.customer_id} className="hover:bg-slate-50 transition-colors">
+                                  <td className="px-4 py-3">
+                                    <div>
+                                      <p className="font-semibold text-slate-800">{c.name}</p>
+                                      {c.phone && <p className="text-xs text-slate-500">{c.phone}</p>}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <Badge variant="outline" className={`text-xs ${cfg.bg} ${cfg.color} border font-poppins`}>
+                                      {cfg.label}
+                                    </Badge>
+                                  </td>
+                                  <td className="px-4 py-3 text-right font-semibold text-green-700">
+                                    ₱{c.totalSpend.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                  </td>
+                                  <td className="px-4 py-3 text-right text-slate-700">{c.visitCount}</td>
+                                  <td className="px-4 py-3 text-slate-600 text-xs">
+                                    {c.lastVisit
+                                      ? <>{new Date(c.lastVisit).toLocaleDateString()}<br /><span className="text-slate-400">{c.daysSinceVisit} days ago</span></>
+                                      : <span className="text-slate-400">Never</span>}
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <span className={`text-xs font-semibold ${loyalty.color}`}>{pts} pts</span>
+                                    <br /><span className="text-xs text-slate-400">{loyalty.tier}</span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleOpenCustomer360(c)}
+                                      className="text-xs h-7 gap-1 font-poppins"
+                                    >
+                                      <Eye className="h-3.5 w-3.5" />
+                                      360°
+                                    </Button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* ── Win-Back List ── */}
+                  <Card>
+                    <CardHeader className="py-2 px-4">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <CardTitle className="text-sm font-medium font-poppins flex items-center gap-2">
+                          <RotateCcw className="h-4 w-4 text-orange-500" />
+                          Win-Back List
+                          <span className="text-muted-foreground font-normal">({winBackCustomers.length} customers)</span>
+                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-500 font-poppins">Inactive for ≥</span>
+                          <Select value={String(winBackDays)} onValueChange={v => setWinBackDays(Number(v))}>
+                            <SelectTrigger className="h-7 w-20 text-xs font-poppins">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {[30, 45, 60, 90, 120, 180].map(d => (
+                                <SelectItem key={d} value={String(d)} className="text-xs font-poppins">{d} days</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm font-poppins">
+                          <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Customer</th>
+                              <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Days Inactive</th>
+                              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Last Visit</th>
+                              <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">LTV</th>
+                              <th className="px-4 py-3"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {winBackCustomers.length === 0 ? (
+                              <tr><td colSpan={5} className="text-center py-8 text-slate-400">No inactive customers in this range.</td></tr>
+                            ) : winBackCustomers.slice(0, 20).map(c => (
+                              <tr key={c.customer_id} className="hover:bg-orange-50 transition-colors">
+                                <td className="px-4 py-3">
+                                  <p className="font-semibold text-slate-800">{c.name}</p>
+                                  {c.phone && <p className="text-xs text-slate-500">{c.phone}</p>}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-300 text-xs font-poppins">
+                                    {c.daysSinceVisit}d
+                                  </Badge>
+                                </td>
+                                <td className="px-4 py-3 text-xs text-slate-500">
+                                  {c.lastVisit ? new Date(c.lastVisit).toLocaleDateString() : '—'}
+                                </td>
+                                <td className="px-4 py-3 text-right text-green-700 font-semibold text-xs">
+                                  ₱{c.totalSpend.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <Button
+                                    variant="outline" size="sm"
+                                    onClick={() => {
+                                      setSelectedCrmCustomer(c);
+                                      setIsAddActivityOpen(true);
+                                    }}
+                                    className="text-xs h-7 gap-1 font-poppins"
+                                  >
+                                    <Bell className="h-3.5 w-3.5" />
+                                    Follow-up
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* ── Follow-up Activities ── */}
+                  <Card>
+                    <CardHeader className="py-2 px-4">
+                      <CardTitle className="text-sm font-medium font-poppins flex items-center gap-2">
+                        <Bell className="h-4 w-4 text-purple-500" />
+                        Upcoming Follow-ups
+                        <span className="text-muted-foreground font-normal">({crmActivities.length} pending)</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      {crmActivities.length === 0 ? (
+                        <div className="text-center py-8 text-slate-400 font-poppins text-sm">No pending follow-ups.</div>
+                      ) : (
+                        <div className="divide-y divide-slate-100">
+                          {crmActivities.map(act => {
+                            const actCfg = ACTIVITY_TYPES.find(a => a.value === act.activity_type) ?? ACTIVITY_TYPES[0];
+                            const ActIcon = actCfg.Icon;
+                            const overdue = new Date(act.date_deadline) < new Date();
+                            const linkedCustomer = customers.find(c => c.customer_id === act.record_id);
+                            return (
+                              <div key={act.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50">
+                                <div className={`p-2 rounded-lg ${overdue ? 'bg-red-100' : 'bg-purple-50'}`}>
+                                  <ActIcon className={`h-4 w-4 ${overdue ? 'text-red-600' : 'text-purple-600'}`} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-slate-800 text-sm font-poppins truncate">{act.summary}</p>
+                                  <p className="text-xs text-slate-500 font-poppins">
+                                    {linkedCustomer?.name ?? 'Unknown Customer'} · Due: {new Date(act.date_deadline).toLocaleDateString()}
+                                    {overdue && <span className="ml-1 text-red-500 font-semibold">Overdue</span>}
+                                  </p>
+                                  {act.note && <p className="text-xs text-slate-400 truncate mt-0.5">{act.note}</p>}
+                                </div>
+                                <Button
+                                  variant="outline" size="sm"
+                                  onClick={() => handleMarkActivityDone(act.id)}
+                                  className="text-xs h-7 gap-1 shrink-0 font-poppins"
+                                >
+                                  <Check className="h-3.5 w-3.5 text-green-600" />
+                                  Done
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* ── Top 10 Customers by LTV ── */}
+                  <Card>
+                    <CardHeader className="py-2 px-4">
+                      <CardTitle className="text-sm font-medium font-poppins flex items-center gap-2">
+                        <Award className="h-4 w-4 text-yellow-500" />
+                        Top Customers (by Lifetime Value)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="divide-y divide-slate-100">
+                        {topCustomers.length === 0 ? (
+                          <div className="text-center py-8 text-slate-400 font-poppins text-sm">No sales data yet.</div>
+                        ) : topCustomers.map((c, idx) => {
+                          const pts = computeLoyaltyPoints(c.totalSpend);
+                          const loyalty = getLoyaltyTier(pts);
+                          return (
+                            <div key={c.customer_id} className="flex items-center gap-3 px-4 py-3 hover:bg-yellow-50 transition-colors">
+                              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold font-poppins ${
+                                idx === 0 ? 'bg-yellow-400 text-white' :
+                                idx === 1 ? 'bg-slate-300 text-white' :
+                                idx === 2 ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-600'
+                              }`}>
+                                {idx + 1}
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-semibold text-slate-800 text-sm font-poppins">{c.name}</p>
+                                <p className="text-xs text-slate-500 font-poppins">{c.phone ?? ''}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-green-700 font-poppins">₱{c.totalSpend.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                                <p className={`text-xs font-semibold ${loyalty.color} font-poppins`}>
+                                  <Gift className="inline h-3 w-3 mr-0.5" />{pts} pts · {loyalty.tier}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                </div>
+              )}
+            </TabsContent>
           </EnhancedTabs>
         </div>
 
@@ -2060,6 +2686,255 @@ export default function EnhancedCustomersPage() {
           actionType={successAnimation.actionType}
           onConfirm={() => setSuccessAnimation(prev => ({ ...prev, isVisible: false }))}
         />
+
+        {/* ===== CUSTOMER 360 MODAL ===== */}
+        <Dialog open={isCustomer360Open} onOpenChange={open => { if (!open) setIsCustomer360Open(false); }}>
+          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto bg-white font-poppins">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-slate-900 font-poppins flex items-center gap-2">
+                <Eye className="h-5 w-5 text-purple-600" />
+                Customer 360° — {selectedCrmCustomer?.name}
+              </DialogTitle>
+              <DialogDescription className="text-slate-500 font-poppins">
+                Complete profile: lifetime value, purchase history, notes & follow-ups.
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedCrmCustomer && (() => {
+              const s = salesByCust[selectedCrmCustomer.customer_id];
+              const sv = svcByCust[selectedCrmCustomer.customer_id];
+              const seg = getCustomerSegment(selectedCrmCustomer, s, sv);
+              const cfg = SEGMENT_CONFIG[seg];
+              const totalSpend = s?.totalSpend ?? 0;
+              const pts = computeLoyaltyPoints(totalSpend);
+              const loyalty = getLoyaltyTier(pts);
+              const lastVisit = s?.lastPurchaseDate && sv?.lastServiceDate
+                ? (s.lastPurchaseDate > sv.lastServiceDate ? s.lastPurchaseDate : sv.lastServiceDate)
+                : (s?.lastPurchaseDate ?? sv?.lastServiceDate ?? null);
+
+              return (
+                <div className="space-y-5">
+                  {/* Summary cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { label: 'Lifetime Value', value: `₱${totalSpend.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, color: 'text-green-700', icon: DollarSign },
+                      { label: 'Purchases',      value: s?.purchaseCount ?? 0,     color: 'text-blue-700',   icon: TrendingUp  },
+                      { label: 'Services',        value: sv?.totalServices ?? 0,    color: 'text-purple-700', icon: Wrench      },
+                      { label: 'Loyalty Points',  value: `${pts} pts`,             color: loyalty.color,     icon: Award       },
+                    ].map(kpi => {
+                      const KIcon = kpi.icon;
+                      return (
+                        <div key={kpi.label} className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+                          <div className="flex items-center gap-1 mb-1">
+                            <KIcon className={`h-3.5 w-3.5 ${kpi.color}`} />
+                            <span className="text-xs text-slate-500 font-poppins">{kpi.label}</span>
+                          </div>
+                          <p className={`text-lg font-bold font-poppins ${kpi.color}`}>{kpi.value}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Segment + loyalty tier */}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Badge variant="outline" className={`${cfg.bg} ${cfg.color} border text-sm px-3 py-1 font-poppins`}>{cfg.label}</Badge>
+                    <Badge variant="outline" className={`${loyalty.color} bg-white border text-sm px-3 py-1 font-poppins`}>{loyalty.tier} Member</Badge>
+                    {lastVisit && <span className="text-xs text-slate-500 font-poppins">Last visit: {new Date(lastVisit).toLocaleDateString()}</span>}
+                    {loyalty.next && <span className="text-xs text-slate-400 font-poppins">{loyalty.next - pts} pts to {loyalty.tier === 'Bronze' ? 'Silver' : loyalty.tier === 'Silver' ? 'Gold' : 'Platinum'}</span>}
+                  </div>
+
+                  {/* Purchase history */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-700 mb-2 font-poppins flex items-center gap-1">
+                      <TrendingUp className="h-4 w-4 text-blue-500" />
+                      Recent Purchases
+                    </h4>
+                    {customer360Sales.length === 0 ? (
+                      <p className="text-xs text-slate-400 font-poppins">No purchase history.</p>
+                    ) : (
+                      <div className="space-y-1 max-h-36 overflow-y-auto">
+                        {customer360Sales.slice(0, 10).map((sale: any) => (
+                          <div key={sale.sale_id} className="flex justify-between text-xs p-2 bg-blue-50 rounded-lg">
+                            <span className="text-slate-600 font-poppins">{new Date(sale.sale_date).toLocaleDateString()}</span>
+                            <span className="font-semibold text-green-700 font-poppins">₱{(sale.total_amount ?? 0).toLocaleString()}</span>
+                            <span className="text-slate-500 capitalize font-poppins">{sale.payment_method}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Service history */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-700 mb-2 font-poppins flex items-center gap-1">
+                      <Wrench className="h-4 w-4 text-purple-500" />
+                      Recent Services
+                    </h4>
+                    {customer360Services.length === 0 ? (
+                      <p className="text-xs text-slate-400 font-poppins">No service history.</p>
+                    ) : (
+                      <div className="space-y-1 max-h-36 overflow-y-auto">
+                        {customer360Services.slice(0, 10).map((svc: any) => (
+                          <div key={svc.job_id} className="flex justify-between items-center text-xs p-2 bg-purple-50 rounded-lg gap-2">
+                            <span className="text-slate-700 font-poppins truncate flex-1">{svc.job_description}</span>
+                            <span className="text-slate-500 font-poppins shrink-0">{new Date(svc.job_date).toLocaleDateString()}</span>
+                            <Badge variant="outline" className="text-xs capitalize font-poppins shrink-0">{svc.status}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Notes/Interaction log */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-700 mb-2 font-poppins flex items-center gap-1">
+                      <MessageSquare className="h-4 w-4 text-green-500" />
+                      Interaction Log
+                    </h4>
+                    <div className="space-y-2 max-h-36 overflow-y-auto mb-2">
+                      {customerChatter.length === 0 ? (
+                        <p className="text-xs text-slate-400 font-poppins">No notes yet.</p>
+                      ) : customerChatter.map((note: any) => (
+                        <div key={note.message_id} className="bg-green-50 rounded-lg p-2 border border-green-100">
+                          <p className="text-xs text-slate-700 font-poppins">{note.message}</p>
+                          <p className="text-xs text-slate-400 mt-0.5 font-poppins">
+                            {note.user?.name ?? 'Unknown'} · {new Date(note.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Add a note..."
+                        value={newNoteText}
+                        onChange={e => setNewNoteText(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveNote(); } }}
+                        className="flex-1 text-sm font-poppins"
+                      />
+                      <Button size="sm" onClick={handleSaveNote} disabled={isSavingNote || !newNoteText.trim()} className="gap-1 font-poppins">
+                        {isSavingNote ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Schedule follow-up */}
+                  <div className="flex justify-end pt-2 border-t border-slate-200">
+                    <Button
+                      variant="outline"
+                      onClick={() => { setIsCustomer360Open(false); setIsAddActivityOpen(true); }}
+                      className="gap-2 font-poppins"
+                    >
+                      <Bell className="h-4 w-4" />
+                      Schedule Follow-up
+                    </Button>
+                  </div>
+                </div>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
+
+        {/* ===== ADD ACTIVITY / FOLLOW-UP MODAL ===== */}
+        <Dialog open={isAddActivityOpen} onOpenChange={open => { if (!open) setIsAddActivityOpen(false); }}>
+          <DialogContent className="sm:max-w-md bg-white font-poppins">
+            <DialogHeader>
+              <DialogTitle className="font-poppins font-bold text-slate-900 flex items-center gap-2">
+                <Bell className="h-5 w-5 text-purple-600" />
+                Schedule Follow-up
+                {selectedCrmCustomer && <span className="text-slate-500 font-normal text-sm">— {selectedCrmCustomer.name}</span>}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className="font-poppins text-sm">Activity Type</Label>
+                <div className="grid grid-cols-4 gap-2">
+                  {ACTIVITY_TYPES.map(at => {
+                    const AtIcon = at.Icon;
+                    return (
+                      <button
+                        key={at.value}
+                        onClick={() => setActivityForm(p => ({ ...p, activityType: at.value }))}
+                        className={`flex flex-col items-center gap-1 p-2 rounded-lg border-2 text-xs font-poppins transition-all ${
+                          activityForm.activityType === at.value
+                            ? 'border-purple-500 bg-purple-50 text-purple-700'
+                            : 'border-slate-200 hover:border-slate-300 text-slate-600'
+                        }`}
+                      >
+                        <AtIcon className="h-4 w-4" />
+                        {at.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-poppins text-sm">Summary *</Label>
+                <Input
+                  placeholder="e.g. Call to schedule tire rotation"
+                  value={activityForm.summary}
+                  onChange={e => {
+                    setActivityForm(p => ({ ...p, summary: e.target.value }));
+                    setActivityFormErrors(p => ({ ...p, summary: validateShortText(e.target.value, { label: 'Summary', required: true, minLength: 2, maxLength: 200 }) }));
+                  }}
+                  maxLength={200}
+                  aria-invalid={!!activityFormErrors.summary}
+                  className={`font-poppins${activityFormErrors.summary ? ' border-red-400 focus-visible:ring-red-300' : ''}`}
+                />
+                {activityFormErrors.summary && <p className="text-xs text-red-500">⚠ {activityFormErrors.summary}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-poppins text-sm">Due Date *</Label>
+                <Input
+                  type="date"
+                  value={activityForm.dueDate}
+                  onChange={e => setActivityForm(p => ({ ...p, dueDate: e.target.value }))}
+                  className="font-poppins"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-poppins text-sm">Notes (optional)</Label>
+                <Textarea
+                  placeholder="Additional details..."
+                  value={activityForm.note}
+                  onChange={e => {
+                    setActivityForm(p => ({ ...p, note: e.target.value }));
+                    setActivityFormErrors(p => ({ ...p, note: validateLongText(e.target.value, { label: 'Notes', maxLength: 500 }) }));
+                  }}
+                  className={`font-poppins text-sm${activityFormErrors.note ? ' border-red-400 focus-visible:ring-red-300' : ''}`}
+                  rows={2}
+                  maxLength={510}
+                />
+                <div className="flex items-center justify-between">
+                  {activityFormErrors.note
+                    ? <p className="text-xs text-red-500">⚠ {activityFormErrors.note}</p>
+                    : <span />}
+                  <p className={`text-xs ${
+                    activityForm.note.length > 500 ? 'text-red-500 font-medium' :
+                    activityForm.note.length > 425 ? 'text-amber-500' : 'text-muted-foreground'
+                  }`}>{activityForm.note.length}/500</p>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="outline" className="font-poppins">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                onClick={handleSaveActivity}
+                disabled={isSavingActivity || !activityForm.summary || !activityForm.dueDate}
+                className="font-poppins gap-2"
+              >
+                {isSavingActivity && <Loader2 className="h-4 w-4 animate-spin" />}
+                <CheckCircle className="h-4 w-4" />
+                Schedule
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Customer Dialog */}
         <Dialog open={isCustomerDialogOpen} onOpenChange={(isOpen) => { if (!isOpen) { setIsCustomerDialogOpen(false); resetCustomerForm(); } }}>
@@ -2075,12 +2950,43 @@ export default function EnhancedCustomersPage() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="customer-name" className="text-slate-700 font-medium font-poppins">Customer Name *</Label>
-                <Input id="customer-name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="John Doe" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" />
+                <Input
+                  id="customer-name"
+                  value={customerName}
+                  onChange={(e) => {
+                    setCustomerName(e.target.value);
+                    setCustomerFormErrors((p) => ({ ...p, name: validateShortText(e.target.value, { label: 'Customer name', required: true, minLength: 2, maxLength: 100 }) }));
+                  }}
+                  placeholder="John Doe"
+                  maxLength={100}
+                  aria-invalid={!!customerFormErrors.name}
+                  className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins${
+                    customerFormErrors.name ? ' border-red-400 focus:border-red-400 focus:ring-red-200' : ''
+                  }`}
+                />
+                {customerFormErrors.name && (
+                  <p className="text-xs text-red-500 flex items-center gap-1">⚠ {customerFormErrors.name}</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="customer-phone" className="text-slate-700 font-medium font-poppins">Phone</Label>
-                  <Input id="customer-phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="+1-555-0101" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" />
+                  <Input
+                    id="customer-phone"
+                    value={customerPhone}
+                    onChange={(e) => {
+                      setCustomerPhone(e.target.value);
+                      setCustomerFormErrors((p) => ({ ...p, phone: validatePhone(e.target.value, { label: 'Phone' }) }));
+                    }}
+                    placeholder="+1-555-0101"
+                    aria-invalid={!!customerFormErrors.phone}
+                    className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins${
+                      customerFormErrors.phone ? ' border-red-400 focus:border-red-400 focus:ring-red-200' : ''
+                    }`}
+                  />
+                  {customerFormErrors.phone && (
+                    <p className="text-xs text-red-500 flex items-center gap-1">⚠ {customerFormErrors.phone}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -2128,7 +3034,23 @@ export default function EnhancedCustomersPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="plate-number" className="text-slate-700 font-medium font-poppins">Plate Number *</Label>
-                <Input id="plate-number" value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} placeholder="ABC-1234" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" />
+                <Input
+                  id="plate-number"
+                  value={plateNumber}
+                  onChange={(e) => {
+                    setPlateNumber(e.target.value);
+                    setVehicleFormErrors((p) => ({ ...p, plateNumber: validateShortText(e.target.value, { label: 'Plate number', required: true, minLength: 3, maxLength: 20, blockDangerousChars: false }) }));
+                  }}
+                  placeholder="ABC-1234"
+                  maxLength={20}
+                  aria-invalid={!!vehicleFormErrors.plateNumber}
+                  className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins${
+                    vehicleFormErrors.plateNumber ? ' border-red-400 focus:border-red-400 focus:ring-red-200' : ''
+                  }`}
+                />
+                {vehicleFormErrors.plateNumber && (
+                  <p className="text-xs text-red-500 flex items-center gap-1">⚠ {vehicleFormErrors.plateNumber}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="vehicle-type" className="text-slate-700 font-medium font-poppins">Vehicle Type</Label>
@@ -2148,17 +3070,59 @@ export default function EnhancedCustomersPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="make" className="text-slate-700 font-medium font-poppins">Make</Label>
-                  <Input id="make" value={make} onChange={(e) => setMake(e.target.value)} placeholder="Toyota" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" />
+                  <Input
+                    id="make"
+                    value={make}
+                    onChange={(e) => {
+                      setMake(e.target.value);
+                      setVehicleFormErrors((p) => ({ ...p, make: validateShortText(e.target.value, { label: 'Make', required: false, minLength: 2, maxLength: 50 }) }));
+                    }}
+                    placeholder="Toyota"
+                    maxLength={50}
+                    aria-invalid={!!vehicleFormErrors.make}
+                    className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins${
+                      vehicleFormErrors.make ? ' border-red-400 focus:border-red-400 focus:ring-red-200' : ''
+                    }`}
+                  />
+                  {vehicleFormErrors.make && <p className="text-xs text-red-500">⚠ {vehicleFormErrors.make}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="model" className="text-slate-700 font-medium font-poppins">Model</Label>
-                  <Input id="model" value={model} onChange={(e) => setModel(e.target.value)} placeholder="Camry" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" />
+                  <Input
+                    id="model"
+                    value={model}
+                    onChange={(e) => {
+                      setModel(e.target.value);
+                      setVehicleFormErrors((p) => ({ ...p, model: validateShortText(e.target.value, { label: 'Model', required: false, minLength: 1, maxLength: 50 }) }));
+                    }}
+                    placeholder="Camry"
+                    maxLength={50}
+                    aria-invalid={!!vehicleFormErrors.model}
+                    className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins${
+                      vehicleFormErrors.model ? ' border-red-400 focus:border-red-400 focus:ring-red-200' : ''
+                    }`}
+                  />
+                  {vehicleFormErrors.model && <p className="text-xs text-red-500">⚠ {vehicleFormErrors.model}</p>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="color" className="text-slate-700 font-medium font-poppins">Color</Label>
-                  <Input id="color" value={color} onChange={(e) => setColor(e.target.value)} placeholder="White" className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins" />
+                  <Input
+                    id="color"
+                    value={color}
+                    onChange={(e) => {
+                      setColor(e.target.value);
+                      setVehicleFormErrors((p) => ({ ...p, color: validateShortText(e.target.value, { label: 'Color', required: false, minLength: 2, maxLength: 30 }) }));
+                    }}
+                    placeholder="White"
+                    maxLength={30}
+                    aria-invalid={!!vehicleFormErrors.color}
+                    className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins${
+                      vehicleFormErrors.color ? ' border-red-400 focus:border-red-400 focus:ring-red-200' : ''
+                    }`}
+                  />
+                  {vehicleFormErrors.color && <p className="text-xs text-red-500">⚠ {vehicleFormErrors.color}</p>}
                 </div>
               </div>
             </div>

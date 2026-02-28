@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 interface StatCardProps {
   title: string;
   value: string;
-  icon: LucideIcon;
+  icon: LucideIcon | React.ComponentType<{ className?: string }>;
   description?: string;
   className?: string;
   iconClassName?: string;

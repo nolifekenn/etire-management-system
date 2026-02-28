@@ -1,0 +1,688 @@
+"use client";
+
+/**
+ * /inventory/products/[id]  — Odoo 19-style Product Form View
+ *
+ * Layout mirrors Odoo product form:
+ *  • Breadcrumb + action buttons (Edit / Save + Discard, Adjustment)
+ *  • Smart Buttons (On Hand, Moves, Sold, Received)
+ *  • Two main tabs: General Information | Inventory
+ *  • Chatter panel below tabs
+ */
+
+import { useEffect, useState, useCallback } from "react";
+import { useRouter, useParams } from "next/navigation";
+import {
+  ArrowLeft,
+  Pencil,
+  Save,
+  X,
+  SlidersHorizontal,
+  Loader2,
+  PackageCheck,
+  ShoppingCart,
+  ArrowLeftRight,
+  Package,
+} from "lucide-react";
+import { Button }   from "@/components/ui/button";
+import { Input }    from "@/components/ui/input";
+import { Label }    from "@/components/ui/label";
+import { Badge }    from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast }  from "@/hooks/use-toast";
+import { useAuth }   from "@/hooks/useAuth";
+import {
+  getProductWithDetails,
+  getInventorySmartButtons,
+  upsertProduct,
+} from "@/lib/actions/inventory";
+import { ChatterPanel }      from "@/components/ChatterPanel";
+import { AdjustmentDialog }  from "@/app/inventory/components/AdjustmentDialog";
+import { validateShortText, validateNumber, type FieldError } from "@/lib/validation";
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+type AnyRecord = Record<string, unknown>;
+
+interface SmartBtn {
+  label:  string;
+  value:  number | string;
+  href?:  string;
+  icon:   string;
+  color:  string;
+}
+
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  ArrowLeftRight: ArrowLeftRight,
+  PackageCheck:   PackageCheck,
+  ShoppingCart:   ShoppingCart,
+  Package:        Package,
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+  tire:      "bg-blue-100   text-blue-800",
+  tool:      "bg-amber-100  text-amber-800",
+  accessory: "bg-purple-100 text-purple-800",
+  service:   "bg-teal-100   text-teal-800",
+};
+
+const MOVE_TYPE_COLORS: Record<string, string> = {
+  receipt:    "text-green-600",
+  sale:       "text-orange-600",
+  adjustment: "text-blue-600",
+};
+
+function str(val: unknown): string {
+  if (val == null) return "";
+  return String(val);
+}
+
+function fmt(n: unknown): string {
+  return Number(n).toLocaleString("en-PH", {
+    style: "currency", currency: "PHP", minimumFractionDigits: 2,
+  });
+}
+
+function fmtDate(val: unknown): string {
+  if (!val) return "—";
+  try {
+    return new Date(String(val)).toLocaleDateString("en-PH", {
+      month: "short", day: "numeric", year: "numeric",
+    });
+  } catch {
+    return String(val);
+  }
+}
+
+// ── Smart Button Component ─────────────────────────────────────────────────
+
+function SmartButton({ btn, onClick }: { btn: SmartBtn; onClick: () => void }) {
+  const Icon = ICON_MAP[btn.icon] ?? Package;
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col items-center gap-1 px-4 py-2 rounded-lg border border-border
+                 bg-card hover:bg-muted transition-colors text-center min-w-[80px]"
+    >
+      <Icon className={`h-4 w-4 ${btn.color}`} />
+      <span className="text-lg font-bold text-foreground leading-none">{btn.value}</span>
+      <span className="text-xs text-muted-foreground">{btn.label}</span>
+    </button>
+  );
+}
+
+// ── Page ────────────────────────────────────────────────────────────────────
+
+export default function ProductFormPage() {
+  const { id: itemId } = useParams<{ id: string }>();
+  const router = useRouter();
+  const { toast } = useToast();
+  const { user, activeBranchId } = useAuth();
+
+  const [product,     setProduct]     = useState<AnyRecord | null>(null);
+  const [moves,       setMoves]       = useState<AnyRecord[]>([]);
+  const [smartBtns,   setSmartBtns]   = useState<SmartBtn[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [editing,     setEditing]     = useState(false);
+  const [saving,      setSaving]      = useState(false);
+  const [showAdjust,  setShowAdjust]  = useState(false);
+
+  // Validation state
+  const [nameError,      setNameError]      = useState<FieldError>(null);
+  const [salePriceError, setSalePriceError] = useState<FieldError>(null);
+  const [costPriceError, setCostPriceError] = useState<FieldError>(null);
+  const [reorderError,   setReorderError]   = useState<FieldError>(null);
+
+  // Editable fields
+  const [editName,     setEditName]     = useState("");
+  const [editCategory, setEditCategory] = useState("");
+  const [editVehicle,  setEditVehicle]  = useState("");
+  const [editSalePrice,setEditSalePrice]= useState("");
+  const [editCostPrice,setEditCostPrice]= useState("");
+  const [editReorder,  setEditReorder]  = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [detailRes, btnRes] = await Promise.all([
+        getProductWithDetails(itemId),
+        getInventorySmartButtons(itemId),
+      ]);
+
+      if (!detailRes.success || !detailRes.product) {
+        toast({ title: "Product not found", variant: "destructive" });
+        router.push("/inventory/products");
+        return;
+      }
+
+      setProduct(detailRes.product);
+      setMoves(detailRes.moves ?? []);
+      setSmartBtns(btnRes as SmartBtn[]);
+
+      // Seed edit fields
+      const p = detailRes.product;
+      setEditName(str(p.name));
+      setEditCategory(str(p.category));
+      setEditVehicle(str(p.vehicle_type));
+      setEditSalePrice(str(p.sale_price));
+      setEditCostPrice(str(p.cost_price));
+      setEditReorder(str(p.reorder_level));
+    } catch {
+      toast({ title: "Failed to load product", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, [itemId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleSave = async () => {
+    if (!product) return;
+
+    // Validate name before saving
+    const nameErr     = validateShortText(editName,      { label: "Product name",  minLength: 2, maxLength: 150 });
+    const saleErr     = validateNumber(editSalePrice,    { label: "Sale price",    required: false, min: 0 });
+    const costErr     = validateNumber(editCostPrice,    { label: "Cost price",    required: false, min: 0 });
+    const reorderErr  = validateNumber(editReorder,      { label: "Reorder level", required: true,  min: 0, integer: true });
+
+    setNameError(nameErr);
+    setSalePriceError(saleErr);
+    setCostPriceError(costErr);
+    setReorderError(reorderErr);
+    if (nameErr || saleErr || costErr || reorderErr) return;
+
+    setSaving(true);
+    try {
+      const result = await upsertProduct({
+        item_id:      itemId,
+        branch_id:    str(product.branch_id),
+        supplier_id:  str(product.supplier_id) || undefined,
+        name:         editName,
+        category:     editCategory as "tire" | "tool" | "accessory" | "service",
+        vehicle_type: editVehicle as "car" | "motor" | "truck",
+        sale_price:   Number(editSalePrice),
+        cost_price:   Number(editCostPrice),
+        reorder_level:Number(editReorder),
+      });
+
+      if (!result.success) throw new Error(result.error);
+
+      toast({ title: "Product saved" });
+      setEditing(false);
+      load();
+    } catch (err) {
+      toast({
+        title: "Save failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDiscard = () => {
+    if (!product) return;
+    setEditName(str(product.name));
+    setEditCategory(str(product.category));
+    setEditVehicle(str(product.vehicle_type));
+    setEditSalePrice(str(product.sale_price));
+    setEditCostPrice(str(product.cost_price));
+    setEditReorder(str(product.reorder_level));
+    setEditing(false);
+    setNameError(null);
+    setSalePriceError(null);
+    setCostPriceError(null);
+    setReorderError(null);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!product) return null;
+
+  const supplier = product.supplier as AnyRecord | undefined;
+  const branch   = product.branch   as AnyRecord | undefined;
+  const qty      = Number(product.stock_quantity ?? 0);
+  const reorder  = Number(product.reorder_level ?? 5);
+  const isLow    = qty < reorder;
+  const isOut    = qty === 0;
+
+  return (
+    <div className="flex flex-col gap-0 h-full overflow-hidden">
+
+      {/* ── Status bar ──────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-card">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-2 text-sm">
+          <button
+            onClick={() => router.push("/inventory/products")}
+            className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Products
+          </button>
+          <span className="text-muted-foreground">/</span>
+          <span className="font-medium text-foreground truncate max-w-[200px]">
+            {str(product.name)}
+          </span>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-2">
+          {editing ? (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDiscard}
+                disabled={saving}
+              >
+                <X className="h-4 w-4 mr-1" />
+                Discard
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSave}
+                disabled={saving}
+                className="bg-[#714B67] hover:bg-[#5a3c53] text-white"
+              >
+                {saving
+                  ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Saving…</>
+                  : <><Save className="h-4 w-4 mr-1" />Save</>
+                }
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAdjust(true)}
+              >
+                <SlidersHorizontal className="h-4 w-4 mr-1" />
+                Adjust
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEditing(true);
+                  setNameError(null);
+                  setSalePriceError(null);
+                  setCostPriceError(null);
+                  setReorderError(null);
+                }}
+              >
+                <Pencil className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── Main content (scrollable) ────────────────────────────────────── */}
+      <div className="flex-1 overflow-auto">
+        <div className="max-w-5xl mx-auto px-6 py-6 space-y-6">
+
+          {/* Product title + stock badge */}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">
+                {editing ? (
+                  <div className="space-y-1">
+                    <Input
+                      value={editName}
+                      onChange={e => {
+                        setEditName(e.target.value);
+                        setNameError(validateShortText(e.target.value, { label: "Product name", minLength: 2, maxLength: 150 }));
+                      }}
+                      onBlur={() => setNameError(validateShortText(editName, { label: "Product name", minLength: 2, maxLength: 150 }))}
+                      maxLength={150}
+                      aria-invalid={!!nameError}
+                      aria-describedby={nameError ? "pf-name-error" : undefined}
+                      className={`text-2xl font-bold h-auto py-0 border-0 border-b rounded-none focus-visible:ring-0 px-0 ${
+                        nameError ? "border-red-400" : "border-border"
+                      }`}
+                    />
+                    {nameError && (
+                      <p id="pf-name-error" className="text-xs text-red-500 flex items-center gap-1 font-normal">
+                        <span aria-hidden>⚠</span> {nameError}
+                      </p>
+                    )}
+                    <p className={`text-xs text-right font-normal ${
+                      editName.trim().length > 130 ? "text-amber-500" : "text-muted-foreground"
+                    }`}>
+                      {editName.trim().length}/150
+                    </p>
+                  </div>
+                ) : str(product.name)}
+              </h1>
+              <div className="flex items-center gap-2 mt-2">
+                <Badge className={CATEGORY_COLORS[str(product.category)] ?? "bg-gray-100 text-gray-800"}>
+                  {str(product.category)}
+                </Badge>
+                {Boolean(product.vehicle_type) && (
+                  <Badge variant="outline">{str(product.vehicle_type)}</Badge>
+                )}
+                {isOut  && <Badge className="bg-red-100 text-red-700">Out of Stock</Badge>}
+                {isLow && !isOut && <Badge className="bg-amber-100 text-amber-700">Low Stock</Badge>}
+              </div>
+            </div>
+
+            {/* On Hand count — prominent */}
+            <div className="text-right shrink-0">
+              <p className="text-xs text-muted-foreground">On Hand</p>
+              <p className={`text-4xl font-bold ${isOut ? "text-red-600" : isLow ? "text-amber-600" : "text-green-600"}`}>
+                {qty}
+              </p>
+              <p className="text-xs text-muted-foreground">units</p>
+            </div>
+          </div>
+
+          {/* Smart Buttons */}
+          {smartBtns.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {smartBtns.map(btn => (
+                <SmartButton
+                  key={btn.label}
+                  btn={btn}
+                  onClick={() => btn.href ? router.push(btn.href) : undefined}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Tabs */}
+          <Tabs defaultValue="general">
+            <TabsList>
+              <TabsTrigger value="general">General Information</TabsTrigger>
+              <TabsTrigger value="inventory">Inventory</TabsTrigger>
+              <TabsTrigger value="moves">Product Moves</TabsTrigger>
+            </TabsList>
+
+            {/* ── General Information ─────────────────────────────────── */}
+            <TabsContent value="general" className="mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+
+                {/* Left: core fields */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Pricing &amp; Classification
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label>Sale Price (₱)</Label>
+                      {editing ? (
+                        <>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={editSalePrice}
+                            onChange={e => {
+                              setEditSalePrice(e.target.value);
+                              setSalePriceError(validateNumber(e.target.value, { label: "Sale price", required: false, min: 0 }));
+                            }}
+                            aria-invalid={!!salePriceError}
+                            className={salePriceError ? "border-red-400 focus-visible:ring-red-300" : ""}
+                          />
+                          {salePriceError && (
+                            <p className="text-xs text-red-500 flex items-center gap-1">
+                              <span aria-hidden>⚠</span> {salePriceError}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-sm font-medium">{fmt(product.sale_price)}</p>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Cost Price (₱)</Label>
+                      {editing ? (
+                        <>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={editCostPrice}
+                            onChange={e => {
+                              setEditCostPrice(e.target.value);
+                              setCostPriceError(validateNumber(e.target.value, { label: "Cost price", required: false, min: 0 }));
+                            }}
+                            aria-invalid={!!costPriceError}
+                            className={costPriceError ? "border-red-400 focus-visible:ring-red-300" : ""}
+                          />
+                          {costPriceError && (
+                            <p className="text-xs text-red-500 flex items-center gap-1">
+                              <span aria-hidden>⚠</span> {costPriceError}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-sm font-medium">{fmt(product.cost_price)}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label>Category</Label>
+                      {editing ? (
+                        <Select value={editCategory} onValueChange={setEditCategory}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="tire">Tire</SelectItem>
+                            <SelectItem value="tool">Tool</SelectItem>
+                            <SelectItem value="accessory">Accessory</SelectItem>
+                            <SelectItem value="service">Service</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-sm">{str(product.category)}</p>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Vehicle Type</Label>
+                      {editing ? (
+                        <Select value={editVehicle} onValueChange={setEditVehicle}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="car">Car</SelectItem>
+                            <SelectItem value="motor">Motorcycle</SelectItem>
+                            <SelectItem value="truck">Truck</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-sm">{str(product.vehicle_type) || "—"}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: supplier / branch */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Sourcing
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Supplier</p>
+                      <p className="text-sm font-medium">{str(supplier?.name) || "—"}</p>
+                      {Boolean(supplier?.phone) && <p className="text-xs text-muted-foreground">{str(supplier?.phone)}</p>}
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Branch</p>
+                      <p className="text-sm font-medium">{str(branch?.name) || "—"}</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Created</p>
+                      <p className="text-sm">{fmtDate(product.created_at)}</p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Last Updated</p>
+                      <p className="text-sm">{fmtDate(product.updated_at)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* ── Inventory ───────────────────────────────────────────── */}
+            <TabsContent value="inventory" className="mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="rounded-lg border border-border p-4 space-y-4 bg-white">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Stock Rules
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <Label>Reorder Level (units)</Label>
+                      {editing ? (
+                        <>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={editReorder}
+                            onChange={e => {
+                              setEditReorder(e.target.value);
+                              setReorderError(validateNumber(e.target.value, { label: "Reorder level", required: true, min: 0, integer: true }));
+                            }}
+                            aria-invalid={!!reorderError}
+                            className={reorderError ? "border-red-400 focus-visible:ring-red-300" : ""}
+                          />
+                          {reorderError && (
+                            <p className="text-xs text-red-500 flex items-center gap-1">
+                              <span aria-hidden>⚠</span> {reorderError}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-sm font-medium">{str(product.reorder_level)}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        A low-stock alert is triggered when quantity falls below this threshold.
+                      </p>
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-muted-foreground">Current Status</p>
+                      <div className="flex items-center gap-2">
+                        <p className={`text-sm font-semibold ${isOut ? "text-red-600" : isLow ? "text-amber-600" : "text-green-600"}`}>
+                          {isOut ? "Out of Stock" : isLow ? "Low Stock" : "In Stock"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          ({qty} on hand, threshold {reorder})
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border p-4 space-y-4 bg-white">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Product Attributes
+                  </h3>
+                  <div className="space-y-2">
+                    {Boolean(product.size_id) && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Tire Size</p>
+                        <p className="text-sm">{str((product.tire_size as AnyRecord)?.label) || str(product.size_id)}</p>
+                      </div>
+                    )}
+                    {Boolean(product.brand_id) && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Brand</p>
+                        <p className="text-sm">{str((product.tire_brand as AnyRecord)?.name) || str(product.brand_id)}</p>
+                      </div>
+                    )}
+                    {!product.size_id && !product.brand_id && (
+                      <p className="text-sm text-muted-foreground">No additional attributes</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* ── Product Moves ────────────────────────────────────────── */}
+            <TabsContent value="moves" className="mt-4">
+              <div className="rounded-lg border border-border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Date</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Reference</th>
+                      <th className="px-4 py-3 text-right font-medium text-muted-foreground">Qty</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted-foreground">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {moves.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-12 text-center text-muted-foreground text-sm">
+                          No moves recorded yet
+                        </td>
+                      </tr>
+                    ) : (
+                      moves.map((m, idx) => (
+                        <tr key={idx} className="border-t border-border hover:bg-muted/30">
+                          <td className="px-4 py-2.5 text-muted-foreground">{fmtDate(m.date)}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`capitalize text-xs font-medium ${MOVE_TYPE_COLORS[str(m.move_type)] ?? ""}`}>
+                              {str(m.move_type)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-foreground">{str(m.ref)}</td>
+                          <td className={`px-4 py-2.5 text-right font-mono font-semibold ${
+                            Number(m.qty_number) > 0 ? "text-green-600" :
+                            Number(m.qty_number) < 0 ? "text-red-600" : "text-foreground"
+                          }`}>
+                            {str(m.qty)}
+                          </td>
+                          <td className="px-4 py-2.5 text-muted-foreground text-xs">{str(m.notes) || "—"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          {/* Chatter */}
+          <div className="border-t border-border pt-4">
+            <ChatterPanel
+              relatedTable="inventory_item"
+              relatedRecordId={itemId}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Adjustment Dialog */}
+      <AdjustmentDialog
+        open={showAdjust}
+        onOpenChange={setShowAdjust}
+        itemId={itemId}
+        currentQty={qty}
+        branchId={str(product.branch_id) || activeBranchId || ""}
+        userId={user?.user_id ?? ""}
+        onAdjusted={load}
+      />
+    </div>
+  );
+}

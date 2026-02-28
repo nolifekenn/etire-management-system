@@ -1,679 +1,692 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-    DialogFooter,
-} from '@/components/ui/dialog';
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+  DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-    Loader2, AlertTriangle, Download, Upload, Database, Cloud,
-    CheckCircle, Clock, RefreshCw, Shield, HardDrive, Server,
-    Archive, FileText, CloudUpload, Settings, Check, FileCheck,
-    CloudCheck, DatabaseBackup, FileJson, FileSpreadsheet
-} from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { TABLE_DEPENDENCY_ORDER } from '@/lib/backupTables';
+  Loader2, AlertTriangle, Download, Upload, Database,
+  CheckCircle, Clock, RefreshCw, Shield, HardDrive, Server,
+  CloudUpload, FileJson, FileSpreadsheet, CalendarClock,
+  FolderOpen, FileText, Check,
+} from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { TABLE_DEPENDENCY_ORDER } from "@/lib/backupTables";
 
-// ===== DESIGN SYSTEM =====
-const buttonStyles = {
-    primary: "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins",
-    secondary: "flex items-center gap-3 min-h-[52px] bg-white border border-slate-300 hover:border-indigo-400 hover:text-indigo-600 text-slate-700 px-6 py-3 rounded-xl font-medium transition-all duration-300 active:scale-95 font-poppins",
-    glass: "bg-white/25 backdrop-blur-lg border border-white/30 hover:bg-white/35 text-white px-6 py-3 rounded-2xl font-semibold transition-all duration-300 hover:translate-y-[-1px] hover:shadow-lg font-poppins",
-    success: "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 border-0 shadow-lg hover:shadow-xl font-poppins"
-};
+// ── Auto-backup schedule ───────────────────────────────────────────────────
+const AUTO_BACKUP_HOURS = [10, 17]; // 10:00 AM and 5:00 PM
 
-const microAnimations = {
-    cardHover: "transition-all duration-350 ease-spring hover:translate-y-[-6px] hover:shadow-2xl",
-    buttonHover: "transition-all duration-200 hover:scale-105 active:scale-95",
-    fadeIn: "animate-in fade-in duration-500",
-    iconHover: "transition-all duration-350 ease-spring group-hover:scale-105 group-hover:translate-y-[-2px]",
-};
+function getNextBackupTime(): Date {
+  const now = new Date();
+  const candidates = AUTO_BACKUP_HOURS.map((h) => {
+    const d = new Date(now);
+    d.setHours(h, 0, 0, 0);
+    if (d <= now) d.setDate(d.getDate() + 1);
+    return d;
+  });
+  return candidates.reduce((a, b) => (a < b ? a : b));
+}
 
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return "Running…";
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  const s = Math.floor((ms % 60_000) / 1_000);
+  return `${h}h ${m}m ${s}s`;
+}
 
-export default function EnhancedBackupPage() {
-    const { toast } = useToast();
-    const { user: authUser } = useAuth();
-    const [mounted, setMounted] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [backupProgress, setBackupProgress] = useState(0);
-    const [lastBackup, setLastBackup] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-    const [currentAction, setCurrentAction] = useState<'export' | 'import' | 'sync' | null>(null);
-    const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-    const [successMessage, setSuccessMessage] = useState('');
-    const [statusMessage, setStatusMessage] = useState("");
-    const [fileInfo, setFileInfo] = useState<{ name: string; size: string } | null>(null);
+function fmtSize(bytes: number | null | undefined): string {
+  if (!bytes) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
+// ── Types ──────────────────────────────────────────────────────────────────
 
-    // Load last backup time from local storage (from leader's version)
-    useEffect(() => {
-        const storedDate = localStorage.getItem('etire_last_backup');
-        if (storedDate) setLastBackup(storedDate);
-        setLastUpdated(new Date());
-        setMounted(true);
-    }, []);
+interface BackupFile {
+  name: string;
+  id?: string;
+  metadata?: { size?: number; mimetype?: string };
+  created_at?: string;
+  updated_at?: string;
+}
 
-    // Enhanced progress animation with smooth gradient
-    useEffect(() => {
-        if (isLoading && backupProgress < 100) {
-            const timer = setTimeout(() => {
-                setBackupProgress(prev => {
-                    if (prev >= 100) return 100;
-                    // Accelerating progress for better UX
-                    const increment = prev < 50 ? 8 : prev < 80 ? 5 : 2;
-                    return Math.min(prev + increment, 100);
-                });
-            }, 120);
-            return () => clearTimeout(timer);
+// ── Component ──────────────────────────────────────────────────────────────
+
+export default function BackupPage() {
+  const { toast } = useToast();
+  const { user: authUser } = useAuth();
+
+  const [isLoading, setIsLoading]           = useState(false);
+  const [backupProgress, setBackupProgress] = useState(0);
+  const [statusMessage, setStatusMessage]   = useState("");
+  const [currentAction, setCurrentAction]   = useState<"export" | "import" | "cloud" | null>(null);
+  const [error, setError]                   = useState<string | null>(null);
+
+  const [lastBackup, setLastBackup]         = useState<string | null>(null);
+  const [countdown, setCountdown]           = useState<string>("");
+  const [nextTime, setNextTime]             = useState<Date | null>(null);
+
+  const [bucketFiles, setBucketFiles]       = useState<BackupFile[]>([]);
+  const [loadingFiles, setLoadingFiles]     = useState(false);
+
+  const [successMsg, setSuccessMsg]         = useState("");
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+
+  // Confirmation dialog
+  const [confirmOpen, setConfirmOpen]       = useState(false);
+  const [pendingAction, setPendingAction]   = useState<(() => void) | null>(null);
+  const [confirmTitle, setConfirmTitle]     = useState("");
+  const [confirmDesc, setConfirmDesc]       = useState("");
+
+  const fileInputRef   = useRef<HTMLInputElement>(null);
+  const autoBackupRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── First mount ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const stored = localStorage.getItem("etire_last_backup");
+    if (stored) setLastBackup(stored);
+    loadBucketFiles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Countdown ticker ──────────────────────────────────────────────────
+  useEffect(() => {
+    const next = getNextBackupTime();
+    setNextTime(next);
+    const tick = setInterval(() => {
+      const remaining = next.getTime() - Date.now();
+      setCountdown(remaining > 0 ? formatCountdown(remaining) : "Running…");
+    }, 1_000);
+    return () => clearInterval(tick);
+  }, [lastBackup]);
+
+  // ── Auto-backup scheduler ─────────────────────────────────────────────
+  useEffect(() => {
+    function scheduleNext() {
+      const next = getNextBackupTime();
+      const delay = next.getTime() - Date.now();
+      autoBackupRef.current = setTimeout(() => {
+        runCloudBackup(true);
+        scheduleNext();
+      }, delay);
+    }
+    scheduleNext();
+    return () => { if (autoBackupRef.current) clearTimeout(autoBackupRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Progress animation ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (isLoading && backupProgress < 95) {
+      const t = setTimeout(() => {
+        setBackupProgress((p) => Math.min(p + (p < 50 ? 8 : p < 80 ? 5 : 2), 95));
+      }, 120);
+      return () => clearTimeout(t);
+    }
+  }, [isLoading, backupProgress]);
+
+  // ── Helpers ────────────────────────────────────────────────────────────
+
+  function askConfirm(title: string, desc: string, action: () => void) {
+    setConfirmTitle(title);
+    setConfirmDesc(desc);
+    setPendingAction(() => action);
+    setConfirmOpen(true);
+  }
+
+  function finishSuccess(msg: string) {
+    setSuccessMsg(msg);
+    setShowSuccessDialog(true);
+    setCurrentAction(null);
+    setIsLoading(false);
+    setBackupProgress(100);
+    setTimeout(() => { setBackupProgress(0); setStatusMessage(""); }, 2000);
+  }
+
+  function failAction(msg: string) {
+    setError(msg);
+    toast({ title: "Error", description: msg, variant: "destructive" });
+    setIsLoading(false);
+    setBackupProgress(0);
+    setStatusMessage("");
+  }
+
+  // ── Load bucket files ─────────────────────────────────────────────────
+  const loadBucketFiles = useCallback(async () => {
+    setLoadingFiles(true);
+    try {
+      const res = await fetch("/api/backup/list");
+      if (res.ok) setBucketFiles((await res.json()).files ?? []);
+    } catch { /* silent */ }
+    setLoadingFiles(false);
+  }, []);
+
+  // ── Convert JSON → CSV ───────────────────────────────────────────────
+  function toCSV(data: Record<string, unknown>[]): string {
+    if (!data.length) return "";
+    const headers = Object.keys(data[0]).join(",");
+    const rows = data.map((row) =>
+      Object.values(row).map((v) => {
+        if (v === null || v === undefined) return "";
+        if (typeof v === "object") return `"${JSON.stringify(v).replace(/"/g, '""')}"`;
+        const s = String(v);
+        return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+      }).join(",")
+    ).join("\n");
+    return `${headers}\n${rows}`;
+  }
+
+  // ── Export (download) ─────────────────────────────────────────────────
+  async function exportData(format: "json" | "csv") {
+    if (!authUser) return;
+    setCurrentAction("export");
+    setIsLoading(true);
+    setError(null);
+    setBackupProgress(5);
+    setStatusMessage("Fetching data from server…");
+
+    try {
+      const res = await fetch("/api/backup/export");
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Export failed");
+      const payload = await res.json();
+      const tables = payload.tables ?? {};
+
+      setStatusMessage("Preparing download…");
+      setBackupProgress(85);
+
+      const exportPayload = {
+        meta: { version: "1.0", exported_at: new Date().toISOString(), exported_by: authUser.name },
+        tables,
+      };
+
+      let blob: Blob;
+      let filename: string;
+
+      if (format === "json") {
+        blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
+        filename = `etire_backup_${new Date().toISOString().split("T")[0]}.json`;
+      } else {
+        let csv = "";
+        for (const t of TABLE_DEPENDENCY_ORDER) {
+          const rows = tables[t];
+          if (rows?.length) {
+            csv += `\n\n--- TABLE: ${t.toUpperCase()} ---\n`;
+            csv += toCSV(rows as Record<string, unknown>[]);
+          }
         }
-    }, [isLoading, backupProgress]);
-
-    const showSuccess = (message: string) => {
-        setSuccessMessage(message);
-        setShowSuccessDialog(true);
-        setCurrentAction(null);
-        setIsLoading(false);
-        setBackupProgress(100);
-        setTimeout(() => {
-            setBackupProgress(0);
-            setStatusMessage("");
-        }, 2000);
-    };
-
-    // 🟢 HELPER: Convert JSON Array to CSV String (from leader's version)
-    const convertToCSV = (data: any[]) => {
-        if (!data || !data.length) return "";
-        const headers = Object.keys(data[0]).join(",");
-        const rows = data.map(row =>
-            Object.values(row).map(value => {
-                // Handle strings with commas, nulls, and objects
-                if (value === null) return "";
-                if (typeof value === 'object') return JSON.stringify(value).replace(/"/g, '""');
-                const str = String(value);
-                return str.includes(",") ? `"${str}"` : str;
-            }).join(",")
-        ).join("\n");
-        return `${headers}\n${rows}`;
-    };
-
-    // 🟢 ENHANCED EXPORT FUNCTION (from leader's version with our UI)
-    const exportData = async (format: 'json' | 'csv') => {
-        if (!authUser) return;
-
-        setCurrentAction('export');
-        setIsLoading(true);
-        setError(null);
-        setBackupProgress(5);
-        setStatusMessage("Requesting secure export...");
-
-        try {
-            const response = await fetch(`/api/backup/export`);
-            if (!response.ok) {
-                const payload = await response.json().catch(() => null);
-                throw new Error(payload?.error || 'Failed to export backup data.');
-            }
-
-            const serverPayload = await response.json();
-            const tables = serverPayload.tables || {};
-            const exportedTables = serverPayload.tableCount ?? Object.keys(tables).length;
-
-            setStatusMessage("Preparing download package...");
-            setBackupProgress(85);
-
-            const exportPayload = {
-                meta: {
-                    version: "1.0",
-                    exported_at: new Date().toISOString(),
-                    exported_by: authUser.name
-                },
-                tables
-            };
-
-            let blob: Blob;
-            let filename: string;
-
-            if (format === 'json') {
-                blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
-                filename = `etire_backup_${new Date().toISOString().split('T')[0]}.json`;
-            } else {
-                let csvContent = "";
-                for (const tableName of TABLE_DEPENDENCY_ORDER) {
-                    const tableRows = tables[tableName];
-                    if (tableRows && tableRows.length > 0) {
-                        csvContent += `\n\n--- TABLE: ${tableName.toUpperCase()} ---\n`;
-                        csvContent += convertToCSV(tableRows);
-                    }
-                }
-                blob = new Blob([csvContent], { type: 'text/csv' });
-                filename = `etire_export_${new Date().toISOString().split('T')[0]}.csv`;
-            }
-
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-
-            const now = new Date().toISOString();
-            setLastBackup(now);
-            localStorage.setItem('etire_last_backup', now);
-            setLastUpdated(new Date());
-
-            showSuccess(`${format.toUpperCase()} backup downloaded successfully. ${exportedTables} tables exported.`);
-
-        } catch (err: any) {
-            setError(`Export failed: ${err.message}`);
-            toast({
-                title: "Export Failed",
-                description: err.message,
-                variant: "destructive"
-            });
-            setIsLoading(false);
-            setBackupProgress(0);
-            setStatusMessage("");
-        }
-    };
-
-    // 🟢 ENHANCED IMPORT FUNCTION (from leader's version with our UI)
-    const importData = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file || !supabase || !authUser) return;
-
-        // Show file info before starting import
-        setFileInfo({
-            name: file.name,
-            size: `${(file.size / 1024 / 1024).toFixed(2)} MB`
-        });
-
-        // Reset input so the same file can be selected again if needed
-        event.target.value = '';
-
-        if (!window.confirm("WARNING: Importing data will overwrite existing records with matching IDs. This action cannot be undone. Are you sure?")) {
-            setFileInfo(null);
-            return;
-        }
-
-        setCurrentAction('import');
-        setIsLoading(true);
-        setError(null);
-        setBackupProgress(0);
-        setStatusMessage("Reading file...");
-
-        try {
-            const text = await file.text();
-            const parsedBackup = JSON.parse(text);
-
-            if (!parsedBackup.tables || !parsedBackup.meta) {
-                throw new Error("Invalid backup file format. Missing 'tables' or 'meta' data.");
-            }
-
-            setStatusMessage("Uploading backup to server...");
-            setBackupProgress(35);
-
-            const response = await fetch('/api/backup/import', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    fileName: file.name,
-                    data: parsedBackup
-                })
-            });
-
-            if (!response.ok) {
-                const payload = await response.json().catch(() => null);
-                throw new Error(payload?.error || 'Failed to import backup data.');
-            }
-
-            const result = await response.json();
-
-            setStatusMessage("Finalizing...");
-            setBackupProgress(100);
-
-            setLastUpdated(new Date());
-            showSuccess(`Data successfully imported from ${file.name}. ${result.restoredTables ?? Object.keys(parsedBackup.tables).length} tables restored.`);
-
-        } catch (err: any) {
-            console.error(err);
-            setError(`Import failed: ${err.message}`);
-            toast({
-                title: "Import Failed",
-                description: err.message,
-                variant: "destructive"
-            });
-            setIsLoading(false);
-            setBackupProgress(0);
-            setStatusMessage("");
-        } finally {
-            setFileInfo(null);
-        }
-    };
-
-    // 🟢 ENHANCED SYNC FUNCTION (from leader's version with our UI)
-    const syncData = async () => {
-        if (!authUser) return;
-
-        setCurrentAction('sync');
-        setIsLoading(true);
-        setError(null);
-        setBackupProgress(15);
-        setStatusMessage("Requesting secure sync...");
-
-        try {
-            const response = await fetch('/api/backup/sync', { method: 'POST' });
-            if (!response.ok) {
-                const payload = await response.json().catch(() => null);
-                throw new Error(payload?.error || 'Failed to sync backup data.');
-            }
-
-            const result = await response.json();
-
-            setBackupProgress(100);
-            setStatusMessage("Sync Complete");
-
-            setLastUpdated(new Date());
-            showSuccess(`Cloud sync successful! Database backed up to cloud as ${result.fileName}.`);
-
-        } catch (err: any) {
-            console.error(err);
-            setError(`Sync failed: ${err.message}`);
-            toast({
-                title: "Sync Failed",
-                description: "Could not upload to cloud storage. Check your network or storage permissions.",
-                variant: "destructive"
-            });
-            setIsLoading(false);
-            setBackupProgress(0);
-            setStatusMessage("");
-        }
-    };
-
-    const handleImportClick = () => {
-        fileInputRef.current?.click();
-    };
-
-    const handleRefresh = () => {
-        const storedDate = localStorage.getItem('etire_last_backup');
-        if (storedDate) setLastBackup(storedDate);
-        setLastUpdated(new Date());
-        toast({
-            title: "Refreshed",
-            description: "Backup status updated."
-        });
-    };
-
-    const getActionIcon = () => {
-        switch (currentAction) {
-            case 'export': return <Download className="h-6 w-6" />;
-            case 'import': return <Upload className="h-6 w-6" />;
-            case 'sync': return <CloudUpload className="h-6 w-6" />;
-            default: return <DatabaseBackup className="h-6 w-6" />;
-        }
-    };
-
-    const getActionTitle = () => {
-        switch (currentAction) {
-            case 'export': return "Exporting Data";
-            case 'import': return "Importing Data";
-            case 'sync': return "Syncing with Cloud";
-            default: return "Processing";
-        }
-    };
-
-    const getActionDescription = () => {
-        return statusMessage || "Please wait while we process your request...";
-    };
-
-    return (
-        <div className="min-h-screen bg-background">
-            <div className="w-full px-3 py-4">
-
-                {/* Compact Header */}
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-4">
-                        <h1 className="text-xl font-semibold text-foreground">
-                            Data Backup & Sync
-                        </h1>
-                        {lastUpdated && (
-                            <span className="text-sm text-muted-foreground hidden sm:inline">
-                                <Clock className="inline h-3.5 w-3.5 mr-1" />
-                                Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                            </span>
-                        )}
-                    </div>
-                    <Button onClick={handleRefresh} disabled={isLoading} variant="outline" size="sm">
-                        <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                    </Button>
-                </div>
-
-                {/* Hidden file input */}
-                <input
-                    type="file"
-                    accept=".json"
-                    onChange={importData}
-                    className="hidden"
-                    id="import-file"
-                    disabled={isLoading}
-                    ref={fileInputRef}
-                />
-
-                {error && (
-                    <Alert variant="destructive" className="mb-6 font-poppins bg-red-50 border-red-200">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle className="text-red-800">Error</AlertTitle>
-                        <AlertDescription className="text-red-700">{error}</AlertDescription>
-                    </Alert>
-                )}
-
-                {/* Enhanced Progress Indicator with Gradient */}
-                {isLoading && (
-                    <Card className="mb-6 bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
-                        <CardContent className="p-6">
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="p-3 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl text-white">
-                                    {getActionIcon()}
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="font-semibold text-slate-800 text-lg font-poppins">
-                                        {getActionTitle()}
-                                    </h3>
-                                    <p className="text-slate-600 font-poppins">
-                                        {getActionDescription()}
-                                    </p>
-                                </div>
-                                <div className="text-right">
-                                    <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
-                                        {backupProgress}%
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Enhanced Gradient Progress Bar */}
-                            <div className="relative w-full h-4 bg-slate-200 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full rounded-full bg-gradient-to-r from-purple-500 via-indigo-500 to-blue-500 transition-all duration-500 ease-out shadow-lg"
-                                    style={{ width: `${backupProgress}%` }}
-                                >
-                                    {/* Animated shimmer effect */}
-                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 animate-shimmer"></div>
-                                </div>
-                            </div>
-
-                            {/* File info for import */}
-                            {fileInfo && currentAction === 'import' && (
-                                <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                                    <div className="flex items-center gap-2 text-sm text-slate-600 font-poppins">
-                                        <FileCheck className="h-4 w-4 text-green-500" />
-                                        <span className="font-medium">{fileInfo.name}</span>
-                                        <span className="text-slate-400">•</span>
-                                        <span>{fileInfo.size}</span>
-                                    </div>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Backup Operations */}
-                    <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
-                        <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-purple-50/50 border-b border-slate-200/50">
-                            <CardTitle className="text-2xl font-bold text-slate-900 font-poppins flex items-center gap-3">
-                                <HardDrive className="h-7 w-7 text-purple-600" />
-                                Backup Operations
-                            </CardTitle>
-                            <CardDescription className="text-slate-600 font-poppins">
-                                Export and import your data for safekeeping
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-6 space-y-6">
-                            <div className="space-y-4">
-                                <h3 className="font-semibold text-slate-800 font-poppins flex items-center gap-2">
-                                    <Download className="h-5 w-5 text-purple-600" />
-                                    Export Data
-                                </h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <Button
-                                        onClick={() => exportData('json')}
-                                        disabled={isLoading}
-                                        className="h-14 font-poppins bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white border-0 shadow-md hover:shadow-lg transition-all duration-300"
-                                    >
-                                        <FileJson className="h-5 w-5 mr-2" />
-                                        JSON Backup
-                                    </Button>
-                                    <Button
-                                        onClick={() => exportData('csv')}
-                                        disabled={isLoading}
-                                        className="h-14 font-poppins bg-gradient-to-r from-blue-500 to-sky-600 hover:from-blue-600 hover:to-sky-700 text-white border-0 shadow-md hover:shadow-lg transition-all duration-300"
-                                    >
-                                        <FileSpreadsheet className="h-5 w-5 mr-2" />
-                                        CSV Report
-                                    </Button>
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <h3 className="font-semibold text-slate-800 font-poppins flex items-center gap-2">
-                                    <Upload className="h-5 w-5 text-blue-600" />
-                                    Restore Data
-                                </h3>
-                                <Button
-                                    onClick={handleImportClick}
-                                    disabled={isLoading}
-                                    className="w-full h-14 font-poppins bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white border-0 shadow-md hover:shadow-lg transition-all duration-300"
-                                >
-                                    <Upload className="h-5 w-5 mr-2" />
-                                    Choose Backup File to Import
-                                </Button>
-                                <p className="text-sm text-slate-500 font-poppins">
-                                    Select a previously exported JSON backup file to restore your data
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* System Status */}
-                    <Card className="bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
-                        <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-blue-50/50 border-b border-slate-200/50">
-                            <CardTitle className="text-2xl font-bold text-slate-900 font-poppins flex items-center gap-3">
-                                <Server className="h-7 w-7 text-blue-600" />
-                                System Status
-                            </CardTitle>
-                            <CardDescription className="text-slate-600 font-poppins">
-                                Current backup and sync status
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-6">
-                            <div className="space-y-6">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <CheckCircle className="h-5 w-5 text-green-500" />
-                                            <span className="font-semibold text-slate-800 font-poppins">Last Backup</span>
-                                        </div>
-                                        <p className="text-slate-600 font-poppins">
-                                            {lastBackup ? new Date(lastBackup).toLocaleDateString() + ' at ' + new Date(lastBackup).toLocaleTimeString() : 'Never'}
-                                        </p>
-                                    </div>
-
-                                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <Cloud className="h-5 w-5 text-blue-500" />
-                                            <span className="font-semibold text-slate-800 font-poppins">Cloud Status</span>
-                                        </div>
-                                        <p className="text-slate-600 font-poppins">Connected & Secure</p>
-                                    </div>
-
-                                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <Settings className="h-5 w-5 text-purple-500" />
-                                            <span className="font-semibold text-slate-800 font-poppins">Auto Backup</span>
-                                        </div>
-                                        <p className="text-slate-600 font-poppins">Daily at 2:00 AM</p>
-                                    </div>
-
-                                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <Shield className="h-5 w-5 text-green-500" />
-                                            <span className="font-semibold text-slate-800 font-poppins">Encryption</span>
-                                        </div>
-                                        <p className="text-slate-600 font-poppins">AES-256 Enabled</p>
-                                    </div>
-                                </div>
-
-                                <div className="pt-4">
-                                    <Button
-                                        onClick={syncData}
-                                        disabled={isLoading}
-                                        className="w-full h-14 font-poppins bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white border-0 shadow-md hover:shadow-lg transition-all duration-300"
-                                    >
-                                        <CloudUpload className="h-5 w-5 mr-2" />
-                                        Sync with Cloud Storage
-                                    </Button>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Best Practices */}
-                <Card className="mt-8 bg-white/90 backdrop-blur-sm border-slate-200/80 shadow-2xl rounded-3xl overflow-hidden border-0">
-                    <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-green-50/50 border-b border-slate-200/50">
-                        <CardTitle className="text-2xl font-bold text-slate-900 font-poppins flex items-center gap-3">
-                            <Shield className="h-7 w-7 text-green-600" />
-                            Backup Best Practices
-                        </CardTitle>
-                        <CardDescription className="text-slate-600 font-poppins">
-                            Follow these guidelines to ensure your data is always safe
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <div className="flex items-start gap-3">
-                                <div className="p-2 bg-green-100 rounded-lg">
-                                    <CheckCircle className="h-5 w-5 text-green-600" />
-                                </div>
-                                <div>
-                                    <h4 className="font-semibold text-slate-800 mb-1 font-poppins">Regular Backups</h4>
-                                    <p className="text-sm text-slate-600 font-poppins">
-                                        Export your data regularly (daily or weekly) to prevent data loss.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-3">
-                                <div className="p-2 bg-blue-100 rounded-lg">
-                                    <CheckCircle className="h-5 w-5 text-blue-600" />
-                                </div>
-                                <div>
-                                    <h4 className="font-semibold text-slate-800 mb-1 font-poppins">Multiple Formats</h4>
-                                    <p className="text-sm text-slate-600 font-poppins">
-                                        Keep backups in both JSON and CSV formats for maximum compatibility.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-3">
-                                <div className="p-2 bg-purple-100 rounded-lg">
-                                    <CheckCircle className="h-5 w-5 text-purple-600" />
-                                </div>
-                                <div>
-                                    <h4 className="font-semibold text-slate-800 mb-1 font-poppins">Secure Storage</h4>
-                                    <p className="text-sm text-slate-600 font-poppins">
-                                        Store backup files in secure, encrypted cloud storage or external drives.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-3">
-                                <div className="p-2 bg-orange-100 rounded-lg">
-                                    <CheckCircle className="h-5 w-5 text-orange-600" />
-                                </div>
-                                <div>
-                                    <h4 className="font-semibold text-slate-800 mb-1 font-poppins">Test Restores</h4>
-                                    <p className="text-sm text-slate-600 font-poppins">
-                                        Periodically test your backup files by importing them to ensure they work.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Success Confirmation Dialog */}
-            <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-                <DialogContent className="sm:max-w-md bg-gradient-to-br from-white to-green-50 border-0 shadow-2xl mt-20 font-poppins rounded-3xl">
-                    <DialogHeader className="text-center">
-                        <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
-                            <Check className="h-8 w-8 text-green-600" />
-                        </div>
-                        <DialogTitle className="text-2xl font-bold text-green-800 text-center font-poppins">
-                            Success!
-                        </DialogTitle>
-                        <DialogDescription className="text-slate-600 text-center font-poppins text-lg">
-                            {successMessage}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter className="sm:justify-center">
-                        <Button
-                            onClick={() => setShowSuccessDialog(false)}
-                            className={buttonStyles.success + " px-8"}
-                        >
-                            <Check className="h-5 w-5 mr-2" />
-                            Continue
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <style jsx global>{`
-                @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
-                
-                .font-poppins {
-                    font-family: 'Poppins', sans-serif;
-                }
-
-                .ease-spring {
-                    transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
-                }
-
-                @keyframes pulse {
-                    0%, 100% { opacity: 1; }
-                    50% { opacity: 0.5; }
-                }
-                
-                .animate-pulse {
-                    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-                }
-
-                @keyframes shimmer {
-                    0% { transform: translateX(-100%) skewX(-12deg); }
-                    100% { transform: translateX(200%) skewX(-12deg); }
-                }
-
-                .animate-shimmer {
-                    animation: shimmer 2s infinite;
-                }
-
-                /* Smooth transitions for all interactive elements */
-                button, input, select, textarea {
-                    transition: all 0.3s ease;
-                }
-            `}</style>
-        </div>
+        blob = new Blob([csv], { type: "text/csv" });
+        filename = `etire_export_${new Date().toISOString().split("T")[0]}.csv`;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      const now = new Date().toISOString();
+      setLastBackup(now);
+      localStorage.setItem("etire_last_backup", now);
+      finishSuccess(`${format.toUpperCase()} backup downloaded — ${payload.tableCount} tables exported.`);
+    } catch (e: unknown) {
+      failAction((e as Error).message);
+    }
+  }
+
+  // ── Import (restore) ──────────────────────────────────────────────────
+  async function importData(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !authUser) return;
+    askConfirm(
+      "Restore from Backup",
+      `Importing "${file.name}" will overwrite existing records with matching IDs. This cannot be undone.`,
+      () => doImport(file)
     );
+  }
+
+  async function doImport(file: File) {
+    setCurrentAction("import");
+    setIsLoading(true);
+    setError(null);
+    setBackupProgress(5);
+    setStatusMessage("Reading file…");
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (!parsed.tables || !parsed.meta) throw new Error("Invalid backup file — missing 'tables' or 'meta'.");
+
+      setStatusMessage("Uploading to server…");
+      setBackupProgress(40);
+
+      const res = await fetch("/api/backup/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileName: file.name, data: parsed }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Import failed");
+      const result = await res.json();
+      finishSuccess(`Restored from ${file.name}. ${result.restoredTables ?? Object.keys(parsed.tables).length} tables restored.`);
+    } catch (e: unknown) {
+      failAction((e as Error).message);
+    }
+  }
+
+  // ── Cloud backup ──────────────────────────────────────────────────────
+  async function runCloudBackup(silent = false) {
+    if (!authUser) return;
+    setCurrentAction("cloud");
+    setIsLoading(true);
+    setError(null);
+    setBackupProgress(15);
+    setStatusMessage("Uploading to Supabase Storage…");
+
+    try {
+      const res = await fetch("/api/backup/sync", { method: "POST" });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Cloud backup failed");
+      const result = await res.json();
+
+      const now = new Date().toISOString();
+      setLastBackup(now);
+      localStorage.setItem("etire_last_backup", now);
+      await loadBucketFiles();
+
+      if (silent) {
+        toast({ title: "Automatic backup complete", description: result.fileName });
+        setIsLoading(false); setBackupProgress(0); setStatusMessage(""); setCurrentAction(null);
+      } else {
+        finishSuccess(`Backup uploaded to Supabase Storage: ${result.fileName}`);
+      }
+    } catch (e: unknown) {
+      if (!silent) failAction((e as Error).message);
+      else { console.error("[auto-backup]", (e as Error).message); setIsLoading(false); setBackupProgress(0); setStatusMessage(""); setCurrentAction(null); }
+    }
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────
+  return (
+    <div className="bg-background min-h-screen">
+      <div className="flex flex-col gap-6 p-6">
+
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Database className="h-5 w-5 text-[#714B67]" />
+            <div>
+              <h1 className="text-xl font-bold text-foreground">Data Backup &amp; Sync</h1>
+              <p className="text-sm text-muted-foreground">Manage database backups and Supabase cloud storage</p>
+            </div>
+          </div>
+          <Button
+            variant="outline" size="sm"
+            className="gap-2"
+            onClick={() => { loadBucketFiles(); toast({ title: "Refreshed" }); }}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Progress bar */}
+        {isLoading && (
+          <Card className="border border-border">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="p-2.5 rounded-lg bg-[#714B67] text-white">
+                  {currentAction === "export" ? <Download className="h-5 w-5" /> :
+                   currentAction === "import" ? <Upload className="h-5 w-5" /> :
+                   <CloudUpload className="h-5 w-5" />}
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm">
+                    {currentAction === "export" ? "Exporting Data" :
+                     currentAction === "import" ? "Restoring Data" : "Uploading to Cloud"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{statusMessage}</p>
+                </div>
+                <span className="text-sm font-bold text-[#714B67]">{backupProgress}%</span>
+              </div>
+              <Progress value={backupProgress} className="h-2" />
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {/* ── Backup Operations ─────────────────────────────────────── */}
+          <Card className="rounded-lg border border-border">
+            <CardHeader className="pb-3 border-b border-border">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <HardDrive className="h-4 w-4 text-[#714B67]" />
+                Backup Operations
+              </CardTitle>
+              <CardDescription className="text-xs">Export, cloud sync, and restore data</CardDescription>
+            </CardHeader>
+            <CardContent className="p-5 space-y-5">
+
+              {/* Export */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Download className="h-3.5 w-3.5" /> Export &amp; Download
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={() => askConfirm(
+                      "Export JSON Backup",
+                      "This will export all data as a JSON backup file and download it to your device.",
+                      () => exportData("json")
+                    )}
+                    disabled={isLoading}
+                    className="bg-[#714B67] hover:bg-[#5a3c53] text-white gap-1.5 h-10"
+                  >
+                    <FileJson className="h-4 w-4" /> JSON
+                  </Button>
+                  <Button
+                    onClick={() => askConfirm(
+                      "Export CSV Report",
+                      "This will export all data as CSV files and download them to your device.",
+                      () => exportData("csv")
+                    )}
+                    disabled={isLoading}
+                    variant="outline"
+                    className="gap-1.5 h-10"
+                  >
+                    <FileSpreadsheet className="h-4 w-4" /> CSV
+                  </Button>
+                </div>
+              </div>
+
+              {/* Cloud Backup */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <CloudUpload className="h-3.5 w-3.5" /> Cloud Backup
+                </p>
+                <Button
+                  onClick={() => askConfirm(
+                    "Upload to Supabase Storage",
+                    "This will create a full JSON backup and upload it to the 'backups' bucket in your Supabase Storage.",
+                    () => runCloudBackup(false)
+                  )}
+                  disabled={isLoading}
+                  className="w-full bg-[#714B67] hover:bg-[#5a3c53] text-white gap-2 h-10"
+                >
+                  <CloudUpload className="h-4 w-4" />
+                  Backup to Cloud Now
+                </Button>
+              </div>
+
+              {/* Restore */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Upload className="h-3.5 w-3.5" /> Restore from File
+                </p>
+                <input ref={fileInputRef} type="file" accept=".json" onChange={importData} className="hidden" />
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading}
+                  variant="outline"
+                  className="w-full gap-2 h-10"
+                >
+                  <Upload className="h-4 w-4" />
+                  Choose Backup File
+                </Button>
+                <p className="text-xs text-muted-foreground">JSON files only. Overwrites matching records.</p>
+              </div>
+
+            </CardContent>
+          </Card>
+
+          {/* ── System Status ─────────────────────────────────────────── */}
+          <Card className="rounded-lg border border-border">
+            <CardHeader className="pb-3 border-b border-border">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Server className="h-4 w-4 text-[#714B67]" />
+                System Status
+              </CardTitle>
+              <CardDescription className="text-xs">Schedule and health overview</CardDescription>
+            </CardHeader>
+            <CardContent className="p-5 space-y-3">
+
+              <div className="rounded-lg border border-border p-3 space-y-1">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <span className="text-sm font-medium">Last Backup</span>
+                </div>
+                <p className="text-sm text-muted-foreground pl-6">
+                  {lastBackup
+                    ? new Date(lastBackup).toLocaleString("en-PH", {
+                        month: "short", day: "numeric", year: "numeric",
+                        hour: "numeric", minute: "2-digit", hour12: true,
+                      })
+                    : "No backup recorded yet"}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-border p-3 space-y-1">
+                <div className="flex items-center gap-2">
+                  <CalendarClock className="h-4 w-4 text-[#714B67]" />
+                  <span className="text-sm font-medium">Automatic Backup</span>
+                </div>
+                <p className="text-sm text-muted-foreground pl-6">
+                  Daily at <strong>10:00 AM</strong> and <strong>5:00 PM</strong>
+                </p>
+                {countdown && (
+                  <p className="text-xs text-[#714B67] font-medium pl-6">
+                    Next run in: {countdown}
+                    {nextTime && (
+                      <span className="text-muted-foreground font-normal">
+                        {" "}({nextTime.toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", hour12: true })})
+                      </span>
+                    )}
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-border p-3 space-y-1">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-green-500" />
+                  <span className="text-sm font-medium">Storage Target</span>
+                </div>
+                <p className="text-sm text-muted-foreground pl-6">
+                  Supabase Storage — <code className="text-xs bg-muted px-1 py-0.5 rounded">backups</code> bucket
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-border p-3 space-y-1">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-blue-500" />
+                  <span className="text-sm font-medium">Formats</span>
+                </div>
+                <p className="text-sm text-muted-foreground pl-6">JSON (full restore) + CSV (reporting)</p>
+              </div>
+
+              <div className="rounded-lg border border-border p-3 space-y-1">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Page Updated</span>
+                </div>
+                <p className="text-sm text-muted-foreground pl-6">
+                  {new Date().toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit", hour12: true })}
+                </p>
+              </div>
+
+            </CardContent>
+          </Card>
+
+          {/* ── Best Practices ────────────────────────────────────────── */}
+          <Card className="rounded-lg border border-border">
+            <CardHeader className="pb-3 border-b border-border">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Shield className="h-4 w-4 text-[#714B67]" />
+                Best Practices
+              </CardTitle>
+              <CardDescription className="text-xs">Keep your data safe</CardDescription>
+            </CardHeader>
+            <CardContent className="p-5 space-y-4">
+              {[
+                { color: "text-green-500", title: "Regular Backups", desc: "Export daily or weekly to prevent data loss." },
+                { color: "text-blue-500",  title: "Multiple Formats", desc: "Keep both JSON (restore) and CSV (reporting)." },
+                { color: "text-[#714B67]", title: "Cloud + Local",   desc: "Store a cloud copy AND a local downloaded copy." },
+                { color: "text-orange-500", title: "Test Restores",  desc: "Periodically import a backup to verify it works." },
+              ].map((item) => (
+                <div key={item.title} className="flex items-start gap-2.5">
+                  <CheckCircle className={`h-4 w-4 shrink-0 mt-0.5 ${item.color}`} />
+                  <div>
+                    <p className="text-sm font-medium">{item.title}</p>
+                    <p className="text-xs text-muted-foreground">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ── Cloud Backup Files (bucket list) ──────────────────────────── */}
+        <Card className="rounded-lg border border-border">
+          <CardHeader className="pb-3 border-b border-border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FolderOpen className="h-4 w-4 text-[#714B67]" />
+                <div>
+                  <CardTitle className="text-base font-semibold">Cloud Backup Files</CardTitle>
+                  <CardDescription className="text-xs">Files stored in Supabase Storage &mdash; <code className="text-xs bg-muted px-1 py-0.5 rounded">backups</code> bucket</CardDescription>
+                </div>
+              </div>
+              <Button
+                variant="outline" size="sm"
+                onClick={loadBucketFiles}
+                disabled={loadingFiles}
+                className="gap-1.5"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loadingFiles ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {loadingFiles ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-5 w-5 animate-spin text-[#714B67]" />
+              </div>
+            ) : bucketFiles.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground text-sm">
+                No backup files found in the storage bucket.
+                <br />
+                <span className="text-xs">Click &ldquo;Backup to Cloud Now&rdquo; to create the first one.</span>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50 border-b border-border text-xs text-muted-foreground">
+                    <th className="px-4 py-2.5 text-left font-medium">File Name</th>
+                    <th className="px-4 py-2.5 text-left font-medium">Size</th>
+                    <th className="px-4 py-2.5 text-left font-medium">Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bucketFiles.map((f) => (
+                    <tr key={f.id ?? f.name} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <FileJson className="h-4 w-4 text-[#714B67] shrink-0" />
+                          <span className="font-mono text-xs">{f.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-muted-foreground text-xs">
+                        {fmtSize(f.metadata?.size)}
+                      </td>
+                      <td className="px-4 py-2.5 text-muted-foreground text-xs">
+                        {f.created_at
+                          ? new Date(f.created_at).toLocaleString("en-PH", {
+                              month: "short", day: "numeric", year: "numeric",
+                              hour: "numeric", minute: "2-digit", hour12: true,
+                            })
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </CardContent>
+        </Card>
+
+      </div>
+
+      {/* ── Confirmation Dialog ────────────────────────────────────────── */}
+      <AlertDialog open={confirmOpen} onOpenChange={(v) => { if (!v) { setConfirmOpen(false); setPendingAction(null); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              {confirmTitle}
+            </AlertDialogTitle>
+            <AlertDialogDescription>{confirmDesc}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setConfirmOpen(false); setPendingAction(null); }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-[#714B67] hover:bg-[#5a3c53] text-white"
+              onClick={() => {
+                setConfirmOpen(false);
+                pendingAction?.();
+                setPendingAction(null);
+              }}
+            >
+              Proceed
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Success Dialog ─────────────────────────────────────────────── */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader className="text-center">
+            <div className="mx-auto flex items-center justify-center h-14 w-14 rounded-full bg-green-100 mb-3">
+              <Check className="h-7 w-7 text-green-600" />
+            </div>
+            <DialogTitle className="text-center">Done!</DialogTitle>
+            <DialogDescription className="text-center">{successMsg}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center">
+            <Button
+              className="bg-[#714B67] hover:bg-[#5a3c53] text-white gap-1.5"
+              onClick={() => setShowSuccessDialog(false)}
+            >
+              <Check className="h-4 w-4" />
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+    </div>
+  );
 }

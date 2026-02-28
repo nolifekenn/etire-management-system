@@ -1,1163 +1,993 @@
-// app/reports/page.tsx
+/* ────────────────────────────────────────────────────────────────────────────
+ * src/app/reports/page.tsx
+ * Phase 3 — Pivot / Report View
+ * Date-range picker · Tab selector · Group-by · Sortable table · CSV export
+ * ──────────────────────────────────────────────────────────────────────────── */
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabaseClient";
-import { fetchSalesReport, exportSalesReportPDF, exportSalesReportCSV } from "@/lib/salesReportService";
-import { fetchInventoryReport, exportInventoryReportPDF, exportInventoryReportCSV } from "@/lib/inventoryReportService";
-import { fetchServiceJobsReport, exportServiceJobsReportPDF, exportServiceJobsReportCSV } from "@/lib/serviceReportService";
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  DollarSign, Package, Wrench, RefreshCw,
+  Loader2, Search, AlertTriangle, ChevronUp, ChevronDown,
+  ArrowUpRight, Filter, FileSpreadsheet, FileText,
+} from 'lucide-react';
+import { format, subDays, startOfMonth, endOfMonth, startOfYear } from 'date-fns';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
-  DollarSign,
-  TrendingUp,
-  CheckCircle,
-  Wrench,
-  ShoppingCart,
-  RefreshCw,
-  Download,
-  Clock,
-  TrendingDown,
-  Zap,
-  Target,
-  Percent,
-  PieChart as PieChartIcon,
-  LineChart as LineChartIcon,
-  TrendingUp as TrendingUpIcon,
-  DollarSign as DollarSignIcon,
-  Package as PackageIcon,
-  Wrench as WrenchIcon
-} from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  PieChart,
-  Pie,
-  BarChart as RechartsBarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  Line,
-  AreaChart,
-  Area,
-  RadialBarChart,
-  RadialBar
-} from "recharts";
+  Popover, PopoverContent, PopoverTrigger,
+} from '@/components/ui/popover';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  getSalesReport,     type SalesReportRow,
+  getInventoryReport, type InventoryReportRow,
+  getServiceReport,   type ServiceReportRow,
+} from '@/lib/actions/analytics';
 
-import { useAuth } from "@/hooks/useAuth";
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-type JobSummaryRow = {
-  status: string | null;
-  job_id: string;
-  service_fee?: number | null;
+type ReportTab = 'sales' | 'inventory' | 'services';
+type SortDir   = 'asc' | 'desc';
+
+// ── Formatting ────────────────────────────────────────────────────────────────
+
+const fmt =   (n: number) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 2 }).format(n);
+const fmtQty = (n: number) => new Intl.NumberFormat('en-PH', { maximumFractionDigits: 0 }).format(n);
+
+// Radix UI: SelectItem must not have value="" — use sentinel
+const NONE   = '__none__';
+const toVal  = (v: string) => (v === NONE ? '' : v);
+const toSel  = (v: string) => (v === ''   ? NONE : v);
+
+// ── Date-range preset ────────────────────────────────────────────────────────
+
+interface DateRange { from: string; to: string; label: string }
+
+const PRESETS: DateRange[] = [
+  { from: format(subDays(new Date(), 6),  'yyyy-MM-dd'), to: format(new Date(), 'yyyy-MM-dd'), label: 'Last 7 days' },
+  { from: format(subDays(new Date(), 29), 'yyyy-MM-dd'), to: format(new Date(), 'yyyy-MM-dd'), label: 'Last 30 days' },
+  { from: format(startOfMonth(new Date()), 'yyyy-MM-dd'), to: format(endOfMonth(new Date()), 'yyyy-MM-dd'), label: 'This Month' },
+  { from: format(startOfYear(new Date()),  'yyyy-MM-dd'), to: format(new Date(), 'yyyy-MM-dd'), label: 'This Year' },
+];
+
+// ── Status color maps ────────────────────────────────────────────────────────
+
+const SALE_STATUS_COLORS: Record<string, string> = {
+  confirmed: 'bg-emerald-100 text-emerald-700',
+  done:      'bg-blue-100 text-blue-700',
+  draft:     'bg-gray-100 text-gray-600',
+  cancelled: 'bg-red-100 text-red-600',
 };
 
-type ServiceRevenueRecord = {
-  quantity?: number | null;
-  price_at_sale?: number | null;
+const SVC_STATE_COLORS: Record<string, string> = {
+  quotation:     'bg-gray-100 text-gray-600',
+  confirmed:     'bg-blue-100 text-blue-700',
+  in_progress:   'bg-amber-100 text-amber-700',
+  quality_check: 'bg-violet-100 text-violet-700',
+  completed:     'bg-emerald-100 text-emerald-700',
+  invoiced:      'bg-green-100 text-green-700',
+  cancelled:     'bg-red-100 text-red-600',
 };
 
-type PieLabelData = {
-  name?: string | number;
-  percent?: number;
-};
+// ── Sort helpers ─────────────────────────────────────────────────────────────
 
-export default function EnhancedReportsPage() {
-  const { activeBranchId } = useAuth();
-  const [summary, setSummary] = useState({
-    totalRevenue: 0,
-    totalProfit: 0,
-    itemsSold: 0,
-    stockValue: 0,
-    potentialRevenue: 0,
-    completedJobs: 0,
-    serviceFees: 0,
-    revenueGrowth: 0,
-    profitMargin: 0,
-    gmroi: 0, // Changed from stockTurnover to GMROI
-  });
+function SortIcon({ col, sortCol, sortDir }: { col: string; sortCol: string; sortDir: SortDir }) {
+  if (col !== sortCol) return <ChevronUp className="h-3 w-3 opacity-20" />;
+  return sortDir === 'asc'
+    ? <ChevronUp className="h-3 w-3" />
+    : <ChevronDown className="h-3 w-3" />;
+}
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [mounted, setMounted] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+function useSortedData<T extends Record<string, unknown>>(
+  data: T[], sortCol: string, sortDir: SortDir
+): T[] {
+  return useMemo(() => {
+    const sorted = [...data].sort((a, b) => {
+      const va = a[sortCol];
+      const vb = b[sortCol];
+      if (typeof va === 'number' && typeof vb === 'number') return sortDir === 'asc' ? va - vb : vb - va;
+      return sortDir === 'asc'
+        ? String(va ?? '').localeCompare(String(vb ?? ''))
+        : String(vb ?? '').localeCompare(String(va ?? ''));
+    });
+    return sorted;
+  }, [data, sortCol, sortDir]);
+}
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+// ── CSV export (accounting format) ──────────────────────────────────────────
 
-  const fetchSummary = useCallback(async () => {
-    try {
-      setIsLoading(true);
+const BOM = '\uFEFF'; // UTF-8 BOM so Excel reads ₱ correctly
 
-      // 🔹 SALES SUMMARY
-      const res = await fetchSalesReport({
-        date_from: "",
-        date_to: "",
-        branch_id: activeBranchId || "",
-        vehicle_type_id: "",
-      });
-
-      let totalRevenue = 0;
-      let totalProfit = 0;
-      let itemsSold = 0;
-
-      if (res?.sales?.length) {
-        totalRevenue = res.sales.reduce(
-          (sum, sale) => sum + (sale.total_amount || 0),
-          0
-        );
-
-        totalProfit = res.sales
-          .flatMap((sale) => sale.sale_item)
-          .reduce((sum, item) => sum + (item.profit || 0), 0);
-
-        itemsSold = res.sales
-          .flatMap((sale) => sale.sale_item)
-          .reduce((sum, item) => sum + (item.quantity || 0), 0);
-      }
-
-      // 🔹 INVENTORY SUMMARY
-      let invQuery = supabase
-        .from("view_branch_inventory")
-        .select("stock_quantity:quantity, cost_price, sale_price")
-        .is("deleted_at", null);
-
-      if (activeBranchId) {
-        invQuery = invQuery.eq('branch_id', activeBranchId);
-      }
-
-      const { data: inventory, error: invError } = await invQuery;
-
-      if (invError) console.error("Inventory summary error:", invError);
-
-      const stockValue =
-        inventory?.reduce(
-          (sum, i) => sum + (i.stock_quantity || 0) * (i.cost_price || 0),
-          0
-        ) || 0;
-
-      const potentialRevenue =
-        inventory?.reduce(
-          (sum, i) => sum + (i.stock_quantity || 0) * (i.sale_price || 0),
-          0
-        ) || 0;
-
-      // Helper: derive service revenue from recorded sales when service_fee column is unavailable
-      const deriveServiceRevenueFromSales = async () => {
-        let serviceRevenueQuery = supabase
-          .from('sale_item')
-          .select(`
-            quantity,
-            price_at_sale,
-            inventory_item!inner (
-              category
-            ),
-            sale!inner (
-              branch_id,
-              deleted_at
-            )
-          `)
-          .eq('inventory_item.category', 'service')
-          .is('sale.deleted_at', null);
-
-        if (activeBranchId) {
-          serviceRevenueQuery = serviceRevenueQuery.eq('sale.branch_id', activeBranchId);
-        }
-
-        const { data, error } = await serviceRevenueQuery;
-
-        if (error) {
-          console.error('Service revenue summary error:', error);
-          return 0;
-        }
-
-        return data?.reduce((sum: number, item: ServiceRevenueRecord) => (
-          sum + (item.price_at_sale || 0) * (item.quantity || 0)
-        ), 0) || 0;
-      };
-
-      // 🔹 SERVICE JOBS SUMMARY
-      let jobsQuery = supabase
-        .from("service_job")
-        .select("status, service_fee, job_id")
-        .is("deleted_at", null);
-
-      if (activeBranchId) {
-        jobsQuery = jobsQuery.eq('branch_id', activeBranchId);
-      }
-
-      const jobsResult = await jobsQuery;
-      let jobs: JobSummaryRow[] = (jobsResult.data as JobSummaryRow[]) ?? [];
-      let serviceFees = 0;
-      let completedJobs = 0;
-      let serviceRevenueFallbackNeeded = false;
-
-      if (jobsResult.error) {
-        console.error("Service jobs summary error:", jobsResult.error);
-
-        if (jobsResult.error.message?.toLowerCase().includes('service_fee')) {
-          serviceRevenueFallbackNeeded = true;
-
-          let fallbackQuery = supabase
-            .from('service_job')
-            .select('status, job_id')
-            .is('deleted_at', null);
-
-          if (activeBranchId) {
-            fallbackQuery = fallbackQuery.eq('branch_id', activeBranchId);
-          }
-
-          const fallbackResult = await fallbackQuery;
-
-          if (fallbackResult.error) {
-            console.error('Service jobs fallback summary error:', fallbackResult.error);
-          } else {
-            jobs = (fallbackResult.data ?? []).map((job) => ({
-              ...job,
-              service_fee: null,
-            }));
-          }
-        }
-      }
-
-      const completedRecords = jobs.filter((job) => job?.status === "completed");
-      completedJobs = completedRecords.length;
-
-      if (serviceRevenueFallbackNeeded) {
-        serviceFees = await deriveServiceRevenueFromSales();
-      } else {
-        serviceFees = completedRecords.reduce(
-          (sum, job) => sum + (job.service_fee ?? 0),
-          0
-        );
-      }
-
-      // 🔹 CALCULATE METRICS
-      const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-
-      // CALCULATE GMROI (Gross Margin Return on Inventory)
-      const gmroi = stockValue > 0 ? (totalProfit / stockValue) * 100 : 0;
-
-      // Mock revenue growth (in real app, compare with previous period)
-      const revenueGrowth = 12.5; // Example growth percentage
-
-      // ✅ Update summary state
-      setSummary({
-        totalRevenue,
-        totalProfit,
-        itemsSold,
-        stockValue,
-        potentialRevenue,
-        completedJobs,
-        serviceFees,
-        revenueGrowth,
-        profitMargin: parseFloat(profitMargin.toFixed(1)),
-        gmroi: parseFloat(gmroi.toFixed(1)), // GMROI instead of stock turnover
-      });
-
-      setLastUpdated(new Date());
-    } catch (err) {
-      console.error("Summary fetch error:", err);
-    } finally {
-      setIsLoading(false);
+function downloadCSV(
+  filename: string,
+  rows: Record<string, unknown>[],
+  cols: string[],
+  headers: string[],
+  numericCols: string[] = [],
+) {
+  const escape = (v: unknown, col: string) => {
+    const raw = v ?? '';
+    // Numeric columns: output plain decimal with 2 dp so Excel applies Accounting format correctly
+    if (numericCols.includes(col) && typeof raw === 'number') {
+      return raw.toFixed(2);
     }
-  }, [activeBranchId]);
+    const s = String(raw);
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? `"${s.replace(/"/g, '""')}"`
+      : s;
+  };
+  const lines = [headers.join(','), ...rows.map(r => cols.map(c => escape(r[c], c)).join(','))];
+  const blob  = new Blob([BOM + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url   = URL.createObjectURL(blob);
+  const a     = Object.assign(document.createElement('a'), { href: url, download: filename });
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
-  useEffect(() => {
-    fetchSummary();
-  }, [fetchSummary]);
+// ── PDF export helpers ────────────────────────────────────────────────────────
 
-  const handleRefresh = () => {
-    fetchSummary();
+const BRAND_COLOR: [number, number, number] = [113, 75, 103]; // eTire purple
+
+function fmtAcct(n: number): string {
+  if (n < 0) return `(${Math.abs(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+  return n === 0 ? '-  ' : n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function pdfHeader(doc: jsPDF, title: string, subtitle: string) {
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(...BRAND_COLOR);
+  doc.text('eTire MIS', 14, 13);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(80, 80, 80);
+  doc.text(title, 14, 19);
+  doc.text(subtitle, 14, 24);
+  doc.text(`Generated: ${format(new Date(), 'MMMM dd, yyyy hh:mm a')}`, 14, 29);
+  doc.setDrawColor(...BRAND_COLOR);
+  doc.setLineWidth(0.4);
+  doc.line(14, 31, doc.internal.pageSize.width - 14, 31);
+}
+
+// ── Summary bar ──────────────────────────────────────────────────────────────
+
+function SummaryBar({ items }: { items: { label: string; value: string; color?: string }[] }) {
+  return (
+    <div className="flex flex-wrap gap-4 rounded-lg border bg-muted/30 px-4 py-2.5">
+      {items.map(({ label, value, color = 'text-foreground' }) => (
+        <div key={label} className="text-center min-w-20">
+          <p className={`text-lg font-bold tracking-tight ${color}`}>{value}</p>
+          <p className="text-[11px] text-muted-foreground">{label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Th helper ────────────────────────────────────────────────────────────────
+
+function Th({
+  col, label, sortCol, sortDir, onClick, align = 'left',
+}: {
+  col: string; label: string; sortCol: string; sortDir: SortDir;
+  onClick: (c: string) => void; align?: 'left' | 'right';
+}) {
+  return (
+    <th
+      className={`px-3 py-2.5 text-xs font-semibold text-muted-foreground cursor-pointer select-none whitespace-nowrap
+        ${align === 'right' ? 'text-right' : 'text-left'}`}
+      onClick={() => onClick(col)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <SortIcon col={col} sortCol={sortCol} sortDir={sortDir} />
+      </span>
+    </th>
+  );
+}
+
+// ── Sales Table ───────────────────────────────────────────────────────────────
+
+function SalesTable({
+  rows, loading, search,
+}: { rows: SalesReportRow[]; loading: boolean; search: string }) {
+  const [sortCol, setSortCol] = useState('sale_date');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const filtered = useMemo(() => rows.filter(r =>
+    !search ||
+    (r.sale_number ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (r.customer_name ?? '').toLowerCase().includes(search.toLowerCase())
+  ), [rows, search]);
+
+  const sorted = useSortedData(filtered as unknown as Record<string, unknown>[], sortCol, sortDir);
+
+  const handleSort = (col: string) => {
+    if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir('asc'); }
   };
 
-  // Chart data calculations - UPDATED COLORS
-  const revenueSourcesData = [
-    {
-      name: 'Sales Revenue',
-      value: Math.max(0, summary.totalRevenue - summary.serviceFees),
-      color: '#9333ea', // Purple
-      description: 'Revenue from product sales'
-    },
-    {
-      name: 'Service Revenue',
-      value: summary.serviceFees,
-      color: '#4f46e5', // Indigo
-      description: 'Revenue from service jobs'
-    }
-  ];
-
-  const revenueProfitData = [
-    {
-      month: 'Jan',
-      revenue: summary.totalRevenue * 0.8,
-      profit: summary.totalProfit * 0.7,
-      target: summary.totalRevenue * 0.85
-    },
-    {
-      month: 'Feb',
-      revenue: summary.totalRevenue * 0.9,
-      profit: summary.totalProfit * 0.8,
-      target: summary.totalRevenue * 0.9
-    },
-    {
-      month: 'Mar',
-      revenue: summary.totalRevenue,
-      profit: summary.totalProfit,
-      target: summary.totalRevenue * 1.1
-    }
-  ];
-
-  const inventoryValueData = [
-    {
-      name: 'Current Value',
-      value: summary.stockValue,
-      color: '#3b82f6', // Blue (replaced orange)
-      description: 'Total cost of inventory on hand'
-    },
-    {
-      name: 'Potential Revenue',
-      value: summary.potentialRevenue,
-      color: '#14b8a6', // Teal
-      description: 'Revenue if all inventory is sold'
-    }
-  ];
-
-  const performanceMetricsData = [
-    {
-      metric: 'Profit Margin',
-      value: summary.profitMargin,
-      target: 20,
-      unit: '%',
-      color: '#10b981', // Green
-      description: 'Profit as percentage of revenue',
-      icon: <Percent className="w-4 h-4" />
-    },
-    {
-      metric: 'GMROI',
-      value: summary.gmroi,
-      target: 50,
-      unit: '%',
-      color: '#3b82f6', // Blue
-      description: 'Gross Margin Return on Inventory',
-      icon: <TrendingUpIcon className="w-4 h-4" />
-    },
-    {
-      metric: 'Service Efficiency',
-      value: Math.min((summary.completedJobs / 100) * 100, 100),
-      target: 80,
-      unit: '%',
-      color: '#8b5cf6', // Violet
-      description: 'Job completion rate',
-      icon: <CheckCircle className="w-4 h-4" />
-    }
-  ];
-
-  const kpiCardsData = [
-    {
-      title: "Total Revenue",
-      value: `₱${summary.totalRevenue.toLocaleString()}`,
-      icon: <DollarSignIcon className="h-5 w-5 text-white" />,
-      change: summary.revenueGrowth,
-      trend: "up",
-      color: "from-purple-600 to-indigo-600",
-      bgColor: "bg-purple-500/10",
-      description: "Combined sales and service revenue",
-      iconBg: "bg-gradient-to-r from-purple-600 to-indigo-600"
-    },
-    {
-      title: "Total Profit",
-      value: `₱${summary.totalProfit.toLocaleString()}`,
-      icon: <TrendingUpIcon className="h-5 w-5 text-white" />,
-      change: summary.profitMargin,
-      trend: summary.profitMargin > 0 ? "up" : "down",
-      color: "from-emerald-600 to-green-600",
-      bgColor: "bg-emerald-500/10",
-      description: "Net profit after costs",
-      iconBg: "bg-gradient-to-r from-emerald-600 to-green-600"
-    },
-    {
-      title: "Items Sold",
-      value: summary.itemsSold.toLocaleString(),
-      icon: <ShoppingCart className="h-5 w-5 text-white" />,
-      change: 8.2,
-      trend: "up",
-      color: "from-blue-600 to-sky-600",
-      bgColor: "bg-blue-500/10",
-      description: "Total units sold",
-      iconBg: "bg-gradient-to-r from-blue-600 to-sky-600"
-    },
-    {
-      title: "Service Revenue",
-      value: `₱${summary.serviceFees.toLocaleString()}`,
-      icon: <WrenchIcon className="h-5 w-5 text-white" />,
-      change: 15.3,
-      trend: "up",
-      color: "from-violet-600 to-purple-600", // Changed from red to violet
-      bgColor: "bg-violet-500/10", // Changed from red to violet
-      description: "Revenue from service jobs",
-      iconBg: "bg-gradient-to-r from-violet-600 to-purple-600" // Changed from red to violet
-    }
-  ];
-
-  // UPDATED COLORS - Removed orange, using purple, blue, green, teal palette
-  const COLORS = ['#9333ea', '#3b82f6', '#10b981', '#8b5cf6'];
+  const totalRevenue  = filtered.reduce((a, r) => a + r.total_amount, 0);
+  const totalDiscount = filtered.reduce((a, r) => a + r.discount, 0);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="w-full px-3 py-4">
-
-        {/* Compact Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-semibold text-foreground">
-              Reports & Analytics
-            </h1>
-            {lastUpdated && (
-              <span className="text-sm text-muted-foreground hidden sm:inline">
-                <Clock className="inline h-3.5 w-3.5 mr-1" />
-                Updated {lastUpdated.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-              </span>
+    <>
+      <SummaryBar items={[
+        { label: 'Transactions', value: fmtQty(filtered.length) },
+        { label: 'Total Revenue', value: fmt(totalRevenue), color: 'text-blue-600' },
+        { label: 'Total Discounts', value: fmt(totalDiscount), color: 'text-red-500' },
+        { label: 'Net', value: fmt(totalRevenue - totalDiscount), color: 'text-emerald-600' },
+      ]} />
+      <div className="overflow-x-auto rounded-lg border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 sticky top-0">
+            <tr>
+              <Th col="sale_number"   label="Sale #"         sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="sale_date"     label="Date"           sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="customer_name" label="Customer"       sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="branch_name"   label="Branch"         sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="payment_method" label="Payment"       sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="status"        label="Status"         sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="items_count"   label="Items"  align="right" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="discount"      label="Discount" align="right" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="total_amount"  label="Total"  align="right" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={9} className="py-12 text-center"><Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" /></td></tr>
+            ) : sorted.length === 0 ? (
+              <tr><td colSpan={9} className="py-12 text-center text-muted-foreground text-sm">No sales data found</td></tr>
+            ) : (
+              (sorted as unknown as SalesReportRow[]).map(row => (
+                <tr key={row.sale_id} className="border-t hover:bg-muted/30 transition-colors">
+                    <td className="px-3 py-2 font-mono text-xs text-blue-600">
+                    <a href={`/receipt/${row.sale_id}`} className="hover:underline inline-flex items-center gap-1">
+                      {row.sale_number ?? '—'} <ArrowUpRight className="h-3 w-3 opacity-60" />
+                    </a>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
+                    {format(new Date(row.sale_date), 'MMM dd, yyyy')}
+                  </td>
+                  <td className="px-3 py-2">{row.customer_name ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{row.branch_name ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs capitalize">{row.payment_method}</td>
+                  <td className="px-3 py-2">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${SALE_STATUS_COLORS[row.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {row.status}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-right text-xs">{row.items_count}</td>
+                  <td className="px-3 py-2 text-right text-xs text-red-500">{row.discount > 0 ? `-${fmt(row.discount)}` : '—'}</td>
+                  <td className="px-3 py-2 text-right font-semibold">{fmt(row.total_amount)}</td>
+                </tr>
+              ))
             )}
-          </div>
-          <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Download className="h-4 w-4" />
-                  Download Reports
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Sales Report</DropdownMenuLabel>
-                <DropdownMenuItem onClick={async () => {
-                  const data = await fetchSalesReport({});
-                  exportSalesReportPDF(data, {});
-                }}>
-                  <Download className="h-4 w-4 mr-2" /> PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={async () => {
-                  const data = await fetchSalesReport({});
-                  exportSalesReportCSV(data);
-                }}>
-                  <Download className="h-4 w-4 mr-2" /> CSV
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Inventory Report</DropdownMenuLabel>
-                <DropdownMenuItem onClick={async () => {
-                  const data = await fetchInventoryReport({});
-                  exportInventoryReportPDF(data, {});
-                }}>
-                  <Download className="h-4 w-4 mr-2" /> PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={async () => {
-                  const data = await fetchInventoryReport({});
-                  exportInventoryReportCSV(data);
-                }}>
-                  <Download className="h-4 w-4 mr-2" /> CSV
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Service Jobs Report</DropdownMenuLabel>
-                <DropdownMenuItem onClick={async () => {
-                  const { jobs } = await fetchServiceJobsReport({});
-                  exportServiceJobsReportPDF(jobs, {});
-                }}>
-                  <Download className="h-4 w-4 mr-2" /> PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={async () => {
-                  const { jobs } = await fetchServiceJobsReport({});
-                  exportServiceJobsReportCSV(jobs);
-                }}>
-                  <Download className="h-4 w-4 mr-2" /> CSV
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button onClick={handleRefresh} disabled={isLoading} variant="outline" size="sm">
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+// ── Inventory Table ────────────────────────────────────────────────────────────
+
+function InventoryTable({
+  rows, loading, search,
+}: { rows: InventoryReportRow[]; loading: boolean; search: string }) {
+  const [sortCol, setSortCol] = useState('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  const filtered = useMemo(() => rows.filter(r =>
+    !search ||
+    (r.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (r.sku ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (r.category ?? '').toLowerCase().includes(search.toLowerCase())
+  ), [rows, search]);
+
+  const sorted = useSortedData(filtered as unknown as Record<string, unknown>[], sortCol, sortDir);
+
+  const handleSort = (col: string) => {
+    if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir('asc'); }
+  };
+
+  const totalValue   = filtered.reduce((a, r) => a + r.stock_value, 0);
+  const lowStockCnt  = filtered.filter(r => r.is_low_stock).length;
+
+  return (
+    <>
+      <SummaryBar items={[
+        { label: 'SKUs', value: fmtQty(filtered.length) },
+        { label: 'Total Value', value: fmt(totalValue), color: 'text-emerald-600' },
+        { label: 'Low Stock', value: String(lowStockCnt), color: lowStockCnt > 0 ? 'text-red-500' : 'text-foreground' },
+      ]} />
+      <div className="overflow-x-auto rounded-lg border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 sticky top-0">
+            <tr>
+              <Th col="name"           label="Item Name"   sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="category"       label="Category"    sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="sku"            label="SKU"         sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="branch_name"    label="Branch"      sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="supplier_name"  label="Supplier"    sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="stock_quantity" label="On Hand"  align="right" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="ledger_on_hand" label="Ledger Qty" align="right" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="cost_price"     label="Cost"    align="right" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="sale_price"     label="Sales Price" align="right" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="stock_value"    label="Value"   align="right" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="reorder_level"  label="Reorder" align="right" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={11} className="py-12 text-center"><Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" /></td></tr>
+            ) : sorted.length === 0 ? (
+              <tr><td colSpan={11} className="py-12 text-center text-muted-foreground text-sm">No inventory data found</td></tr>
+            ) : (
+              (sorted as unknown as InventoryReportRow[]).map(row => (
+                <tr
+                  key={row.item_id}
+                  className={`border-t transition-colors ${row.is_low_stock ? 'bg-red-50/50 hover:bg-red-50' : 'hover:bg-muted/30'}`}
+                >
+                  <td className="px-3 py-2 font-medium">
+                    {row.name}
+                    {row.is_low_stock && (
+                      <Badge variant="destructive" className="ml-2 text-[10px] px-1.5 py-0">Low</Badge>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-xs capitalize text-muted-foreground">{row.category}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{row.sku ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{row.branch_name ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{row.supplier_name ?? '—'}</td>
+                  <td className="px-3 py-2 text-right">{fmtQty(row.stock_quantity)}</td>
+                  <td className="px-3 py-2 text-right text-xs text-muted-foreground">{fmtQty(row.ledger_on_hand)}</td>
+                  <td className="px-3 py-2 text-right text-xs">{fmt(row.cost_price)}</td>
+                  <td className="px-3 py-2 text-right text-xs">{fmt(row.sale_price)}</td>
+                  <td className="px-3 py-2 text-right font-semibold">{fmt(row.stock_value)}</td>
+                  <td className="px-3 py-2 text-right text-xs text-muted-foreground">{row.reorder_level}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+// ── Services Table ────────────────────────────────────────────────────────────
+
+function ServicesTable({
+  rows, loading, search,
+}: { rows: ServiceReportRow[]; loading: boolean; search: string }) {
+  const [sortCol, setSortCol] = useState('job_date');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const filtered = useMemo(() => rows.filter(r =>
+    !search ||
+    (r.job_number ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (r.customer_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (r.plate_number ?? '').toLowerCase().includes(search.toLowerCase())
+  ), [rows, search]);
+
+  const sorted = useSortedData(filtered as unknown as Record<string, unknown>[], sortCol, sortDir);
+
+  const handleSort = (col: string) => {
+    if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir('asc'); }
+  };
+
+  const totalValue  = filtered.reduce((a, r) => a + r.total_value, 0);
+  const partsValue  = filtered.reduce((a, r) => a + r.parts_value, 0);
+  const laborValue  = filtered.reduce((a, r) => a + r.labor_value, 0);
+
+  return (
+    <>
+      <SummaryBar items={[
+        { label: 'Jobs', value: fmtQty(filtered.length) },
+        { label: 'Total Value', value: fmt(totalValue), color: 'text-violet-600' },
+        { label: 'Parts', value: fmt(partsValue), color: 'text-blue-600' },
+        { label: 'Labor', value: fmt(laborValue), color: 'text-amber-600' },
+      ]} />
+      <div className="overflow-x-auto rounded-lg border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 sticky top-0">
+            <tr>
+              <Th col="job_number"    label="Job #"       sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="job_date"      label="Date"        sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="state"         label="State"       sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="priority"      label="Priority"    sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="customer_name" label="Customer"    sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="plate_number"  label="Plate"       sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="mechanic_name" label="Mechanic"    sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="branch_name"   label="Branch"      sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="items_count"   label="Items" align="right" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="parts_value"   label="Parts" align="right" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="labor_value"   label="Labor" align="right" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+              <Th col="total_value"   label="Total" align="right" sortCol={sortCol} sortDir={sortDir} onClick={handleSort} />
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={12} className="py-12 text-center"><Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" /></td></tr>
+            ) : sorted.length === 0 ? (
+              <tr><td colSpan={12} className="py-12 text-center text-muted-foreground text-sm">No service data found</td></tr>
+            ) : (
+              (sorted as unknown as ServiceReportRow[]).map(row => (
+                <tr key={row.job_id} className="border-t hover:bg-muted/30 transition-colors">
+                  <td className="px-3 py-2 font-mono text-xs text-violet-600">
+                    <a href={`/services/${row.job_id}`} className="hover:underline inline-flex items-center gap-1">
+                      {row.job_number ?? '—'} <ArrowUpRight className="h-3 w-3 opacity-60" />
+                    </a>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
+                    {format(new Date(row.job_date), 'MMM dd, yyyy')}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${SVC_STATE_COLORS[row.state] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {row.state.replace('_', ' ')}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-xs capitalize text-muted-foreground">{row.priority}</td>
+                  <td className="px-3 py-2">{row.customer_name ?? '—'}</td>
+                  <td className="px-3 py-2 font-mono text-xs">{row.plate_number ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{row.mechanic_name ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{row.branch_name ?? '—'}</td>
+                  <td className="px-3 py-2 text-right text-xs">{row.items_count}</td>
+                  <td className="px-3 py-2 text-right text-xs text-blue-600">{fmt(row.parts_value)}</td>
+                  <td className="px-3 py-2 text-right text-xs text-amber-600">{fmt(row.labor_value)}</td>
+                  <td className="px-3 py-2 text-right font-semibold">{fmt(row.total_value)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
+
+export default function ReportsPage() {
+  const { activeBranchId } = useAuth();
+
+  const [activeTab,     setActiveTab]     = useState<ReportTab>('sales');
+  const [dateRange,     setDateRange]     = useState<DateRange>(PRESETS[1]);
+  const [customFrom,    setCustomFrom]    = useState('');
+  const [customTo,      setCustomTo]      = useState('');
+  const [showCustom,    setShowCustom]    = useState(false);
+
+  // Filter state per tab
+  const [salesStatus,   setSalesStatus]   = useState('');
+  const [invCategory,   setInvCategory]   = useState('');
+  const [invLowStock,   setInvLowStock]   = useState(false);
+  const [svcState,      setSvcState]      = useState('');
+  const [search,        setSearch]        = useState('');
+
+  // Data
+  const [salesRows,     setSalesRows]     = useState<SalesReportRow[]>([]);
+  const [invRows,       setInvRows]       = useState<InventoryReportRow[]>([]);
+  const [svcRows,       setSvcRows]       = useState<ServiceReportRow[]>([]);
+  const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState<string | null>(null);
+
+  const branchFilter = activeBranchId ? { branch_id: activeBranchId } : {};
+
+  // ── Loaders ───────────────────────────────────────────────────────────────
+
+  const loadSales = useCallback(async () => {
+    setLoading(true); setError(null);
+    const res = await getSalesReport({
+      ...branchFilter,
+      date_from: dateRange.from,
+      date_to:   dateRange.to,
+      status:    salesStatus || undefined,
+      page_size: 500,
+    });
+    if (res.success) setSalesRows(res.rows);
+    else setError(res.error ?? 'Failed to load sales');
+    setLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBranchId, dateRange, salesStatus]);
+
+  const loadInventory = useCallback(async () => {
+    setLoading(true); setError(null);
+    const res = await getInventoryReport({
+      ...branchFilter,
+      category:       invCategory || undefined,
+      low_stock_only: invLowStock,
+    });
+    if (res.success) setInvRows(res.rows);
+    else setError(res.error ?? 'Failed to load inventory');
+    setLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBranchId, invCategory, invLowStock]);
+
+  const loadServices = useCallback(async () => {
+    setLoading(true); setError(null);
+    const res = await getServiceReport({
+      ...branchFilter,
+      date_from: dateRange.from,
+      date_to:   dateRange.to,
+      state:     svcState || undefined,
+    });
+    if (res.success) setSvcRows(res.rows);
+    else setError(res.error ?? 'Failed to load services');
+    setLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBranchId, dateRange, svcState]);
+
+  // Reload when tab or relevant filters change
+  useEffect(() => {
+    setSearch('');
+    if (activeTab === 'sales')     loadSales();
+    if (activeTab === 'inventory') loadInventory();
+    if (activeTab === 'services')  loadServices();
+  }, [activeTab, loadSales, loadInventory, loadServices]);
+
+  // ── CSV export ──────────────────────────────────────────────────────────
+
+  const handleExportCSV = () => {
+    if (activeTab === 'sales') {
+      downloadCSV(
+        `sales-report-${dateRange.from}-${dateRange.to}.csv`,
+        salesRows as unknown as Record<string, unknown>[],
+        ['sale_number','sale_date','customer_name','branch_name','payment_method','status','items_count','discount','total_amount'],
+        ['Sale #','Date','Customer','Branch','Payment Method','Status','Items','Discount (PHP)','Total Amount (PHP)'],
+        ['discount','total_amount'],
+      );
+    } else if (activeTab === 'inventory') {
+      downloadCSV(
+        `inventory-report-${format(new Date(), 'yyyy-MM-dd')}.csv`,
+        invRows as unknown as Record<string, unknown>[],
+        ['name','category','sku','branch_name','supplier_name','stock_quantity','ledger_on_hand','cost_price','sale_price','stock_value','reorder_level','is_low_stock'],
+        ['Product','Category','SKU','Branch','Supplier','Stock Qty','Ledger On Hand','Cost Price (PHP)','Selling Price (PHP)','Stock Value (PHP)','Reorder Level','Low Stock Alert'],
+        ['cost_price','sale_price','stock_value'],
+      );
+    } else {
+      downloadCSV(
+        `services-report-${dateRange.from}-${dateRange.to}.csv`,
+        svcRows as unknown as Record<string, unknown>[],
+        ['job_number','job_date','state','priority','customer_name','plate_number','mechanic_name','branch_name','items_count','parts_value','labor_value','total_value'],
+        ['Job #','Date','Status','Priority','Customer','Plate Number','Mechanic','Branch','Items','Parts (PHP)','Labor (PHP)','Total Value (PHP)'],
+        ['parts_value','labor_value','total_value'],
+      );
+    }
+  };
+
+  // ── PDF export ──────────────────────────────────────────────────────────
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+    if (activeTab === 'sales') {
+      pdfHeader(doc, 'Sales Report', `Period: ${dateRange.from}  to  ${dateRange.to}`);
+      const totalAmount   = salesRows.reduce((s, r) => s + (r.total_amount ?? 0), 0);
+      const totalDiscount = salesRows.reduce((s, r) => s + (r.discount    ?? 0), 0);
+      autoTable(doc, {
+        startY: 35,
+        head: [['Sale #','Date','Customer','Branch','Payment Method','Status','Items','Discount (PHP)','Total Amount (PHP)']],        body: salesRows.map(r => [
+          r.sale_number ?? '-',
+          r.sale_date ? r.sale_date.slice(0, 10) : '-',
+          r.customer_name ?? '-',
+          r.branch_name   ?? '-',
+          (r.payment_method ?? 'cash').replace(/_/g,' '),
+          (r.status ?? '').toUpperCase(),
+          String(r.items_count ?? 0),
+          fmtAcct(r.discount ?? 0),
+          fmtAcct(r.total_amount ?? 0),
+        ]),
+        foot: [['','','','','','','Totals', fmtAcct(totalDiscount), fmtAcct(totalAmount)]],
+        styles:      { fontSize: 8, cellPadding: 2 },
+        headStyles:  { fillColor: BRAND_COLOR, textColor: 255, fontStyle: 'bold', fontSize: 8 },
+        footStyles:  { fillColor: [240, 235, 245], textColor: [50, 20, 70], fontStyle: 'bold' },
+        columnStyles: { 7: { halign: 'right' }, 8: { halign: 'right' } },
+        alternateRowStyles: { fillColor: [251, 248, 252] },
+      });
+      doc.save(`sales-report-${dateRange.from}-${dateRange.to}.pdf`);
+
+    } else if (activeTab === 'inventory') {
+      pdfHeader(doc, 'Inventory Report', `As of ${format(new Date(), 'MMMM dd, yyyy')}`);
+      const totalStockValue = invRows.reduce((s, r) => s + (r.stock_value ?? 0), 0);
+      autoTable(doc, {
+        startY: 35,
+        head: [['Product','Category','SKU','Branch','Supplier','Stock Qty','Ledger QOH','Cost (PHP)','Price (PHP)','Stock Value (PHP)','Reorder','Alert']],
+        body: invRows.map(r => [
+          r.name,
+          r.category ?? '-',
+          r.sku ?? '-',
+          r.branch_name   ?? '-',
+          r.supplier_name ?? '-',
+          String(r.stock_quantity ?? 0),
+          String(r.ledger_on_hand ?? 0),
+          fmtAcct(r.cost_price ?? 0),
+          fmtAcct(r.sale_price  ?? 0),
+          fmtAcct(r.stock_value ?? 0),
+          String(r.reorder_level ?? 5),
+          r.is_low_stock ? 'LOW' : '',
+        ]),
+        foot: [['','','','','','','','','Total Stock Value', fmtAcct(totalStockValue),'','']],
+        styles:      { fontSize: 7, cellPadding: 1.8 },
+        headStyles:  { fillColor: BRAND_COLOR, textColor: 255, fontStyle: 'bold', fontSize: 7 },
+        footStyles:  { fillColor: [240, 235, 245], textColor: [50, 20, 70], fontStyle: 'bold' },
+        columnStyles: { 7: { halign: 'right' }, 8: { halign: 'right' }, 9: { halign: 'right' } },
+        alternateRowStyles: { fillColor: [251, 248, 252] },
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.column.index === 11) {
+            const val = data.cell.raw as string;
+            if (val === 'LOW') data.cell.styles.textColor = [220, 38, 38];
+          }
+        },
+      });
+      doc.save(`inventory-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+
+    } else {
+      pdfHeader(doc, 'Services Report', `Period: ${dateRange.from}  to  ${dateRange.to}`);
+      const totalParts  = svcRows.reduce((s, r) => s + (r.parts_value ?? 0), 0);
+      const totalLabor  = svcRows.reduce((s, r) => s + (r.labor_value ?? 0), 0);
+      const totalValue  = svcRows.reduce((s, r) => s + (r.total_value ?? 0), 0);
+      autoTable(doc, {
+        startY: 35,
+        head: [['Job #','Date','Status','Priority','Customer','Plate','Mechanic','Branch','Items','Parts (PHP)','Labor (PHP)','Total (PHP)']],
+        body: svcRows.map(r => [
+          r.job_number ?? '-',
+          r.job_date ? r.job_date.slice(0, 10) : '-',
+          (r.state ?? '').replace(/_/g,' '),
+          (r.priority ?? '-'),
+          r.customer_name ?? '-',
+          r.plate_number  ?? '-',
+          r.mechanic_name ?? '-',
+          r.branch_name   ?? '-',
+          String(r.items_count ?? 0),
+          fmtAcct(r.parts_value ?? 0),
+          fmtAcct(r.labor_value ?? 0),
+          fmtAcct(r.total_value ?? 0),
+        ]),
+        foot: [['','','','','','','','Totals','', fmtAcct(totalParts), fmtAcct(totalLabor), fmtAcct(totalValue)]],
+        styles:      { fontSize: 7.5, cellPadding: 2 },
+        headStyles:  { fillColor: BRAND_COLOR, textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
+        footStyles:  { fillColor: [240, 235, 245], textColor: [50, 20, 70], fontStyle: 'bold' },
+        columnStyles: { 9: { halign: 'right' }, 10: { halign: 'right' }, 11: { halign: 'right' } },
+        alternateRowStyles: { fillColor: [251, 248, 252] },
+      });
+      doc.save(`services-report-${dateRange.from}-${dateRange.to}.pdf`);
+    }
+  };
+
+  // ── Consolidated PDF (all 3 reports in one document) ────────────────────────
+
+  const handleExportConsolidatedPDF = () => {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageW = doc.internal.pageSize.width;
+    const pageH = doc.internal.pageSize.height;
+
+    // ── Cover page ──
+    doc.setFillColor(...BRAND_COLOR);
+    doc.rect(0, 0, pageW, 45, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(255, 255, 255);
+    doc.text('eTire MIS', 14, 20);
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Consolidated Business Report', 14, 29);
+    doc.setFontSize(9);
+    doc.text(`Period: ${dateRange.from}  to  ${dateRange.to}`, 14, 37);
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${format(new Date(), 'MMMM dd, yyyy hh:mm a')}`, 14, 54);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...BRAND_COLOR);
+    doc.text('Table of Contents', 14, 68);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(60, 60, 60);
+    doc.text('1.  Sales Report', 20, 78);
+    doc.text('2.  Inventory Report', 20, 86);
+    doc.text('3.  Services Report', 20, 94);
+    doc.setDrawColor(...BRAND_COLOR);
+    doc.setLineWidth(0.3);
+    doc.line(14, 100, pageW - 14, 100);
+    doc.setFontSize(8);
+    doc.setTextColor(160, 160, 160);
+    doc.text('eTire Management Information System  |  Confidential', pageW / 2, pageH - 8, { align: 'center' });
+
+    // ── Page 2: Sales ──
+    doc.addPage();
+    pdfHeader(doc, 'Section 1  -  Sales Report', `Period: ${dateRange.from}  to  ${dateRange.to}`);
+    const sTotalAmount   = salesRows.reduce((s, r) => s + (r.total_amount ?? 0), 0);
+    const sTotalDiscount = salesRows.reduce((s, r) => s + (r.discount    ?? 0), 0);
+    autoTable(doc, {
+      startY: 35,
+      head: [['Sale #','Date','Customer','Branch','Payment Method','Status','Items','Discount (PHP)','Total Amount (PHP)']],
+      body: salesRows.map(r => [
+        r.sale_number ?? '-',
+        r.sale_date ? r.sale_date.slice(0, 10) : '-',
+        r.customer_name ?? '-',
+        r.branch_name   ?? '-',
+        (r.payment_method ?? 'cash').replace(/_/g,' '),
+        (r.status ?? '').toUpperCase(),
+        String(r.items_count ?? 0),
+        fmtAcct(r.discount ?? 0),
+        fmtAcct(r.total_amount ?? 0),
+      ]),
+      foot: [['','','','','','','Totals', fmtAcct(sTotalDiscount), fmtAcct(sTotalAmount)]],
+      styles:      { fontSize: 8, cellPadding: 2 },
+      headStyles:  { fillColor: BRAND_COLOR, textColor: 255, fontStyle: 'bold', fontSize: 8 },
+      footStyles:  { fillColor: [240, 235, 245], textColor: [50, 20, 70], fontStyle: 'bold' },
+      columnStyles: { 7: { halign: 'right' }, 8: { halign: 'right' } },
+      alternateRowStyles: { fillColor: [251, 248, 252] },
+    });
+
+    // ── Page 3: Inventory ──
+    doc.addPage();
+    pdfHeader(doc, 'Section 2  -  Inventory Report', `As of ${format(new Date(), 'MMMM dd, yyyy')}`);
+    const iTotalStockValue = invRows.reduce((s, r) => s + (r.stock_value ?? 0), 0);
+    autoTable(doc, {
+      startY: 35,
+      head: [['Product','Category','SKU','Branch','Supplier','Stock Qty','Ledger QOH','Cost (PHP)','Price (PHP)','Stock Value (PHP)','Reorder','Alert']],
+      body: invRows.map(r => [
+        r.name,
+        r.category ?? '-',
+        r.sku ?? '-',
+        r.branch_name   ?? '-',
+        r.supplier_name ?? '-',
+        String(r.stock_quantity ?? 0),
+        String(r.ledger_on_hand ?? 0),
+        fmtAcct(r.cost_price ?? 0),
+        fmtAcct(r.sale_price  ?? 0),
+        fmtAcct(r.stock_value ?? 0),
+        String(r.reorder_level ?? 5),
+        r.is_low_stock ? 'LOW' : '',
+      ]),
+      foot: [['','','','','','','','','Total Stock Value', fmtAcct(iTotalStockValue),'','']],
+      styles:      { fontSize: 7, cellPadding: 1.8 },
+      headStyles:  { fillColor: BRAND_COLOR, textColor: 255, fontStyle: 'bold', fontSize: 7 },
+      footStyles:  { fillColor: [240, 235, 245], textColor: [50, 20, 70], fontStyle: 'bold' },
+      columnStyles: { 7: { halign: 'right' }, 8: { halign: 'right' }, 9: { halign: 'right' } },
+      alternateRowStyles: { fillColor: [251, 248, 252] },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index === 11 && data.cell.raw === 'LOW') {
+          data.cell.styles.textColor = [220, 38, 38];
+        }
+      },
+    });
+
+    // ── Page 4: Services ──
+    doc.addPage();
+    pdfHeader(doc, 'Section 3  -  Services Report', `Period: ${dateRange.from}  to  ${dateRange.to}`);
+    const svTotalParts = svcRows.reduce((s, r) => s + (r.parts_value ?? 0), 0);
+    const svTotalLabor = svcRows.reduce((s, r) => s + (r.labor_value ?? 0), 0);
+    const svTotalValue = svcRows.reduce((s, r) => s + (r.total_value ?? 0), 0);
+    autoTable(doc, {
+      startY: 35,
+      head: [['Job #','Date','Status','Priority','Customer','Plate','Mechanic','Branch','Items','Parts (PHP)','Labor (PHP)','Total (PHP)']],
+      body: svcRows.map(r => [
+        r.job_number ?? '-',
+        r.job_date ? r.job_date.slice(0, 10) : '-',
+        (r.state ?? '').replace(/_/g,' '),
+        (r.priority ?? '-'),
+        r.customer_name ?? '-',
+        r.plate_number  ?? '-',
+        r.mechanic_name ?? '-',
+        r.branch_name   ?? '-',
+        String(r.items_count ?? 0),
+        fmtAcct(r.parts_value ?? 0),
+        fmtAcct(r.labor_value ?? 0),
+        fmtAcct(r.total_value ?? 0),
+      ]),
+      foot: [['','','','','','','','Totals','', fmtAcct(svTotalParts), fmtAcct(svTotalLabor), fmtAcct(svTotalValue)]],
+      styles:      { fontSize: 7.5, cellPadding: 2 },
+      headStyles:  { fillColor: BRAND_COLOR, textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
+      footStyles:  { fillColor: [240, 235, 245], textColor: [50, 20, 70], fontStyle: 'bold' },
+      columnStyles: { 9: { halign: 'right' }, 10: { halign: 'right' }, 11: { halign: 'right' } },
+      alternateRowStyles: { fillColor: [251, 248, 252] },
+    });
+
+    doc.save(`consolidated-report-${dateRange.from}-${dateRange.to}.pdf`);
+  };
+
+  // ── Apply custom date range ───────────────────────────────────────────────
+
+  const applyCustomRange = () => {
+    if (customFrom && customTo) {
+      setDateRange({ from: customFrom, to: customTo, label: `${customFrom} → ${customTo}` });
+      setShowCustom(false);
+    }
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="p-4 md:p-6 space-y-4 max-w-[1600px] mx-auto">
+
+      {/* ── Header ───────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Pivot reports with date filtering, CSV and PDF export (accounting format)</p>
         </div>
-
-        {/* KPI Cards - Minimal Overview */}
-        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
-          }`}>
-          {kpiCardsData.map((card, index) => (
-            <Card key={index} className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300 hover:border-slate-300">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`p-3 rounded-xl ${card.iconBg}`}>
-                    {card.icon}
-                  </div>
-                  <div className={`flex items-center gap-1 text-sm font-medium px-2.5 py-1 rounded-full ${card.trend === 'up' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                    {card.trend === 'up' ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                    {card.change}%
-                  </div>
-                </div>
-                <p className="text-sm font-medium text-slate-600 mb-1">{card.title}</p>
-                <p className="text-2xl font-bold text-slate-900 mb-2">{card.value}</p>
-                <p className="text-xs text-slate-500">{card.description}</p>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline" size="sm"
+            onClick={() => {
+              if (activeTab === 'sales')     loadSales();
+              if (activeTab === 'inventory') loadInventory();
+              if (activeTab === 'services')  loadServices();
+            }}
+            className="gap-1.5"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Refresh
+          </Button>
+          <Button size="sm" onClick={handleExportCSV} variant="outline" className="gap-1.5">
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            CSV
+          </Button>
+          <Button size="sm" onClick={handleExportPDF} className="gap-1.5 bg-[#714B67] hover:bg-[#5a3c53] text-white">
+            <FileText className="h-3.5 w-3.5" />
+            PDF
+          </Button>
+          <Button size="sm" onClick={handleExportConsolidatedPDF} variant="outline" className="gap-1.5 border-[#714B67] text-[#714B67] hover:bg-[#714B67]/10">
+            <FileText className="h-3.5 w-3.5" />
+            Full Report
+          </Button>
         </div>
-
-        {/* MAIN CHART SECTION */}
-        <div className="space-y-8">
-
-          {/* Revenue Analysis Row */}
-          <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
-            }`}>
-            {/* Revenue Sources Pie Chart */}
-            <Card className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-3 mb-6">
-                  <div className="p-3 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl">
-                    <PieChartIcon className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-slate-900 font-poppins">Revenue Distribution</h3>
-                    <p className="text-sm text-slate-500 font-poppins">
-                      Visual breakdown of income sources between product sales and service fees
-                    </p>
-                  </div>
-                </div>
-
-                <div className="h-64 mb-6">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={revenueSourcesData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={90}
-                        paddingAngle={2}
-                        dataKey="value"
-                        label={({ name, percent }: PieLabelData) => `${name}: ${((percent || 0) * 100).toFixed(1)}%`}
-                        animationDuration={800}
-                      >
-                        {revenueSourcesData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={COLORS[index % COLORS.length]}
-                            stroke="white"
-                            strokeWidth={2}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value, name, props) => {
-                          const { payload } = props;
-                          return [
-                            `₱${Number(value).toLocaleString()}`,
-                            payload.description || name
-                          ];
-                        }}
-                        contentStyle={{
-                          backgroundColor: 'white',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontFamily: "'Poppins', sans-serif",
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-
-                <div className="space-y-3">
-                  {revenueSourcesData.map((source, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: source.color }}></div>
-                        <div>
-                          <p className="text-sm font-medium text-slate-800">{source.name}</p>
-                          <p className="text-xs text-slate-500">{source.description}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-slate-900">₱{source.value.toLocaleString()}</p>
-                        <p className="text-xs text-slate-500">
-                          {((source.value / summary.totalRevenue) * 100 || 0).toFixed(1)}% of total
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Revenue & Profit Trend */}
-            <Card className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-3 mb-6">
-                  <div className="p-3 bg-gradient-to-r from-emerald-500 to-green-600 rounded-xl">
-                    <LineChartIcon className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-slate-900 font-poppins">Revenue & Profit Trend</h3>
-                    <p className="text-sm text-slate-500 font-poppins">
-                      Track monthly performance trends and compare against targets for better financial planning
-                    </p>
-                  </div>
-                </div>
-
-                <div className="h-64 mb-6">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                      data={revenueProfitData}
-                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis
-                        dataKey="month"
-                        tick={{ fill: '#64748b', fontSize: 12 }}
-                      />
-                      <YAxis
-                        tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
-                        tick={{ fill: '#64748b', fontSize: 12 }}
-                      />
-                      <Tooltip
-                        formatter={(value, name) => {
-                          const label = name === 'revenue' ? 'Revenue' :
-                            name === 'profit' ? 'Profit' : 'Target';
-                          return [`₱${Number(value).toLocaleString()}`, label];
-                        }}
-                        contentStyle={{
-                          backgroundColor: 'white',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontFamily: "'Poppins', sans-serif",
-                        }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="revenue"
-                        name="Revenue"
-                        stroke="#9333ea"
-                        fill="url(#colorRevenue)"
-                        fillOpacity={0.3}
-                        strokeWidth={2}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="profit"
-                        name="Profit"
-                        stroke="#10b981"
-                        fill="url(#colorProfit)"
-                        fillOpacity={0.3}
-                        strokeWidth={2}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="target"
-                        name="Target"
-                        stroke="#8b5cf6" // Changed from yellow to violet
-                        strokeWidth={2}
-                        strokeDasharray="5 5"
-                        dot={false}
-                      />
-                      <defs>
-                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#9333ea" stopOpacity={0.4} />
-                          <stop offset="95%" stopColor="#9333ea" stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="text-center p-3 bg-purple-50 rounded-lg">
-                      <p className="text-xs text-purple-700 font-medium">Current Revenue</p>
-                      <p className="text-lg font-bold text-purple-900">
-                        ₱{summary.totalRevenue.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="text-center p-3 bg-emerald-50 rounded-lg">
-                      <p className="text-xs text-emerald-700 font-medium">Current Profit</p>
-                      <p className="text-lg font-bold text-emerald-900">
-                        ₱{summary.totalProfit.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="text-center p-3 bg-violet-50 rounded-lg"> {/* Changed from amber to violet */}
-                      <p className="text-xs text-violet-700 font-medium">Growth</p>
-                      <p className="text-lg font-bold text-violet-900">
-                        +{summary.revenueGrowth}%
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    <span className="font-medium">Insight:</span> {summary.profitMargin >= 15
-                      ? "Strong profit margins with consistent growth"
-                      : "Focus on improving profit margins through cost optimization"}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Inventory & Performance Row */}
-          <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5 delay-200'
-            }`}>
-            {/* Inventory Analysis */}
-            <Card className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-3 mb-6">
-                  <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl"> {/* Changed from orange to blue */}
-                    <PackageIcon className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-slate-900 font-poppins">Inventory Value Analysis</h3>
-                    <p className="text-sm text-slate-500 font-poppins">
-                      Compare current inventory investment against potential revenue to identify opportunity gaps
-                    </p>
-                  </div>
-                </div>
-
-                <div className="h-64 mb-6">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RechartsBarChart
-                      data={inventoryValueData}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fill: '#64748b', fontSize: 12 }}
-                      />
-                      <YAxis
-                        tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
-                        tick={{ fill: '#64748b', fontSize: 12 }}
-                      />
-                      <Tooltip
-                        formatter={(value, name, props) => {
-                          const { payload } = props;
-                          return [
-                            `₱${Number(value).toLocaleString()}`,
-                            payload.description || name
-                          ];
-                        }}
-                        contentStyle={{
-                          backgroundColor: 'white',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontFamily: "'Poppins', sans-serif",
-                        }}
-                      />
-                      <Bar
-                        dataKey="value"
-                        radius={[6, 6, 0, 0]}
-                        animationDuration={1000}
-                      >
-                        {inventoryValueData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Bar>
-                    </RechartsBarChart>
-                  </ResponsiveContainer>
-                </div>
-
-                <div className="space-y-4">
-                  {/* 1. Inventory Efficiency Bar */}
-                  <div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600"></div> {/* Changed from orange to blue */}
-                        <span className="text-sm font-medium text-slate-800">Inventory Efficiency</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xl font-bold text-slate-900">
-                          {summary.potentialRevenue > 0
-                            ? ((summary.totalRevenue - summary.serviceFees) / summary.potentialRevenue * 100).toFixed(1)
-                            : '0'}%
-                        </span>
-                        <span className="text-xs text-slate-500 ml-1">utilization</span>
-                      </div>
-                    </div>
-                    <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full" // Changed from orange to blue
-                        style={{
-                          width: `${Math.min(
-                            summary.potentialRevenue > 0
-                              ? ((summary.totalRevenue - summary.serviceFees) / summary.potentialRevenue * 100)
-                              : 0,
-                            100
-                          )}%`
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 2. Projected Margin Bar */}
-                  <div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600"></div>
-                        <span className="text-sm font-medium text-slate-800">Projected Margin</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xl font-bold text-slate-900">
-                          {summary.potentialRevenue > 0
-                            ? (((summary.potentialRevenue - summary.stockValue) / summary.potentialRevenue) * 100).toFixed(1)
-                            : '0'}%
-                        </span>
-                        <span className="text-xs text-slate-500 ml-1">profitability</span>
-                      </div>
-                    </div>
-                    <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full"
-                        style={{
-                          width: `${Math.min(
-                            summary.potentialRevenue > 0
-                              ? (((summary.potentialRevenue - summary.stockValue) / summary.potentialRevenue) * 100)
-                              : 0,
-                            100
-                          )}%`
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 3. Cost Ratio Bar */}
-                  <div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600"></div>
-                        <span className="text-sm font-medium text-slate-800">Cost Ratio</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xl font-bold text-slate-900">
-                          {summary.potentialRevenue > 0
-                            ? ((summary.stockValue / summary.potentialRevenue) * 100).toFixed(1)
-                            : '0'}%
-                        </span>
-                        <span className="text-xs text-slate-500 ml-1">investment</span>
-                      </div>
-                    </div>
-                    <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full"
-                        style={{
-                          width: `${Math.min(
-                            summary.potentialRevenue > 0
-                              ? ((summary.stockValue / summary.potentialRevenue) * 100)
-                              : 0,
-                            100
-                          )}%`
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="text-xs text-slate-500">
-                    <span className="font-medium">Interpretation:</span> Higher potential revenue compared to current value indicates opportunities for sales growth. GMROI of {summary.gmroi.toFixed(1)}% shows {summary.gmroi > 100 ? 'excellent' : 'moderate'} return on inventory investment.
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Performance Metrics */}
-            <Card className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-3 mb-6">
-                  <div className="p-3 bg-gradient-to-r from-blue-500 to-sky-600 rounded-xl">
-                    <Target className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-slate-900 font-poppins">Key Performance Indicators</h3>
-                    <p className="text-sm text-slate-500 font-poppins">
-                      Critical business metrics showing overall performance and efficiency across operations
-                    </p>
-                  </div>
-                </div>
-
-                <div className="h-64 mb-6">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadialBarChart
-                      innerRadius="25%"
-                      outerRadius="95%"
-                      data={performanceMetricsData}
-                      startAngle={180}
-                      endAngle={0}
-                      barSize={24}
-                    >
-                      <RadialBar
-
-                        background={{ fill: '#f8fafc', fillOpacity: 0.8 }}
-                        dataKey="value"
-                        cornerRadius={8}
-                        label={false}
-                      >
-                        {performanceMetricsData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={entry.color}
-                            fillOpacity={0.8}
-                          />
-                        ))}
-                      </RadialBar>
-                      <Tooltip
-                        formatter={(value, name, props) => {
-                          const { payload } = props;
-                          return [
-                            `${value}${payload.unit}`,
-                            payload.metric
-                          ];
-                        }}
-                        contentStyle={{
-                          backgroundColor: 'white',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          fontFamily: "'Poppins', sans-serif",
-                        }}
-                      />
-                    </RadialBarChart>
-                  </ResponsiveContainer>
-                </div>
-
-                <div className="space-y-4">
-                  {performanceMetricsData.map((metric, index) => (
-                    <div key={index} className="p-3 bg-gradient-to-r from-slate-50 to-slate-100 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg`} style={{ backgroundColor: `${metric.color}20` }}>
-                            {metric.icon}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-slate-800">{metric.metric}</p>
-                            <p className="text-xs text-slate-500">{metric.description}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-lg font-bold text-slate-900">{metric.value.toFixed(1)}{metric.unit}</span>
-                          <div className="text-xs text-slate-500">
-                            Target: {metric.target}{metric.unit}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-700"
-                          style={{
-                            width: `${Math.min((metric.value / metric.target) * 100, 100)}%`,
-                            backgroundColor: metric.color
-                          }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-xs text-slate-500 mt-1">
-                        <span>Current</span>
-                        <span className={metric.value >= metric.target ? 'text-green-600 font-medium' : 'text-amber-600 font-medium'}>
-                          {metric.value >= metric.target ? '✓ Target Achieved' : `${((metric.target - metric.value) / metric.target * 100).toFixed(1)}% below target`}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Service Performance */}
-          <div className={`transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5 delay-300'
-            }`}>
-            <Card className="border-slate-200/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-3 mb-6">
-                  <div className="p-3 bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl"> {/* Changed from red to violet */}
-                    <Wrench className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-slate-900 font-poppins">Service Operations Performance</h3>
-                    <p className="text-sm text-slate-500 font-poppins">
-                      Monitor service department efficiency, revenue generation, and job completion metrics
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="p-5 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl hover:shadow-md transition-all duration-300">
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className="p-3 bg-gradient-to-r from-emerald-500 to-green-600 rounded-xl">
-                        <CheckCircle className="w-6 h-6 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-700">Completed Jobs</p>
-                        <p className="text-2xl font-bold text-slate-900">{summary.completedJobs}</p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-slate-500 mb-3">Total service jobs successfully completed</p>
-                    <div className="h-2 bg-emerald-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-emerald-400 to-green-500 rounded-full transition-all duration-700"
-                        style={{ width: `${Math.min((summary.completedJobs / 100) * 100, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="p-5 bg-gradient-to-r from-blue-50 to-sky-50 rounded-xl hover:shadow-md transition-all duration-300">
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className="p-3 bg-gradient-to-r from-blue-500 to-sky-600 rounded-xl">
-                        <DollarSign className="w-6 h-6 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-700">Service Revenue</p>
-                        <p className="text-2xl font-bold text-slate-900">
-                          ₱{summary.serviceFees.toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-slate-500 mb-3">Total income generated from service operations</p>
-                    <div className="h-2 bg-blue-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-blue-400 to-sky-500 rounded-full transition-all duration-700"
-                        style={{
-                          width: `${Math.min(
-                            summary.totalRevenue > 0
-                              ? (summary.serviceFees / summary.totalRevenue * 100)
-                              : 0,
-                            100
-                          )}%`
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="p-5 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl hover:shadow-md transition-all duration-300">
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className="p-3 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl">
-                        <Zap className="w-6 h-6 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-700">Service Contribution</p>
-                        <p className="text-2xl font-bold text-slate-900">
-                          {summary.totalRevenue > 0
-                            ? ((summary.serviceFees / summary.totalRevenue) * 100).toFixed(1)
-                            : '0'}%
-                        </p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-slate-500 mb-3">Percentage of total revenue from services</p>
-                    <div className="h-2 bg-purple-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-purple-400 to-indigo-500 rounded-full transition-all duration-700"
-                        style={{
-                          width: `${Math.min(
-                            summary.totalRevenue > 0
-                              ? (summary.serviceFees / summary.totalRevenue * 100)
-                              : 0,
-                            100
-                          )}%`
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                    <span className="text-sm font-medium text-slate-800">Service Department Insights</span>
-                  </div>
-                  <p className="text-xs text-slate-600">
-                    {summary.serviceFees > summary.totalRevenue * 0.3
-                      ? "Services are a significant revenue driver. Consider expanding service offerings."
-                      : "Services have growth potential. Focus on upselling and marketing service packages."}
-                    {" "}Average revenue per job: ₱{summary.completedJobs > 0
-                      ? (summary.serviceFees / summary.completedJobs).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                      : '0'}.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Report downloads available in header dropdown */}
       </div>
 
-      <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
-        
-        .font-poppins {
-          font-family: 'Poppins', sans-serif;
-        }
+      {/* ── Tab Bar ──────────────────────────────────────────────────── */}
+      <Tabs value={activeTab} onValueChange={v => setActiveTab(v as ReportTab)}>
+        <TabsList className="h-9">
+          <TabsTrigger value="sales" className="gap-1.5 text-sm">
+            <DollarSign className="h-3.5 w-3.5" /> Sales
+          </TabsTrigger>
+          <TabsTrigger value="inventory" className="gap-1.5 text-sm">
+            <Package className="h-3.5 w-3.5" /> Inventory
+          </TabsTrigger>
+          <TabsTrigger value="services" className="gap-1.5 text-sm">
+            <Wrench className="h-3.5 w-3.5" /> Services
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-        .ripple {
-          position: relative;
-          overflow: hidden;
-        }
+      {/* ── Filter Bar ───────────────────────────────────────────────── */}
+      <Card>
+        <CardContent className="py-3 flex flex-wrap gap-2 items-center">
+          <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
 
-        .ripple:after {
-          content: "";
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          width: 5px;
-          height: 5px;
-          background: rgba(255, 255, 255, 0.5);
-          opacity: 0;
-          border-radius: 100%;
-          transform: scale(1, 1) translate(-50%);
-          transform-origin: 50% 50%;
-        }
+          {/* Date range — not shown for inventory */}
+          {activeTab !== 'inventory' && (
+            <Popover open={showCustom} onOpenChange={setShowCustom}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+                  {dateRange.label}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-3 space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground">Presets</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {PRESETS.map(p => (
+                    <Button
+                      key={p.label}
+                      variant={dateRange.label === p.label ? 'default' : 'outline'}
+                      size="sm" className="text-xs h-7"
+                      onClick={() => { setDateRange(p); setShowCustom(false); }}
+                    >
+                      {p.label}
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-xs font-semibold text-muted-foreground">Custom</p>
+                <div className="flex gap-2 items-center">
+                  <Input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="h-7 text-xs" />
+                  <span className="text-xs text-muted-foreground">→</span>
+                  <Input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="h-7 text-xs" />
+                </div>
+                <Button size="sm" className="w-full h-7 text-xs" onClick={applyCustomRange}>Apply</Button>
+              </PopoverContent>
+            </Popover>
+          )}
 
-        .ripple:focus:not(:active)::after {
-          animation: ripple 1s ease-out;
-        }
+          {/* Sales filter */}
+          {activeTab === 'sales' && (
+            <Select value={toSel(salesStatus)} onValueChange={v => setSalesStatus(toVal(v))}>
+              <SelectTrigger className="h-8 w-34 text-xs">
+                <SelectValue placeholder="All States" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>All States</SelectItem>
+                <SelectItem value="confirmed">Confirmed</SelectItem>
+                <SelectItem value="done">Done</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
 
-        @keyframes ripple {
-          0% {
-            transform: scale(0, 0);
-            opacity: 0.5;
-          }
-          20% {
-            transform: scale(25, 25);
-            opacity: 0.3;
-          }
-          100% {
-            opacity: 0;
-            transform: scale(40, 40);
-          }
-        }
+          {/* Inventory filters */}
+          {activeTab === 'inventory' && (
+            <>
+              <Select value={toSel(invCategory)} onValueChange={v => setInvCategory(toVal(v))}>
+                <SelectTrigger className="h-8 w-36 text-xs">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>All Categories</SelectItem>
+                  <SelectItem value="tire">Tire</SelectItem>
+                  <SelectItem value="tool">Tool</SelectItem>
+                  <SelectItem value="accessory">Accessory</SelectItem>
+                  <SelectItem value="service">Service</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant={invLowStock ? 'default' : 'outline'}
+                size="sm" className="h-8 text-xs gap-1"
+                onClick={() => setInvLowStock(v => !v)}
+              >
+                <AlertTriangle className="h-3.5 w-3.5" /> Low Stock Only
+              </Button>
+            </>
+          )}
 
-        @keyframes progress {
-          from {
-            width: 0%;
-          }
-        }
+          {/* Services filter */}
+          {activeTab === 'services' && (
+            <Select value={toSel(svcState)} onValueChange={v => setSvcState(toVal(v))}>
+              <SelectTrigger className="h-8 w-36 text-xs">
+                <SelectValue placeholder="All States" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>All States</SelectItem>
+                <SelectItem value="quotation">Quotation</SelectItem>
+                <SelectItem value="confirmed">Confirmed</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="quality_check">Quality Check</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="invoiced">Invoiced</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
 
-        .progress-bar {
-          animation: progress 1s ease-out forwards;
-        }
+          {/* Search */}
+          <div className="relative ml-auto">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search…"
+              className="h-8 pl-8 text-xs w-44"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-        .ease-spring {
-          transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
+      {/* ── Error ────────────────────────────────────────────────────── */}
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+          <Button variant="ghost" size="sm" className="ml-auto h-6 px-2" onClick={() => setError(null)}>×</Button>
+        </div>
+      )}
 
-        .glass-effect {
-          background: rgba(255, 255, 255, 0.7);
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-      `}</style>
+      {/* ── Data Table ───────────────────────────────────────────────── */}
+      <div className="space-y-3">
+        {activeTab === 'sales'     && <SalesTable     rows={salesRows} loading={loading} search={search} />}
+        {activeTab === 'inventory' && <InventoryTable  rows={invRows}   loading={loading} search={search} />}
+        {activeTab === 'services'  && <ServicesTable   rows={svcRows}   loading={loading} search={search} />}
+      </div>
+
     </div>
   );
 }

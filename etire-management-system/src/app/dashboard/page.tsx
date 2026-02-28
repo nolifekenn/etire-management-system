@@ -1,874 +1,468 @@
+/* ────────────────────────────────────────────────────────────────────────────
+ * src/app/dashboard/page.tsx
+ * Phase 3 — Executive Dashboard
+ * KPI scorecards · Revenue vs COGS bar chart · Inventory donut ·
+ * Workshop analytics — all figures derived from the Phase 2 ledger.
+ * ──────────────────────────────────────────────────────────────────────────── */
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
+import {
+  DollarSign, Package, ShoppingCart, Wrench,
+  TrendingUp, TrendingDown, RefreshCw, Loader2,
+  ArrowUpRight, BarChart2, AlertTriangle,
+} from 'lucide-react';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+} from 'recharts';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import {
-  BarChart, Blocks, DollarSign, AlertTriangle, Users, Wrench, Loader2,
-  Building2, Package, Car, TrendingUp, RefreshCw, Plus, ChevronDown, ChevronUp,
-  ArrowUpRight, Calendar, Settings2, Eye, EyeOff, LayoutGrid
-} from 'lucide-react';
-import { useDashboardAnalytics } from '@/hooks/useDashboardAnalytics';
-import { RevenueSplitChart } from '@/components/dashboard/widgets/RevenueSplitChart';
-import { AROCard } from '@/components/dashboard/widgets/AROCard';
-import { TopBrandsChart } from '@/components/dashboard/widgets/TopBrandsChart';
-import { InventoryHealthTable } from '@/components/dashboard/widgets/InventoryHealthTable';
-import { BayUtilizationGauge } from '@/components/dashboard/widgets/BayUtilizationGauge';
-import { ResponsiveContainer, AreaChart, XAxis, YAxis, Tooltip, Area, ReferenceLine, BarChart as RechartsBarChart, Bar, Cell } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from '@/components/ui/dropdown-menu';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { fetchSalesReport } from "@/lib/salesReportService";
+  getExecutiveSummary,
+  getRevenueCOGSChart,
+  getInventoryByCategory,
+  getWorkshopAnalytics,
+  type ExecutiveSummary,
+  type RevenueCOGSPoint,
+  type InventoryCategoryPoint,
+  type WorkshopAnalytics,
+} from '@/lib/actions/analytics';
 
-interface DashboardStats {
-  total_sales: number;
-  total_items: number;
-  total_customers: number;
-  pending_jobs: number;
-  total_branches: number;
-  total_suppliers: number;
-  total_vehicles: number;
-  unread_notifications: number;
-  low_stock_count?: number;
+// ── Formatting helpers ────────────────────────────────────────────────────────
+
+const fmt = (n: number) =>
+  new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(n);
+
+const fmtCompact = (n: number) =>
+  n >= 1_000_000
+    ? `₱${(n / 1_000_000).toFixed(1)}M`
+    : n >= 1_000
+    ? `₱${(n / 1_000).toFixed(1)}K`
+    : `₱${n.toFixed(0)}`;
+
+// ── KPI Card Component ────────────────────────────────────────────────────────
+
+interface KpiCardProps {
+  title:     string;
+  value:     string;
+  subtitle?: string;
+  trend?:    number | null;    // % change (positive = good)
+  icon:      React.ReactNode;
+  href?:     string;
+  loading?:  boolean;
+  color?:    string;           // tailwind ring color class
 }
 
-interface SalesDataPoint {
-  date: string;
-  sales: number;
-  average: number;
+function KpiCard({ title, value, subtitle, trend, icon, href, loading, color = 'ring-blue-500/20' }: KpiCardProps) {
+  const content = (
+    <Card className={`relative overflow-hidden border ring-1 ${color} hover:shadow-md transition-shadow`}>
+      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <div className="text-muted-foreground/60">{icon}</div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        ) : (
+          <>
+            <div className="text-2xl font-bold tracking-tight">{value}</div>
+            <div className="flex items-center gap-2 mt-1">
+              {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+              {trend != null && (
+                <Badge
+                  variant="outline"
+                  className={`text-xs px-1 py-0 ${trend >= 0 ? 'text-emerald-600 border-emerald-300' : 'text-red-500 border-red-300'}`}
+                >
+                  {trend >= 0 ? <TrendingUp className="h-3 w-3 mr-0.5 inline" /> : <TrendingDown className="h-3 w-3 mr-0.5 inline" />}
+                  {Math.abs(trend).toFixed(1)}% MoM
+                </Badge>
+              )}
+            </div>
+          </>
+        )}
+      </CardContent>
+      {href && <ArrowUpRight className="absolute top-3 right-3 h-4 w-4 text-muted-foreground/40" />}
+    </Card>
+  );
+
+  return href ? <Link href={href} className="block group">{content}</Link> : content;
 }
 
-interface RecentSale {
-  sale_item_id: string;
-  quantity: number;
-  price_at_sale: number;
-  created_at: string;
-  item_name: string;
-  item_category: string;
-  user_name: string;
-  total_amount: number;
+// ── Custom Tooltip for Revenue/COGS chart ─────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function RevenueTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-background border rounded-lg p-3 shadow-lg text-xs">
+      <p className="font-semibold mb-1">{label}</p>
+      {payload.map((p: { color: string; name: string; value: number }) => (
+        <p key={p.name} style={{ color: p.color }}>
+          {p.name}: {fmtCompact(p.value)}
+        </p>
+      ))}
+    </div>
+  );
 }
 
-interface LowStockItem {
-  item_id: string;
-  name: string;
-  category: string;
-  stock_quantity: number;
-  reorder_level: number;
+// ── Custom Tooltip for donut chart ────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function DonutTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0];
+  return (
+    <div className="bg-background border rounded-lg p-3 shadow-lg text-xs">
+      <p className="font-semibold">{d.name}</p>
+      <p className="text-muted-foreground">Value: {fmt(d.value)}</p>
+      <p className="text-muted-foreground">SKUs: {d.payload.count}</p>
+    </div>
+  );
 }
 
-interface TopSellingItem {
-  name: string;
-  category: string;
-  total_quantity: number;
-  total_revenue: number;
-  average_price: number;
-  sales_count: number;
-}
-
-type TimeFrame = '1d' | '3d' | '7d';
-
-// Widget visibility configuration
-interface WidgetVisibility {
-  quickActions: boolean;
-  keyMetrics: boolean;
-  secondaryMetrics: boolean;
-  salesChart: boolean;
-  lowStock: boolean;
-  revenueSplit: boolean;
-  aroCard: boolean;
-  bayUtilization: boolean;
-  topBrands: boolean;
-  inventoryHealth: boolean;
-  recentSales: boolean;
-  topSelling: boolean;
-}
-
-const WIDGET_STORAGE_KEY = 'dashboard_widget_visibility';
-
-const DEFAULT_VISIBILITY: WidgetVisibility = {
-  quickActions: true,
-  keyMetrics: true,
-  secondaryMetrics: false,
-  salesChart: true,
-  lowStock: true,
-  revenueSplit: true,
-  aroCard: true,
-  bayUtilization: true,
-  topBrands: true,
-  inventoryHealth: true,
-  recentSales: true,
-  topSelling: true,
-};
-
-const WIDGET_LABELS: Record<keyof WidgetVisibility, string> = {
-  quickActions: 'Quick Actions',
-  keyMetrics: 'Key Metrics',
-  secondaryMetrics: 'Secondary Metrics',
-  salesChart: 'Sales Performance Chart',
-  lowStock: 'Low Stock Alerts',
-  revenueSplit: 'Revenue Split',
-  aroCard: 'Average Repair Order',
-  bayUtilization: 'Bay Utilization',
-  topBrands: 'Top Brands',
-  inventoryHealth: 'Inventory Health',
-  recentSales: 'Recent Sales',
-  topSelling: 'Top Selling Items',
-};
+// ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const { user, activeBranchId } = useAuth();
-  const router = useRouter();
-  const [stats, setStats] = useState<DashboardStats>({
-    total_sales: 0,
-    total_items: 0,
-    total_customers: 0,
-    pending_jobs: 0,
-    total_branches: 0,
-    total_suppliers: 0,
-    total_vehicles: 0,
-    unread_notifications: 0,
-    low_stock_count: 0,
-  });
 
-  const { data: analyticsData, isLoading: isAnalyticsLoading, refetch: refetchAnalytics } = useDashboardAnalytics();
-  const [salesData, setSalesData] = useState<SalesDataPoint[]>([]);
-  const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([]);
-  const [recentSales, setRecentSales] = useState<RecentSale[]>([]);
-  const [filteredRecentSales, setFilteredRecentSales] = useState<RecentSale[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [timeFrame, setTimeFrame] = useState<TimeFrame>('7d');
+  const [chartDays,    setChartDays]    = useState<number>(30);
+  const [summary,      setSummary]      = useState<ExecutiveSummary | null>(null);
+  const [chartData,    setChartData]    = useState<RevenueCOGSPoint[]>([]);
+  const [donutData,    setDonutData]    = useState<(InventoryCategoryPoint & Record<string, unknown>)[]>([]);
+  const [workshop,     setWorkshop]     = useState<WorkshopAnalytics | null>(null);
+  const [loadingKPIs,  setLoadingKPIs]  = useState(true);
+  const [loadingChart, setLoadingChart] = useState(true);
+  const [loadingDonut, setLoadingDonut] = useState(true);
+  const [loadingWS,    setLoadingWS]    = useState(true);
+  const [error,        setError]        = useState<string | null>(null);
+  const [lastRefresh,  setLastRefresh]  = useState<Date>(new Date());
 
-  // Widget visibility state with localStorage persistence
-  const [widgetVisibility, setWidgetVisibility] = useState<WidgetVisibility>(DEFAULT_VISIBILITY);
+  const branchFilter = activeBranchId ? { branch_id: activeBranchId } : {};
 
-  // Load widget visibility from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem(WIDGET_STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setWidgetVisibility({ ...DEFAULT_VISIBILITY, ...parsed });
-      } catch (e) {
-        console.error('Failed to parse widget visibility:', e);
-      }
-    }
-  }, []);
+  // ── Data fetchers ─────────────────────────────────────────────────────────
 
-  // Save widget visibility to localStorage
-  const toggleWidget = (widget: keyof WidgetVisibility) => {
-    setWidgetVisibility(prev => {
-      const updated = { ...prev, [widget]: !prev[widget] };
-      localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(updated));
-      return updated;
-    });
-  };
+  const fetchKPIs = useCallback(async () => {
+    setLoadingKPIs(true);
+    const res = await getExecutiveSummary(branchFilter);
+    if (res.success) setSummary(res.data);
+    else setError(res.error ?? 'Failed to load KPIs');
+    setLoadingKPIs(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBranchId]);
 
-  const showAllWidgets = () => {
-    const allVisible = Object.keys(DEFAULT_VISIBILITY).reduce((acc, key) => {
-      acc[key as keyof WidgetVisibility] = true;
-      return acc;
-    }, {} as WidgetVisibility);
-    setWidgetVisibility(allVisible);
-    localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(allVisible));
-  };
+  const fetchChart = useCallback(async () => {
+    setLoadingChart(true);
+    const res = await getRevenueCOGSChart({ ...branchFilter, days: chartDays });
+    if (res.success) setChartData(res.data);
+    setLoadingChart(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBranchId, chartDays]);
 
-  const hideAllWidgets = () => {
-    const allHidden = Object.keys(DEFAULT_VISIBILITY).reduce((acc, key) => {
-      acc[key as keyof WidgetVisibility] = false;
-      return acc;
-    }, {} as WidgetVisibility);
-    setWidgetVisibility(allHidden);
-    localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(allHidden));
-  };
+  const fetchDonut = useCallback(async () => {
+    setLoadingDonut(true);
+    const res = await getInventoryByCategory(branchFilter);
+    if (res.success) setDonutData(res.data as (InventoryCategoryPoint & Record<string, unknown>)[]);
+    setLoadingDonut(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBranchId]);
 
-  const resetWidgets = () => {
-    setWidgetVisibility(DEFAULT_VISIBILITY);
-    localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(DEFAULT_VISIBILITY));
-  };
+  const fetchWorkshop = useCallback(async () => {
+    setLoadingWS(true);
+    const res = await getWorkshopAnalytics(branchFilter);
+    if (res.success) setWorkshop(res.data);
+    setLoadingWS(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBranchId]);
 
-  // Calculate top selling items
-  const topSellingItems = useMemo(() => {
-    if (!filteredRecentSales || filteredRecentSales.length === 0) return [];
-    const itemMap = new Map<string, TopSellingItem>();
-
-    filteredRecentSales.forEach(sale => {
-      const existing = itemMap.get(sale.item_name);
-      if (existing) {
-        existing.total_quantity += sale.quantity;
-        existing.total_revenue += sale.total_amount;
-        existing.average_price = existing.total_revenue / existing.total_quantity;
-        existing.sales_count += 1;
-      } else {
-        itemMap.set(sale.item_name, {
-          name: sale.item_name,
-          category: sale.item_category,
-          total_quantity: sale.quantity,
-          total_revenue: sale.total_amount,
-          average_price: sale.price_at_sale,
-          sales_count: 1
-        });
-      }
-    });
-
-    return Array.from(itemMap.values())
-      .sort((a, b) => b.total_revenue - a.total_revenue)
-      .slice(0, 6);
-  }, [filteredRecentSales]);
-
-  const getTimeFrameDays = (tf: TimeFrame): number => {
-    switch (tf) {
-      case '1d': return 1;
-      case '3d': return 3;
-      case '7d': return 7;
-    }
-  };
-
-  const filterRecentSalesByTimeFrame = useCallback((sales: RecentSale[], tf: TimeFrame) => {
-    const now = new Date();
-    const cutoffDate = new Date();
-    cutoffDate.setDate(now.getDate() - getTimeFrameDays(tf));
-    return sales.filter(sale => new Date(sale.created_at) >= cutoffDate);
-  }, []);
-
-  const calculateSalesChartData = useCallback((sales: RecentSale[], tf: TimeFrame) => {
-    const chartDataMap = new Map<string, number>();
-    const now = new Date();
-
-    if (tf === '1d') {
-      for (let i = 0; i < 24; i++) {
-        chartDataMap.set(`${i}:00`, 0);
-      }
-    } else {
-      const daysToShow = tf === '3d' ? 3 : 7;
-      for (let i = daysToShow - 1; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(now.getDate() - i);
-        chartDataMap.set(d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }), 0);
-      }
-    }
-
-    sales.forEach(sale => {
-      const saleDate = new Date(sale.created_at);
-      let key: string;
-      if (tf === '1d') {
-        key = `${saleDate.getHours()}:00`;
-      } else {
-        key = saleDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-      }
-      if (chartDataMap.has(key)) {
-        chartDataMap.set(key, (chartDataMap.get(key) || 0) + sale.total_amount);
-      }
-    });
-
-    const chartData = Array.from(chartDataMap.entries()).map(([date, sales]) => ({
-      date,
-      sales,
-      average: 0
-    }));
-
-    if (tf === '1d') {
-      chartData.sort((a, b) => parseInt(a.date.split(':')[0]) - parseInt(b.date.split(':')[0]));
-    }
-
-    if (chartData.length > 0) {
-      const totalSales = chartData.reduce((sum, day) => sum + day.sales, 0);
-      const average = totalSales / chartData.length;
-      return chartData.map(item => ({ ...item, average }));
-    }
-
-    return chartData;
-  }, []);
-
-  const fetchDashboardData = useCallback(async () => {
-    if (!supabase || !user?.user_id) {
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
+  const refresh = useCallback(() => {
     setError(null);
+    setLastRefresh(new Date());
+    fetchKPIs();
+    fetchChart();
+    fetchDonut();
+    fetchWorkshop();
+  }, [fetchKPIs, fetchChart, fetchDonut, fetchWorkshop]);
 
-    try {
-      const salesReportPromise = fetchSalesReport({
-        date_from: "",
-        date_to: "",
-        branch_id: activeBranchId || ""
-      });
+  useEffect(() => { fetchKPIs(); fetchDonut(); fetchWorkshop(); }, [fetchKPIs, fetchDonut, fetchWorkshop]);
+  useEffect(() => { fetchChart(); }, [fetchChart]);
 
-      let inventoryCountQuery = supabase.from('view_branch_inventory')
-        .select('quantity, deleted_at')
-        .is('deleted_at', null);
-      if (activeBranchId) inventoryCountQuery = inventoryCountQuery.eq('branch_id', activeBranchId);
+  // ── Derived values ────────────────────────────────────────────────────────
 
-      let customerCountQuery = supabase.from('customer').select('customer_id', { count: 'exact', head: true }).is('deleted_at', null);
-      if (activeBranchId) customerCountQuery = customerCountQuery.eq('branch_id', activeBranchId);
+  const totalChartRevenue = chartData.reduce((a, r) => a + r.revenue, 0);
+  const totalChartCOGS    = chartData.reduce((a, r) => a + r.cogs, 0);
+  const grossMarginPct    = totalChartRevenue > 0
+    ? ((totalChartRevenue - totalChartCOGS) / totalChartRevenue * 100).toFixed(1)
+    : '—';
 
-      let jobQuery = supabase.from('service_job').select('status').is('deleted_at', null);
-      if (activeBranchId) jobQuery = jobQuery.eq('branch_id', activeBranchId);
+  const totalInventoryValue = donutData.reduce((a, d) => a + d.value, 0);
 
-      let branchCountQuery = supabase.from('branch').select('branch_id', { count: 'exact', head: true }).is('deleted_at', null);
-      let supplierCountQuery = supabase.from('supplier').select('supplier_id', { count: 'exact', head: true }).is('deleted_at', null);
+  // Thin out X-axis labels when showing 30+ days
+  const xAxisInterval = chartDays <= 14 ? 0 : chartDays <= 30 ? 4 : 6;
 
-      let vehicleCountQuery = supabase
-        .from('vehicle')
-        .select('vehicle_id, customer!inner(branch_id)', { count: 'exact', head: true })
-        .is('deleted_at', null);
-      if (activeBranchId) vehicleCountQuery = vehicleCountQuery.eq('customer.branch_id', activeBranchId);
+  // ── Render ────────────────────────────────────────────────────────────────
 
-      let notifCountQuery = supabase.from('notification').select('notification_id', { count: 'exact', head: true }).eq('user_id', user.user_id).eq('is_read', false);
-
-      let recentSalesQuery = supabase
-        .from('sale_item')
-        .select(`
-          sale_item_id,
-          quantity,
-          price_at_sale,
-          created_at,
-          sale!inner(
-            sale_id,
-            sale_date,
-            user:user_id(name),
-            total_amount,
-            branch_id
-          ),
-          inventory_item!inner(name, category)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (activeBranchId) recentSalesQuery = recentSalesQuery.eq('sale.branch_id', activeBranchId);
-
-      let lowStockListQuery = supabase
-        .from('view_branch_inventory')
-        .select('*, stock_quantity:quantity')
-        .is('deleted_at', null)
-        .lte('quantity', 5)
-        .order('quantity', { ascending: true })
-        .limit(10);
-      if (activeBranchId) lowStockListQuery = lowStockListQuery.eq('branch_id', activeBranchId);
-
-      const [
-        salesRes,
-        invRes,
-        custRes,
-        jobRes,
-        branchRes,
-        suppRes,
-        vehRes,
-        notifRes,
-        { data: recentSalesData, error: recentSalesError },
-        { data: lowStockData, error: lowStockListError }
-      ] = await Promise.all([
-        salesReportPromise,
-        inventoryCountQuery,
-        customerCountQuery,
-        jobQuery,
-        branchCountQuery,
-        supplierCountQuery,
-        vehicleCountQuery,
-        notifCountQuery,
-        recentSalesQuery,
-        lowStockListQuery
-      ]);
-
-      if (recentSalesError) throw recentSalesError;
-      if (lowStockListError) throw lowStockListError;
-
-      const totalSales = (salesRes.sales || []).reduce((sum: number, sale: any) => sum + (sale.total_amount || 0), 0);
-      const inventoryCount = invRes.data?.length || 0;
-      const lowStockCount = invRes.data?.filter((i: any) => i.quantity <= 5).length || 0;
-      const pendingJobs = jobRes.data?.filter((j: any) => j.status === 'pending').length || 0;
-
-      setStats({
-        total_sales: totalSales,
-        total_items: inventoryCount,
-        total_customers: custRes.count || 0,
-        pending_jobs: pendingJobs,
-        total_branches: branchRes.count || 0,
-        total_suppliers: suppRes.count || 0,
-        total_vehicles: vehRes.count || 0,
-        unread_notifications: notifRes.count || 0,
-        low_stock_count: lowStockCount
-      });
-
-      const formattedRecentSales: RecentSale[] = (recentSalesData as any[] || []).map(item => ({
-        sale_item_id: item.sale_item_id,
-        quantity: item.quantity,
-        price_at_sale: item.price_at_sale,
-        created_at: item.created_at,
-        item_name: item.inventory_item?.name || 'Unknown',
-        item_category: item.inventory_item?.category || 'Unknown',
-        user_name: item.sale?.user?.name || 'Unknown',
-        total_amount: item.quantity * item.price_at_sale,
-      }));
-
-      const filtered = filterRecentSalesByTimeFrame(formattedRecentSales, timeFrame);
-      const chartData = calculateSalesChartData(filtered, timeFrame);
-
-      setRecentSales(formattedRecentSales);
-      setFilteredRecentSales(filtered);
-      setSalesData(chartData);
-      setLowStockItems(lowStockData as LowStockItem[] || []);
-
-    } catch (err: any) {
-      console.error('Dashboard data fetch error:', err);
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user, activeBranchId, timeFrame, filterRecentSalesByTimeFrame, calculateSalesChartData]);
-
-  useEffect(() => {
-    if (user?.user_id) {
-      fetchDashboardData();
-    }
-  }, [fetchDashboardData, user]);
-
-  useEffect(() => {
-    if (recentSales.length > 0) {
-      const filtered = filterRecentSalesByTimeFrame(recentSales, timeFrame);
-      const chartData = calculateSalesChartData(filtered, timeFrame);
-      setFilteredRecentSales(filtered);
-      setSalesData(chartData);
-    }
-  }, [timeFrame, recentSales, filterRecentSalesByTimeFrame, calculateSalesChartData]);
-
-  const handleRefresh = () => {
-    fetchDashboardData();
-    refetchAnalytics();
-  };
-
-  const primaryStats = [
-    { id: 'sales', title: "Total Sales", value: `₱${stats.total_sales.toLocaleString()}`, icon: DollarSign, href: '/reports/sales', color: 'bg-green-500' },
-    { id: 'inventory', title: "Inventory Items", value: stats.total_items.toLocaleString(), icon: Blocks, href: '/inventory', color: 'bg-primary' },
-    { id: 'customers', title: "Customers", value: stats.total_customers.toLocaleString(), icon: Users, href: '/customers', color: 'bg-purple-500' },
-    { id: 'jobs', title: "Pending Jobs", value: stats.pending_jobs.toLocaleString(), icon: Wrench, href: '/services', color: 'bg-orange-500' }
-  ];
-
-  const secondaryStats = [
-    { title: "Branches", value: stats.total_branches.toLocaleString(), icon: Building2, color: 'bg-blue-500' },
-    { title: "Suppliers", value: stats.total_suppliers.toLocaleString(), icon: Package, color: 'bg-teal-500' },
-    { title: "Vehicles", value: stats.total_vehicles.toLocaleString(), icon: Car, color: 'bg-indigo-500' }
-  ];
-
-  const chartColors = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4'];
-
-  const chartConfig = useMemo(() => {
-    const maxVal = Math.max(...salesData.map(d => d.sales), 0);
-    if (maxVal === 0) return { domain: [0, 10000], ticks: [0, 2500, 5000, 7500, 10000] };
-    const steps = 4;
-    const niceStep = Math.ceil(maxVal / steps / 1000) * 1000;
-    const upperLimit = niceStep * steps;
-    return { domain: [0, upperLimit], ticks: Array.from({ length: steps + 1 }, (_, i) => i * niceStep) };
-  }, [salesData]);
-
-  const getInitials = (name: string) => name.charAt(0).toUpperCase();
-
-  const visibleWidgetCount = Object.values(widgetVisibility).filter(Boolean).length;
+  if (!user) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Full-width container with minimal padding */}
-      <div className="w-full px-3 py-4">
+    <div className="p-4 md:p-6 space-y-6 max-w-[1600px] mx-auto">
 
-        {/* Compact Header with Widget Filter */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl font-semibold text-foreground">
-              Dashboard
-            </h1>
-            <span className="text-sm text-muted-foreground hidden sm:inline">
-              <Calendar className="inline h-3.5 w-3.5 mr-1" />
-              {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Widget Filter Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <LayoutGrid className="h-4 w-4" />
-                  <span className="hidden sm:inline">Widgets</span>
-                  <Badge variant="secondary" className="ml-1 text-xs">
-                    {visibleWidgetCount}/{Object.keys(widgetVisibility).length}
-                  </Badge>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuLabel className="flex items-center justify-between">
-                  <span>Dashboard Widgets</span>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={showAllWidgets}>
-                      <Eye className="h-3 w-3 mr-1" />All
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={hideAllWidgets}>
-                      <EyeOff className="h-3 w-3 mr-1" />None
-                    </Button>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <div className="max-h-80 overflow-y-auto py-1">
-                  {(Object.keys(WIDGET_LABELS) as Array<keyof WidgetVisibility>).map((key) => (
-                    <div
-                      key={key}
-                      className="flex items-center gap-2 px-2 py-1.5 hover:bg-accent rounded cursor-pointer"
-                      onClick={() => toggleWidget(key)}
-                    >
-                      <Checkbox
-                        checked={widgetVisibility[key]}
-                        onCheckedChange={() => toggleWidget(key)}
-                        className="h-4 w-4"
-                      />
-                      <span className="text-sm flex-1">{WIDGET_LABELS[key]}</span>
-                    </div>
-                  ))}
-                </div>
-                <DropdownMenuSeparator />
-                <div className="p-2">
-                  <Button variant="ghost" size="sm" className="w-full text-xs" onClick={resetWidgets}>
-                    <Settings2 className="h-3 w-3 mr-1" />Reset to Default
-                  </Button>
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <Button onClick={handleRefresh} disabled={isLoading} variant="outline" size="sm">
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Last refreshed: {lastRefresh.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}
+            {activeBranchId && <span className="ml-2 text-xs text-muted-foreground">· Branch filtered</span>}
+          </p>
         </div>
-
-        {/* Quick Actions - Compact horizontal bar */}
-        {widgetVisibility.quickActions && (
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-            <Button asChild size="sm" className="shrink-0 bg-green-500 hover:bg-green-600 text-white">
-              <Link href="/pos"><Plus className="h-4 w-4 mr-1" />New Sale</Link>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={refresh} className="gap-1.5">
+            <RefreshCw className="h-3.5 w-3.5" />
+            Refresh
+          </Button>
+          <Link href="/reports">
+            <Button size="sm" className="gap-1.5">
+              <BarChart2 className="h-3.5 w-3.5" />
+              Full Reports
             </Button>
-            <Button asChild size="sm" className="shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Link href="/inventory"><Package className="h-4 w-4 mr-1" />Inventory</Link>
-            </Button>
-            <Button asChild size="sm" className="shrink-0 bg-orange-500 hover:bg-orange-600 text-white">
-              <Link href="/services"><Wrench className="h-4 w-4 mr-1" />Services</Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="shrink-0">
-              <Link href="/reports"><BarChart className="h-4 w-4 mr-1" />Reports</Link>
-            </Button>
-          </div>
-        )}
-
-        {/* Key Metrics - Compact stat cards */}
-        {widgetVisibility.keyMetrics && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
-            {isLoading ? (
-              [1, 2, 3, 4].map(i => <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />)
-            ) : (
-              primaryStats.map((stat) => (
-                <Card key={stat.id} className="cursor-pointer hover:bg-accent/50 transition-all" onClick={() => router.push(stat.href)}>
-                  <CardContent className="p-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground">{stat.title}</p>
-                      <p className="text-lg font-semibold">{stat.value}</p>
-                    </div>
-                    <div className={`p-2 rounded-lg ${stat.color} text-white`}>
-                      <stat.icon className="h-4 w-4" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* Secondary Metrics */}
-        {widgetVisibility.secondaryMetrics && (
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            {secondaryStats.map((stat, i) => (
-              <Card key={i}>
-                <CardContent className="p-3 flex items-center gap-3">
-                  <div className={`p-1.5 rounded ${stat.color} text-white`}>
-                    <stat.icon className="h-3.5 w-3.5" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">{stat.title}</p>
-                    <p className="text-base font-semibold">{stat.value}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {/* Main Grid - Sales Chart & Low Stock side by side */}
-        {(widgetVisibility.salesChart || widgetVisibility.lowStock) && (
-          <div className="grid lg:grid-cols-4 gap-3 mb-4">
-            {/* Sales Chart - Takes 3/4 width */}
-            {widgetVisibility.salesChart && (
-              <Card className={widgetVisibility.lowStock ? "lg:col-span-3" : "lg:col-span-4"}>
-                <CardHeader className="py-2 px-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium">Sales Performance</CardTitle>
-                    <Select value={timeFrame} onValueChange={(v) => setTimeFrame(v as TimeFrame)}>
-                      <SelectTrigger className="w-20 h-7 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1d">1 Day</SelectItem>
-                        <SelectItem value="3d">3 Days</SelectItem>
-                        <SelectItem value="7d">7 Days</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardHeader>
-                <CardContent className="px-2 pb-2">
-                  {isLoading ? (
-                    <div className="flex justify-center items-center h-48">
-                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : salesData.length > 0 ? (
-                    <div className="h-48">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={salesData}>
-                          <defs>
-                            <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                              <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                            </linearGradient>
-                          </defs>
-                          <XAxis
-                            dataKey="date"
-                            stroke="hsl(var(--muted-foreground))"
-                            fontSize={10}
-                            tickLine={false}
-                            axisLine={false}
-                            interval={timeFrame === '1d' ? 4 : 0}
-                            tickFormatter={(value) => {
-                              if (timeFrame === '1d') {
-                                const hour = parseInt(value.split(':')[0]);
-                                return hour % 12 === 0 ? (hour === 0 ? '12a' : '12p') : `${hour % 12}`;
-                              }
-                              return value.split(',')[0];
-                            }}
-                          />
-                          <YAxis
-                            stroke="hsl(var(--muted-foreground))"
-                            fontSize={10}
-                            tickLine={false}
-                            axisLine={false}
-                            width={40}
-                            tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}k`}
-                            domain={chartConfig.domain}
-                            ticks={chartConfig.ticks}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "hsl(var(--background))",
-                              border: "1px solid hsl(var(--border))",
-                              borderRadius: "6px",
-                              fontSize: "12px"
-                            }}
-                            formatter={(value) => [`₱${Number(value).toLocaleString()}`, 'Sales']}
-                          />
-                          <ReferenceLine y={salesData[0]?.average} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
-                          <Area
-                            type="monotone"
-                            dataKey="sales"
-                            stroke="hsl(var(--primary))"
-                            strokeWidth={2}
-                            fillOpacity={1}
-                            fill="url(#colorSales)"
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : (
-                    <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">
-                      No sales data for this period
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Low Stock Alerts - Takes 1/4 width */}
-            {widgetVisibility.lowStock && (
-              <Card className={widgetVisibility.salesChart ? "" : "lg:col-span-4"}>
-                <CardHeader className="py-2 px-3">
-                  <CardTitle className="text-sm font-medium flex items-center gap-1.5">
-                    <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
-                    Low Stock ({lowStockItems.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-2 pb-2">
-                  <div className="space-y-1 max-h-44 overflow-y-auto">
-                    {lowStockItems.length > 0 ? lowStockItems.slice(0, 6).map((item) => (
-                      <div key={item.item_id} className="flex items-center justify-between py-1.5 px-1 hover:bg-accent/50 rounded text-sm">
-                        <span className="truncate flex-1">{item.name}</span>
-                        <Badge variant="destructive" className="text-xs ml-2 shrink-0">
-                          {item.stock_quantity}
-                        </Badge>
-                      </div>
-                    )) : (
-                      <div className="text-center py-6 text-muted-foreground text-xs">
-                        <Package className="h-6 w-6 mx-auto mb-1 opacity-50" />
-                        All stock healthy
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
-
-        {/* Advanced Analytics Grid - Full width, compact cards */}
-        {analyticsData && (widgetVisibility.revenueSplit || widgetVisibility.aroCard || widgetVisibility.bayUtilization || widgetVisibility.topBrands || widgetVisibility.inventoryHealth) && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-            {widgetVisibility.revenueSplit && (
-              <div className="h-56"><RevenueSplitChart data={analyticsData.revenueSplit} /></div>
-            )}
-            {(widgetVisibility.aroCard || widgetVisibility.bayUtilization) && (
-              <div className="space-y-3">
-                {widgetVisibility.aroCard && <div className="h-[106px]"><AROCard data={analyticsData.averageRepairOrder} /></div>}
-                {widgetVisibility.bayUtilization && <div className="h-[106px]"><BayUtilizationGauge data={analyticsData.bayUtilization} /></div>}
-              </div>
-            )}
-            {widgetVisibility.topBrands && (
-              <div className="h-56"><TopBrandsChart data={analyticsData.topBrands} /></div>
-            )}
-            {widgetVisibility.inventoryHealth && (
-              <div className="h-56"><InventoryHealthTable data={analyticsData.inventoryHealth} /></div>
-            )}
-          </div>
-        )}
-
-        {/* Recent Sales & Top Selling - Full width */}
-        {(widgetVisibility.recentSales || widgetVisibility.topSelling) && (
-          <div className="grid lg:grid-cols-3 gap-3">
-            {/* Recent Sales */}
-            {widgetVisibility.recentSales && (
-              <Card>
-                <CardHeader className="py-2 px-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium">Recent Sales</CardTitle>
-                    <Button asChild variant="ghost" size="sm" className="h-6 text-xs">
-                      <Link href="/pos">View all</Link>
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="max-h-52 overflow-y-auto">
-                    {filteredRecentSales.length > 0 ? (
-                      <div className="divide-y divide-border">
-                        {filteredRecentSales.slice(0, 6).map((sale) => (
-                          <div key={sale.sale_item_id} className="px-3 py-2 flex items-center justify-between hover:bg-accent/50 text-sm">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-medium">
-                                {getInitials(sale.user_name)}
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium truncate max-w-24">{sale.item_name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {new Date(sale.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </p>
-                              </div>
-                            </div>
-                            <p className="text-sm font-semibold">₱{sale.total_amount.toLocaleString()}</p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="p-6 text-center text-muted-foreground text-sm">No recent sales</div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Top Selling */}
-            {widgetVisibility.topSelling && (
-              <Card className={widgetVisibility.recentSales ? "lg:col-span-2" : "lg:col-span-3"}>
-                <CardHeader className="py-2 px-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium">Top Selling Items</CardTitle>
-                    <Button asChild variant="ghost" size="sm" className="h-6 text-xs">
-                      <Link href="/inventory">View all <ArrowUpRight className="h-3 w-3 ml-1" /></Link>
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="px-2 pb-2">
-                  {topSellingItems.length > 0 ? (
-                    <div className="grid lg:grid-cols-5 gap-2">
-                      <div className="lg:col-span-2 h-44">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RechartsBarChart data={topSellingItems.slice(0, 5)} layout="vertical">
-                            <XAxis type="number" hide />
-                            <YAxis dataKey="name" type="category" width={70} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                            <Tooltip />
-                            <Bar dataKey="total_revenue" radius={[0, 4, 4, 0]}>
-                              {topSellingItems.slice(0, 5).map((_, i) => (
-                                <Cell key={i} fill={chartColors[i % chartColors.length]} />
-                              ))}
-                            </Bar>
-                          </RechartsBarChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <div className="lg:col-span-3">
-                        <div className="divide-y divide-border">
-                          {topSellingItems.slice(0, 5).map((item, i) => (
-                            <div key={item.name} className="py-1.5 flex items-center justify-between text-sm">
-                              <div className="flex items-center gap-2">
-                                <span className={`w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center ${i < 3 ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground'}`}>
-                                  {i + 1}
-                                </span>
-                                <div>
-                                  <p className="text-sm font-medium truncate max-w-32">{item.name}</p>
-                                  <p className="text-xs text-muted-foreground">{item.category}</p>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm font-semibold text-primary">₱{item.total_revenue.toLocaleString()}</p>
-                                <p className="text-xs text-muted-foreground">{item.total_quantity} sold</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="h-44 flex items-center justify-center text-muted-foreground text-sm">
-                      No sales data yet
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
-
-        {/* Error Display */}
-        {error && (
-          <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-              <span className="text-sm text-destructive">{error}</span>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => setError(null)}>Dismiss</Button>
-          </div>
-        )}
+          </Link>
+        </div>
       </div>
+
+      {/* ── Error Banner ────────────────────────────────────────────────── */}
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+          <Button variant="ghost" size="sm" className="ml-auto h-6 px-2" onClick={() => setError(null)}>Dismiss</Button>
+        </div>
+      )}
+
+      {/* ── KPI Row ─────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard
+          title="Total Sales Revenue"
+          value={loadingKPIs ? '…' : fmtCompact(summary?.total_sales_revenue ?? 0)}
+          subtitle={loadingKPIs ? undefined : `${summary?.total_sales_count ?? 0} transactions`}
+          trend={summary?.revenue_mom_pct ?? null}
+          icon={<DollarSign className="h-4 w-4" />}
+          href="/sales"
+          loading={loadingKPIs}
+          color="ring-blue-500/20"
+        />
+        <KpiCard
+          title="Inventory Value"
+          value={loadingKPIs ? '…' : fmtCompact(summary?.inventory_value ?? 0)}
+          subtitle={loadingKPIs ? undefined : `${summary?.inventory_item_count ?? 0} SKUs on hand`}
+          icon={<Package className="h-4 w-4" />}
+          href="/inventory"
+          loading={loadingKPIs}
+          color="ring-emerald-500/20"
+        />
+        <KpiCard
+          title="Open Purchase Orders"
+          value={loadingKPIs ? '…' : String(summary?.open_pos_count ?? 0)}
+          subtitle="Awaiting receipt / approval"
+          icon={<ShoppingCart className="h-4 w-4" />}
+          href="/purchasing?filter=status:pending"
+          loading={loadingKPIs}
+          color="ring-amber-500/20"
+        />
+        <KpiCard
+          title="Pending Services"
+          value={loadingKPIs ? '…' : String(summary?.pending_services ?? 0)}
+          subtitle="Quotation · In-Progress · QC"
+          icon={<Wrench className="h-4 w-4" />}
+          href="/services"
+          loading={loadingKPIs}
+          color="ring-violet-500/20"
+        />
+      </div>
+
+      {/* ── Charts Row ──────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+
+        {/* Revenue vs COGS bar chart (2/3 width) */}
+        <Card className="xl:col-span-2">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Revenue vs COGS</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Gross Margin: <span className="font-semibold text-foreground">{grossMarginPct}%</span>
+                  {' · '}Revenue: <span className="font-semibold">{fmtCompact(totalChartRevenue)}</span>
+                  {' · '}COGS: <span className="font-semibold">{fmtCompact(totalChartCOGS)}</span>
+                </p>
+              </div>
+              <Select
+                value={String(chartDays)}
+                onValueChange={v => setChartDays(Number(v))}
+              >
+                <SelectTrigger className="h-7 w-24 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">7 days</SelectItem>
+                  <SelectItem value="14">14 days</SelectItem>
+                  <SelectItem value="30">30 days</SelectItem>
+                  <SelectItem value="60">60 days</SelectItem>
+                  <SelectItem value="90">90 days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loadingChart ? (
+              <div className="h-56 flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : chartData.length === 0 ? (
+              <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">
+                No sales data in this period
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10 }}
+                    tickLine={false}
+                    axisLine={false}
+                    interval={xAxisInterval}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10 }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)}
+                    width={38}
+                  />
+                  <Tooltip content={<RevenueTooltip />} />
+                  <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="cogs"    name="COGS"    fill="#f97316" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Inventory by Category donut (1/3 width) */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Inventory by Category</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Total: <span className="font-semibold text-foreground">{fmtCompact(totalInventoryValue)}</span>
+            </p>
+          </CardHeader>
+          <CardContent>
+            {loadingDonut ? (
+              <div className="h-56 flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : donutData.length === 0 ? (
+              <div className="h-56 flex items-center justify-center text-sm text-muted-foreground">
+                No inventory data
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={donutData}
+                    dataKey="value"
+                    nameKey="category"
+                    cx="50%"
+                    cy="45%"
+                    innerRadius={54}
+                    outerRadius={80}
+                    paddingAngle={3}
+                  >
+                    {donutData.map((entry) => (
+                      <Cell key={entry.category} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Legend
+                    formatter={(value: string) => (
+                      <span className="text-xs text-foreground">{value}</span>
+                    )}
+                    iconSize={8}
+                    iconType="circle"
+                  />
+                  <Tooltip content={<DonutTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Workshop Analytics Row ───────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-violet-500" />
+              Workshop Analytics
+              <Badge variant="outline" className="text-xs ml-1">Completed Jobs</Badge>
+            </CardTitle>
+            <Link href="/services/list?state=completed">
+              <Button variant="ghost" size="sm" className="text-xs gap-1">
+                View All <ArrowUpRight className="h-3 w-3" />
+              </Button>
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingWS ? (
+            <div className="h-16 flex items-center">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : !workshop ? (
+            <p className="text-sm text-muted-foreground">No workshop data available.</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              <WorkshopStat label="Completed Jobs"   value={String(workshop.total_jobs_completed)} />
+              <WorkshopStat label="Total Revenue"    value={fmtCompact(workshop.total_revenue)} />
+              <WorkshopStat label="Parts Revenue"    value={fmtCompact(workshop.parts_revenue)} color="text-blue-600" />
+              <WorkshopStat label="Labor Revenue"    value={fmtCompact(workshop.labor_revenue)} color="text-violet-600" />
+              <WorkshopStat label="Avg Job Value"    value={fmtCompact(workshop.avg_job_value)} />
+              <WorkshopStat
+                label="Stock Consumed"
+                value={fmtCompact(workshop.inventory_consumed_value)}
+                color="text-orange-600"
+                note="at cost"
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+    </div>
+  );
+}
+
+// ── Mini stat block used in Workshop row ─────────────────────────────────────
+
+function WorkshopStat({
+  label, value, color = 'text-foreground', note,
+}: {
+  label: string; value: string; color?: string; note?: string;
+}) {
+  return (
+    <div className="text-center">
+      <p className={`text-xl font-bold tracking-tight ${color}`}>{value}</p>
+      <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+      {note && <p className="text-[10px] text-muted-foreground/60">{note}</p>}
     </div>
   );
 }

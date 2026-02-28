@@ -229,7 +229,7 @@ export const generateHtmlReceipt = (data: ReceiptData): string => {
           </div>
 
           <div class="details">
-            <p>Sale ID: ${sale.sale_id.split('-')[0]}</p>
+            <p>Sale ID: ${sale.sale_id.split('-')[0]!}</p>
             <p>Date: ${formatDate(sale.sale_date)}</p>
             <p>Cashier: ${cashier.name}</p>
             ${branch ? `<p>Branch: ${branch.name}</p>` : ''}
@@ -301,4 +301,163 @@ export const printReceipt = (htmlContent: string) => {
   } else {
     alert('Please allow popups to print the receipt.');
   }
+};
+
+// -----------------------------------------------------------------------------
+// SERVICE JOB RECEIPT
+// -----------------------------------------------------------------------------
+
+export interface ServiceReceiptLine {
+  name:       string;
+  quantity:   number;
+  unit_price: number;
+}
+
+export interface ServiceReceiptData {
+  job_number:     string;
+  job_date:       string;
+  branch_name:    string;
+  branch_address?: string;
+  branch_phone?:  string;
+  customer_name?: string;
+  customer_phone?: string;
+  plate_number?:  string;
+  vehicle_make?:  string;
+  vehicle_model?: string;
+  vehicle_year?:  number | null;
+  mechanic_name?: string;
+  lines:          ServiceReceiptLine[];
+  total_amount:   number;
+  notes?:         string;
+}
+
+export const generateServiceReceiptHtml = (data: ServiceReceiptData): string => {
+  const {
+    job_number, job_date, branch_name, branch_address, branch_phone,
+    customer_name, customer_phone, plate_number, vehicle_make, vehicle_model,
+    vehicle_year, mechanic_name, lines, total_amount, notes,
+  } = data;
+
+  const vehicleStr = [plate_number, vehicle_make, vehicle_model, vehicle_year]
+    .filter(Boolean).join(' ');
+
+  const lineRows = lines.map(l => `
+    <tr>
+      <td style="padding:4px 0">${l.name}</td>
+      <td style="text-align:center;padding:4px 4px">${l.quantity}</td>
+      <td style="text-align:right;padding:4px 4px">${formatCurrency(l.unit_price)}</td>
+      <td style="text-align:right;padding:4px 0">${formatCurrency(l.quantity * l.unit_price)}</td>
+    </tr>
+  `).join('');
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Service Invoice — ${job_number}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      background: #f4f4f4;
+      padding: 20px;
+    }
+    .receipt {
+      width: 320px;
+      margin: auto;
+      background: #fff;
+      border: 1px dashed #ccc;
+      padding: 18px;
+      box-shadow: 0 0 10px rgba(0,0,0,.08);
+    }
+    .center { text-align: center; }
+    .divider { border-top: 1px dashed #000; margin: 8px 0; }
+    h1 { font-size: 18px; margin-bottom: 4px; }
+    .sub { font-size: 11px; line-height: 1.5; }
+    .section { font-size: 12px; padding: 6px 0; }
+    .section p { margin: 2px 0; }
+    .label { font-weight: bold; }
+    table { width: 100%; font-size: 12px; border-collapse: collapse; }
+    thead th {
+      text-align: left;
+      border-bottom: 1px solid #000;
+      padding-bottom: 4px;
+      font-size: 11px;
+    }
+    tfoot td {
+      padding-top: 6px;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    .footer {
+      text-align: center;
+      font-size: 11px;
+      padding-top: 8px;
+      line-height: 1.6;
+    }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .receipt { box-shadow: none; border: none; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="receipt">
+
+    <div class="center" style="padding-bottom:8px;border-bottom:1px dashed #000">
+      <h1>${branch_name}</h1>
+      ${branch_address ? `<p class="sub">${branch_address}</p>` : ''}
+      ${branch_phone   ? `<p class="sub">Tel: ${branch_phone}</p>` : ''}
+    </div>
+
+    <div class="center" style="padding:6px 0;border-bottom:1px dashed #000">
+      <p style="font-size:13px;font-weight:bold;letter-spacing:1px">SERVICE INVOICE</p>
+    </div>
+
+    <div class="section" style="border-bottom:1px dashed #000">
+      <p><span class="label">Job #: </span>${job_number}</p>
+      <p><span class="label">Date: </span>${formatDate(job_date)}</p>
+      ${mechanic_name ? `<p><span class="label">Mechanic: </span>${mechanic_name}</p>` : ''}
+    </div>
+
+    <div class="section" style="border-bottom:1px dashed #000">
+      <p><span class="label">Customer: </span>${customer_name ?? 'Walk-in'}</p>
+      ${customer_phone ? `<p><span class="label">Phone: </span>${customer_phone}</p>` : ''}
+      ${vehicleStr     ? `<p><span class="label">Vehicle: </span>${vehicleStr}</p>` : ''}
+    </div>
+
+    <table style="margin-top:8px;margin-bottom:4px">
+      <thead>
+        <tr>
+          <th>Service / Part</th>
+          <th style="text-align:center">Qty</th>
+          <th style="text-align:right">Unit</th>
+          <th style="text-align:right">Total</th>
+        </tr>
+      </thead>
+      <tbody>${lineRows}</tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3" style="text-align:right;padding-right:4px">TOTAL</td>
+          <td style="text-align:right">${formatCurrency(total_amount)}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    ${notes ? `
+    <div class="divider"></div>
+    <div class="section">
+      <p class="label">Notes:</p>
+      <p>${notes}</p>
+    </div>` : ''}
+
+    <div class="divider"></div>
+    <div class="footer">
+      <p>Thank you for choosing ${branch_name}!</p>
+      <p>Please retain this receipt for your records.</p>
+    </div>
+
+  </div>
+</body>
+</html>`;
 };

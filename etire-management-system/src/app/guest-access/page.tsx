@@ -14,7 +14,7 @@ export default function GuestAccessPage() {
 
     useEffect(() => {
         // Redirect if user is not a guest
-        if (user && user.role !== 0) {
+        if (user && Number(user.role) !== 0) {
             router.push('/dashboard');
         }
     }, [user, router]);
@@ -24,7 +24,7 @@ export default function GuestAccessPage() {
         router.push('/login');
     };
 
-    if (!user || user.role !== 0) {
+    if (!user || Number(user.role) !== 0) {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>

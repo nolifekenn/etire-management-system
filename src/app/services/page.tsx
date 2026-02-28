@@ -279,6 +279,100 @@ const COMMON_SERVICES = [
   "Other (Please specify below)"
 ];
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SERVICE PRESETS
+// Each service type has a default fee and a list of pre-identified materials.
+// 'nameContains' is a case-insensitive substring matched against inventory
+// item names when auto-populating the items list.
+//
+// To add a new service job preset:
+//   1. Add the service name string to COMMON_SERVICES above.
+//   2. Add a matching entry in SERVICE_PRESETS below with:
+//      - defaultServiceFee : labor/service fee in ₱
+//      - materials         : array of { nameContains, defaultQuantity }
+// ─────────────────────────────────────────────────────────────────────────────
+interface ServiceMaterialPreset {
+  nameContains: string;   // substring of inventory item name (case-insensitive)
+  defaultQuantity: number;
+}
+interface ServicePresetConfig {
+  defaultServiceFee: number;
+  materials: ServiceMaterialPreset[];
+}
+
+const SERVICE_PRESETS: Record<string, ServicePresetConfig> = {
+  "Tire Rotation and Balancing": {
+    defaultServiceFee: 350,
+    materials: [
+      { nameContains: "wheel weight", defaultQuantity: 4 },
+    ],
+  },
+  "Tire Replacement": {
+    defaultServiceFee: 250,
+    materials: [
+      { nameContains: "tire", defaultQuantity: 1 },
+      { nameContains: "valve stem", defaultQuantity: 1 },
+    ],
+  },
+  "Tire Patch/Repair": {
+    defaultServiceFee: 150,
+    materials: [
+      { nameContains: "patch", defaultQuantity: 1 },
+      { nameContains: "rubber cement", defaultQuantity: 1 },
+    ],
+  },
+  "Tire Vulcanizing": {
+    defaultServiceFee: 150,
+    materials: [
+      { nameContains: "patch", defaultQuantity: 1 },
+      { nameContains: "rubber", defaultQuantity: 1 },
+    ],
+  },
+  "Wheel Alignment": {
+    defaultServiceFee: 500,
+    materials: [],
+  },
+  "Brake Pad Replacement": {
+    defaultServiceFee: 800,
+    materials: [
+      { nameContains: "brake pad", defaultQuantity: 4 },
+    ],
+  },
+  "Oil Change": {
+    defaultServiceFee: 350,
+    materials: [
+      { nameContains: "oil filter", defaultQuantity: 1 },
+      { nameContains: "motor oil", defaultQuantity: 4 },
+    ],
+  },
+  "Engine Tune-up": {
+    defaultServiceFee: 600,
+    materials: [
+      { nameContains: "spark plug", defaultQuantity: 4 },
+      { nameContains: "air filter", defaultQuantity: 1 },
+      { nameContains: "oil filter", defaultQuantity: 1 },
+    ],
+  },
+  "Battery Replacement": {
+    defaultServiceFee: 200,
+    materials: [
+      { nameContains: "battery", defaultQuantity: 1 },
+    ],
+  },
+  "Suspension Repair": {
+    defaultServiceFee: 1200,
+    materials: [],
+  },
+  "Exhaust System Repair": {
+    defaultServiceFee: 900,
+    materials: [],
+  },
+  "General Check-up/Maintenance": {
+    defaultServiceFee: 500,
+    materials: [],
+  },
+};
+
 // ServiceJob interface
 interface ServiceJob {
     job_id: string;
@@ -1309,6 +1403,43 @@ const TabbedServiceForm = ({
                 </Button>
               </div>
 
+              {/* Preset materials guide — shows expected materials when a preset service is chosen */}
+              {(() => {
+                const preset = formData.selectedServiceType
+                  ? SERVICE_PRESETS[formData.selectedServiceType]
+                  : undefined;
+                if (!preset || preset.materials.length === 0) return null;
+                return (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-xs font-semibold text-blue-700 mb-1 font-poppins flex items-center gap-1">
+                      <Package className="h-3 w-3" />
+                      Preset materials for "{formData.selectedServiceType}"
+                    </p>
+                    <ul className="space-y-0.5">
+                      {preset.materials.map((mat, i) => (
+                        <li key={i} className="text-xs text-blue-600 font-poppins flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block shrink-0" />
+                          {mat.nameContains.charAt(0).toUpperCase() + mat.nameContains.slice(1)}
+                          {' '}
+                          <span className="text-blue-400">× {mat.defaultQuantity}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {formData.vehicleTypeId && formData.selectedItems.length === 0 && (
+                      <p className="text-xs text-blue-500 mt-1 font-poppins italic">
+                        Select a vehicle type to auto-populate matching inventory items.
+                      </p>
+                    )}
+                    {formData.vehicleTypeId && formData.selectedItems.length > 0 && (
+                      <p className="text-xs text-green-600 mt-1 font-poppins flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" />
+                        Items auto-populated from inventory. Adjust quantities as needed.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+
               {!formData.vehicleTypeId && !isFieldsLocked && (
                 <p className="text-sm text-amber-600 bg-amber-50 p-2 rounded font-poppins">
                   Please select a vehicle type first to add items
@@ -1528,6 +1659,29 @@ const TabbedServiceForm = ({
                   ₱{calculateGrandTotal.toFixed(2)}
                 </span>
               </div>
+            </div>
+
+            {/* Payment Method */}
+            <div className="space-y-2">
+              <Label className="text-slate-700 font-medium font-poppins flex items-center gap-1">
+                <DollarSign className="h-4 w-4 text-green-600" />
+                Payment Method
+              </Label>
+              <Select
+                value={formData.paymentMethod}
+                onValueChange={(val) => onFormDataChange({ ...formData, paymentMethod: val as 'cash' | 'card' | 'check' | 'credit' })}
+                disabled={isFieldsLocked}
+              >
+                <SelectTrigger className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins ${isFieldsLocked ? 'bg-slate-100 cursor-not-allowed' : 'bg-white/80'}`}>
+                  <SelectValue placeholder="Select payment method..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash" className="font-poppins">💵 Cash</SelectItem>
+                  <SelectItem value="card" className="font-poppins">💳 Card</SelectItem>
+                  <SelectItem value="check" className="font-poppins">📄 Check</SelectItem>
+                  <SelectItem value="credit" className="font-poppins">🏦 Credit</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </TabsContent>
         </Tabs>
@@ -1968,7 +2122,8 @@ export default function EnhancedServiceManagementPage() {
       serviceFee: '0',
       vehicleTypeId: '',
       selectedItems: [] as ServiceJobItem[],
-      originalStatus: null as ServiceJob['status'] | null
+      originalStatus: null as ServiceJob['status'] | null,
+      paymentMethod: 'cash' as 'cash' | 'card' | 'check' | 'credit'
     });
 
     useEffect(() => {
@@ -2006,14 +2161,59 @@ export default function EnhancedServiceManagementPage() {
       fetchCustomerVehicles();
     }, [formData.customerId, supabase, toast]);
 
-    // Handle service type selection
+    // Handle service type selection — also auto-fills default service fee from preset
     useEffect(() => {
-        if (formData.selectedServiceType === 'Other (Please specify below)') {
+        const svcType = formData.selectedServiceType;
+        if (svcType === 'Other (Please specify below)') {
             setFormData(prev => ({ ...prev, jobDescription: '' }));
-        } else if (formData.selectedServiceType) {
-            setFormData(prev => ({ ...prev, jobDescription: formData.selectedServiceType }));
+        } else if (svcType) {
+            const preset = SERVICE_PRESETS[svcType];
+            setFormData(prev => ({
+                ...prev,
+                jobDescription: svcType,
+                // Only overwrite fee when it is still at the default '0' or a previous preset value
+                // (don't overwrite if the user already typed a custom fee in an edit scenario)
+                ...(preset && prev.originalStatus === null
+                    ? { serviceFee: String(preset.defaultServiceFee) }
+                    : {}),
+            }));
         }
-    }, [formData.selectedServiceType]);
+    }, [formData.selectedServiceType]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Auto-populate preset materials when BOTH service type and vehicle type are set
+    // Only triggers on a new/add form (originalStatus === null) and when no items are chosen yet
+    useEffect(() => {
+        const svcType = formData.selectedServiceType;
+        const vtId    = formData.vehicleTypeId;
+        if (!svcType || !vtId || formData.originalStatus !== null) return;          // editing – don't overwrite
+        if (formData.selectedItems.length > 0) return;                              // user already added items
+
+        const preset = SERVICE_PRESETS[svcType];
+        if (!preset || preset.materials.length === 0) return;
+
+        const selectedVehicleType = vehicleTypes.find(vt => vt.vehicle_type_id === vtId);
+        if (!selectedVehicleType) return;
+
+        const available = inventoryItems.filter(item =>
+            item.vehicle_type?.toLowerCase() === selectedVehicleType.name.toLowerCase() &&
+            item.stock_quantity > 0
+        );
+
+        const autoItems: ServiceJobItem[] = [];
+        for (const mat of preset.materials) {
+            const match = available.find(inv =>
+                inv.name.toLowerCase().includes(mat.nameContains.toLowerCase())
+            );
+            if (match) {
+                autoItems.push({ item_id: match.item_id, quantity: mat.defaultQuantity });
+            }
+        }
+
+        if (autoItems.length > 0) {
+            setFormData(prev => ({ ...prev, selectedItems: autoItems }));
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [formData.selectedServiceType, formData.vehicleTypeId]);
 
     // Fetch data functions
     const fetchJobs = useCallback(async () => {
@@ -2254,7 +2454,8 @@ export default function EnhancedServiceManagementPage() {
           serviceFee: '0',
           vehicleTypeId: '',
           selectedItems: [],
-          originalStatus: null
+          originalStatus: null,
+          paymentMethod: 'cash'
         });
         setEditingJob(null);
     };
@@ -2308,7 +2509,8 @@ export default function EnhancedServiceManagementPage() {
           serviceFee: serviceFeeValue,
           vehicleTypeId: job.vehicle_type_id || '',
           selectedItems: job.items || [],
-          originalStatus: job.status
+          originalStatus: job.status,
+          paymentMethod: 'cash'
         });
         
         setIsAddDialogOpen(false); // ✅ Ensure add dialog is closed
@@ -2512,14 +2714,15 @@ export default function EnhancedServiceManagementPage() {
           if (itemsError) throw itemsError;
         }
 
-        if (shouldCreateSale && validItems.length > 0) {
+        if (shouldCreateSale) {
+          // Always create a sale record when a job is completed — service fee is pure labor profit
           const saleData = {
             customer_id: formData.customerId === ANONYMOUS_CUSTOMER_ID ? null : formData.customerId,
-            total_amount: itemsTotal,
-            payment_method: 'cash',
-            status: 'completed',
+            total_amount: feeOnly + itemsTotal,
+            payment_method: formData.paymentMethod,
             user_id: authUser.user_id,
-            job_id: jobId
+            service_job_id: jobId,
+            branch_id: authUser.branch_id
           };
 
           const { data: saleResult, error: saleError } = await supabase
@@ -2530,12 +2733,14 @@ export default function EnhancedServiceManagementPage() {
 
           if (saleError) throw saleError;
 
-          if (saleResult) {
+          // Only insert sale_items and deduct stock when material items are actually used
+          if (saleResult && validItems.length > 0) {
             const saleItems = validItems.map(item => ({
               sale_id: saleResult.sale_id,
               item_id: item.item_id,
               quantity: item.quantity,
-              price: inventoryItems.find(i => i.item_id === item.item_id)?.sale_price || 0
+              price_at_sale: inventoryItems.find(i => i.item_id === item.item_id)?.sale_price || 0,
+              installation_fee: 0
             }));
 
             const { error: saleItemsError } = await supabase
@@ -2745,45 +2950,35 @@ export default function EnhancedServiceManagementPage() {
                 }
             }
     
-            // ✅ 4. Handle sales logic (existing code - unchanged)
-            if (isBecomingCompleted && job.items && job.items.length > 0) {
+            // ✅ 4. Handle sales logic — always create sale on completion (service fee = pure labor profit)
+            if (isBecomingCompleted) {
                 const { data: existingSale, error: saleCheckErr } = await supabase
                     .from('sale')
                     .select('sale_id')
-                    .eq('job_id', jobId)
+                    .eq('service_job_id', jobId)
                     .maybeSingle();
                 if (saleCheckErr) throw saleCheckErr;
     
                 if (existingSale) {
                     toast({ title: 'Already Processed', description: 'Sale already exists.', variant: 'default' });
                 } else {
-                    const firstItem = job.items[0];
-                    const { data: firstInv, error: invErr } = await supabase
-                        .from('inventory_item')
-                        .select('branch_id')
-                        .eq('item_id', firstItem.item_id)
-                        .maybeSingle();
-                    if (invErr) throw invErr;
+                    const { data: newSale, error: saleCreateErr } = await supabase
+                        .from('sale')
+                        .insert([{
+                            user_id: authUser.user_id,
+                            branch_id: authUser.branch_id,
+                            customer_id: job.customer_id || null,
+                            sale_date: new Date().toISOString(),
+                            service_job_id: jobId,
+                            total_amount: job.service_fee + itemsTotal,
+                            payment_method: 'cash'
+                        }])
+                        .select('sale_id')
+                        .single();
+                    if (saleCreateErr) throw saleCreateErr;
+                    const saleId = newSale?.sale_id || null;
     
-                    let saleId: string | null = null;
-                    if (firstInv) {
-                        const { data: newSale, error: saleCreateErr } = await supabase
-                            .from('sale')
-                            .insert([{
-                                user_id: authUser.user_id,
-                                branch_id: firstInv.branch_id,
-                                customer_id: job.customer_id || null,
-                                sale_date: new Date().toISOString(),
-                                job_id: jobId,
-                                total_amount: itemsTotal,
-                                payment_method: 'cash'
-                            }])
-                            .select('sale_id')
-                            .single();
-                        if (saleCreateErr) throw saleCreateErr;
-                        saleId = newSale?.sale_id || null;
-                    }
-                    if (saleId) {
+                    if (saleId && job.items && job.items.length > 0) {
                         for (const it of job.items) {
                             const { data: currentItem, error: itemErr } = await supabase
                                 .from('inventory_item')
@@ -2808,7 +3003,7 @@ export default function EnhancedServiceManagementPage() {
                 const { data: sale, error: saleErr } = await supabase
                     .from('sale')
                     .select('sale_id')
-                    .eq('job_id', jobId)
+                    .eq('service_job_id', jobId)
                     .maybeSingle();
                 if (saleErr) throw saleErr;
     

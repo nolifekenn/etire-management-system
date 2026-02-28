@@ -26,21 +26,19 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/hooks/use-toast";
+import { validateShortText, validatePhone, validateLongText, type FieldError } from '@/lib/validation';
 import {
-  Loader2, PlusCircle, AlertTriangle, Building2, Users, MapPin, Phone, Mail,
-  RefreshCw, Clock, Edit, Trash2, Search, Filter, X, Eye, CheckCircle, XCircle,
-  UserCheck, UserX, Target, Sparkles, ArrowLeft, Check, Package, ArrowUpDown,
-  ChevronDown, Save, Archive, ArrowRight, Download, TrendingUp, DollarSign,
+  Loader2, PlusCircle, AlertTriangle, Building2, MapPin, Phone,
+  RefreshCw, Clock, Edit, Trash2, Search, X, Eye, CheckCircle,
+  ArrowLeft, Save, Archive, Download,
   Plus, Download as DownloadIcon, Eye as EyeIcon
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
-import { Branch, User } from '@/lib/types';
+import { Branch } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // ===== DESIGN SYSTEM =====
 const buttonStyles = {
@@ -67,13 +65,11 @@ interface BranchFormProps {
     name: string;
     address: string;
     phone: string;
-    email: string;
-    managerId: string;
     isActive: boolean;
-    customers?: any[];
   };
   onFormDataChange: (data: any) => void;
   isEdit?: boolean;
+  formErrors?: { name?: FieldError; address?: FieldError; phone?: FieldError };
 }
 
 const BranchForm = ({
@@ -83,269 +79,100 @@ const BranchForm = ({
   isLoading,
   formData,
   onFormDataChange,
-  isEdit = false
+  isEdit = false,
+  formErrors = {},
 }: BranchFormProps) => {
-  const [activeTab, setActiveTab] = useState('basic');
-  const { customers } = formData;
-
-  const handleNext = () => {
-    if (activeTab === 'basic') setActiveTab('review');
-  };
-
-  const handleBack = () => {
-    if (activeTab === 'review') setActiveTab('basic');
-  };
-
-  const isBasicValid = formData.name && formData.name.trim() !== '';
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-gradient-to-br from-white to-slate-100 border-0 shadow-2xl font-poppins fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] gap-4 z-50">
+      <DialogContent className="sm:max-w-md bg-white border border-slate-200 shadow-2xl font-poppins">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
-            {isEdit ? 'Edit Branch' : 'Create New Branch'}
+          <DialogTitle className="text-xl font-bold">
+            {isEdit ? 'Edit Branch' : 'Add New Branch'}
           </DialogTitle>
-          <DialogDescription className="text-slate-600 font-poppins">
-            {isEdit ? 'Update the branch details.' : 'Fill in the details for the new branch location.'}
+          <DialogDescription className="text-slate-600">
+            {isEdit ? 'Update the branch details.' : 'Fill in the details for the new branch.'}
           </DialogDescription>
         </DialogHeader>
 
-        {/* Progress Steps */}
-        <div className="flex justify-between mb-6">
-          {['Basic Info', 'Review'].map((step, index) => {
-            const stepNumber = index + 1;
-            const isActive = activeTab === ['basic', 'review'][index];
-            const isCompleted = activeTab === 'review' && stepNumber < 2;
+        <div className="space-y-4 py-2">
+          <div className="space-y-1">
+            <Label htmlFor="branch-name" className="text-sm font-medium text-slate-700">
+              Branch Name <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="branch-name"
+              value={formData.name}
+              onChange={(e) => onFormDataChange({ ...formData, name: e.target.value })}
+              placeholder="e.g. Main Branch"
+              maxLength={100}
+              aria-invalid={!!formErrors.name}
+              className={`h-9 border-slate-300 focus:border-indigo-400${formErrors.name ? ' border-red-400 focus:border-red-400' : ''}`}
+            />
+            {formErrors.name && <p className="text-xs text-red-500">⚠ {formErrors.name}</p>}
+          </div>
 
-            return (
-              <div key={step} className="flex items-center">
-                <div className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold text-sm ${isActive
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white'
-                  : isCompleted
-                    ? 'bg-green-500 text-white'
-                    : 'bg-slate-200 text-slate-600'
-                  }`}>
-                  {isCompleted ? <Check className="h-4 w-4" /> : stepNumber}
-                </div>
-                <span className={`ml-2 text-sm font-medium ${isActive ? 'text-purple-600' : isCompleted ? 'text-green-600' : 'text-slate-500'
-                  }`}>
-                  {step}
+          <div className="space-y-1">
+            <Label htmlFor="branch-address" className="text-sm font-medium text-slate-700">Address</Label>
+            <Textarea
+              id="branch-address"
+              value={formData.address}
+              onChange={(e) => onFormDataChange({ ...formData, address: e.target.value })}
+              placeholder="123 Main Street, City"
+              maxLength={210}
+              aria-invalid={!!formErrors.address}
+              className={`border-slate-300 focus:border-indigo-400 resize-none${formErrors.address ? ' border-red-400 focus:border-red-400' : ''}`}
+              rows={2}
+            />
+            {formErrors.address && <p className="text-xs text-red-500">⚠ {formErrors.address}</p>}
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="branch-phone" className="text-sm font-medium text-slate-700">Phone</Label>
+            <Input
+              id="branch-phone"
+              value={formData.phone}
+              onChange={(e) => onFormDataChange({ ...formData, phone: e.target.value })}
+              placeholder="+1-555-0101"
+              aria-invalid={!!formErrors.phone}
+              className={`h-9 border-slate-300 focus:border-indigo-400${formErrors.phone ? ' border-red-400 focus:border-red-400' : ''}`}
+            />
+            {formErrors.phone && <p className="text-xs text-red-500">⚠ {formErrors.phone}</p>}
+          </div>
+
+          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+            <Switch
+              id="branch-active"
+              checked={formData.isActive}
+              onCheckedChange={(checked) => onFormDataChange({ ...formData, isActive: checked })}
+              className="data-[state=checked]:bg-green-500"
+            />
+            <Label htmlFor="branch-active" className="text-sm font-medium text-slate-700 cursor-pointer">
+              Active Branch
+            </Label>
+            {formData.isActive && (
+              <div className="ml-auto flex items-center gap-1 text-green-600 text-sm">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
                 </span>
-                {index < 1 && (
-                  <div className={`w-12 h-1 mx-2 ${isCompleted ? 'bg-green-500' : 'bg-slate-200'
-                    }`} />
-                )}
+                Active
               </div>
-            );
-          })}
+            )}
+          </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          {/* Basic Info Tab */}
-          <TabsContent value="basic" className="space-y-4">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-slate-700 font-medium font-poppins">Branch Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => onFormDataChange({ ...formData, name: e.target.value })}
-                  placeholder="Main Branch"
-                  className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins ${formData.name ? "border-green-400" : ""
-                    }`}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="address" className="text-slate-700 font-medium font-poppins">Address</Label>
-                <Textarea
-                  id="address"
-                  value={formData.address}
-                  onChange={(e) => onFormDataChange({ ...formData, address: e.target.value })}
-                  placeholder="123 Main Street, City, State"
-                  className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phone" className="text-slate-700 font-medium font-poppins">Phone</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => onFormDataChange({ ...formData, phone: e.target.value })}
-                    placeholder="+1-555-0101"
-                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-slate-700 font-medium font-poppins">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => onFormDataChange({ ...formData, email: e.target.value })}
-                    placeholder="branch@company.com"
-                    className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="manager" className="text-slate-700 font-medium font-poppins">Manager</Label>
-                <Select
-                  value={formData.managerId}
-                  onValueChange={(value) => onFormDataChange({ ...formData, managerId: value })}
-                >
-                  <SelectTrigger className="border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 font-poppins">
-                    <SelectValue placeholder="Select a manager..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none" className="font-poppins">No Manager</SelectItem>
-                    {(customers || []).filter((c: any) => c.user_id && c.role && [1, 2].includes(c.role)).map((manager: any) => (
-                      <SelectItem key={manager.user_id} value={manager.user_id} className="font-poppins">
-                        {manager.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center space-x-2 p-3 bg-slate-50 rounded-lg">
-                <Switch
-                  id="is_active"
-                  checked={formData.isActive}
-                  onCheckedChange={(checked) => onFormDataChange({ ...formData, isActive: checked })}
-                  className="data-[state=checked]:bg-green-500"
-                />
-                <Label htmlFor="is_active" className="text-slate-700 font-medium font-poppins">Active Branch</Label>
-                {formData.isActive && (
-                  <div className="ml-auto flex items-center gap-1 text-green-600">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                    </span>
-                    <span className="text-sm">Active</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* Review Tab */}
-          <TabsContent value="review" className="space-y-4">
-            <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-              <h3 className="font-semibold text-slate-800 font-poppins">Branch Summary</h3>
-
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-slate-600 font-poppins">Branch Name:</span>
-                  <p className="font-semibold text-slate-800 font-poppins">{formData.name || 'Not specified'}</p>
-                </div>
-
-                <div>
-                  <span className="text-slate-600 font-poppins">Status:</span>
-                  <p className="font-semibold text-slate-800 font-poppins">
-                    {formData.isActive ? 'Active' : 'Inactive'}
-                  </p>
-                </div>
-
-                <div className="col-span-2">
-                  <span className="text-slate-600 font-poppins">Address:</span>
-                  <p className="font-semibold text-slate-800 font-poppins">
-                    {formData.address || 'No address provided'}
-                  </p>
-                </div>
-
-                <div>
-                  <span className="text-slate-600 font-poppins">Phone:</span>
-                  <p className="font-semibold text-slate-800 font-poppins">
-                    {formData.phone || 'Not provided'}
-                  </p>
-                </div>
-
-                <div>
-                  <span className="text-slate-600 font-poppins">Email:</span>
-                  <p className="font-semibold text-slate-800 font-poppins">
-                    {formData.email || 'Not provided'}
-                  </p>
-                </div>
-
-                <div className="col-span-2">
-                  <span className="text-slate-600 font-poppins">Manager:</span>
-                  <p className="font-semibold text-slate-800 font-poppins">
-                    {formData.managerId === 'none' || !formData.managerId
-                      ? 'No manager assigned'
-                      : (customers || []).find((c: any) => c.user_id === formData.managerId)?.name || 'Unknown Manager'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Status Summary */}
-            <div className="space-y-3 p-4 bg-gradient-to-br from-slate-50 to-purple-50 rounded-xl border-2 border-purple-200">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-600 font-poppins">Branch Status:</span>
-                <Badge className={`font-semibold ${formData.isActive ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
-                  {formData.isActive ? 'Active' : 'Inactive'}
-                </Badge>
-              </div>
-
-              <div className="h-px bg-slate-300"></div>
-
-              <div className="flex justify-between items-center">
-                <span className="text-base font-bold text-slate-800 font-poppins">Ready to {isEdit ? 'Update' : 'Create'}</span>
-                <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent font-poppins">
-                  {formData.name || 'New Branch'}
-                </span>
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        <DialogFooter className="flex justify-between">
-          <div>
-            {activeTab !== 'basic' && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleBack}
-                className={buttonStyles.back}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            <DialogClose asChild>
-              <Button type="button" variant="outline" className={buttonStyles.back}>
-                Cancel
-              </Button>
-            </DialogClose>
-
-            {activeTab !== 'review' ? (
-              <Button
-                onClick={handleNext}
-                disabled={!isBasicValid}
-                className={buttonStyles.primary}
-              >
-                Next
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            ) : (
-              <Button
-                onClick={onSubmit}
-                disabled={isLoading}
-                className={buttonStyles.primary}
-              >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isEdit ? 'Update Branch' : 'Create Branch'}
-              </Button>
-            )}
-          </div>
+        <DialogFooter className="gap-2">
+          <DialogClose asChild>
+            <Button type="button" variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button
+            onClick={onSubmit}
+            disabled={isLoading || !formData.name.trim()}
+            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white"
+          >
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isEdit ? 'Update Branch' : 'Create Branch'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -502,7 +329,6 @@ export default function EnhancedBranchesPage() {
   const { toast } = useToast();
   const { user: authUser } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [managers, setManagers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -535,16 +361,13 @@ export default function EnhancedBranchesPage() {
     name: '',
     address: '',
     phone: '',
-    email: '',
-    managerId: '',
     isActive: true,
-    customers: [] as any[],
   });
+  const [branchErrors, setBranchErrors] = useState<{ name?: FieldError; address?: FieldError; phone?: FieldError }>({});
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [managerFilter, setManagerFilter] = useState('all');
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -557,75 +380,42 @@ export default function EnhancedBranchesPage() {
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, managerFilter]);
+  }, [searchTerm, statusFilter]);
 
   const fetchBranches = useCallback(async () => {
-    if (!supabase) return;
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('branch')
-      .select(`
-                *,
-                user:manager_id(user_id, name)
-            `)
-      .is('deleted_at', null)
-      .order('name', { ascending: true });
-
-    if (error) {
-      setFetchError(`Could not fetch branches: ${error.message}`);
-      setBranches([]);
-    } else {
-      setBranches(data as any);
+    try {
+      const res = await fetch('/api/branches');
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Failed to fetch branches.');
+      setBranches(payload.data || []);
       setFetchError(null);
+    } catch (err: any) {
+      setFetchError(err.message || 'Could not fetch branches.');
+      setBranches([]);
     }
     setIsLoading(false);
     setLastUpdated(new Date());
   }, []);
 
-  const fetchManagers = useCallback(async () => {
-    if (!supabase) return;
-    const { data, error } = await supabase
-      .from('user')
-      .select('user_id, name, role')
-      .in('role', ['staff', 'branch_manager'])
-      .is('deleted_at', null)
-      .order('name', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching managers:', error);
-      setManagers([]);
-    } else {
-      setManagers(data as User[]);
-      setFormData(prev => ({
-        ...prev,
-        customers: data.map(m => ({ user_id: m.user_id, name: m.name, role: m.role }))
-      }));
-    }
-  }, []);
-
   useEffect(() => {
     fetchBranches();
-    fetchManagers();
-  }, [fetchBranches, fetchManagers]);
+  }, [fetchBranches]);
 
   // Filter branches based on search and filters
   const filteredBranches = useMemo(() => {
     return branches.filter(branch => {
       const matchesSearch = branch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         branch.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        branch.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        branch.email?.toLowerCase().includes(searchTerm.toLowerCase());
+        branch.phone?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesStatus = statusFilter === 'all' ||
         (statusFilter === 'active' && branch.is_active) ||
         (statusFilter === 'inactive' && !branch.is_active);
 
-      const matchesManager = managerFilter === 'all' ||
-        branch.manager_id === managerFilter;
-
-      return matchesSearch && matchesStatus && matchesManager;
+      return matchesSearch && matchesStatus;
     });
-  }, [branches, searchTerm, statusFilter, managerFilter]);
+  }, [branches, searchTerm, statusFilter]);
 
   // Pagination Logic
   const totalItems = filteredBranches.length;
@@ -643,12 +433,10 @@ export default function EnhancedBranchesPage() {
       name: '',
       address: '',
       phone: '',
-      email: '',
-      managerId: '',
       isActive: true,
-      customers: formData.customers,
     });
     setEditingBranch(null);
+    setBranchErrors({});
   };
 
   const handleOpenAddDialog = () => {
@@ -662,10 +450,7 @@ export default function EnhancedBranchesPage() {
       name: branch.name,
       address: branch.address || '',
       phone: branch.phone || '',
-      email: branch.email || '',
-      managerId: branch.manager_id || '',
       isActive: branch.is_active,
-      customers: formData.customers,
     });
     setIsEditDialogOpen(true);
   };
@@ -677,110 +462,109 @@ export default function EnhancedBranchesPage() {
 
   const handleRefresh = () => {
     fetchBranches();
-    fetchManagers();
   };
 
   const handleSubmit = async () => {
-    if (!supabase || !authUser) return;
-    if (!formData.name) {
-      toast({
-        title: "Validation Error",
-        description: "Branch name is required.",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!authUser) return;
+
+    // Inline validation
+    const errs = {
+      name:    validateShortText(formData.name,    { label: 'Branch name', required: true,  minLength: 2, maxLength: 100 }),
+      address: validateLongText (formData.address, { label: 'Address',     maxLength: 200 }),
+      phone:   validatePhone    (formData.phone,   { label: 'Phone' }),
+    };
+    setBranchErrors(errs);
+    if (errs.name || errs.address || errs.phone) return;
 
     setIsLoading(true);
+    try {
+      const branchData = {
+        name: formData.name,
+        address: formData.address || null,
+        phone: formData.phone || null,
+        is_active: formData.isActive,
+      };
 
-    const branchData = {
-      name: formData.name,
-      address: formData.address || null,
-      phone: formData.phone || null,
-      email: formData.email || null,
-      manager_id: formData.managerId && formData.managerId !== 'none' ? formData.managerId : null,
-      is_active: formData.isActive,
-    };
+      let res: Response;
+      if (editingBranch) {
+        res = await fetch('/api/branches', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ branch_id: editingBranch.branch_id, ...branchData }),
+        });
+      } else {
+        res = await fetch('/api/branches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(branchData),
+        });
+      }
 
-    let error;
-    if (editingBranch) {
-      const { error: updateError } = await supabase
-        .from('branch')
-        .update(branchData)
-        .eq('branch_id', editingBranch.branch_id);
-      error = updateError;
-    } else {
-      const { error: insertError } = await supabase
-        .from('branch')
-        .insert([branchData]);
-      error = insertError;
-    }
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Could not save branch.');
 
-    setIsLoading(false);
-
-    if (error) {
-      toast({
-        title: "Save Error",
-        description: `Could not save branch: ${error.message}`,
-        variant: "destructive"
-      });
-    } else {
       setSuccessAnimation({
         isVisible: true,
         title: editingBranch ? "Branch Updated!" : "Branch Created!",
         message: `Branch has been ${editingBranch ? 'updated' : 'created'} successfully.`,
         actionType: editingBranch ? 'edit' : 'add'
       });
-
       setIsAddDialogOpen(false);
       setIsEditDialogOpen(false);
       fetchBranches();
+    } catch (err: any) {
+      toast({
+        title: "Save Error",
+        description: err.message || 'Could not save branch.',
+        variant: "destructive"
+      });
     }
+    setIsLoading(false);
   };
 
   const handleDeleteBranch = async () => {
-    if (!deletingBranch || !supabase) return;
+    if (!deletingBranch) return;
     setIsLoading(true);
-    // Soft delete: set deleted_at timestamp instead of removing the record
-    const { error } = await supabase
-      .from('branch')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('branch_id', deletingBranch.branch_id);
-    setIsLoading(false);
-
-    if (error) {
-      toast({
-        title: "Delete Error",
-        description: `Could not delete branch: ${error.message}`,
-        variant: "destructive"
+    try {
+      const res = await fetch('/api/branches', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          branch_id: deletingBranch.branch_id,
+          deleted_at: new Date().toISOString(),
+        }),
       });
-    } else {
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Could not delete branch.');
+
       setSuccessAnimation({
         isVisible: true,
         title: "Branch Deleted!",
         message: "The branch has been removed from the system.",
         actionType: 'delete'
       });
-
       setIsDeleteConfirmationOpen(false);
       fetchBranches();
+    } catch (err: any) {
+      toast({
+        title: "Delete Error",
+        description: err.message || 'Could not delete branch.',
+        variant: "destructive"
+      });
     }
+    setIsLoading(false);
   };
 
   const handleExportExcel = () => {
-    const headers = ['Branch Name', 'Address', 'Phone', 'Email', 'Manager', 'Status'];
+    const headers = ['Branch Name', 'Address', 'Phone', 'Status'];
     const csvContent = [
       headers.join(','),
       ...branches.map(branch => {
-        const managerName = branch.manager?.name || branch.user?.name || 'No Manager';
         const status = branch.is_active ? 'Active' : 'Inactive';
-
         return [
           `"${branch.name}"`,
           `"${branch.address || ''}"`,
           branch.phone || '',
-          branch.email || '',
-          `"${managerName}"`,
           status
         ].join(',');
       })
@@ -807,7 +591,6 @@ export default function EnhancedBranchesPage() {
   const clearFilters = () => {
     setSearchTerm('');
     setStatusFilter('all');
-    setManagerFilter('all');
   };
 
   // Columns configuration for the table - UPDATED to include view icon
@@ -834,41 +617,12 @@ export default function EnhancedBranchesPage() {
     },
     {
       key: 'contact',
-      header: 'Contact Details',
-      render: (value: any, branch: any) => (
-        <div className="space-y-2">
-          {branch.phone && (
-            <div className="flex items-center gap-2">
-              <Phone className="h-4 w-4 text-slate-400" />
-              <span className="text-sm text-slate-700 font-poppins">{branch.phone}</span>
-            </div>
-          )}
-          {branch.email && (
-            <div className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-slate-400" />
-              <span className="text-sm text-slate-700 font-poppins">{branch.email}</span>
-            </div>
-          )}
-          {!branch.phone && !branch.email && (
-            <span className="text-sm text-slate-400 font-poppins">No contact details</span>
-          )}
-        </div>
+      header: 'Phone',
+      render: (_value: any, branch: any) => (
+        branch.phone
+          ? <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-slate-400" /><span className="text-sm text-slate-700 font-poppins">{branch.phone}</span></div>
+          : <span className="text-sm text-slate-400 font-poppins">No phone</span>
       )
-    },
-    {
-      key: 'manager',
-      header: 'Manager',
-      render: (value: any, branch: any) => {
-        const managerName = branch.manager?.name || branch.user?.name;
-        return managerName ? (
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-slate-400" />
-            <span className="text-sm text-slate-700 font-poppins">{managerName}</span>
-          </div>
-        ) : (
-          <span className="text-sm text-slate-400 font-poppins">No manager assigned</span>
-        );
-      }
     },
     {
       key: 'status',
@@ -968,7 +722,7 @@ export default function EnhancedBranchesPage() {
 
         {/* Quick Actions - Compact horizontal bar */}
         <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-          <Button onClick={handleOpenAddDialog} size="sm" className="shrink-0 bg-purple-600 hover:bg-purple-700 text-white">
+          <Button onClick={handleOpenAddDialog} size="sm" className="shrink-0 bg-[#714B67] hover:bg-[#5a3c53] text-white">
             <Plus className="h-4 w-4 mr-1" />Add Branch
           </Button>
           <Button onClick={handleExportExcel} size="sm" variant="outline" className="shrink-0">
@@ -999,7 +753,7 @@ export default function EnhancedBranchesPage() {
                 {branches.length === 0 ? (
                   <Button
                     onClick={handleOpenAddDialog}
-                    className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 hover:scale-105"
+                    className="bg-[#714B67] hover:bg-[#5a3c53] text-white"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add First Branch
@@ -1019,18 +773,14 @@ export default function EnhancedBranchesPage() {
           ) : (
             <>
               {/* Single rounded card: gradient header + table */}
-              <div className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm">
-                <div className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-teal-400 text-white p-4 flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="p-2 bg-white/20 rounded-lg">
-                      <Building2 className="h-6 w-6 text-white" />
-                    </div>
+              <div className="rounded-lg overflow-hidden border border-border">
+                <div className="w-full bg-muted/50 border-b border-border p-4 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <Building2 className="h-5 w-5 text-muted-foreground" />
                     <div>
-                      <div className="text-xl font-bold font-poppins">Branch Locations</div>
-                      <div className="text-sm opacity-90">Manage your business branches and locations</div>
-                      {/* Total / Filtered count */}
-                      <div className="text-sm text-white/90 mt-1">
-                        {searchTerm || statusFilter !== 'all' || managerFilter !== 'all' ? (
+                      <div className="text-sm font-semibold text-foreground">Branch Locations</div>
+                      <div className="text-xs text-muted-foreground">
+                        {searchTerm || statusFilter !== 'all' ? (
                           <>Filtered: <strong>{filteredBranches.length}</strong> of <strong>{branches.length}</strong> branches</>
                         ) : (
                           <>Total: <strong>{branches.length}</strong> branches</>
@@ -1041,7 +791,7 @@ export default function EnhancedBranchesPage() {
                 </div>
 
                 {/* Filter Section */}
-                <div className="bg-white p-5 border-b border-slate-200">
+                <div className="p-4 border-b border-border bg-background">
                   {/* Removed 'mb-5' from the classList below to eliminate space below filters */}
                   <div className="flex flex-col lg:flex-row lg:items-end gap-4">
                     <div className="flex-1 relative">
@@ -1049,7 +799,7 @@ export default function EnhancedBranchesPage() {
                       <div className="relative group">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4 group-focus-within:text-indigo-500 transition-colors" />
                         <Input
-                          placeholder="Search by name, address, phone, or email..."
+                          placeholder="Search by name, address, or phone..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                           className="pl-10 h-10 bg-slate-50 border-slate-200 focus:bg-white focus:border-indigo-500 transition-all rounded-md"
@@ -1083,27 +833,7 @@ export default function EnhancedBranchesPage() {
                         </Select>
                       </div>
 
-                      <div className="w-1/2 lg:w-48">
-                        <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Manager</Label>
-                        <Select
-                          value={managerFilter}
-                          onValueChange={setManagerFilter}
-                        >
-                          <SelectTrigger className="h-10 bg-white border-slate-200 rounded-md">
-                            <SelectValue placeholder="All managers" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Managers</SelectItem>
-                            {managers.map(manager => (
-                              <SelectItem key={manager.user_id} value={manager.user_id}>
-                                {manager.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {(searchTerm || statusFilter !== 'all' || managerFilter !== 'all') && (
+                      {(searchTerm || statusFilter !== 'all') && (
                         <div className="hidden lg:flex items-end">
                           <Button
                             variant="outline"
@@ -1123,12 +853,11 @@ export default function EnhancedBranchesPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="bg-slate-50">
-                        <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700 font-poppins">Branch Name</th>
-                        <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700 font-poppins">Contacts</th>
-                        <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700 font-poppins">Manager</th>
-                        <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700 font-poppins">Status</th>
-                        <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700 font-poppins">Actions</th>
+                      <tr className="bg-muted/50">
+                        <th className="border border-border p-3 text-left font-medium text-muted-foreground">Branch Name</th>
+                        <th className="border border-border p-3 text-left font-medium text-muted-foreground">Phone</th>
+                        <th className="border border-border p-3 text-left font-medium text-muted-foreground">Status</th>
+                        <th className="border border-border p-3 text-left font-medium text-muted-foreground">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1148,9 +877,6 @@ export default function EnhancedBranchesPage() {
                           </td>
                           <td className="p-4">
                             {columns[3].render(null, branch)}
-                          </td>
-                          <td className="p-4">
-                            {columns[4].render(null, branch)}
                           </td>
                         </tr>
                       ))}
@@ -1182,8 +908,16 @@ export default function EnhancedBranchesPage() {
           onSubmit={handleSubmit}
           isLoading={isLoading}
           formData={formData}
-          onFormDataChange={setFormData}
+          onFormDataChange={(newData) => {
+            setFormData(newData);
+            setBranchErrors({
+              name:    validateShortText(newData.name,    { label: 'Branch name', required: true,  minLength: 2, maxLength: 100 }),
+              address: validateLongText (newData.address, { label: 'Address',     maxLength: 200 }),
+              phone:   validatePhone    (newData.phone,   { label: 'Phone' }),
+            });
+          }}
           isEdit={!!editingBranch}
+          formErrors={branchErrors}
         />
 
         {/* Quick View Panel - ADDED BACK */}
@@ -1228,28 +962,11 @@ export default function EnhancedBranchesPage() {
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm font-medium text-slate-500 font-poppins">Phone</Label>
-                      <p className="mt-1 text-slate-700 flex items-center gap-2 font-poppins">
-                        <Phone className="h-4 w-4 text-slate-400" />
-                        {quickViewBranch.phone || 'Not provided'}
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-slate-500 font-poppins">Email</Label>
-                      <p className="mt-1 text-slate-700 flex items-center gap-2 font-poppins">
-                        <Mail className="h-4 w-4 text-slate-400" />
-                        {quickViewBranch.email || 'Not provided'}
-                      </p>
-                    </div>
-                  </div>
-
                   <div>
-                    <Label className="text-sm font-medium text-slate-500 font-poppins">Manager</Label>
+                    <Label className="text-sm font-medium text-slate-500 font-poppins">Phone</Label>
                     <p className="mt-1 text-slate-700 flex items-center gap-2 font-poppins">
-                      <Users className="h-4 w-4 text-slate-400" />
-                      {quickViewBranch.manager?.name || quickViewBranch.user?.name || 'No manager assigned'}
+                      <Phone className="h-4 w-4 text-slate-400" />
+                      {quickViewBranch.phone || 'Not provided'}
                     </p>
                   </div>
 
@@ -1316,21 +1033,15 @@ export default function EnhancedBranchesPage() {
                       <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Branch Name</th>
                       <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Address</th>
                       <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Phone</th>
-                      <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Email</th>
-                      <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Manager</th>
                       <th className="border border-slate-200 p-3 text-left font-semibold text-slate-700">Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {branches.map((branch) => {
-                      const managerName = branch.manager?.name || branch.user?.name;
-                      return (
+                    {branches.map((branch) => (
                         <tr key={branch.branch_id} className="hover:bg-slate-50">
                           <td className="border border-slate-200 p-3">{branch.name}</td>
                           <td className="border border-slate-200 p-3">{branch.address || 'N/A'}</td>
                           <td className="border border-slate-200 p-3">{branch.phone || 'N/A'}</td>
-                          <td className="border border-slate-200 p-3">{branch.email || 'N/A'}</td>
-                          <td className="border border-slate-200 p-3">{managerName || 'No Manager'}</td>
                           <td className="border border-slate-200 p-3">
                             <Badge
                               variant={branch.is_active ? "default" : "outline"}
@@ -1344,8 +1055,7 @@ export default function EnhancedBranchesPage() {
                             </Badge>
                           </td>
                         </tr>
-                      );
-                    })}
+                    ))}
                   </tbody>
                 </table>
               </div>

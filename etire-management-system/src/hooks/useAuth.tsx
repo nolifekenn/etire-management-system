@@ -20,6 +20,7 @@ interface AuthContextType {
   logout: () => void;
   activeBranchId: string | null;
   setActiveBranchId: (id: string | null) => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => { },
   activeBranchId: null,
   setActiveBranchId: () => { },
+  refreshUser: async () => { },
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -289,6 +291,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const refreshUser = async (): Promise<void> => {
+    if (!supabase) return;
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) return;
+
+      let result = await supabase
+        .from("user")
+        .select("user_id, name, username, role, branch_id")
+        .eq("auth_id", authUser.id)
+        .is("deleted_at", null)
+        .maybeSingle();
+
+      if (!result.data && !result.error) {
+        result = await supabase
+          .from("user")
+          .select("user_id, name, username, role, branch_id")
+          .eq("auth_id", authUser.id)
+          .maybeSingle();
+      }
+
+      if (result.data && !result.error) {
+        const profile = result.data as ExtendedUser;
+        setUser(profile);
+        if (profile.role === 'super_admin') {
+          const savedBranch = localStorage.getItem('etire_active_branch');
+          setActiveBranchIdState(savedBranch || profile.branch_id || null);
+        } else {
+          setActiveBranchIdState(profile.branch_id || null);
+        }
+      }
+    } catch (err) {
+      console.error("[useAuth] refreshUser error:", err);
+    }
+  };
+
   const logout = async () => {
     if (!supabase) {
       setUser(null);
@@ -308,7 +346,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, activeBranchId, setActiveBranchId }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, activeBranchId, setActiveBranchId, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

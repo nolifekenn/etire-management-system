@@ -1,0 +1,447 @@
+'use server';
+
+/**
+ * src/lib/actions/purchasing.ts
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Next.js Server Actions for the Purchasing Module (Phase 2).
+ *
+ * Covers:
+ *  1. createRFQ          — Create a new Draft RFQ (auto-sequences PO-YYYY-XXXX)
+ *  2. transitionPO       — State machine: draft → sent → purchase → locked → cancelled
+ *  3. upsertPOLines      — Save/update purchase_order_item rows
+ *  4. validateReceipt    — Validate a delivery, insert inventory_moves, update stock
+ *  5. getPOWithDetails   — Full PO fetch with supplier, branch, lines, deliveries
+ *  6. listPOs            — Paginated / filtered list for the List View
+ */
+
+import { createClient } from '@/lib/supabaseServer';
+import { revalidatePath } from 'next/cache';
+import {
+  transitionPurchaseOrder,
+  POState,
+} from '@/lib/stateTransitions';
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+export interface POLineInput {
+  item_id:   string;
+  quantity:  number;
+  unit_cost: number;
+}
+
+export interface CreateRFQInput {
+  supplier_id:            string;
+  branch_id:              string;
+  user_id:                string;
+  expected_delivery_date?: string;
+  payment_method:         'cash' | 'credit';
+  notes?:                 string;
+  lines:                  POLineInput[];
+}
+
+export interface ListPOsInput {
+  branchId?:  string;
+  supplierId?: string;
+  state?:     POState;
+  search?:    string;   // searches po_number
+  page?:      number;
+  pageSize?:  number;
+}
+
+export interface ValidateReceiptInput {
+  delivery_id: string;
+  po_id:       string;
+  branch_id:   string;
+  user_id:     string;
+  lines: {
+    item_id:           string;
+    quantity_received: number;
+    quantity_damaged:  number;
+    unit_cost:         number;
+    notes?:            string;
+  }[];
+}
+
+// ── 1. Create RFQ ──────────────────────────────────────────────────────────
+
+export async function createRFQ(input: CreateRFQInput) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase: any = await createClient();
+
+  const totalAmount = input.lines.reduce(
+    (sum, l) => sum + l.quantity * l.unit_cost,
+    0
+  );
+
+  // Insert PO — trigger auto-generates po_number
+  const { data: po, error: poErr } = await supabase
+    .from('purchase_order')
+    .insert({
+      po_number:              '',          // trigger fills this
+      supplier_id:            input.supplier_id,
+      branch_id:              input.branch_id,
+      user_id:                input.user_id,
+      status:                 'draft',
+      state:                  'draft',
+      payment_method:         input.payment_method,
+      payment_status:         'pending',
+      expected_delivery_date: input.expected_delivery_date ?? null,
+      notes:                  input.notes ?? null,
+      total_amount:           totalAmount,
+    })
+    .select('po_id, po_number')
+    .single();
+
+  if (poErr || !po) {
+    return { success: false, error: poErr?.message ?? 'Failed to create PO' };
+  }
+
+  // Insert line items
+  if (input.lines.length > 0) {
+    const lineRows = input.lines.map((l) => ({
+      po_id:      po.po_id,
+      item_id:    l.item_id,
+      quantity:   l.quantity,
+      unit_cost:  l.unit_cost,
+      total_cost: l.quantity * l.unit_cost,
+    }));
+
+    const { error: lineErr } = await supabase
+      .from('purchase_order_item')
+      .insert(lineRows);
+
+    if (lineErr) {
+      // Roll back the PO
+      await supabase.from('purchase_order').delete().eq('po_id', po.po_id);
+      return { success: false, error: lineErr.message };
+    }
+  }
+
+  // Log creation in chatter
+  await supabase.from('chatter_messages').insert({
+    related_table:     'purchase_order',
+    related_record_id: po.po_id,
+    user_id:           input.user_id,
+    type:              'log',
+    message:           `RFQ ${po.po_number} created.`,
+    is_internal:       true,
+  });
+
+  revalidatePath('/purchasing');
+  return { success: true, poId: po.po_id, poNumber: po.po_number };
+}
+
+// ── 2. Transition PO State ─────────────────────────────────────────────────
+
+export async function transitionPO(
+  poId:      string,
+  nextState: POState,
+  userId:    string,
+  note?:     string
+) {
+  const result = await transitionPurchaseOrder(poId, nextState, userId, note);
+
+  if (result.success) {
+    // When confirming to 'purchase', create a pending delivery record
+    if (nextState === 'purchase') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const supabase: any = await createClient();
+
+      // Fetch PO lines so we know what quantities to expect
+      const { data: poLines } = await supabase
+        .from('purchase_order_item')
+        .select('po_item_id, item_id, quantity, unit_cost')
+        .eq('po_id', poId)
+        .is('deleted_at', null);
+
+      // Create delivery record
+      const { data: delivery, error: deliveryErr } = await supabase
+        .from('delivery')
+        .insert({
+          po_id:         poId,
+          delivery_date: new Date().toISOString().split('T')[0],
+          notes:         'Auto-generated receipt on PO confirmation.',
+        })
+        .select('delivery_id')
+        .single();
+
+      if (!deliveryErr && delivery && poLines) {
+        // Create delivery items (quantity_received = 0, pending validation)
+        const deliveryItems = poLines.map((l: { item_id: string; quantity: number }) => ({
+          delivery_id:        delivery.delivery_id,
+          item_id:            l.item_id,
+          quantity_received:  0,
+          quantity_damaged:   0,
+          notes:              null,
+        }));
+
+        await supabase.from('delivery_item').insert(deliveryItems);
+      }
+    }
+
+    revalidatePath('/purchasing');
+    revalidatePath(`/purchasing/${poId}`);
+  }
+
+  return result;
+}
+
+// ── 3. Upsert PO Line Items ────────────────────────────────────────────────
+
+export async function upsertPOLines(
+  poId:   string,
+  lines:  POLineInput[]
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase: any = await createClient();
+
+  // Delete existing lines, re-insert
+  await supabase
+    .from('purchase_order_item')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('po_id', poId)
+    .is('deleted_at', null);
+
+  if (lines.length > 0) {
+    const rows = lines.map((l) => ({
+      po_id:      poId,
+      item_id:    l.item_id,
+      quantity:   l.quantity,
+      unit_cost:  l.unit_cost,
+      total_cost: l.quantity * l.unit_cost,
+    }));
+
+    const { error } = await supabase.from('purchase_order_item').insert(rows);
+    if (error) return { success: false, error: error.message };
+  }
+
+  // Recalculate total
+  const { data: allLines } = await supabase
+    .from('purchase_order_item')
+    .select('total_cost')
+    .eq('po_id', poId)
+    .is('deleted_at', null);
+
+  const total = (allLines ?? []).reduce(
+    (s: number, r: { total_cost: number }) => s + Number(r.total_cost ?? 0),
+    0
+  );
+
+  await supabase
+    .from('purchase_order')
+    .update({ total_amount: total, updated_at: new Date().toISOString() })
+    .eq('po_id', poId);
+
+  revalidatePath(`/purchasing/${poId}`);
+  return { success: true };
+}
+
+// ── 4. Validate Receipt (insert inventory_moves) ───────────────────────────
+
+export async function validateReceipt(input: ValidateReceiptInput) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase: any = await createClient();
+
+  // 1. Update delivery_item rows with actual received quantities
+  for (const line of input.lines) {
+    await supabase
+      .from('delivery_item')
+      .update({
+        quantity_received: line.quantity_received,
+        quantity_damaged:  line.quantity_damaged,
+        notes:             line.notes ?? null,
+      })
+      .eq('delivery_id', input.delivery_id)
+      .eq('item_id',     line.item_id);
+  }
+
+  // 2. Insert inventory_moves for each line received
+  const moveRows = input.lines
+    .filter((l) => l.quantity_received > 0)
+    .map((l) => ({
+      item_id:              l.item_id,
+      branch_id:            input.branch_id,
+      source_document_type: 'purchase',
+      source_document_id:   input.po_id,
+      quantity_moved:       l.quantity_received,
+      unit_cost:            l.unit_cost,
+      notes:                `Receipt from PO. Damaged: ${l.quantity_damaged}`,
+      created_by:           input.user_id,
+    }));
+
+  if (moveRows.length > 0) {
+    const { error: moveErr } = await supabase
+      .from('inventory_moves')
+      .insert(moveRows);
+
+    if (moveErr) return { success: false, error: moveErr.message };
+
+    // 3. Update legacy stock_quantity on inventory_item
+    for (const line of input.lines.filter((l) => l.quantity_received > 0)) {
+      await supabase.rpc('fn_record_stock_move', {
+        p_item_id:   line.item_id,
+        p_branch_id: input.branch_id,
+        p_doc_type:  'purchase',
+        p_doc_id:    input.po_id,
+        p_qty:       line.quantity_received,
+        p_unit_cost: line.unit_cost,
+        p_user_id:   input.user_id,
+        p_notes:     `Receipt validated`,
+      });
+    }
+  }
+
+  // 4. Log to chatter
+  const totalReceived = input.lines.reduce((s, l) => s + l.quantity_received, 0);
+  await supabase.from('chatter_messages').insert({
+    related_table:     'purchase_order',
+    related_record_id: input.po_id,
+    user_id:           input.user_id,
+    type:              'log',
+    message:           `Receipt validated: ${totalReceived} unit(s) received into stock.`,
+    is_internal:       true,
+  });
+
+  revalidatePath(`/purchasing/${input.po_id}`);
+  revalidatePath('/inventory');
+  return { success: true };
+}
+
+// ── 5. Get Full PO Detail ──────────────────────────────────────────────────
+
+export async function getPOWithDetails(poId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase: any = await createClient();
+
+  const { data, error } = await supabase
+    .from('purchase_order')
+    .select(`
+      *,
+      supplier:supplier_id ( supplier_id, name, contact_person, phone, email ),
+      branch:branch_id     ( branch_id, name ),
+      created_by:user_id   ( user_id, name ),
+      lines:purchase_order_item (
+        po_item_id, quantity, unit_cost, total_cost, deleted_at,
+        item:item_id (
+          item_id, name, category, sku,
+          brand:brand_id ( name ),
+          size:size_id  ( label )
+        )
+      ),
+      deliveries:delivery (
+        delivery_id, delivery_date, notes,
+        received_by:received_by ( name ),
+        items:delivery_item (
+          delivery_item_id, quantity_received, quantity_damaged, notes,
+          item:item_id ( item_id, name )
+        )
+      )
+    `)
+    .eq('po_id', poId)
+    .single();
+
+  if (error) return { data: null, error: error.message };
+  return { data, error: null };
+}
+
+// ── 6. List POs ────────────────────────────────────────────────────────────
+
+export async function listPOs(input: ListPOsInput = {}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase: any = await createClient();
+
+  const page     = input.page     ?? 1;
+  const pageSize = input.pageSize ?? 25;
+  const from     = (page - 1) * pageSize;
+  const to       = from + pageSize - 1;
+
+  let query = supabase
+    .from('purchase_order')
+    .select(`
+      po_id, po_number, order_date, expected_delivery_date,
+      status, state, total_amount, payment_method, payment_status,
+      created_at,
+      supplier:supplier_id ( name ),
+      branch:branch_id     ( name )
+    `, { count: 'exact' })
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  if (input.branchId)  query = query.eq('branch_id', input.branchId);
+  if (input.supplierId) query = query.eq('supplier_id', input.supplierId);
+  if (input.state)     query = query.eq('state', input.state);
+  if (input.search)    query = query.ilike('po_number', `%${input.search}%`);
+
+  const { data, error, count } = await query;
+
+  if (error) return { data: [], count: 0, error: error.message };
+  return { data: data ?? [], count: count ?? 0, error: null };
+}
+
+// ── Vendor (Supplier) CRUD ─────────────────────────────────────────────────
+
+export interface VendorInput {
+  name:            string;
+  contact_person?: string;
+  phone?:          string;
+  email?:          string;
+  address?:        string;
+  city?:           string;
+  vat?:            string;
+  website?:        string;
+  payment_terms?:  string;
+  notes?:          string;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export async function listVendors(search?: string): Promise<{ vendors: Record<string, unknown>[]; error: string | null }> {
+  const supabase = await createClient();
+  let query = (supabase as any)
+    .from('supplier')
+    .select('supplier_id, name, contact_person, phone, email, address, city, vat, website, payment_terms, notes, is_active, created_at')
+    .is('deleted_at', null)
+    .order('name', { ascending: true });
+  if (search) query = query.ilike('name', `%${search}%`);
+  const { data, error } = await query;
+  if (error) return { vendors: [], error: error.message };
+  return { vendors: (data ?? []) as Record<string, unknown>[], error: null };
+}
+
+export async function createVendor(input: VendorInput): Promise<{ vendor: Record<string, unknown> | null; error: string | null }> {
+  const supabase = await createClient();
+  const { data, error } = await (supabase as any)
+    .from('supplier')
+    .insert({ ...input, is_active: true })
+    .select()
+    .single();
+  if (error) return { vendor: null, error: error.message };
+  revalidatePath('/purchasing');
+  revalidatePath('/purchasing/vendors');
+  return { vendor: data as Record<string, unknown>, error: null };
+}
+
+export async function updateVendor(vendorId: string, input: Partial<VendorInput> & { is_active?: boolean }): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const { error } = await (supabase as any)
+    .from('supplier')
+    .update({ ...input })
+    .eq('supplier_id', vendorId);
+  if (error) return { error: error.message };
+  revalidatePath('/purchasing');
+  revalidatePath('/purchasing/vendors');
+  return { error: null };
+}
+
+export async function deleteVendor(vendorId: string): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const { error } = await (supabase as any)
+    .from('supplier')
+    .update({ deleted_at: new Date().toISOString(), is_active: false })
+    .eq('supplier_id', vendorId);
+  if (error) return { error: error.message };
+  revalidatePath('/purchasing');
+  revalidatePath('/purchasing/vendors');
+  return { error: null };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */

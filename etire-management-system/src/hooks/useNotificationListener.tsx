@@ -82,7 +82,7 @@ function showNotificationToast(notification: Notification) {
                 <span>{getIcon(notification.type)}</span>
                 <span>{notification.title}</span>
             </div>
-        ),
+        ) as unknown as string,
         description: notification.message,
         variant: getVariant(notification.type),
         duration: 5000, // Auto-dismiss after 5 seconds

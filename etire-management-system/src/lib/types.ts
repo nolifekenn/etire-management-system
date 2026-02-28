@@ -26,14 +26,9 @@ export interface Branch {
   name: string;
   address?: string;
   phone?: string;
-  email?: string;
-  manager_id?: string;
   is_active: boolean;
   created_at?: string;
   deleted_at?: string | null;
-  // Joined data
-  manager?: { user_id: string; name: string };
-  user?: { user_id: string; name: string };
 }
 
 // Supplier Management
@@ -215,6 +210,9 @@ export interface Sale {
   discount_amount?: number;
   tax_amount?: number;
   payment_method?: 'cash' | 'card' | 'check' | 'credit';
+  status?: 'draft' | 'confirmed' | 'done' | 'cancelled';
+  sale_number?: string;
+  notes?: string;
   // Joined data
   user?: User;
   customer?: Customer;

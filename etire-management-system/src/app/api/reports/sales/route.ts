@@ -20,8 +20,10 @@ export async function POST(request: Request) {
         total_amount,
         discount_amount,
         tax_amount,
+        service_job_id,
         sale_date:created_at,
         customer:customer_id ( name ),
+        service_job:service_job_id ( service_fee ),
         sale_item (
           item_id,
           quantity,
@@ -60,9 +62,10 @@ export async function POST(request: Request) {
     }
 
     // 4️⃣ Post-process data to calculate line_total and profit
-    const processedData = data.map((sale: any) => ({
-      ...sale,
-      sale_item: sale.sale_item.map((item: any) => {
+    const processedData = data.map((sale: any) => {
+      const serviceFee: number = (sale.service_job as any)?.service_fee ?? 0;
+
+      const processedItems = sale.sale_item.map((item: any) => {
         const quantity = item.quantity || 0;
         const price = item.price_at_sale || 0;
         const cost = item.inventory_item?.cost_price || 0;
@@ -75,8 +78,31 @@ export async function POST(request: Request) {
           line_total,
           profit
         };
-      })
-    }));
+      });
+
+      // Add a synthetic "Service Labor Fee" item so that service fee profit
+      // is included in the SalesReportCard totalProfit sum (labor cost = 0)
+      if (serviceFee > 0) {
+        processedItems.push({
+          item_id: null,
+          quantity: 1,
+          price_at_sale: serviceFee,
+          installation_fee: 0,
+          line_total: serviceFee,
+          profit: serviceFee,
+          inventory_item: {
+            name: "Service Labor Fee",
+            category: "service",
+            cost_price: 0
+          }
+        });
+      }
+
+      return {
+        ...sale,
+        sale_item: processedItems
+      };
+    });
 
     // 5️⃣ Return sales data
     return NextResponse.json({ sales: processedData });

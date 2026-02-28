@@ -1,0 +1,342 @@
+"use client";
+
+/**
+ * /inventory/adjustments — Inventory Adjustments Page
+ *
+ * Displays all inventory items so a user can perform manual stock corrections
+ * (cycle counts, scrap, data corrections).  Recent adjustment history is
+ * shown below the product grid.
+ */
+
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Loader2,
+  RefreshCw,
+  SlidersHorizontal,
+  Search,
+  ChevronLeft,
+  AlertTriangle,
+  PackageX,
+  ArrowUp,
+  ArrowDown,
+  Minus,
+  Clock,
+} from "lucide-react";
+import { Button }  from "@/components/ui/button";
+import { Input }   from "@/components/ui/input";
+import { Badge }   from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth }  from "@/hooks/useAuth";
+import { listProducts, listAdjustments } from "@/lib/actions/inventory";
+import { AdjustmentDialog } from "@/app/inventory/components/AdjustmentDialog";
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+type AnyRecord = Record<string, unknown>;
+
+const CATEGORY_COLORS: Record<string, string> = {
+  tire:      "bg-blue-100   text-blue-800",
+  tool:      "bg-amber-100  text-amber-800",
+  accessory: "bg-purple-100 text-purple-800",
+  service:   "bg-teal-100   text-teal-800",
+};
+
+const REASON_LABELS: Record<string, string> = {
+  cycle_count: "Cycle Count",
+  scrap:       "Scrap / Damaged",
+  correction:  "Data Correction",
+  other:       "Other",
+};
+
+// ── Component ──────────────────────────────────────────────────────────────
+
+export default function AdjustmentsPage() {
+  const router    = useRouter();
+  const { toast } = useToast();
+  const { user, activeBranchId } = useAuth();
+
+  // Products list state
+  const [items,        setItems]       = useState<AnyRecord[]>([]);
+  const [totalItems,   setTotalItems]  = useState(0);
+  const [loadingItems, setLoadingItems]= useState(true);
+  const [search,       setSearch]      = useState("");
+  const [category,     setCategory]    = useState("all");
+
+  // Adjustment dialog state
+  const [adjOpen,      setAdjOpen]     = useState(false);
+  const [adjItem,      setAdjItem]     = useState<AnyRecord | null>(null);
+
+  // Recent adjustments history
+  const [history,      setHistory]     = useState<AnyRecord[]>([]);
+  const [loadingHist,  setLoadingHist] = useState(true);
+
+  // ── Data loaders ────────────────────────────────────────────────────────
+
+  const loadItems = useCallback(async () => {
+    setLoadingItems(true);
+    try {
+      const res = await listProducts({
+        search:    search || undefined,
+        category:  category !== "all" ? category : undefined,
+        page:      1,
+        page_size: 200,
+      });
+      setItems(res.items as AnyRecord[]);
+      setTotalItems(res.total);
+    } catch {
+      toast({ title: "Failed to load products", variant: "destructive" });
+    } finally {
+      setLoadingItems(false);
+    }
+  }, [search, category, toast]);
+
+  const loadHistory = useCallback(async () => {
+    setLoadingHist(true);
+    try {
+      const res = await listAdjustments(activeBranchId ?? undefined, 30);
+      if (res.success) setHistory(res.rows as AnyRecord[]);
+    } catch {
+      // history is optional — fail silently
+    } finally {
+      setLoadingHist(false);
+    }
+  }, [activeBranchId]);
+
+  useEffect(() => { loadItems(); }, [loadItems]);
+  useEffect(() => { loadHistory(); }, [loadHistory]);
+
+  // ── Handlers ────────────────────────────────────────────────────────────
+
+  const handleOpenAdj = (item: AnyRecord) => {
+    setAdjItem(item);
+    setAdjOpen(true);
+  };
+
+  const handleAdjusted = () => {
+    setAdjOpen(false);
+    setAdjItem(null);
+    loadItems();
+    loadHistory();
+    toast({ title: "Adjustment recorded" });
+  };
+
+  // ── Helpers ─────────────────────────────────────────────────────────────
+
+  const stockBadge = (item: AnyRecord) => {
+    const qty     = Number(item.stock_quantity);
+    const reorder = Number(item.reorder_level ?? 5);
+    if (qty === 0)     return <Badge className="bg-red-100 text-red-700 border-red-200 gap-1"><PackageX className="h-3 w-3" />Out of Stock</Badge>;
+    if (qty < reorder) return <Badge className="bg-amber-100 text-amber-700 border-amber-200 gap-1"><AlertTriangle className="h-3 w-3" />{qty} ▼</Badge>;
+    return <span className="text-sm font-medium">{qty}</span>;
+  };
+
+  const deltaIcon = (delta: number) => {
+    if (delta > 0) return <ArrowUp   className="h-3.5 w-3.5 text-green-600 inline" />;
+    if (delta < 0) return <ArrowDown className="h-3.5 w-3.5 text-red-600   inline" />;
+    return              <Minus    className="h-3.5 w-3.5 text-slate-400 inline" />;
+  };
+
+  // ── Render ───────────────────────────────────────────────────────────────
+
+  return (
+    <div className="flex flex-col gap-6 p-6">
+
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <nav className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+            <button onClick={() => router.push("/inventory")} className="hover:underline flex items-center gap-1">
+              <ChevronLeft className="h-3 w-3" />Inventory
+            </button>
+            <span>/</span>
+            <span>Adjustments</span>
+          </nav>
+          <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <SlidersHorizontal className="h-5 w-5 text-teal-600" />
+            Inventory Adjustments
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Perform cycle counts and stock corrections for any product.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => { loadItems(); loadHistory(); }}
+          disabled={loadingItems}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${loadingItems ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search products…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-8 h-9"
+          />
+        </div>
+        <Select value={category} onValueChange={setCategory}>
+          <SelectTrigger className="h-9 w-[150px]">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            <SelectItem value="tire">Tire</SelectItem>
+            <SelectItem value="tool">Tool</SelectItem>
+            <SelectItem value="accessory">Accessory</SelectItem>
+            <SelectItem value="service">Service</SelectItem>
+          </SelectContent>
+        </Select>
+        <span className="text-xs text-muted-foreground ml-2">
+          {totalItems} product{totalItems !== 1 ? "s" : ""}
+        </span>
+      </div>
+
+      {/* Product Table */}
+      <div className="overflow-auto rounded-lg border border-border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50 sticky top-0 z-10">
+            <tr>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-2/5">Product</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Category</th>
+              <th className="px-4 py-3 text-right font-medium text-muted-foreground">On Hand</th>
+              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Reorder Level</th>
+              <th className="px-4 py-3 text-center font-medium text-muted-foreground w-32">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loadingItems ? (
+              <tr>
+                <td colSpan={5} className="py-16 text-center">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                </td>
+              </tr>
+            ) : items.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-16 text-center text-muted-foreground text-sm">
+                  No products found
+                </td>
+              </tr>
+            ) : items.map(item => (
+              <tr key={String(item.item_id)} className="border-t border-border hover:bg-muted/30 transition-colors">
+                <td className="px-4 py-3">
+                  <p className="font-medium text-foreground">{String(item.name)}</p>
+                  {(Boolean(item.tire_brand) || Boolean(item.tire_size)) && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {[String((item.tire_brand as AnyRecord)?.name ?? ""), String((item.tire_size as AnyRecord)?.label ?? "")].filter(Boolean).join(" · ")}
+                    </p>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <Badge className={`text-xs ${CATEGORY_COLORS[String(item.category)] ?? "bg-gray-100 text-gray-800"}`}>
+                    {String(item.category)}
+                  </Badge>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  {stockBadge(item)}
+                </td>
+                <td className="px-4 py-3 text-right text-muted-foreground">
+                  {String(item.reorder_level ?? 5)}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleOpenAdj(item)}
+                    className="h-7 text-xs border-teal-300 text-teal-700 hover:bg-teal-50"
+                  >
+                    <SlidersHorizontal className="h-3 w-3 mr-1" />
+                    Adjust
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Adjustment History */}
+      <section>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+          <Clock className="h-4 w-4" />
+          Recent Adjustment History
+        </h2>
+
+        {loadingHist ? (
+          <div className="flex items-center gap-2 text-muted-foreground py-6">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm">Loading history…</span>
+          </div>
+        ) : history.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">No adjustments recorded yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {history.map(adj => {
+              const lines = (adj.lines ?? []) as AnyRecord[];
+              return (
+                <div key={String(adj.adjustment_id)} className="rounded-lg border border-border p-4 bg-card">
+                  <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs capitalize">
+                        {REASON_LABELS[String(adj.reason)] ?? String(adj.reason)}
+                      </Badge>
+                      {adj.note != null && adj.note !== '' && <span className="text-xs text-muted-foreground">{String(adj.note)}</span>}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(String(adj.created_at)).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {lines.map(line => {
+                      const delta = Number(line.delta);
+                      const itemName = (line.item as AnyRecord)?.name ?? line.item_id;
+                      return (
+                        <div key={String(line.adj_line_id)} className="flex items-center gap-3 text-sm">
+                          <span className="text-foreground flex-1">{String(itemName)}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {String(line.quantity_before)} → {String(line.quantity_after)}
+                          </span>
+                          <span className={`text-xs font-medium flex items-center gap-0.5 ${delta > 0 ? "text-green-600" : delta < 0 ? "text-red-600" : "text-slate-400"}`}>
+                            {deltaIcon(delta)}
+                            {delta > 0 ? `+${delta}` : delta}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Adjustment Dialog */}
+      {adjItem && (
+        <AdjustmentDialog
+          open={adjOpen}
+          onOpenChange={open => { if (!open) { setAdjOpen(false); setAdjItem(null); } }}
+          itemId={String(adjItem.item_id)}
+          currentQty={Number(adjItem.stock_quantity)}
+          branchId={String(adjItem.branch_id ?? activeBranchId ?? "")}
+          userId={String(user?.user_id ?? "")}
+          onAdjusted={handleAdjusted}
+        />
+      )}
+    </div>
+  );
+}

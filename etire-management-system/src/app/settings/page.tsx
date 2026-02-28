@@ -14,9 +14,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, AlertTriangle, Settings as SettingsIcon, Shield, History, DollarSign, Bell, RefreshCw, CheckCircle, XCircle, Info, Palette, Globe, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Loader2, AlertTriangle, Settings as SettingsIcon, Shield, History, DollarSign, Bell, RefreshCw, CheckCircle, XCircle, Info, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { SystemSetting, AuditLog, Notification } from '@/lib/types';
+import { validateShortText, validatePhone, validateLongText, type FieldError } from '@/lib/validation';
 
 // Design system from POS page (keeping the button styles and animations)
 const buttonStyles = {
@@ -133,6 +134,10 @@ export default function SettingsPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Profile validation errors
+  const [nameError,     setNameError]     = useState<FieldError>(null);
+  const [usernameError, setUsernameError] = useState<FieldError>(null);
+
   // Password Verification State
   const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
@@ -159,9 +164,11 @@ export default function SettingsPage() {
   const [companyAddress, setCompanyAddress] = useState('');
   const [companyPhone, setCompanyPhone] = useState('');
 
-  // Common settings state (Placeholders)
-  const [theme, setTheme] = useState('light');
-  const [language, setLanguage] = useState('en');
+  // System settings validation errors
+  const [companyNameError,    setCompanyNameError]    = useState<FieldError>(null);
+  const [companyAddressError, setCompanyAddressError] = useState<FieldError>(null);
+  const [companyPhoneError,   setCompanyPhoneError]   = useState<FieldError>(null);
+
 
   useEffect(() => {
     setMounted(true);
@@ -237,8 +244,9 @@ export default function SettingsPage() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      setNotifError(`Could not fetch notifications: ${error.message}`);
+      // Table may not exist yet in this environment — show empty state silently
       setNotifications([]);
+      setNotifError(null);
     } else {
       setNotifications(data as Notification[]);
       setNotifError(null);
@@ -259,6 +267,13 @@ export default function SettingsPage() {
       toast({ title: "Error", description: "You must be logged in to change settings.", variant: "destructive" });
       return;
     }
+
+    // Inline validation for profile fields
+    const nErr = validateShortText(name,     { label: 'Full name', required: true, minLength: 2, maxLength: 100 });
+    const uErr = validateShortText(username, { label: 'Username',  required: true, minLength: 2, maxLength: 50  });
+    setNameError(nErr);
+    setUsernameError(uErr);
+    if (nErr || uErr) return;
 
     // Password validation logic
     if (password) {
@@ -387,6 +402,16 @@ export default function SettingsPage() {
 
   const handleSaveSystemSettings = async () => {
     if (!user || !supabase) return;
+
+    // Inline validation
+    const cnErr = validateShortText(companyName,    { label: 'Company name', required: true,  minLength: 2, maxLength: 100 });
+    const caErr = validateLongText (companyAddress, { label: 'Address',      maxLength: 200 });
+    const cpErr = validatePhone    (companyPhone,   { label: 'Company phone' });
+    setCompanyNameError(cnErr);
+    setCompanyAddressError(caErr);
+    setCompanyPhoneError(cpErr);
+    if (cnErr || caErr || cpErr) return;
+
     setIsSaving(true);
 
     try {
@@ -470,6 +495,19 @@ export default function SettingsPage() {
     }
   };
 
+  const markAllAsRead = async () => {
+    if (!supabase || !user) return;
+    const unread = notifications.filter(n => !n.is_read);
+    if (unread.length === 0) return;
+    const { error } = await (supabase.from('notification') as any)
+      .update({ is_read: true })
+      .eq('user_id', user.user_id)
+      .eq('is_read', false);
+    if (!error) {
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    }
+  };
+
   const refreshData = () => {
     fetchSystemSettings();
     fetchNotifications();
@@ -478,407 +516,388 @@ export default function SettingsPage() {
     }
   };
 
+  // ── Role metadata ─────────────────────────────────────────────────────────
+  const ROLE_META: Record<string, { label: string; bg: string; desc: string }> = {
+    super_admin:    { label: 'Super Admin',     bg: 'bg-purple-100 text-purple-800', desc: 'Full access to all branches and system configuration' },
+    branch_manager: { label: 'Branch Manager',  bg: 'bg-blue-100 text-blue-800',    desc: 'Manages their assigned branch — inventory, staff, reports' },
+    staff:          { label: 'Staff',           bg: 'bg-green-100 text-green-800',  desc: 'Operational staff with standard transactional access' },
+    cashier:        { label: 'Cashier',         bg: 'bg-amber-100 text-amber-800',  desc: 'Point-of-sale and payment processing access' },
+  };
+
+  const roleMeta = ROLE_META[user?.role ?? ''] ?? { label: user?.role ?? '—', bg: 'bg-slate-100 text-slate-700', desc: '' };
+  const initials = (user?.name ?? '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
   if (isAuthLoading) {
     return (
-      <div className="min-h-screen bg-white text-slate-800 font-poppins">
-        <div className="container mx-auto p-6 sm:p-8 lg:p-10 flex justify-center items-center h-96">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white text-slate-800 font-poppins">
-      <div className="container mx-auto p-6 sm:p-8 lg:p-10">
-        {/* Clean Header Section - Simplified for Settings */}
-        <div className={`mb-8 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
-          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 flex items-center justify-between shadow-xl">
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-white mb-2 font-poppins tracking-tight">
-                System Settings
-              </h1>
-              <div className="flex items-center gap-6 text-white/90">
-                <p className="flex items-center gap-3 text-lg font-medium">
-                  <SettingsIcon className="h-5 w-5 opacity-90" />
-                  Manage your application and account settings
-                </p>
-              </div>
-            </div>
+    <div className="min-h-screen bg-background">
+      <div className="flex flex-col gap-6 p-6 max-w-6xl mx-auto">
+
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-foreground">Settings</h1>
+            <p className="text-sm text-muted-foreground">Manage your account and view activity logs</p>
           </div>
+          <Button variant="outline" size="sm" onClick={refreshData} className="gap-1.5">
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </Button>
         </div>
 
-        {/* Main Content */}
-        <div className={`transition-all duration-500 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full bg-white border border-slate-200 rounded-2xl p-1 mb-6 shadow-sm"
-              style={{
-                gridTemplateColumns: 'repeat(3, 1fr)'
-              }}>
-              <TabsTrigger
-                value="account"
-                className="rounded-xl transition-all duration-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
-              >
-                <SettingsIcon className="h-4 w-4 mr-2" />
-                Account
-              </TabsTrigger>
-              <TabsTrigger
-                value="general"
-                className="rounded-xl transition-all duration-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
-              >
-                <Shield className="h-4 w-4 mr-2" />
-                General
-              </TabsTrigger>
-              <TabsTrigger
-                value="activity"
-                className="rounded-xl transition-all duration-300 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
-              >
-                <History className="h-4 w-4 mr-2" />
-                Activity Logs
-              </TabsTrigger>
-            </TabsList>
+        {/* ── Tabs ── */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full bg-muted border border-border rounded-lg p-1 mb-6" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+            <TabsTrigger value="account" className="rounded-md data-[state=active]:bg-[#714B67] data-[state=active]:text-white">
+              <SettingsIcon className="h-4 w-4 mr-2" />
+              My Profile
+            </TabsTrigger>
+            <TabsTrigger value="activity" className="rounded-md data-[state=active]:bg-[#714B67] data-[state=active]:text-white">
+              <Bell className="h-4 w-4 mr-2" />
+              Activity
+              {unreadCount > 0 && (
+                <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold bg-red-500 text-white rounded-full leading-none">
+                  {unreadCount}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="account" className="space-y-6">
-              {/* Account Information Card */}
-              <Card className="bg-white border-slate-200 shadow-lg">
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2">
-                    <SettingsIcon className="h-5 w-5 text-indigo-600" />
-                    Account Information
-                  </CardTitle>
-                  <CardDescription>Update your personal details and password.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="fullName" className="text-slate-700 font-medium">Full Name</Label>
-                      <Input
-                        id="fullName"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
-                      />
+          {/* ══════════════ PROFILE TAB ══════════════ */}
+          <TabsContent value="account" className="space-y-6">
+            <div className="grid md:grid-cols-[280px_1fr] gap-6 items-start">
+
+              {/* ── Identity sidebar ── */}
+              <Card className="border border-border sticky top-6">
+                <CardContent className="pt-6 space-y-4">
+                  {/* Avatar + name */}
+                  <div className="flex flex-col items-center text-center gap-3">
+                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#714B67] to-indigo-500 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                      {initials}
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="username" className="text-slate-700 font-medium">Username</Label>
-                      <Input
-                        id="username"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
-                      />
+                    <div>
+                      <p className="font-semibold text-slate-800 text-base">{user?.name}</p>
+                      <p className="text-sm text-muted-foreground">@{user?.username}</p>
                     </div>
+                    <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${roleMeta.bg}`}>
+                      {roleMeta.label}
+                    </span>
+                    {roleMeta.desc && (
+                      <p className="text-xs text-slate-500 leading-snug">{roleMeta.desc}</p>
+                    )}
                   </div>
 
-                  <Separator className="bg-slate-200" />
+                  <Separator />
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="new-password" className="text-slate-700 font-medium">New Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="new-password"
-                          type={showPassword ? "text" : "password"}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Leave blank to keep current password"
-                          className="border-slate-300 focus:border-indigo-400 transition-all duration-300 pr-10"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition-colors"
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                      {password && <PasswordStrengthIndicator password={password} />}
+                  {/* Read-only details */}
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Role</span>
+                      <span className="font-medium text-slate-800 capitalize">{(user?.role ?? '').replace('_', ' ')}</span>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirm-password" className="text-slate-700 font-medium">Confirm New Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="confirm-password"
-                          type={showConfirmPassword ? "text" : "password"}
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          placeholder="Confirm your new password"
-                          className={`border-slate-300 focus:border-indigo-400 transition-all duration-300 pr-10 ${confirmPassword && password !== confirmPassword ? 'border-red-300 focus:border-red-400' : ''}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition-colors"
-                        >
-                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
+                    {user?.branch_id && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Branch ID</span>
+                        <span className="font-mono text-xs text-slate-700">{user.branch_id.slice(0, 8)}…</span>
                       </div>
-                      {confirmPassword && password !== confirmPassword && (
-                        <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                          <XCircle className="h-3 w-3" /> Passwords do not match
-                        </p>
-                      )}
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Account ID</span>
+                      <span className="font-mono text-xs text-slate-700">{(user?.user_id ?? '').slice(0, 8)}…</span>
                     </div>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={handleSaveChanges}
-                      disabled={isSaving}
-                      className={`${buttonStyles.primary} ml-auto w-auto px-6`}
-                    >
-                      {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Save Changes
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="general" className="space-y-6">
-              <Card className={`bg-white border-slate-200 shadow-lg`}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5 text-indigo-600" />
-                    General Settings
-                  </CardTitle>
-                  <CardDescription>Configure application preferences and company details.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {settingsError && (
-                    <Alert variant="destructive" className="border-red-200 bg-red-50">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Error</AlertTitle>
-                      <AlertDescription>{settingsError}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  <div className="space-y-4">
-                    <h4 className="text-lg font-medium text-slate-800 flex items-center gap-2">
-                      <Palette className="h-4 w-4 text-indigo-600" />
-                      Appearance & Preferences
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* ── Edit forms ── */}
+              <div className="space-y-6">
+                {/* Profile fields */}
+                <Card className="border border-border">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <SettingsIcon className="h-4 w-4 text-indigo-600" />
+                      Profile Information
+                    </CardTitle>
+                    <CardDescription>Update your display name and login username.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="theme" className="text-slate-700 font-medium">Theme</Label>
-                        <div className="flex items-center gap-4">
-                          <Button variant={theme === 'light' ? 'default' : 'outline'} onClick={() => setTheme('light')} className="w-full">Light</Button>
-                          <Button variant={theme === 'dark' ? 'default' : 'outline'} onClick={() => setTheme('dark')} className="w-full" disabled>Dark (Coming Soon)</Button>
-                        </div>
+                        <Label htmlFor="fullName" className="text-slate-700 font-medium">Full Name <span className="text-red-500">*</span></Label>
+                        <Input
+                          id="fullName"
+                          value={name}
+                          onChange={(e) => {
+                            setName(e.target.value);
+                            setNameError(validateShortText(e.target.value, { label: 'Full name', required: true, minLength: 2, maxLength: 100 }));
+                          }}
+                          maxLength={100}
+                          placeholder="Your full name"
+                          aria-invalid={!!nameError}
+                          className={`border-slate-300 focus:border-indigo-400 transition-all duration-300${nameError ? ' border-red-400 focus:border-red-400' : ''}`}
+                        />
+                        {nameError && <p className="text-xs text-red-500">⚠ {nameError}</p>}
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="language" className="text-slate-700 font-medium">Language</Label>
-                        <div className="flex items-center gap-4">
-                          <Button variant={language === 'en' ? 'default' : 'outline'} onClick={() => setLanguage('en')} className="w-full">English</Button>
-                          <Button variant={language === 'fil' ? 'default' : 'outline'} onClick={() => setLanguage('fil')} className="w-full" disabled>Filipino (Coming Soon)</Button>
-                        </div>
+                        <Label htmlFor="username" className="text-slate-700 font-medium">Username <span className="text-red-500">*</span></Label>
+                        <Input
+                          id="username"
+                          value={username}
+                          onChange={(e) => {
+                            setUsername(e.target.value);
+                            setUsernameError(validateShortText(e.target.value, { label: 'Username', required: true, minLength: 2, maxLength: 50 }));
+                          }}
+                          maxLength={50}
+                          placeholder="Login username"
+                          aria-invalid={!!usernameError}
+                          className={`border-slate-300 focus:border-indigo-400 transition-all duration-300${usernameError ? ' border-red-400 focus:border-red-400' : ''}`}
+                        />
+                        {usernameError && <p className="text-xs text-red-500">⚠ {usernameError}</p>}
                       </div>
                     </div>
-                  </div>
-
-                  <Separator className="bg-slate-200" />
-
-                  <div className="space-y-4">
-                    <h4 className="text-lg font-medium text-slate-800 flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-indigo-600" />
-                      Company Information
-                    </h4>
-                    <div className="space-y-2">
-                      <Label htmlFor="company-name" className="text-slate-700 font-medium">Company Name</Label>
-                      <Input
-                        id="company-name"
-                        value={companyName}
-                        onChange={(e) => setCompanyName(e.target.value)}
-                        placeholder="Q.R Tire Supply & Vulcanizing Shop"
-                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
-                        disabled={user?.role !== 'super_admin'}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="company-address" className="text-slate-700 font-medium">Company Address</Label>
-                      <Input
-                        id="company-address"
-                        value={companyAddress}
-                        onChange={(e) => setCompanyAddress(e.target.value)}
-                        placeholder="123 Main Street, City"
-                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
-                        disabled={user?.role !== 'super_admin'}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="company-phone" className="text-slate-700 font-medium">Company Phone</Label>
-                      <Input
-                        id="company-phone"
-                        value={companyPhone}
-                        onChange={(e) => setCompanyPhone(e.target.value)}
-                        placeholder="+1-555-0101"
-                        className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
-                        disabled={user?.role !== 'super_admin'}
-                      />
-                    </div>
-                  </div>
-
-                  {user?.role === 'super_admin' && (
-                    <div className="flex justify-end">
+                    <div className="flex justify-end pt-2">
                       <Button
-                        onClick={handleSaveSystemSettings}
-                        disabled={isSaving || isSettingsLoading}
-                        className={`${buttonStyles.primary} ml-auto w-auto px-6`}
+                        onClick={handleSaveChanges}
+                        disabled={isSaving || !!nameError || !!usernameError}
+                        className="bg-[#714B67] hover:bg-[#5a3c53] text-white px-6"
                       >
-                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Save General Settings
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Save Profile
                       </Button>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="activity" className="space-y-6">
-              {/* Notifications Section */}
-              <Card className={`bg-white border-slate-200 shadow-lg ${microAnimations.cardHover}`}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Bell className="h-5 w-5 text-indigo-600" />
-                    Notifications
-                  </CardTitle>
-                  <CardDescription>Recent alerts and updates.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {notifError && (
-                    <Alert variant="destructive" className="mb-4">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Error</AlertTitle>
-                      <AlertDescription>{notifError}</AlertDescription>
-                    </Alert>
-                  )}
-                  {isNotifLoading ? (
-                    <div className="flex justify-center items-center h-32">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {notifications.length === 0 ? (
-                        <div className="text-center py-8">
-                          <Bell className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                          <p className="text-slate-500">No new notifications</p>
-                        </div>
-                      ) : (
-                        notifications.map((notification) => (
-                          <div
-                            key={notification.notification_id}
-                            className={`flex items-start justify-between p-4 border rounded-lg transition-all duration-300 ${!notification.is_read ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-200'
-                              }`}
-                          >
-                            <div className="flex items-start space-x-3">
-                              {getNotificationIcon(notification.type)}
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <p className="font-medium text-slate-800">{notification.title}</p>
-                                  {!notification.is_read && (
-                                    <Badge variant="default" className="text-xs bg-indigo-600">New</Badge>
-                                  )}
-                                </div>
-                                <p className="text-sm text-slate-600 mt-1">{notification.message}</p>
-                                <p className="text-xs text-slate-400 mt-2">
-                                  {new Date(notification.created_at || '').toLocaleString()}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              {!notification.is_read && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => markAsRead(notification.notification_id)}
-                                  title="Mark as read"
-                                >
-                                  <CheckCircle className="h-4 w-4 text-indigo-600" />
-                                </Button>
-                              )}
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => deleteNotification(notification.notification_id)}
-                                className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                title="Delete"
-                              >
-                                <XCircle className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {(user?.role === 'super_admin' || user?.role === 'branch_manager') && (
-                <Card className={`bg-white border-slate-200 shadow-lg ${microAnimations.cardHover}`}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <History className="h-5 w-5 text-indigo-600" />
-                      Audit Logs
-                    </CardTitle>
-                    <CardDescription>View system activity and user actions.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {auditError && (
-                      <Alert variant="destructive" className="mb-4 border-red-200 bg-red-50">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Error</AlertTitle>
-                        <AlertDescription>{auditError}</AlertDescription>
-                      </Alert>
-                    )}
-
-                    {isAuditLoading ? (
-                      <div className="flex justify-center items-center h-32">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {auditLogs.length === 0 ? (
-                          <div className="text-center py-12">
-                            <History className="h-16 w-16 text-slate-300 mx-auto mb-4" />
-                            <p className="text-slate-500 text-lg">No audit logs found</p>
-                            <p className="text-slate-400 text-sm">System activity will appear here</p>
-                          </div>
-                        ) : (
-                          auditLogs.map((log) => (
-                            <div
-                              key={log.log_id}
-                              className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:border-indigo-400 hover:shadow-md transition-all duration-300"
-                            >
-                              <div className="flex items-center space-x-3">
-                                <Shield className="h-4 w-4 text-indigo-600" />
-                                <div>
-                                  <p className="font-medium text-slate-800">{log.action}</p>
-                                  <p className="text-sm text-slate-600">
-                                    {log.table_name} • {log.user?.name || 'System'} • {new Date(log.created_at || '').toLocaleString()}
-                                  </p>
-                                </div>
-                              </div>
-                              <Badge
-                                variant="outline"
-                                className="bg-indigo-50 text-indigo-700 border-indigo-200"
-                              >
-                                {log.action}
-                              </Badge>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
-              )}
-            </TabsContent>
-          </Tabs>
-        </div>
+
+                {/* Password change */}
+                <Card className="border border-border">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Shield className="h-4 w-4 text-indigo-600" />
+                      Change Password
+                    </CardTitle>
+                    <CardDescription>Leave both fields blank if you do not want to change your password.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="new-password" className="text-slate-700 font-medium">New Password</Label>
+                        <div className="relative">
+                          <Input
+                            id="new-password"
+                            type={showPassword ? 'text' : 'password'}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Leave blank to keep current"
+                            className="border-slate-300 focus:border-indigo-400 transition-all duration-300 pr-10"
+                          />
+                          <button type="button" onClick={() => setShowPassword(v => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition-colors">
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                        {password && <PasswordStrengthIndicator password={password} />}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="confirm-password" className="text-slate-700 font-medium">Confirm New Password</Label>
+                        <div className="relative">
+                          <Input
+                            id="confirm-password"
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Repeat new password"
+                            className={`border-slate-300 focus:border-indigo-400 transition-all duration-300 pr-10${confirmPassword && password !== confirmPassword ? ' border-red-300 focus:border-red-400' : ''}`}
+                          />
+                          <button type="button" onClick={() => setShowConfirmPassword(v => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition-colors">
+                            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                        {confirmPassword && password !== confirmPassword && (
+                          <p className="text-xs text-red-500 flex items-center gap-1">
+                            <XCircle className="h-3 w-3" /> Passwords do not match
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex justify-end pt-2">
+                      <Button
+                        onClick={handleSaveChanges}
+                        disabled={isSaving || !password}
+                        className="bg-[#714B67] hover:bg-[#5a3c53] text-white px-6"
+                      >
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Change Password
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* ══════════════ ACTIVITY TAB ══════════════ */}
+          <TabsContent value="activity" className="space-y-6">
+
+            {/* Notifications */}
+            <Card className="border border-border">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Bell className="h-5 w-5 text-indigo-600" />
+                      Notifications
+                      {unreadCount > 0 && (
+                        <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-red-500 text-white rounded-full">
+                          {unreadCount}
+                        </span>
+                      )}
+                    </CardTitle>
+                    <CardDescription>System alerts and updates for your account.</CardDescription>
+                  </div>
+                  {unreadCount > 0 && (
+                    <Button variant="outline" size="sm" onClick={markAllAsRead} className="gap-1.5 text-xs">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      Mark all read
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {notifError && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription>{notifError}</AlertDescription>
+                  </Alert>
+                )}
+                {isNotifLoading ? (
+                  <div className="flex items-center gap-2 py-8 text-muted-foreground justify-center text-sm">
+                    <Loader2 className="h-5 w-5 animate-spin" /> Loading notifications…
+                  </div>
+                ) : notifications.length === 0 ? (
+                  <div className="text-center py-10">
+                    <Bell className="h-12 w-12 text-slate-200 mx-auto mb-3" />
+                    <p className="text-slate-500 font-medium">All caught up!</p>
+                    <p className="text-xs text-muted-foreground mt-1">No notifications right now.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {notifications.map((n) => (
+                      <div
+                        key={n.notification_id}
+                        className={`flex items-start justify-between gap-3 p-3 rounded-lg border transition-colors ${
+                          !n.is_read ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3 min-w-0">
+                          <span className="mt-0.5 shrink-0">{getNotificationIcon(n.type)}</span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium text-sm text-slate-800">{n.title}</p>
+                              {!n.is_read && (
+                                <Badge className="text-[10px] px-1.5 py-0 bg-indigo-600 hover:bg-indigo-600">New</Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{n.message}</p>
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              {new Date(n.created_at || '').toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {!n.is_read && (
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100"
+                              title="Mark as read" onClick={() => markAsRead(n.notification_id)}>
+                              <CheckCircle className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-400 hover:text-red-500 hover:bg-red-50"
+                            title="Dismiss" onClick={() => deleteNotification(n.notification_id)}>
+                            <XCircle className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Audit Logs — admins only */}
+            {(user?.role === 'super_admin' || user?.role === 'branch_manager') && (
+              <Card className="border border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <History className="h-5 w-5 text-indigo-600" />
+                    Audit Logs
+                  </CardTitle>
+                  <CardDescription>Last 50 system events across all users and tables.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {auditError && (
+                    <Alert variant="destructive" className="mb-4 border-red-200 bg-red-50">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>{auditError}</AlertDescription>
+                    </Alert>
+                  )}
+                  {isAuditLoading ? (
+                    <div className="flex items-center gap-2 py-8 text-muted-foreground justify-center text-sm">
+                      <Loader2 className="h-5 w-5 animate-spin" /> Loading audit log…
+                    </div>
+                  ) : auditLogs.length === 0 ? (
+                    <div className="text-center py-10">
+                      <History className="h-12 w-12 text-slate-200 mx-auto mb-3" />
+                      <p className="text-slate-500 font-medium">No audit events yet</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-600">Action</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-600">Table</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-600">User</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-600">Time</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {auditLogs.map((log) => (
+                            <tr key={log.log_id} className="hover:bg-slate-50">
+                              <td className="px-3 py-2">
+                                <Badge variant="outline" className={`text-[10px] capitalize ${
+                                  log.action === 'INSERT' ? 'bg-green-50 text-green-700 border-green-200' :
+                                  log.action === 'UPDATE' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                  log.action === 'DELETE' ? 'bg-red-50 text-red-700 border-red-200' :
+                                  'bg-slate-50 text-slate-600 border-slate-200'
+                                }`}>{log.action}</Badge>
+                              </td>
+                              <td className="px-3 py-2 text-slate-600 font-mono text-xs">{log.table_name}</td>
+                              <td className="px-3 py-2 text-slate-800">{log.user?.name || 'System'}</td>
+                              <td className="px-3 py-2 text-slate-400 text-xs whitespace-nowrap">
+                                {new Date(log.created_at || '').toLocaleString('en-PH', { dateStyle: 'short', timeStyle: 'short' })}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
-      {/* Password Verification Dialog */}
+      {/* ── Password Verification Dialog ── */}
       <Dialog open={isVerifyDialogOpen} onOpenChange={setIsVerifyDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -887,7 +906,7 @@ export default function SettingsPage() {
               Verify Your Identity
             </DialogTitle>
             <DialogDescription>
-              To change your password, please enter your current password for verification.
+              Enter your current password to confirm password change.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -901,49 +920,20 @@ export default function SettingsPage() {
                 placeholder="Enter your current password"
                 className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
                 disabled={isVerifying}
+                onKeyDown={e => e.key === 'Enter' && !isVerifying && oldPassword && handleVerifyAndSave()}
               />
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsVerifyDialogOpen(false);
-                setOldPassword('');
-              }}
-              disabled={isVerifying}
-            >
+            <Button variant="outline" onClick={() => { setIsVerifyDialogOpen(false); setOldPassword(''); }} disabled={isVerifying}>
               Cancel
             </Button>
-            <Button
-              onClick={handleVerifyAndSave}
-              disabled={isVerifying || !oldPassword}
-              className={buttonStyles.primary}
-            >
-              {isVerifying ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Verifying...
-                </>
-              ) : (
-                'Confirm & Save'
-              )}
+            <Button onClick={handleVerifyAndSave} disabled={isVerifying || !oldPassword} className="bg-[#714B67] hover:bg-[#5a3c53] text-white">
+              {isVerifying ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying…</> : 'Confirm & Save'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
-        
-        .font-poppins {
-          font-family: 'Poppins', sans-serif;
-        }
-
-        .ease-spring {
-          transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-      `}</style>
     </div>
   );
 }

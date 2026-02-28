@@ -81,6 +81,34 @@ export interface Database {
           updated_at?: string
         }
       }
+      tire_size: {
+        Row: {
+          size_id: string
+          label: string
+        }
+        Insert: {
+          size_id?: string
+          label: string
+        }
+        Update: {
+          size_id?: string
+          label?: string
+        }
+      }
+      tire_brand: {
+        Row: {
+          brand_id: string
+          name: string
+        }
+        Insert: {
+          brand_id?: string
+          name: string
+        }
+        Update: {
+          brand_id?: string
+          name?: string
+        }
+      }
       sale: {
         Row: {
           sale_id: string
