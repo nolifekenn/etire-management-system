@@ -6,7 +6,7 @@ This is a web application developed as part of our Capstone 1 & 2.
 The system digitalizes and automates Queen.R Tire Supply & Vulcanizing Shop operations such as inventory tracking, sales & services recording, and financial monitoring. 
 
 **Key Features:** 
-- Role-Based Access Contro (Admin, Branch Manager, Employee, Guest)
+- Role-Based Access Contro (Super Admin, Branch Manager, STaff, Cashier)
 - Dashboard
 - Inventory Management
 - Point-of-Sales
