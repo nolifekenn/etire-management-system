@@ -171,28 +171,77 @@
    RESPONSIVE ADJUSTMENTS
    ============================================ */
 
+/* ── Safe-area insets for notched devices (iPhone X+, Android cutouts) ── */
+:root {
+  --safe-top:    env(safe-area-inset-top,    0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left,   0px);
+  --safe-right:  env(safe-area-inset-right,  0px);
+}
+
 /* Mobile (<640px) */
 @media (max-width: 639px) {
-  .container, [class*="container"] {
+  /* Ensure top nav clears notch */
+  header.fixed {
+    padding-top: var(--safe-top);
+  }
+
+  /* Main content: add bottom padding for home-indicator bar */
+  main {
+    padding-bottom: var(--safe-bottom);
+  }
+
+  /* Touch-friendly targets — 44px minimum per Apple/Google HIG */
+  button,
+  [role="button"],
+  a[href],
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  /* Exception: icon-only buttons within the top nav can stay smaller */
+  header button {
+    min-height: unset;
+  }
+
+  /* Tighten horizontal padding on small screens */
+  .container,
+  [class*="container"] {
     padding-left: 1rem;
     padding-right: 1rem;
   }
 
-  /* Touch-friendly targets */
-  button, [role="button"], input, select, textarea {
-    min-height: 44px;
+  /* Tables: allow horizontal scroll rather than overflow-hidden */
+  .overflow-x-auto,
+  table {
+    -webkit-overflow-scrolling: touch;
   }
 
-  /* Full-width dialogs on mobile */
+  /* Full-width dialogs on mobile — sheet-style from bottom */
   [role="dialog"] {
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
-    border-radius: 0.5rem 0.5rem 0 0 !important;
+    border-radius: 0.75rem 0.75rem 0 0 !important;
     bottom: 0 !important;
     top: auto !important;
     transform: none !important;
+    padding-bottom: calc(var(--safe-bottom) + 1rem);
   }
+
+  /* Stack flex rows vertically on mobile where not overridden */
+  .flex-row-mobile-stack {
+    flex-direction: column !important;
+  }
+}
+
+/* Tablet breakpoint corrections (640–1023px) */
+@media (min-width: 640px) and (max-width: 1023px) {
+  /* Reduce outer padding slightly */
+  .p-6 { padding: 1.25rem; }
+  .p-8 { padding: 1.5rem; }
 }
 
 /* ============================================

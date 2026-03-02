@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabaseServer";
+import { loginRateLimiter } from "@/lib/rateLimit";
 
 interface VerifyRequestBody {
   username?: string;
@@ -17,7 +18,39 @@ interface UserRecord {
 
 const EMAIL_DOMAIN = "etire-system.local";
 
-export async function POST(request: Request) {
+/** Extract the best available IP from request headers (works behind proxies/Vercel). */
+function getClientIp(request: NextRequest): string {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    request.headers.get("x-real-ip") ??
+    "unknown"
+  );
+}
+
+export async function POST(request: NextRequest) {
+  const ip = getClientIp(request);
+
+  // ── Brute-force protection ─────────────────────────────────────────────────
+  // Peek at the current state without consuming a slot yet.
+  const peek = loginRateLimiter.peek(ip);
+  if (!peek.allowed) {
+    const retryAfterSec = Math.ceil((peek.resetAt - Date.now()) / 1000);
+    return NextResponse.json(
+      {
+        success: false,
+        message: `Too many failed login attempts. Please try again in ${Math.ceil(retryAfterSec / 60)} minute(s).`,
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(retryAfterSec),
+          "X-RateLimit-Limit": "5",
+          "X-RateLimit-Remaining": "0",
+        },
+      }
+    );
+  }
+
   try {
     const { username, password } = (await request.json()) as VerifyRequestBody;
 
@@ -47,9 +80,17 @@ export async function POST(request: Request) {
     }
 
     if (!userRecord) {
+      // Record the failed attempt for this IP
+      const result = loginRateLimiter.check(ip);
       return NextResponse.json(
         { success: false, message: "Invalid username or password." },
-        { status: 401 }
+        {
+          status: 401,
+          headers: {
+            "X-RateLimit-Limit": "5",
+            "X-RateLimit-Remaining": String(result.remaining),
+          },
+        }
       );
     }
 
@@ -111,6 +152,9 @@ export async function POST(request: Request) {
     if (!authEmail) {
       authEmail = `${username}@${EMAIL_DOMAIN}`;
     }
+
+    // Successful authentication — clear the failed-attempt counter for this IP
+    loginRateLimiter.reset(ip);
 
     return NextResponse.json({ success: true, email: authEmail });
   } catch (error) {

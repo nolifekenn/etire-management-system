@@ -141,23 +141,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const initializeAuth = async () => {
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        // getUser() always validates against the Supabase Auth server — no stale cache risk
+        const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
 
-        if (sessionError) console.error("[useAuth] getSession error:", sessionError);
+        if (userError) console.error("[useAuth] getUser error:", userError);
 
-        if (session?.user) {
-          const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
-
-          if (userError || !authUser) {
-            await supabase.auth.signOut();
-            if (mounted) {
-              setUser(null);
-              setIsLoading(false);
-              hasInitialized = true;
-            }
-            return;
-          }
-
+        if (authUser) {
+          // user is verified by the server — load their profile
           const profile = await fetchUserProfile(authUser.id);
           if (mounted) {
             if (profile) {
@@ -328,20 +318,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = async () => {
-    if (!supabase) {
-      setUser(null);
-      setActiveBranchIdState(null);
-      setIsLoading(false);
-      router.push("/login");
-      return;
-    }
-    setIsLoading(true);
+    // Clear state immediately so the UI reflects the logged-out state right away.
+    // The SIGNED_OUT event from onAuthStateChange will fire shortly after and
+    // also call router.push('/login') as a fallback.
+    setUser(null);
+    setActiveBranchIdState(null);
+    localStorage.removeItem('etire_active_branch');
+    router.push('/login');
+
+    if (!supabase) return;
     try {
       await supabase.auth.signOut();
-      localStorage.removeItem('etire_active_branch'); // Clear specific branch pref
     } catch (error) {
       console.error("Logout Error:", error);
-      setIsLoading(false);
     }
   };
 

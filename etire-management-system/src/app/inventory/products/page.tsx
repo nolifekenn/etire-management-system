@@ -322,7 +322,7 @@ export default function ProductListPage() {
 
         {/* Category filter */}
         <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="h-9 w-[140px]">
+          <SelectTrigger className="h-9 w-full sm:w-[140px]">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
@@ -336,7 +336,7 @@ export default function ProductListPage() {
 
         {/* Stock filter */}
         <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="h-9 w-[150px]">
+          <SelectTrigger className="h-9 w-full sm:w-[150px]">
             <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
             <SelectValue placeholder="Filter" />
           </SelectTrigger>

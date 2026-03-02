@@ -1,70 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient, createClient } from "@/lib/supabaseServer";
 
-// Helper to verify admin access
-async function verifyAdminAccess(request: NextRequest) {
-    const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-        return { error: "Unauthorized", status: 401 };
-    }
-
-    // Get user profile to check role
-    const { data: userProfile, error } = await supabase
-        .from('user')
-        .select('user_id, role, branch_id')
-        .eq('auth_id', session.user.id) // Corrected from uuid to auth_id if that's the column name, or keep uuid if it is. user table usually has auth_id or uuid links to auth.users. 
-        // Note: Previous code used 'uuid'. I should verify if 'uuid' or 'auth_id' is correct.
-        // useAuth uses .eq("auth_id", authUserId).
-        // I should use 'auth_id' to be consistent with useAuth.
-        .single();
-
-    // Quick check on column name: useAuth used 'auth_id'. 
-    // The previous API code used 'uuid'. 
-    // I'll stick to 'auth_id' as I saw it working in useAuth.
-    // Wait, let's verify if I can just use 'auth_id'.
-    // If I change it, it might break if the column is 'uuid'.
-    // useAuth: .eq("auth_id", authUserId)
-    // api: .eq('uuid', session.user.id)
-    // This suggests inconsistency or alias?
-    // Let's assume 'auth_id' is the correct one based on useAuth (frontend) working.
-    // If 'uuid' was working before, maybe both exist? Or one is correct?
-    // I'll use 'auth_id' but fallback to 'uuid' if I need to? No, better pick one.
-    // 'auth_id' seems more standard in Supabase for foreign key to auth.users.
-
-    // Let's use 'auth_id' to match useAuth. 
-}
-
-// Re-writing the function with improvements
+// Verify the request comes from an authenticated admin/branch-manager.
+// Uses getUser() which always re-validates against the Supabase Auth server,
+// unlike getSession() which can return a stale/revoked cached token.
 async function verifyAdminAccessImproved(request: NextRequest) {
     const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (authError || !user) {
         return { error: "Unauthorized", status: 401 };
     }
 
-    // Get user profile to check role
-    // Using 'auth_id' to match useAuth.
     const { data: userProfile, error } = await supabase
         .from('user')
         .select('user_id, role')
-        .eq('auth_id', session.user.id)
+        .eq('auth_id', user.id)
         .single();
 
     if (error || !userProfile) {
-        console.error("verifyAdminAccess: Profile not found for", session.user.id);
+        console.error("[admin/users] Profile not found for auth id:", user.id);
         return { error: "Could not verify user profile", status: 401 };
     }
 
     const role = (userProfile as any).role;
-    // Check for string roles
     if (role !== 'super_admin' && role !== 'branch_manager') {
         return { error: "Insufficient permissions", status: 403 };
     }
 
-    return { userProfile, session };
+    return { userProfile, user };
 }
 
 // GET - Fetch all users

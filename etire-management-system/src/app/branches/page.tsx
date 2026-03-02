@@ -1004,7 +1004,7 @@ export default function EnhancedBranchesPage() {
         />
 
         {/* Quick View Panel - ADDED BACK */}
-        <div className={`fixed right-0 top-0 h-full w-96 bg-white shadow-2xl z-50 border-l border-slate-200 transition-transform duration-300 ${quickViewBranch ? 'translate-x-0' : 'translate-x-full'
+        <div className={`fixed right-0 top-0 h-full w-full sm:w-96 bg-white shadow-2xl z-50 border-l border-slate-200 transition-transform duration-300 ${quickViewBranch ? 'translate-x-0' : 'translate-x-full'
           }`}>
           {quickViewBranch && (
             <div className="p-6 h-full overflow-y-auto">
@@ -1098,7 +1098,7 @@ export default function EnhancedBranchesPage() {
 
         {/* View More Dialog */}
         <Dialog open={isViewMoreOpen} onOpenChange={setIsViewMoreOpen}>
-          <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl">
+          <DialogContent className="w-full sm:max-w-6xl max-h-[90vh] overflow-y-auto bg-white border border-slate-200 shadow-2xl">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
                 Complete Branches List

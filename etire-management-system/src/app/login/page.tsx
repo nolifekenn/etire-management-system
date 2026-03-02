@@ -13,7 +13,6 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const { login, user } = useAuth();
 
-  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -35,13 +34,9 @@ export default function LoginPage() {
     }
   }, [searchParams, toast, router]);
 
-  // Load saved password
+  // Clean up any previously stored plaintext passwords (security fix)
   useEffect(() => {
-    const savedPassword = localStorage.getItem('etire_saved_password');
-    if (savedPassword) {
-      setPassword(savedPassword);
-      setRememberMe(true);
-    }
+    localStorage.removeItem('etire_saved_password');
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -62,12 +57,6 @@ export default function LoginPage() {
       const success = await login(username, password);
 
       if (success) {
-        if (rememberMe) {
-          localStorage.setItem('etire_saved_password', password);
-        } else {
-          localStorage.removeItem('etire_saved_password');
-        }
-
         toast({
           title: 'Welcome back!',
           description: 'Login successful. Redirecting...',
@@ -264,31 +253,6 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-            </div>
-
-            {/* Remember me */}
-            <div className="flex items-center gap-2.5">
-              <input
-                type="checkbox"
-                id="remember"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                style={{
-                  width: 16,
-                  height: 16,
-                  accentColor: '#875A7B',
-                  cursor: 'pointer',
-                  borderRadius: 4,
-                  flexShrink: 0,
-                }}
-              />
-              <label
-                htmlFor="remember"
-                className="text-sm cursor-pointer select-none"
-                style={{ color: '#6b5878' }}
-              >
-                Stay signed in
-              </label>
             </div>
 
             {/* Submit */}

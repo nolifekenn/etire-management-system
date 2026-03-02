@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient, createClient } from '@/lib/supabaseServer';
 
-async function getSession() {
+async function getAuthenticatedUser() {
   const supabase = await createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  return session;
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
 }
 
 // GET: Fetch a single inventory item by item_id (for hydrating edit form lookups)
 export async function GET(request: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const user = await getAuthenticatedUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
   const item_id = searchParams.get('item_id');
@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
 
 // POST: Create a new inventory item
 export async function POST(request: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const user = await getAuthenticatedUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;
@@ -80,8 +80,8 @@ export async function POST(request: NextRequest) {
 
 // PATCH: Update an inventory item (edit fields, stock adjustment, soft delete)
 export async function PATCH(request: NextRequest) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const user = await getAuthenticatedUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as any;

@@ -557,6 +557,7 @@ export default function POSPage() {
   const [showPayment, setShowPayment] = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showCart,    setShowCart]    = useState(false);
 
   // ── branch load ────────────────────────────────────────────────────────────
 
@@ -761,10 +762,40 @@ export default function POSPage() {
   // ──────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-gray-100">
+    <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden bg-gray-100">
+
+      {/* ── Mobile tab bar ─────────────────────────────────────────────────── */}
+      <div className="flex md:hidden border-b bg-white shrink-0">
+        <button
+          onClick={() => setShowCart(false)}
+          className={cn(
+            'flex-1 py-2.5 text-sm font-medium transition-colors',
+            !showCart ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500',
+          )}
+        >
+          Products
+        </button>
+        <button
+          onClick={() => setShowCart(true)}
+          className={cn(
+            'flex-1 py-2.5 text-sm font-medium transition-colors relative',
+            showCart ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500',
+          )}
+        >
+          Cart
+          {cart.length > 0 && (
+            <span className="ml-1.5 inline-flex items-center justify-center h-4 w-4 rounded-full bg-blue-600 text-white text-[10px] font-bold">
+              {cart.length}
+            </span>
+          )}
+        </button>
+      </div>
 
       {/* ── LEFT — Product browser ─────────────────────────────────────────── */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className={cn(
+        'flex flex-1 flex-col overflow-hidden',
+        showCart ? 'hidden md:flex' : 'flex',
+      )}>
 
         {/* Search bar */}
         <div className="flex items-center gap-3 border-b bg-white px-4 py-2">
@@ -848,7 +879,11 @@ export default function POSPage() {
       </div>
 
       {/* ── RIGHT — Order sidebar ──────────────────────────────────────────── */}
-      <div className="flex w-80 xl:w-96 flex-col border-l bg-white shadow-lg">
+      <div className={cn(
+        'flex flex-col border-l bg-white shadow-lg',
+        'w-full md:w-80 xl:w-96',
+        !showCart ? 'hidden md:flex' : 'flex',
+      )}>
 
         {/* Header */}
         <div className="flex items-center justify-between border-b px-4 py-3">

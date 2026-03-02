@@ -165,7 +165,7 @@ export default function SalesListPage() {
         </Button>
 
         {/* Search */}
-        <div className="relative w-60">
+        <div className="relative w-full sm:w-60">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
             placeholder="Search order number…"

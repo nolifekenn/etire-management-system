@@ -6,9 +6,9 @@ type TableDump = Partial<Record<BackupTableName, unknown[]>>;
 
 export async function GET() {
   const supabase = await createClient();
-  const { data, error: sessionError } = await supabase.auth.getSession();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-  if (sessionError || !data.session) {
+  if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

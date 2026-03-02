@@ -52,6 +52,30 @@ const nextConfig: NextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(), payment=()",
           },
+          // Content Security Policy — restrict sources for scripts, styles, and connections
+          // 'unsafe-inline' + 'unsafe-eval' are required by Next.js internals (inline scripts, HMR)
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              // Next.js requires unsafe-inline (inline <script> tags) and unsafe-eval (eval from webpack/turbopack)
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "style-src 'self' 'unsafe-inline'",
+              // Supabase storage & auth avatars
+              "img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com",
+              // Supabase REST, Auth, Storage, and Realtime (ws/wss)
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+              "font-src 'self'",
+              // Block Flash, Java, and other plugins
+              "object-src 'none'",
+              // Prevent base-tag hijacking
+              "base-uri 'self'",
+              // Only allow form actions on the same origin
+              "form-action 'self'",
+              // Complement to X-Frame-Options SAMEORIGIN
+              "frame-ancestors 'self'",
+            ].join("; "),
+          },
         ],
       },
     ];

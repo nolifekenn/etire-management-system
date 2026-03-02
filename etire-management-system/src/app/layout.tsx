@@ -19,6 +19,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [isHydrated, setIsHydrated] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Enable real-time notification toasts
   useNotificationListener();
@@ -92,25 +93,34 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   // Layout:
   //
   //  ┌──────────── Top Nav (52px, fixed) ───────────────────────────────┐
-  //  ├──────┬──────────────────────────────────────────────────────────┤
-  //  │ Icon │                                                            │
-  //  │ Side │            Main Content Area                              │
-  //  │ bar  │         (scrollable, fills remaining space)               │
-  //  │ 52px │                                                            │
-  //  └──────┴──────────────────────────────────────────────────────────┘
+  //  ├──────────┬────────────────────────────────────────────────────── ┤
+  //  │ Icon     │                                                        │
+  //  │ Sidebar  │          Main Content Area                             │
+  //  │ 52px     │       (scrollable, fills remaining space)              │
+  //  │ (md+)    │                                                        │
+  //  └──────────┴────────────────────────────────────────────────────── ┘
+  //
+  //  On mobile: sidebar is a slide-in drawer; main is full-width.
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[#f5f5f5]">
-      {/* Fixed top navigation bar */}
-      <OdooTopNav />
+      {/* Fixed top navigation bar — passes hamburger handler on mobile */}
+      <OdooTopNav onMenuToggle={() => setMobileSidebarOpen(v => !v)} />
 
-      {/* Fixed left icon sidebar */}
-      <OdooSidebar />
+      {/* Fixed left icon sidebar — desktop only; mobile drawer */}
+      <OdooSidebar
+        mobileOpen={mobileSidebarOpen}
+        onMobileClose={() => setMobileSidebarOpen(false)}
+      />
 
-      {/* Main scrollable content — offset for fixed top nav + left sidebar */}
+      {/* Main scrollable content
+          - Desktop (md+): offset left by sidebar (52px) + top nav (52px)
+          - Mobile (<md):  no left offset (sidebar is a drawer overlay)
+      */}
       <main
         className="
           absolute inset-0
-          top-[52px] left-[52px]
+          top-[52px]
+          md:left-[52px] left-0
           overflow-x-hidden overflow-y-auto
           bg-[#f5f5f5]
         "
@@ -130,6 +140,10 @@ export default function AppLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Proper viewport for mobile — enables responsive scaling + notch/safe-area insets */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+      </head>
       <body suppressHydrationWarning={true}>
         <GlobalErrorBoundary>
           <AuthProvider>

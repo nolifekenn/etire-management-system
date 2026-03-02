@@ -28,6 +28,7 @@ import {
   Wrench,
   BarChart3,
   Database,
+  Menu,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth }               from "@/hooks/useAuth";
@@ -66,7 +67,7 @@ function NotifIcon({ type }: { type: Notification["type"] }) {
   return                         <Info          className="h-4 w-4 text-blue-500  shrink-0" />;
 }
 
-export function OdooTopNav() {
+export function OdooTopNav({ onMenuToggle }: { onMenuToggle?: () => void }) {
   const { user, logout, activeBranchId, setActiveBranchId } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -235,8 +236,17 @@ export function OdooTopNav() {
 
   return (
     <header className="fixed inset-x-0 top-0 z-30 flex h-[52px] items-center gap-3 border-b border-white/10 bg-[#714B67] px-3 shadow-sm">
-      {/* ── Left: App Switcher + Brand ───────────────────────────── */}
+      {/* ── Left: Hamburger (mobile) + App Switcher + Brand ──────────── */}
       <div className="flex items-center gap-2 shrink-0">
+        {/* Hamburger — only on mobile */}
+        <button
+          onClick={onMenuToggle}
+          aria-label="Open navigation"
+          className="flex md:hidden h-9 w-9 items-center justify-center rounded-md text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+
         <OdooAppSwitcher />
         <Link
           href="/dashboard"
@@ -257,10 +267,19 @@ export function OdooTopNav() {
 
       {/* ── Center: Command Palette ──────────────────────────────── */}
       <div className="flex-1 max-w-xl mx-auto relative" ref={searchContainerRef}>
-        {/* Input bar */}
+        {/* Mobile: icon-only toggle; expands to full bar when tapped */}
+        <button
+          className="flex sm:hidden h-8 w-8 items-center justify-center rounded-md border border-white/20 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors"
+          onClick={() => { setSearchOpen(true); setTimeout(() => searchInputRef.current?.focus(), 50); }}
+          aria-label="Search"
+        >
+          <Search className="h-3.5 w-3.5" />
+        </button>
+
+        {/* Desktop: always visible input bar */}
         <div
           className={cn(
-            "flex items-center gap-2 rounded-md border transition-all px-3 h-8 cursor-text",
+            "hidden sm:flex items-center gap-2 rounded-md border transition-all px-3 h-8 cursor-text",
             searchOpen || searchValue
               ? "border-white/60 bg-white/20 text-white"
               : "border-white/20 bg-white/10 text-white/70"
@@ -290,9 +309,62 @@ export function OdooTopNav() {
           )}
         </div>
 
-        {/* Dropdown */}
+        {/* Mobile full-screen search overlay */}
         {searchOpen && (
-          <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-lg shadow-2xl border border-border z-[60] overflow-hidden">
+          <div className="fixed inset-0 z-[70] flex flex-col bg-white sm:hidden">
+            {/* Mobile search header */}
+            <div className="flex items-center gap-2 border-b border-border px-3 py-2 bg-[#714B67]">
+              <Search className="h-4 w-4 text-white/70 shrink-0" />
+              <input
+                autoFocus
+                type="text"
+                placeholder="Search pages…"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onKeyDown={handleSearchKey}
+                className="flex-1 bg-transparent text-sm outline-none placeholder:text-white/50 text-white"
+              />
+              <button
+                onClick={() => { setSearchOpen(false); setSearchValue(''); }}
+                className="text-white/70 hover:text-white transition-colors px-1"
+              >
+                Cancel
+              </button>
+            </div>
+            {/* Mobile results */}
+            <div className="flex-1 overflow-y-auto">
+              {searchResults.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
+                  <Search className="h-8 w-8 opacity-20" />
+                  <span className="text-sm">No results for &ldquo;{searchValue}&rdquo;</span>
+                </div>
+              ) : (
+                searchResults.map((item, idx) => (
+                  <button
+                    key={item.id}
+                    onClick={() => navigateTo(item.href)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-4 py-3 text-left border-b border-border/30 last:border-0",
+                      idx === highlightedIdx ? "bg-[#714B67]/10" : "hover:bg-slate-50"
+                    )}
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 shrink-0">
+                      {item.icon}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground">{item.label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Desktop dropdown */}
+        {searchOpen && (
+          <div className="hidden sm:block absolute top-full left-0 right-0 mt-1.5 bg-white rounded-lg shadow-2xl border border-border z-[60] overflow-hidden">
             {/* Header */}
             <div className="px-3 py-2 border-b border-border flex items-center justify-between bg-slate-50">
               <span className="text-[11px] text-muted-foreground font-medium">
@@ -343,7 +415,7 @@ export function OdooTopNav() {
 
       {/* ── Branch Switcher (super_admin only) ──────────────────── */}
       {user?.role === 'super_admin' && branches.length > 0 && (
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="hidden sm:flex items-center gap-1.5 shrink-0">
           <GitBranchIcon className="h-3.5 w-3.5 text-white/60 shrink-0" />
           <select
             value={activeBranchId ?? ''}

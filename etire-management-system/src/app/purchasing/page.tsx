@@ -192,7 +192,7 @@ export default function PurchasingPage() {
         </div>
 
         {/* Table */}
-        <div className="rounded-lg border border-border bg-white overflow-hidden">
+        <div className="rounded-lg border border-border bg-white overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-gray-50 text-xs text-muted-foreground">

@@ -240,7 +240,7 @@ export default function ServicesKanbanPage() {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/*  Top bar  */}
-      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between gap-4 shrink-0">
+      <header className="bg-white border-b border-gray-200 px-4 py-3 flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-3">
           <Wrench className="h-6 w-6 text-primary" />
           <div>
@@ -293,7 +293,7 @@ export default function ServicesKanbanPage() {
         </div>
       ) : (
         <main className="flex-1 overflow-x-auto p-6">
-          <div className="flex gap-4 min-h-full" style={{ minWidth: `${KANBAN_COLUMNS.length * 264}px` }}>
+          <div className="flex gap-4 min-h-full">
             {KANBAN_COLUMNS.map(col => (
               <KanbanColumn
                 key={col.state}
