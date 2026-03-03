@@ -1,7 +1,14 @@
 // /lib/reportToken.ts
+// server-only: this module uses Node's crypto — never import from client components
+import 'server-only';
 import crypto from "crypto";
 
-const SECRET = process.env.REPORTS_SECRET_KEY || "";
+// Matches the REPORT_TOKEN_SECRET variable defined in .env.local
+const SECRET = process.env.REPORT_TOKEN_SECRET || "";
+
+if (!SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('REPORT_TOKEN_SECRET env variable is not set. Generate one with: openssl rand -hex 32');
+}
 
 // How long tokens are valid (30 minutes)
 const TOKEN_EXPIRY_MS = 30 * 60 * 1000;

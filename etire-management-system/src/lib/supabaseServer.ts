@@ -1,4 +1,5 @@
-
+// server-only: this module accesses cookies() and the service role key — never import from client components
+import 'server-only';
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { Database } from './supabaseClient'

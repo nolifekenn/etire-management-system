@@ -336,7 +336,7 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 if (!supabaseUrl || !supabaseKey) {
   console.error('Missing Supabase credentials. Please check your .env.local file.');
   console.error('Required variables: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  console.error('Current values:', { supabaseUrl, supabaseKey });
+  // NOTE: Never log the actual key values here — browser DevTools would expose them
 }
 
 // Create browser client - uses @supabase/ssr which automatically handles cookies
