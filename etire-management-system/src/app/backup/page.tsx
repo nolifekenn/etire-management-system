@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { TABLE_DEPENDENCY_ORDER } from "@/lib/backupTables";
+import { supabase } from "@/lib/supabaseClient";
 
 // ── Auto-backup schedule ───────────────────────────────────────────────────
 const AUTO_BACKUP_HOURS = [10, 17]; // 10:00 AM and 5:00 PM
@@ -293,6 +294,18 @@ export default function BackupPage() {
       });
       if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Import failed");
       const result = await res.json();
+      // Audit log: backup restore
+      if (authUser && supabase) {
+        await supabase.from('audit_log').insert({
+          user_id: authUser.user_id,
+          action: 'UPDATE',
+          table_name: 'backup_restore',
+          record_id: null,
+          old_values: null,
+          new_values: { fileName: file.name, restoredTables: result.restoredTables ?? Object.keys(parsed.tables).length },
+          record_number: file.name,
+        });
+      }
       finishSuccess(`Restored from ${file.name}. ${result.restoredTables ?? Object.keys(parsed.tables).length} tables restored.`);
     } catch (e: unknown) {
       failAction((e as Error).message);
@@ -312,6 +325,18 @@ export default function BackupPage() {
       const res = await fetch("/api/backup/sync", { method: "POST" });
       if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Cloud backup failed");
       const result = await res.json();
+      // Audit log: cloud backup
+      if (authUser && supabase) {
+        await supabase.from('audit_log').insert({
+          user_id: authUser.user_id,
+          action: 'INSERT',
+          table_name: 'backup_cloud',
+          record_id: null,
+          old_values: null,
+          new_values: { fileName: result.fileName, triggered_by: authUser.name },
+          record_number: result.fileName ?? null,
+        });
+      }
 
       const now = new Date().toISOString();
       setLastBackup(now);

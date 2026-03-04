@@ -300,6 +300,16 @@ export async function upsertProduct(input: UpsertProductInput) {
   revalidatePath('/inventory/products');
   if (!isNew) revalidatePath(`/inventory/products/${input.item_id}`);
 
+  // Audit trail
+  await supabase.from('audit_log').insert({
+    user_id:       null,
+    action:        isNew ? 'INSERT' : 'UPDATE',
+    table_name:    'inventory_item',
+    record_id:     result.item_id as string,
+    record_number: input.name,
+    new_values:    payload,
+  });
+
   return { success: true, itemId: result.item_id as string };
 }
 
@@ -379,6 +389,20 @@ export async function createAdjustment(input: CreateAdjustmentInput) {
 
   revalidatePath('/inventory');
   revalidatePath('/inventory/products');
+
+  // Audit trail
+  await supabase.from('audit_log').insert({
+    user_id:    user_id,
+    action:     'ADJUSTMENT',
+    table_name: 'inventory_item',
+    record_id:  adjustmentId ?? undefined,
+    new_values: {
+      reason,
+      branch_id,
+      lines_count: lines.length,
+      adjustment_id: adjustmentId,
+    },
+  });
 
   return { success: true, adjustmentId };
 }

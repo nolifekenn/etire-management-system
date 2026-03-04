@@ -127,6 +127,23 @@ export async function createRFQ(input: CreateRFQInput) {
     is_internal:   true,
   });
 
+  // Audit trail
+  await supabase.from('audit_log').insert({
+    user_id:       input.user_id,
+    action:        'INSERT',
+    table_name:    'purchase_order',
+    record_id:     po.po_id,
+    record_number: po.po_number,
+    new_values: {
+      po_number:      po.po_number,
+      supplier_id:    input.supplier_id,
+      branch_id:      input.branch_id,
+      payment_method: input.payment_method,
+      total_amount:   totalAmount,
+      lines_count:    input.lines.length,
+    },
+  });
+
   revalidatePath('/purchasing');
   return { success: true, poId: po.po_id, poNumber: po.po_number };
 }
@@ -142,11 +159,11 @@ export async function transitionPO(
   const result = await transitionPurchaseOrder(poId, nextState, userId, note);
 
   if (result.success) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const supabase: any = await createClient();
+
     // When confirming to 'purchase', create a pending delivery record
     if (nextState === 'purchase') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const supabase: any = await createClient();
-
       // Fetch PO lines so we know what quantities to expect
       const { data: poLines } = await supabase
         .from('purchase_order_item')
@@ -178,6 +195,15 @@ export async function transitionPO(
         await supabase.from('delivery_item').insert(deliveryItems);
       }
     }
+
+    // Audit log: PO state transition
+    await supabase.from('audit_log').insert({
+      user_id:    userId,
+      action:     'STATE_TRANSITION',
+      table_name: 'purchase_order',
+      record_id:  poId,
+      new_values: { state: nextState },
+    });
 
     revalidatePath('/purchasing');
     revalidatePath(`/purchasing/${poId}`);
@@ -231,6 +257,15 @@ export async function upsertPOLines(
     .from('purchase_order')
     .update({ total_amount: total, updated_at: new Date().toISOString() })
     .eq('po_id', poId);
+
+  // Audit trail (no userId available in this helper — log with system marker)
+  await supabase.from('audit_log').insert({
+    user_id:    null,
+    action:     'UPDATE_LINES',
+    table_name: 'purchase_order',
+    record_id:  poId,
+    new_values: { total_amount: total, lines_count: lines.length },
+  });
 
   revalidatePath(`/purchasing/${poId}`);
   return { success: true };
@@ -307,6 +342,23 @@ export async function validateReceipt(input: ValidateReceiptInput) {
     message_type:  'system',
     body:          `Receipt validated: ${totalReceived} unit(s) received into stock.`,
     is_internal:   true,
+  });
+
+  // Audit log: receipt validation
+  await supabase.from('audit_log').insert({
+    user_id:    input.user_id,
+    action:     'VALIDATE_RECEIPT',
+    table_name: 'purchase_order',
+    record_id:  input.po_id,
+    new_values: {
+      delivery_id:    input.delivery_id,
+      total_received: totalReceived,
+      lines: input.lines.map(l => ({
+        item_id:           l.item_id,
+        quantity_received: l.quantity_received,
+        quantity_damaged:  l.quantity_damaged,
+      })),
+    },
   });
 
   revalidatePath(`/purchasing/${input.po_id}`);
@@ -423,6 +475,15 @@ export async function createVendor(input: VendorInput): Promise<{ vendor: Record
     .select()
     .single();
   if (error) return { vendor: null, error: error.message };
+  // Audit trail
+  await (supabase as any).from('audit_log').insert({
+    user_id:       null,
+    action:        'INSERT',
+    table_name:    'supplier',
+    record_id:     (data as Record<string, unknown>).supplier_id,
+    record_number: input.name,
+    new_values:    { name: input.name, phone: input.phone, email: input.email },
+  });
   revalidatePath('/purchasing');
   revalidatePath('/purchasing/vendors');
   return { vendor: data as Record<string, unknown>, error: null };
@@ -435,6 +496,14 @@ export async function updateVendor(vendorId: string, input: Partial<VendorInput>
     .update({ ...input })
     .eq('supplier_id', vendorId);
   if (error) return { error: error.message };
+  // Audit trail
+  await (supabase as any).from('audit_log').insert({
+    user_id:    null,
+    action:     'UPDATE',
+    table_name: 'supplier',
+    record_id:  vendorId,
+    new_values: input,
+  });
   revalidatePath('/purchasing');
   revalidatePath('/purchasing/vendors');
   return { error: null };
@@ -447,6 +516,14 @@ export async function deleteVendor(vendorId: string): Promise<{ error: string | 
     .update({ deleted_at: new Date().toISOString(), is_active: false })
     .eq('supplier_id', vendorId);
   if (error) return { error: error.message };
+  // Audit trail
+  await (supabase as any).from('audit_log').insert({
+    user_id:    null,
+    action:     'DELETE',
+    table_name: 'supplier',
+    record_id:  vendorId,
+    new_values: { deleted_at: new Date().toISOString() },
+  });
   revalidatePath('/purchasing');
   revalidatePath('/purchasing/vendors');
   return { error: null };

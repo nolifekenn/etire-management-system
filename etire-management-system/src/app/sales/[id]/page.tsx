@@ -18,7 +18,7 @@ import {
   type POSLineInput,
 } from '@/lib/actions/sales';
 import { useAuth }        from '@/hooks/useAuth';
-import { ChatterPanel }   from '@/components/ChatterPanel';
+import { AuditTrailPanel }   from '@/components/AuditTrailPanel';
 import { Button }         from '@/components/ui/button';
 import { Badge }          from '@/components/ui/badge';
 import { Input }          from '@/components/ui/input';
@@ -756,7 +756,7 @@ export default function SaleFormPage() {
 
       {/* ── Chatter ──────────────────────────────────────────────────────── */}
       <div className="bg-white border-t px-6 py-4">
-        <ChatterPanel relatedTable="sale" relatedRecordId={saleId} />
+        <AuditTrailPanel relatedTable="sale" relatedRecordId={saleId} />
       </div>
 
       {/* Void modal */}

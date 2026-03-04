@@ -13,6 +13,7 @@ import { useRouter }      from 'next/navigation';
 import Link              from 'next/link';
 import { listSales, createQuotation, type ListSalesInput } from '@/lib/actions/sales';
 import { useAuth }        from '@/hooks/useAuth';
+import { supabase }       from '@/lib/supabaseClient';
 import { Button }         from '@/components/ui/button';
 import { Input }          from '@/components/ui/input';
 import { Badge }          from '@/components/ui/badge';
@@ -131,6 +132,18 @@ export default function SalesListPage() {
         lines:     [],
       });
       if (result.success && result.saleId) {
+        // Audit log: new quotation created
+        if (user?.user_id && supabase) {
+          await supabase.from('audit_log').insert({
+            user_id: String(user.user_id),
+            action: 'INSERT',
+            table_name: 'sale',
+            record_id: result.saleId,
+            old_values: null,
+            new_values: { branch_id: branch?.branch_id ?? '', status: 'draft', lines: [] },
+            record_number: null,
+          });
+        }
         router.push(`/sales/${result.saleId}`);
       } else {
         toast({ title: 'Error', description: result.error, variant: 'destructive' });

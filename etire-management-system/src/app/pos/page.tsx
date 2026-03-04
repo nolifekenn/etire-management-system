@@ -690,6 +690,19 @@ export default function POSPage() {
         return;
       }
 
+      // Audit log: POS sale created
+      if (user?.user_id && result.saleId) {
+        await _supabase.from('audit_log').insert({
+          user_id: String(user.user_id),
+          action: 'INSERT',
+          table_name: 'sale',
+          record_id: result.saleId,
+          old_values: null,
+          new_values: inputPayload,
+          record_number: result.saleNumber ?? null,
+        });
+      }
+
       // Build and print receipt
       const customerObj  = customers.find(c => c.customer_id === customerId);
       const biz: BusinessInfo = {

@@ -422,10 +422,27 @@ export async function createServiceJob(input: CreateServiceJobInput) {
   }
 
   revalidatePath('/services');
+
+  // Audit trail
+  await supabase.from('audit_log').insert({
+    user_id:       user_id,
+    action:        'INSERT',
+    table_name:    'service_job',
+    record_id:     job.job_id,
+    record_number: job.job_number ?? undefined,
+    new_values: {
+      job_number:      job.job_number,
+      job_description,
+      customer_id:     customer_id ?? null,
+      vehicle_id:      vehicle_id ?? null,
+      branch_id,
+      priority,
+      lines_count:     lines.length,
+    },
+  });
+
   return { success: true, error: null, job_id: job.job_id, job_number: job.job_number };
 }
-
-// ── 4. updateServiceJobInfo ───────────────────────────────────────────────
 
 export async function updateServiceJobInfo(
   jobId:  string,
@@ -451,6 +468,15 @@ export async function updateServiceJobInfo(
     .is('deleted_at', null);
 
   if (error) return { success: false, error: error.message };
+
+  // Audit trail
+  await supabase.from('audit_log').insert({
+    user_id:    null,
+    action:     'UPDATE',
+    table_name: 'service_job',
+    record_id:  jobId,
+    new_values: updates,
+  });
 
   revalidatePath(`/services/${jobId}`);
   revalidatePath('/services');
@@ -496,6 +522,15 @@ export async function upsertServiceJobItems(
 
   if (insErr) return { success: false, error: insErr.message };
 
+  // Audit trail
+  await supabase.from('audit_log').insert({
+    user_id:    null,
+    action:     'UPSERT_LINES',
+    table_name: 'service_job_item',
+    record_id:  jobId,
+    new_values: { lines_count: lines.length },
+  });
+
   revalidatePath(`/services/${jobId}`);
   return { success: true, error: null };
 }
@@ -511,6 +546,15 @@ export async function deleteServiceJobItem(serviceJobItemId: string, jobId: stri
     .eq('service_job_item_id', serviceJobItemId);
 
   if (error) return { success: false, error: error.message };
+
+  // Audit trail
+  await supabase.from('audit_log').insert({
+    user_id:    null,
+    action:     'DELETE',
+    table_name: 'service_job_item',
+    record_id:  serviceJobItemId,
+    old_values: { job_id: jobId },
+  });
 
   revalidatePath(`/services/${jobId}`);
   return { success: true, error: null };
@@ -676,6 +720,16 @@ export async function transitionServiceJob(
     message: note ?? `Status changed: "${SERVICE_STATE_LABELS[currentState]}" → "${SERVICE_STATE_LABELS[nextState]}"`,
   });
 
+  // Audit log: service job state transition
+  await supabase.from('audit_log').insert({
+    user_id:    userId,
+    action:     'STATE_TRANSITION',
+    table_name: 'service_job',
+    record_id:  jobId,
+    old_values: { state: currentState },
+    new_values: { state: nextState },
+  });
+
   revalidatePath(`/services/${jobId}`);
   revalidatePath('/services');
   return { success: true, newState: nextState, error: null };
@@ -723,6 +777,16 @@ export async function cancelServiceJob(
     supabase, jobId, userId,
     currentState, nextState: 'cancelled',
     message: `Job cancelled. Reason: ${reason}`,
+  });
+
+  // Audit log: job cancellation
+  await supabase.from('audit_log').insert({
+    user_id:    userId,
+    action:     'CANCEL_JOB',
+    table_name: 'service_job',
+    record_id:  jobId,
+    old_values: { state: currentState },
+    new_values: { state: 'cancelled', reason },
   });
 
   revalidatePath(`/services/${jobId}`);

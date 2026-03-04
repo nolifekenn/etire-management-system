@@ -220,6 +220,24 @@ export async function createPOSSale(input: CreatePOSSaleInput) {
   const soldItemIds = lines.map(l => l.item_id).filter(Boolean) as string[];
   notifyLowStockItems(soldItemIds).catch(() => {});
 
+  // Audit trail
+  await supabase.from('audit_log').insert({
+    user_id:       user_id,
+    action:        'INSERT',
+    table_name:    'sale',
+    record_id:     saleId,
+    record_number: saleNumber ?? undefined,
+    new_values: {
+      sale_number:    saleNumber,
+      branch_id,
+      customer_id:    customer_id ?? null,
+      payment_method,
+      total_amount:   total,
+      lines_count:    lines.length,
+      source:         'pos',
+    },
+  });
+
   revalidatePath('/pos');
   revalidatePath('/sales');
   revalidatePath('/inventory');
@@ -275,6 +293,24 @@ export async function createQuotation(input: CreateQuotationInput) {
   }
 
   revalidatePath('/sales');
+
+  // Audit trail
+  await supabase.from('audit_log').insert({
+    user_id:       user_id,
+    action:        'INSERT',
+    table_name:    'sale',
+    record_id:     saleId,
+    record_number: saleNumber ?? undefined,
+    new_values: {
+      sale_number:  saleNumber,
+      branch_id,
+      customer_id:  customer_id ?? null,
+      total_amount: subtotal,
+      lines_count:  lines.length,
+      source:       'quotation',
+    },
+  });
+
   return { success: true, saleId, saleNumber };
 }
 
@@ -348,6 +384,16 @@ export async function confirmSaleOrder(saleId: string, userId: string) {
     .eq('sale_id', saleId);
 
   if (updErr) return { success: false, error: updErr.message };
+
+  // Audit trail
+  await supabase.from('audit_log').insert({
+    user_id:    userId,
+    action:     'STATE_TRANSITION',
+    table_name: 'sale',
+    record_id:  saleId,
+    old_values: { state: 'draft' },
+    new_values: { state: 'done' },
+  });
 
   revalidatePath('/sales');
   revalidatePath(`/sales/${saleId}`);
@@ -515,6 +561,16 @@ export async function voidSale(saleId: string, userId: string, reason: string) {
 
   if (error) return { success: false, error: error.message };
 
+  // Audit trail
+  await supabase.from('audit_log').insert({
+    user_id:    userId,
+    action:     'VOID',
+    table_name: 'sale',
+    record_id:  saleId,
+    old_values: { state: 'confirmed' },
+    new_values: { state: 'cancelled', reason },
+  });
+
   revalidatePath('/sales');
   return { success: true };
 }
@@ -554,6 +610,15 @@ export async function upsertSaleLines(
     .eq('sale_id', saleId);
 
   if (totalErr) return { success: false, error: totalErr.message };
+
+  // Audit trail
+  await supabase.from('audit_log').insert({
+    user_id:    null,
+    action:     'UPDATE_LINES',
+    table_name: 'sale',
+    record_id:  saleId,
+    new_values: { lines_count: lines.length, total_amount: subtotal },
+  });
 
   revalidatePath('/sales');
   revalidatePath(`/sales/${saleId}`);

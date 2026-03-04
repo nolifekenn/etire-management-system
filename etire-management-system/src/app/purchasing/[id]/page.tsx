@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { ChatterPanel } from "@/components/ChatterPanel";
+import { AuditTrailPanel } from "@/components/AuditTrailPanel";
 import { getPOWithDetails, transitionPO } from "@/lib/actions/purchasing";
 import { getPurchaseOrderSmartButtons } from "@/lib/smartButtons";
 import type { POState } from "@/lib/poUtils";
@@ -319,7 +319,7 @@ export default function POFormPage({ params }: { params: Promise<{ id: string }>
             {/* Chatter panel */}
             <div className="lg:col-span-1">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Activity</p>
-              <ChatterPanel relatedTable="purchase_order" relatedRecordId={poId} />
+              <AuditTrailPanel relatedTable="purchase_order" relatedRecordId={poId} />
             </div>
           </div>
         </div>

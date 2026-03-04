@@ -57,7 +57,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChatterPanel }      from "@/components/ChatterPanel";
+import { AuditTrailPanel }      from "@/components/AuditTrailPanel";
 import { AdjustmentDialog }  from "@/app/inventory/components/AdjustmentDialog";
 import { validateShortText, validateNumber, type FieldError } from "@/lib/validation";
 
@@ -906,7 +906,7 @@ export default function ProductFormPage() {
 
           {/* Chatter */}
           <div className="border-t border-border pt-4">
-            <ChatterPanel
+            <AuditTrailPanel
               relatedTable="inventory_item"
               relatedRecordId={itemId}
             />

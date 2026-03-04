@@ -1661,6 +1661,16 @@ export default function EnhancedCustomersPage() {
         is_internal: false,
       }]);
       if (error) throw error;
+      // Audit log
+      await supabase.from('audit_log').insert({
+        user_id: authUser.user_id,
+        action: 'INSERT',
+        table_name: 'chatter_messages',
+        record_id: null,
+        old_values: null,
+        new_values: { related_table: 'customer', related_record_id: selectedCrmCustomer.customer_id, type: 'note', message: newNoteText.trim() },
+        record_number: selectedCrmCustomer.name,
+      });
       setNewNoteText('');
       // Refresh chatter
       const { data: chatData } = await supabase
@@ -1707,6 +1717,16 @@ export default function EnhancedCustomersPage() {
         is_done: false,
       }]);
       if (error) throw error;
+      // Audit log
+      await supabase.from('audit_log').insert({
+        user_id: authUser.user_id,
+        action: 'INSERT',
+        table_name: 'record_activity',
+        record_id: null,
+        old_values: null,
+        new_values: { record_table: 'customer', record_id: selectedCrmCustomer.customer_id, activity_type: activityForm.activityType, summary: activityForm.summary, date_deadline: activityForm.dueDate },
+        record_number: selectedCrmCustomer.name,
+      });
       setIsAddActivityOpen(false);
       setActivityForm({ activityType: 'todo', summary: '', note: '', dueDate: '', assignedTo: '' });
       toast({ title: 'Follow-up scheduled' });
@@ -1721,6 +1741,15 @@ export default function EnhancedCustomersPage() {
   const handleMarkActivityDone = async (activityId: string) => {
     if (!supabase) return;
     await supabase.from('record_activity').update({ is_done: true, done_at: new Date().toISOString() }).eq('id', activityId);
+    await supabase.from('audit_log').insert({
+      user_id: authUser?.user_id,
+      action: 'UPDATE',
+      table_name: 'record_activity',
+      record_id: activityId,
+      old_values: { is_done: false },
+      new_values: { is_done: true, done_at: new Date().toISOString() },
+      record_number: null,
+    });
     fetchCRMData();
     toast({ title: 'Activity marked as done' });
   };
@@ -1988,11 +2017,35 @@ export default function EnhancedCustomersPage() {
         .update(customerData)
         .eq('customer_id', editingCustomer.customer_id);
       error = updateError;
+      if (!updateError && authUser) {
+        await supabase.from('audit_log').insert({
+          user_id: authUser.user_id,
+          action: 'UPDATE',
+          table_name: 'customer',
+          record_id: editingCustomer.customer_id,
+          old_values: { name: editingCustomer.name, phone: editingCustomer.phone },
+          new_values: customerData,
+          record_number: customerData.name,
+        });
+      }
     } else {
-      const { error: insertError } = await (supabase
+      const { data: insertedCustomer, error: insertError } = await (supabase
         .from('customer') as any)
-        .insert([customerData]);
+        .insert([customerData])
+        .select()
+        .single();
       error = insertError;
+      if (!insertError && insertedCustomer && authUser) {
+        await supabase.from('audit_log').insert({
+          user_id: authUser.user_id,
+          action: 'INSERT',
+          table_name: 'customer',
+          record_id: insertedCustomer.customer_id,
+          old_values: null,
+          new_values: customerData,
+          record_number: customerData.name,
+        });
+      }
     }
 
     setIsCustomerLoading(false);
@@ -2051,11 +2104,35 @@ export default function EnhancedCustomersPage() {
         .update(vehicleData)
         .eq('vehicle_id', editingVehicle.vehicle_id);
       error = updateError;
+      if (!updateError && authUser) {
+        await supabase.from('audit_log').insert({
+          user_id: authUser.user_id,
+          action: 'UPDATE',
+          table_name: 'vehicle',
+          record_id: editingVehicle.vehicle_id,
+          old_values: { customer_id: editingVehicle.customer_id, plate_number: editingVehicle.plate_number, make: editingVehicle.make, model: editingVehicle.model, color: editingVehicle.color, vehicle_type_id: editingVehicle.vehicle_type_id },
+          new_values: vehicleData,
+          record_number: vehicleData.plate_number,
+        });
+      }
     } else {
-      const { error: insertError } = await (supabase
+      const { data: insertedVehicle, error: insertError } = await (supabase
         .from('vehicle') as any)
-        .insert([vehicleData]);
+        .insert([vehicleData])
+        .select()
+        .single();
       error = insertError;
+      if (!insertError && insertedVehicle && authUser) {
+        await supabase.from('audit_log').insert({
+          user_id: authUser.user_id,
+          action: 'INSERT',
+          table_name: 'vehicle',
+          record_id: insertedVehicle.vehicle_id,
+          old_values: null,
+          new_values: vehicleData,
+          record_number: vehicleData.plate_number,
+        });
+      }
     }
 
     setIsVehicleLoading(false);
@@ -2183,6 +2260,18 @@ export default function EnhancedCustomersPage() {
         toast({ title: "Delete Error", description: `Could not delete ${deletingItem.type}: ${error.message}`, variant: "destructive" });
       }
     } else {
+      // Audit log for soft-delete
+      if (authUser && supabase) {
+        await supabase.from('audit_log').insert({
+          user_id: authUser.user_id,
+          action: 'DELETE',
+          table_name: tableName,
+          record_id: deletingItem[idField] as string,
+          old_values: { name: deletingItem.name ?? deletingItem.plate_number ?? null, ...deletingItem },
+          new_values: { deleted_at: new Date().toISOString() },
+          record_number: deletingItem.name ?? deletingItem.plate_number ?? null,
+        });
+      }
       // Show success animation for deletion
       setSuccessAnimation({
         isVisible: true,

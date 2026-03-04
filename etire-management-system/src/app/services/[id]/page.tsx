@@ -35,7 +35,7 @@ import {
 import { useToast }  from "@/hooks/use-toast";
 import { useAuth }   from "@/hooks/useAuth";
 import { validateShortText, validateLongText, type FieldError } from "@/lib/validation";
-import { ChatterPanel } from "@/components/ChatterPanel";
+import { AuditTrailPanel } from "@/components/AuditTrailPanel";
 import {
   ArrowLeft, Wrench, User, Car, Package, MessageSquare, History,
   ArrowLeftRight, Loader2, Plus, Trash2, Save, CheckCircle2,
@@ -1106,7 +1106,7 @@ export default function ServiceFormPage() {
 
         {/* Right: Chatter */}
         <div className="w-80 shrink-0 flex flex-col min-h-0">
-          <ChatterPanel
+          <AuditTrailPanel
             relatedTable="service_job"
             relatedRecordId={jobId}
             className="flex-1 min-h-0"

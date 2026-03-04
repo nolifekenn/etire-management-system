@@ -28,6 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from "@/hooks/use-toast";
 import { validateShortText, validatePhone, validateLongText, type FieldError } from '@/lib/validation';
+import { supabase } from '@/lib/supabaseClient';
 import {
   Loader2, PlusCircle, AlertTriangle, Building2, MapPin, Phone,
   RefreshCw, Clock, Edit, Trash2, Search, X, Eye, CheckCircle,
@@ -505,6 +506,21 @@ export default function EnhancedBranchesPage() {
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Could not save branch.');
 
+      // Audit log
+      if (authUser && supabase && payload.data) {
+        await supabase.from('audit_log').insert({
+          user_id: authUser.user_id,
+          action: editingBranch ? 'UPDATE' : 'INSERT',
+          table_name: 'branch',
+          record_id: payload.data.branch_id,
+          old_values: editingBranch
+            ? { name: editingBranch.name, address: editingBranch.address, phone: editingBranch.phone, is_active: editingBranch.is_active }
+            : null,
+          new_values: branchData,
+          record_number: payload.data.name,
+        });
+      }
+
       setSuccessAnimation({
         isVisible: true,
         title: editingBranch ? "Branch Updated!" : "Branch Created!",
@@ -538,6 +554,19 @@ export default function EnhancedBranchesPage() {
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Could not delete branch.');
+
+      // Audit log
+      if (authUser && supabase && deletingBranch) {
+        await supabase.from('audit_log').insert({
+          user_id: authUser.user_id,
+          action: 'DELETE',
+          table_name: 'branch',
+          record_id: deletingBranch.branch_id,
+          old_values: { name: deletingBranch.name, address: deletingBranch.address, phone: deletingBranch.phone, is_active: deletingBranch.is_active },
+          new_values: { deleted_at: new Date().toISOString() },
+          record_number: deletingBranch.name,
+        });
+      }
 
       setSuccessAnimation({
         isVisible: true,
