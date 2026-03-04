@@ -16,6 +16,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  // Redirect deferred until user state is populated by onAuthStateChange
+  const [pendingRedirect, setPendingRedirect] = useState(false);
 
   const { value: username, setValue: setUsername } = useFormFieldPersistence('login-form', 'username', '');
   const [password, setPassword] = useState('');
@@ -39,6 +41,23 @@ export default function LoginPage() {
     localStorage.removeItem('etire_saved_password');
   }, []);
 
+  // Fires once the auth state machinery has resolved the user profile after login.
+  // Using a flag instead of reading user?.role inline prevents the race condition
+  // where login() returns true but user is still null (onAuthStateChange is async).
+  useEffect(() => {
+    if (!pendingRedirect || !user) return;
+    setPendingRedirect(false);
+    const intended = sessionStorage.getItem('etire_intended_path');
+    if (intended && intended.startsWith('/') && !intended.startsWith('//')) {
+      sessionStorage.removeItem('etire_intended_path');
+      router.push(intended);
+    } else if (user.role === 'staff' || user.role === 'cashier') {
+      router.push('/pos');
+    } else {
+      router.push('/dashboard');
+    }
+  }, [pendingRedirect, user, router]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -61,20 +80,8 @@ export default function LoginPage() {
           title: 'Welcome back!',
           description: 'Login successful. Redirecting...',
         });
-
-        // Restore the intended path from sessionStorage if available
-        const intended = sessionStorage.getItem('etire_intended_path');
-        if (intended && intended.startsWith('/') && !intended.startsWith('//')) {
-          sessionStorage.removeItem('etire_intended_path');
-          router.push(intended);
-        } else {
-          const role = user?.role;
-          if (role === 'staff' || role === 'cashier') {
-            router.push('/pos');
-          } else {
-            router.push('/dashboard');
-          }
-        }
+        // Defer redirect until onAuthStateChange populates user state
+        setPendingRedirect(true);
       } else {
         toast({
           title: 'Login Failed',
