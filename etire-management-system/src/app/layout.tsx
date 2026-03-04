@@ -61,12 +61,26 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     if (!isHydrated || isLoading) return;
 
     if (!user && pathname !== '/login') {
+      // Save the current path in sessionStorage so we can return after login
+      if (typeof window !== 'undefined') {
+        const fullPath = pathname + window.location.search;
+        sessionStorage.setItem('etire_intended_path', fullPath);
+      }
       router.push('/login');
       return;
     }
 
     if (user && pathname === '/login') {
-      router.push('/dashboard');
+      // Restore the intended path if one was saved, otherwise role-based default
+      const intended = typeof window !== 'undefined'
+        ? sessionStorage.getItem('etire_intended_path')
+        : null;
+      if (intended && intended.startsWith('/') && !intended.startsWith('//')) {
+        sessionStorage.removeItem('etire_intended_path');
+        router.push(intended);
+      } else {
+        router.push('/dashboard');
+      }
     }
   }, [user, isLoading, pathname, router, isHydrated]);
 

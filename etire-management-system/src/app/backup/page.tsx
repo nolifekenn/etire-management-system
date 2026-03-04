@@ -168,7 +168,20 @@ export default function BackupPage() {
     setLoadingFiles(true);
     try {
       const res = await fetch("/api/backup/list");
-      if (res.ok) setBucketFiles((await res.json()).files ?? []);
+      if (res.ok) {
+        const files: BackupFile[] = (await res.json()).files ?? [];
+        setBucketFiles(files);
+        // Derive last backup time from the most recent file in the bucket
+        const mostRecent = files
+          .map(f => f.created_at ?? f.updated_at ?? null)
+          .filter(Boolean)
+          .sort()
+          .at(-1);
+        if (mostRecent) {
+          setLastBackup(mostRecent);
+          localStorage.setItem("etire_last_backup", mostRecent);
+        }
+      }
     } catch { /* silent */ }
     setLoadingFiles(false);
   }, []);

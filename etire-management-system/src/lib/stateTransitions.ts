@@ -197,7 +197,7 @@ export async function transitionServiceJob(
   return { success: true, newState: nextState, error: null };
 }
 
-// ── Internal: write a log entry to chatter_messages ───────────────────────
+// ── Internal: write a log entry to chatter_message ────────────────────────
 
 async function addChatterLog(params: {
   relatedTable:    string;
@@ -208,14 +208,14 @@ async function addChatterLog(params: {
   message:         string;
 }) {
   const supabase: AnyClient = await createClient();
-  await supabase.from('chatter_messages').insert({
-    related_table:     params.relatedTable,
-    related_record_id: params.relatedRecordId,
-    user_id:           params.userId,
-    type:              'log',
-    message:           params.message,
-    old_value:         params.oldValue,
-    new_value:         params.newValue,
-    is_internal:       true,
+  await supabase.from('chatter_message').insert({
+    record_table:  params.relatedTable,
+    record_id:     params.relatedRecordId,
+    author_id:     params.userId,
+    message_type:  'state_change',
+    body:          params.message,
+    old_state:     params.oldValue,
+    new_state:     params.newValue,
+    is_internal:   true,
   });
 }

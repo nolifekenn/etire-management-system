@@ -109,7 +109,9 @@ export default function PurchasingPage() {
 
   const draftCount    = orders.filter(o => ["draft","pending"].includes(String(o.state ?? o.status))).length;
   const purchaseCount = orders.filter(o => ["purchase","approved","ordered"].includes(String(o.state ?? o.status))).length;
-  const totalAmt      = orders.reduce((s, o) => s + Number(o.total_amount ?? 0), 0);
+  const totalAmt      = orders
+    .filter(o => !["cancelled", "canceled", "rejected"].includes(String(o.state ?? o.status)))
+    .reduce((s, o) => s + Number(o.total_amount ?? 0), 0);
 
   return (
     <div className="flex flex-col h-full">

@@ -99,11 +99,11 @@ export async function createRFQ(input: CreateRFQInput) {
   // Insert line items
   if (input.lines.length > 0) {
     const lineRows = input.lines.map((l) => ({
-      po_id:      po.po_id,
-      item_id:    l.item_id,
-      quantity:   l.quantity,
-      unit_cost:  l.unit_cost,
-      total_cost: l.quantity * l.unit_cost,
+      po_id:     po.po_id,
+      item_id:   l.item_id,
+      quantity:  l.quantity,
+      unit_cost: l.unit_cost,
+      // total_cost is a generated column — do not insert
     }));
 
     const { error: lineErr } = await supabase
@@ -118,13 +118,13 @@ export async function createRFQ(input: CreateRFQInput) {
   }
 
   // Log creation in chatter
-  await supabase.from('chatter_messages').insert({
-    related_table:     'purchase_order',
-    related_record_id: po.po_id,
-    user_id:           input.user_id,
-    type:              'log',
-    message:           `RFQ ${po.po_number} created.`,
-    is_internal:       true,
+  await supabase.from('chatter_message').insert({
+    record_table:  'purchase_order',
+    record_id:     po.po_id,
+    author_id:     input.user_id,
+    message_type:  'system',
+    body:          `RFQ ${po.po_number} created.`,
+    is_internal:   true,
   });
 
   revalidatePath('/purchasing');
@@ -204,11 +204,11 @@ export async function upsertPOLines(
 
   if (lines.length > 0) {
     const rows = lines.map((l) => ({
-      po_id:      poId,
-      item_id:    l.item_id,
-      quantity:   l.quantity,
-      unit_cost:  l.unit_cost,
-      total_cost: l.quantity * l.unit_cost,
+      po_id:     poId,
+      item_id:   l.item_id,
+      quantity:  l.quantity,
+      unit_cost: l.unit_cost,
+      // total_cost is a generated column — do not insert
     }));
 
     const { error } = await supabase.from('purchase_order_item').insert(rows);
@@ -276,30 +276,37 @@ export async function validateReceipt(input: ValidateReceiptInput) {
 
     if (moveErr) return { success: false, error: moveErr.message };
 
-    // 3. Update legacy stock_quantity on inventory_item
+    // 3. Update legacy stock_quantity on inventory_item directly
+    //    (fn_record_stock_move RPC does not exist — apply increment manually)
     for (const line of input.lines.filter((l) => l.quantity_received > 0)) {
-      await supabase.rpc('fn_record_stock_move', {
-        p_item_id:   line.item_id,
-        p_branch_id: input.branch_id,
-        p_doc_type:  'purchase',
-        p_doc_id:    input.po_id,
-        p_qty:       line.quantity_received,
-        p_unit_cost: line.unit_cost,
-        p_user_id:   input.user_id,
-        p_notes:     `Receipt validated`,
-      });
+      // Fetch current stock
+      const { data: item } = await supabase
+        .from('inventory_item')
+        .select('stock_quantity')
+        .eq('item_id', line.item_id)
+        .single();
+
+      const currentQty = Number(item?.stock_quantity ?? 0);
+      await supabase
+        .from('inventory_item')
+        .update({
+          stock_quantity: currentQty + line.quantity_received,
+          cost_price:     line.unit_cost > 0 ? line.unit_cost : undefined,
+          updated_at:     new Date().toISOString(),
+        })
+        .eq('item_id', line.item_id);
     }
   }
 
   // 4. Log to chatter
   const totalReceived = input.lines.reduce((s, l) => s + l.quantity_received, 0);
-  await supabase.from('chatter_messages').insert({
-    related_table:     'purchase_order',
-    related_record_id: input.po_id,
-    user_id:           input.user_id,
-    type:              'log',
-    message:           `Receipt validated: ${totalReceived} unit(s) received into stock.`,
-    is_internal:       true,
+  await supabase.from('chatter_message').insert({
+    record_table:  'purchase_order',
+    record_id:     input.po_id,
+    author_id:     input.user_id,
+    message_type:  'system',
+    body:          `Receipt validated: ${totalReceived} unit(s) received into stock.`,
+    is_internal:   true,
   });
 
   revalidatePath(`/purchasing/${input.po_id}`);

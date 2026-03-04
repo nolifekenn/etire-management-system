@@ -11,7 +11,7 @@
  * • "New" button opens CreateProductDialog
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Fragment } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
@@ -24,6 +24,11 @@ import {
   PackageX,
   Filter,
   FileText,
+  ChevronDown,
+  ChevronUp,
+  Package,
+  Tag,
+  Truck,
 } from "lucide-react";
 import { Button }  from "@/components/ui/button";
 import { Input }   from "@/components/ui/input";
@@ -73,7 +78,8 @@ export default function ProductListPage() {
   const [total, setTotal]           = useState(0);
   const [page, setPage]             = useState(1);
   const [loading, setLoading]       = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
+  const [showCreate,  setShowCreate]  = useState(false);
+  const [expandedId,  setExpandedId]  = useState<string | null>(null);
 
   // Filters
   const [search,   setSearch]   = useState("");
@@ -84,19 +90,15 @@ export default function ProductListPage() {
     setLoading(true);
     try {
       const res = await listProducts({
-        search:    search || undefined,
-        category:  category !== "all" ? category : undefined,
-        low_stock: filter === "low_stock",
-        page:      p,
-        page_size: PAGE_SIZE,
+        search:       search || undefined,
+        category:     category !== "all" ? category : undefined,
+        low_stock:    filter === "low_stock",
+        out_of_stock: filter === "out_of_stock",
+        page:         p,
+        page_size:    PAGE_SIZE,
       });
 
-      let rows = res.items as AnyRecord[];
-
-      // Client-side filter for out_of_stock (stock_quantity === 0)
-      if (filter === "out_of_stock") {
-        rows = rows.filter(i => Number(i.stock_quantity) === 0);
-      }
+      const rows = res.items as AnyRecord[];
 
       setItems(rows);
       setTotal(res.total);
@@ -139,16 +141,14 @@ export default function ProductListPage() {
     let allItems: AnyRecord[] = [];
     try {
       const res = await listProducts({
-        search:    search || undefined,
-        category:  category !== 'all' ? category : undefined,
-        low_stock: filter === 'low_stock',
-        page:      1,
-        page_size: 9999,
+        search:       search || undefined,
+        category:     category !== 'all' ? category : undefined,
+        low_stock:    filter === 'low_stock',
+        out_of_stock: filter === 'out_of_stock',
+        page:         1,
+        page_size:    9999,
       });
       allItems = res.items as AnyRecord[];
-      if (filter === 'out_of_stock') {
-        allItems = allItems.filter(i => Number(i.stock_quantity) === 0);
-      }
     } catch {
       toast({ title: "Failed to fetch products", variant: "destructive" });
       return;
@@ -401,40 +401,179 @@ export default function ProductListPage() {
               </tr>
             ) : (
               items.map(item => {
-                const brandName = (item.tire_brand as AnyRecord)?.name;
-                const sizeName  = (item.tire_size  as AnyRecord)?.label;
+                const itemId    = String(item.item_id);
+                const brandName = (item.tire_brand as AnyRecord)?.name as string | undefined;
+                const sizeName  = (item.tire_size  as AnyRecord)?.label as string | undefined;
                 const subtitle  = [brandName, sizeName].filter(Boolean).join(" · ");
+                const isExpanded = expandedId === itemId;
+                const branchName   = (item.branch   as AnyRecord)?.name as string | undefined;
+                const supplierName = (item.supplier as AnyRecord)?.name as string | undefined;
 
                 return (
-                  <tr
-                    key={String(item.item_id)}
-                    onClick={() => router.push(`/inventory/products/${item.item_id}`)}
-                    className="border-t border-border hover:bg-muted/40 cursor-pointer transition-colors"
-                  >
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-foreground">{String(item.name)}</p>
-                      {subtitle && (
-                        <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge className={`text-xs ${CATEGORY_COLORS[String(item.category)] ?? "bg-gray-100 text-gray-800"}`}>
-                        {String(item.category)}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {item.vehicle_type ? VEHICLE_LABELS[String(item.vehicle_type)] ?? String(item.vehicle_type) : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium">
-                      {fmt(item.sale_price)}
-                    </td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">
-                      {fmt(item.cost_price)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {stockBadge(item)}
-                    </td>
-                  </tr>
+                  <Fragment key={itemId}>
+                    {/* Main row */}
+                    <tr
+                      key={itemId}
+                      onClick={() => setExpandedId(prev => prev === itemId ? null : itemId)}
+                      className={`border-t border-border hover:bg-muted/40 cursor-pointer transition-colors ${isExpanded ? "bg-muted/30" : ""}`}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {isExpanded
+                            ? <ChevronUp   className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                          <div>
+                            <p className="font-medium text-foreground">{String(item.name)}</p>
+                            {subtitle && (
+                              <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge className={`text-xs ${CATEGORY_COLORS[String(item.category)] ?? "bg-gray-100 text-gray-800"}`}>
+                          {String(item.category)}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {item.vehicle_type ? VEHICLE_LABELS[String(item.vehicle_type)] ?? String(item.vehicle_type) : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium">
+                        {fmt(item.sale_price)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-muted-foreground">
+                        {fmt(item.cost_price)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {stockBadge(item)}
+                      </td>
+                    </tr>
+
+                    {/* Expanded detail row */}
+                    {isExpanded && (
+                      <tr key={`${itemId}-detail`} className="bg-muted/20 border-t border-dashed border-border">
+                        <td colSpan={6} className="px-6 py-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                            {/* Product info */}
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                                <Package className="h-3.5 w-3.5" /> Product Info
+                              </p>
+                              <div className="space-y-1">
+                                {!!(item.sku as string) && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">SKU</span>
+                                    <span className="font-mono font-medium">{item.sku as string}</span>
+                                  </div>
+                                )}
+                                {brandName && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Brand</span>
+                                    <span className="font-medium">{brandName}</span>
+                                  </div>
+                                )}
+                                {sizeName && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Size</span>
+                                    <span className="font-medium">{sizeName}</span>
+                                  </div>
+                                )}
+                                {(item.tire_pattern as string) && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Pattern</span>
+                                    <span>{item.tire_pattern as string}</span>
+                                  </div>
+                                )}
+                                {(item.ply_rating as string) && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Ply Rating</span>
+                                    <span>{item.ply_rating as string}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Pricing */}
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                                <Tag className="h-3.5 w-3.5" /> Pricing
+                              </p>
+                              <div className="space-y-1">
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Sale Price</span>
+                                  <span className="font-semibold text-foreground">{fmt(item.sale_price)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Cost Price</span>
+                                  <span>{fmt(item.cost_price)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Margin</span>
+                                  <span className={Number(item.sale_price) > Number(item.cost_price) ? "text-green-600 font-medium" : "text-red-500"}>
+                                    {fmt(Number(item.sale_price) - Number(item.cost_price))}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Stock */}
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                                <Package className="h-3.5 w-3.5" /> Stock
+                              </p>
+                              <div className="space-y-1">
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">On Hand</span>
+                                  <span className="font-semibold">{String(item.stock_quantity ?? 0)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Reorder Level</span>
+                                  <span>{String(item.reorder_level ?? 5)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Status</span>
+                                  {stockBadge(item)}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Logistics */}
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                                <Truck className="h-3.5 w-3.5" /> Logistics
+                              </p>
+                              <div className="space-y-1">
+                                {branchName && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Branch</span>
+                                    <span>{branchName}</span>
+                                  </div>
+                                )}
+                                {supplierName && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Supplier</span>
+                                    <span>{supplierName}</span>
+                                  </div>
+                                )}
+                                {(item.vehicle_type as string) && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Vehicle</span>
+                                    <span>{VEHICLE_LABELS[item.vehicle_type as string] ?? (item.vehicle_type as string)}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Category</span>
+                                  <Badge className={`text-xs ${CATEGORY_COLORS[String(item.category)] ?? "bg-gray-100 text-gray-800"}`}>
+                                    {String(item.category)}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })
             )}

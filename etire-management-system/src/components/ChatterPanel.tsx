@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { MessageSquare, Clock, Plus, CheckCircle2, Loader2 } from "lucide-react";
+import { MessageSquare, Plus, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,9 +46,10 @@ function formatRelativeTime(isoString: string): string {
 // ── Type badge colours ─────────────────────────────────────────────────────
 
 const TYPE_BADGE: Record<string, { label: string; class: string }> = {
-  note:     { label: "Note",     class: "bg-blue-100 text-blue-700" },
-  log:      { label: "Log",      class: "bg-gray-100 text-gray-600" },
-  activity: { label: "Activity", class: "bg-amber-100 text-amber-700" },
+  comment:       { label: "Note",         class: "bg-blue-100 text-blue-700" },
+  state_change:  { label: "State Change", class: "bg-gray-100 text-gray-600" },
+  system:        { label: "System",       class: "bg-gray-100 text-gray-500" },
+  activity_done: { label: "Activity",     class: "bg-amber-100 text-amber-700" },
 };
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -107,12 +108,6 @@ export function ChatterPanel({ relatedTable, relatedRecordId, className }: Chatt
     } finally {
       setSubmitting(false);
     }
-  };
-
-  // Mark activity done
-  const handleMarkDone = async (messageId: string) => {
-    await fetch(`/api/chatter?id=${messageId}`, { method: "PATCH" });
-    await fetchMessages();
   };
 
   return (
@@ -194,15 +189,15 @@ export function ChatterPanel({ relatedTable, relatedRecordId, className }: Chatt
       ) : (
         <div className="space-y-3">
           {messages.map((msg) => {
-            const badge = TYPE_BADGE[msg.type] ?? TYPE_BADGE.note;
-            const isLog = msg.type === "log";
+            const badge = TYPE_BADGE[msg.message_type] ?? TYPE_BADGE.comment;
+            const isSystemLog = msg.message_type === "state_change" || msg.message_type === "system";
 
             return (
               <div
-                key={msg.message_id}
+                key={msg.id}
                 className={cn(
                   "flex gap-3 rounded-lg p-3 text-sm",
-                  isLog ? "bg-gray-50 border border-dashed border-border" : "bg-white border border-border"
+                  isSystemLog ? "bg-gray-50 border border-dashed border-border" : "bg-white border border-border"
                 )}
               >
                 {/* Avatar */}
@@ -237,41 +232,16 @@ export function ChatterPanel({ relatedTable, relatedRecordId, className }: Chatt
                   </div>
 
                   {/* State change diff */}
-                  {msg.type === "log" && msg.old_value && msg.new_value ? (
+                  {msg.message_type === "state_change" && msg.old_state && msg.new_state ? (
                     <p className="text-xs text-muted-foreground">
-                      <span className="line-through text-red-500">{msg.old_value}</span>
+                      <span className="line-through text-red-500">{msg.old_state}</span>
                       {" → "}
-                      <span className="text-green-600 font-medium">{msg.new_value}</span>
+                      <span className="text-green-600 font-medium">{msg.new_state}</span>
                     </p>
                   ) : (
                     <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
-                      {msg.message}
+                      {msg.body}
                     </p>
-                  )}
-
-                  {/* Activity details */}
-                  {msg.type === "activity" && (
-                    <div className="flex items-center gap-2 pt-1">
-                      <Clock className="h-3 w-3 text-amber-500 shrink-0" />
-                      <span className="text-[10px] text-muted-foreground">
-                        Due: {msg.activity_due_date}
-                      </span>
-                      {!msg.activity_done && (
-                        <button
-                          onClick={() => handleMarkDone(msg.message_id)}
-                          className="ml-auto flex items-center gap-1 text-[10px] text-green-600 hover:text-green-800 transition-colors"
-                        >
-                          <CheckCircle2 className="h-3 w-3" />
-                          Mark Done
-                        </button>
-                      )}
-                      {msg.activity_done && (
-                        <span className="ml-auto text-[10px] text-green-600 flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3" />
-                          Done
-                        </span>
-                      )}
-                    </div>
                   )}
                 </div>
               </div>

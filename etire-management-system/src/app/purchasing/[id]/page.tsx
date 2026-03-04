@@ -124,14 +124,18 @@ export default function POFormPage({ params }: { params: Promise<{ id: string }>
   const loadPO = useCallback(async () => {
     setLoading(true);
     try {
-      const [poData, btns] = await Promise.all([
+      const [poResult, btns] = await Promise.all([
         getPOWithDetails(poId),
         getPurchaseOrderSmartButtons(poId),
       ]);
-      setPO(poData as AnyRecord);
+      if (poResult.error || !poResult.data) {
+        toast({ title: "Error", description: poResult.error ?? "PO not found.", variant: "destructive" });
+        setPO(null);
+      } else {
+        setPO(poResult.data as AnyRecord);
+      }
       setSmartBtns(btns);
     } catch {
-
       toast({ title: "Error", description: "Failed to load purchase order.", variant: "destructive" });
     } finally {
       setLoading(false);
@@ -217,12 +221,32 @@ export default function POFormPage({ params }: { params: Promise<{ id: string }>
 
           {/* ── Status bar ─────────────────────────────────────────────── */}
           <div className="bg-white rounded-lg border border-border p-4 space-y-3">
-            <StatusBar
-              current={currentState}
-              allowedNext={allowedNext}
-              onTransition={handleTransition}
-              transitioning={transitioning}
-            />
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <StatusBar
+                current={currentState}
+                allowedNext={allowedNext}
+                onTransition={handleTransition}
+                transitioning={transitioning}
+              />
+
+              {/* Cancel / Retract button — only visible when cancellation is allowed */}
+              {allowedNext.includes("cancelled" as POState) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 shrink-0"
+                  disabled={transitioning}
+                  onClick={() => {
+                    if (window.confirm(`Cancel ${String(po.po_number ?? "this PO")}? This cannot be undone.`)) {
+                      handleTransition("cancelled" as POState);
+                    }
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                  Cancel RFQ
+                </Button>
+              )}
+            </div>
 
             {/* PO headline */}
             <div className="flex items-start justify-between gap-4">

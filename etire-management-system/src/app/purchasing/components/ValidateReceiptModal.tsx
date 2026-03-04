@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2, Truck } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -27,8 +27,8 @@ interface ValidateReceiptModalProps {
 
 interface LineInput {
   delivery_item_id: string;
+  item_id: string;
   item_name: string;
-  po_item_id: string;
   quantity_ordered: number;
   quantity_received: number;
   quantity_damaged: number;
@@ -43,22 +43,64 @@ export function ValidateReceiptModal({
   const [saving,    setSaving]    = useState(false);
   const [receiptNotes, setReceiptNotes] = useState("");
 
-  // Build line inputs from the first pending delivery
-  const pendingDelivery = deliveries.find((d) => d.status !== "done") ?? deliveries[0];
+  // Build line inputs from the first delivery (newest first) or fall back to PO lines
+  const pendingDelivery = deliveries[0] ?? null;
   const deliveryId      = pendingDelivery ? String(pendingDelivery.delivery_id) : "";
 
-  const rawItems = (pendingDelivery?.items ?? (po.lines ?? [])) as AnyRecord[];
+  // Reinitialize line inputs whenever the modal opens or delivery data changes
+  const [lineInputs, setLineInputs] = useState<LineInput[]>([]);
 
-  const [lineInputs, setLineInputs] = useState<LineInput[]>(() =>
-    rawItems.map((item) => ({
-      delivery_item_id: String(item.delivery_item_id ?? item.po_item_id ?? ""),
-      item_name:        String((item.item as AnyRecord | null)?.name ?? item.name ?? "Unknown"),
-      po_item_id:       String(item.po_item_id ?? ""),
-      quantity_ordered: Number(item.quantity ?? item.quantity_ordered ?? 0),
-      quantity_received: Number(item.quantity ?? item.quantity_ordered ?? 0),
-      quantity_damaged:  0,
-    }))
-  );
+  useEffect(() => {
+    if (!open) return;
+
+    // Build a lookup map of PO lines: item_id → quantity ordered
+    const poLines = (po.lines ?? []) as AnyRecord[];
+    const quantityByItemId: Record<string, number> = {};
+    for (const l of poLines) {
+      const id = String((l.item as AnyRecord | null)?.item_id ?? l.item_id ?? "");
+      if (id) quantityByItemId[id] = Number(l.quantity ?? 0);
+    }
+
+    // Use delivery items if available; fall back to PO lines
+    const deliveryItems = (pendingDelivery?.items ?? []) as AnyRecord[];
+
+    if (deliveryItems.length > 0) {
+      setLineInputs(
+        deliveryItems.map((di) => {
+          const itemObj   = di.item as AnyRecord | null;
+          const itemId    = String(itemObj?.item_id ?? di.item_id ?? "");
+          const itemName  = String(itemObj?.name ?? di.item_name ?? "Unknown");
+          const ordered   = quantityByItemId[itemId] ?? Number(di.quantity_received ?? 0);
+          return {
+            delivery_item_id: String(di.delivery_item_id ?? ""),
+            item_id:          itemId,
+            item_name:        itemName,
+            quantity_ordered:  ordered,
+            quantity_received: ordered,   // default to full quantity
+            quantity_damaged:  0,
+          };
+        })
+      );
+    } else {
+      // No delivery items yet — derive from PO lines directly
+      setLineInputs(
+        poLines.map((l) => {
+          const itemObj  = l.item as AnyRecord | null;
+          const itemId   = String(itemObj?.item_id ?? l.item_id ?? "");
+          const itemName = String(itemObj?.name ?? l.item_name ?? "Unknown");
+          const ordered  = Number(l.quantity ?? 0);
+          return {
+            delivery_item_id: "",
+            item_id:          itemId,
+            item_name:        itemName,
+            quantity_ordered:  ordered,
+            quantity_received: ordered,
+            quantity_damaged:  0,
+          };
+        })
+      );
+    }
+  }, [open, deliveries, po]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function setLineField<K extends "quantity_received" | "quantity_damaged">(
     idx: number, key: K, val: number
@@ -75,16 +117,24 @@ export function ValidateReceiptModal({
     }
     setSaving(true);
     try {
+      // Build unit_cost lookup from PO lines
+      const poLines = (po.lines ?? []) as AnyRecord[];
+      const costByItemId: Record<string, number> = {};
+      for (const l of poLines) {
+        const id = String((l.item as AnyRecord | null)?.item_id ?? l.item_id ?? "");
+        if (id) costByItemId[id] = Number(l.unit_cost ?? 0);
+      }
+
       const result = await validateReceipt({
         po_id:       String(po.po_id),
         delivery_id: deliveryId,
         user_id:     userId,
         branch_id:   String(po.branch_id ?? ""),
-        lines:      lineInputs.map((l) => ({
-          item_id:           String((rawItems.find((ri) => ri.po_item_id === l.po_item_id) as AnyRecord)?.item_id ?? ""),
+        lines:       lineInputs.map((l) => ({
+          item_id:           l.item_id,
           quantity_received: l.quantity_received,
           quantity_damaged:  l.quantity_damaged,
-          unit_cost:         0,
+          unit_cost:         costByItemId[l.item_id] ?? 0,
         })),
       });
 

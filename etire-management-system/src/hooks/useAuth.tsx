@@ -141,10 +141,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const initializeAuth = async () => {
       try {
-        // getUser() always validates against the Supabase Auth server — no stale cache risk
+        // Check for a local session first — avoids AuthSessionMissingError spam when
+        // getUser() is called with no cookies (Supabase internally logs the error before
+        // returning it to our code). getSession() never throws when no session exists.
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session) {
+          // No session at all — no need to hit the server
+          if (mounted) {
+            setUser(null);
+            setIsLoading(false);
+            hasInitialized = true;
+            if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
+          }
+          return;
+        }
+
+        // Session exists locally — validate it server-side with getUser()
         const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
 
-        if (userError) console.error("[useAuth] getUser error:", userError);
+        if (userError) {
+          // auth_session_missing is expected when no user is logged in — not a real error
+          const code = (userError as { code?: string }).code;
+          if (code !== 'auth_session_missing') {
+            console.error("[useAuth] getUser error:", userError);
+          }
+        }
 
         if (authUser) {
           // user is verified by the server — load their profile

@@ -62,12 +62,18 @@ export default function LoginPage() {
           description: 'Login successful. Redirecting...',
         });
 
-        // Redirect based on role
-        const role = user?.role;
-        if (role === 'staff' || role === 'cashier') {
-          router.push('/pos');
+        // Restore the intended path from sessionStorage if available
+        const intended = sessionStorage.getItem('etire_intended_path');
+        if (intended && intended.startsWith('/') && !intended.startsWith('//')) {
+          sessionStorage.removeItem('etire_intended_path');
+          router.push(intended);
         } else {
-          router.push('/dashboard');
+          const role = user?.role;
+          if (role === 'staff' || role === 'cashier') {
+            router.push('/pos');
+          } else {
+            router.push('/dashboard');
+          }
         }
       } else {
         toast({

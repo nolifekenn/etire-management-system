@@ -85,7 +85,7 @@ export default function InventoryPage() {
       icon:        PackageCheck,
       href:        "/inventory/receipts",
       count:       counts.receipts,
-      countLabel:  "Transactions",
+      countLabel:  counts.receipts === 1 ? "Sale" : "Sales",
       urgent:      false,
       color:       "text-blue-700",
       bg:          "bg-blue-50 border-blue-200",

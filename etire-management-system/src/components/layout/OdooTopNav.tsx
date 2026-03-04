@@ -8,7 +8,6 @@ import {
   ChevronDown,
   LogOut,
   Settings,
-  User as UserIcon,
   Shield,
   CheckCheck,
   AlertTriangle,
@@ -597,25 +596,25 @@ export function OdooTopNav({ onMenuToggle }: { onMenuToggle?: () => void }) {
 
               {/* Menu items */}
               <div className="py-1">
-                <Link
-                  href="/settings"
-                  onClick={() => setUserMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
-                >
-                  <UserIcon className="h-4 w-4 text-muted-foreground" />
-                  Preferences
-                </Link>
-
-                {user?.role && ["super_admin", "branch_manager"].includes(user.role) && (
-                  <Link
-                    href="/settings"
-                    onClick={() => setUserMenuOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
-                  >
-                    <Settings className="h-4 w-4 text-muted-foreground" />
-                    Settings
-                  </Link>
-                )}
+                {/* User details */}
+                <div className="px-3 py-2 space-y-1.5">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">Role</span>
+                    <span className="font-medium text-foreground capitalize">
+                      {user?.role ? ROLE_NAMES[user.role as keyof typeof ROLE_NAMES] : "—"}
+                    </span>
+                  </div>
+                  {user?.branch_id && (
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-muted-foreground">Branch&nbsp;ID</span>
+                      <span className="font-mono text-foreground">{user.branch_id.slice(0, 8)}…</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground">User&nbsp;ID</span>
+                    <span className="font-mono text-foreground">{(user?.user_id ?? "").slice(0, 8)}…</span>
+                  </div>
+                </div>
 
                 <div className="border-t border-border my-1" />
 

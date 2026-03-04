@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { useToast }  from "@/hooks/use-toast";
 import { useAuth }   from "@/hooks/useAuth";
 import { supabase }  from "@/lib/supabaseClient";
@@ -40,7 +40,7 @@ type AnyRecord = Record<string, unknown>;
 
 export function CreateProductDialog({ open, onOpenChange, onCreated }: Props) {
   const { toast } = useToast();
-  const { user, activeBranchId } = useAuth();
+  const { activeBranchId } = useAuth();
 
   const [submitting, setSubmitting] = useState(false);
   const [branches,   setBranches]   = useState<AnyRecord[]>([]);
@@ -63,14 +63,58 @@ export function CreateProductDialog({ open, onOpenChange, onCreated }: Props) {
   const [supplierId,  setSupplierId] = useState<string>("none");
   const [branchId,    setBranchId]   = useState<string>("");
 
-  // Reset validation when dialog opens/closes
+  // Tire-specific state
+  const [tireBrands,    setTireBrands]    = useState<{ id: string; label: string }[]>([]);
+  const [tireSizes,     setTireSizes]     = useState<{ id: string; label: string }[]>([]);
+  const [brandId,       setBrandId]       = useState<string>("none");
+  const [sizeId,        setSizeId]        = useState<string>("none");
+  const [tirePattern,   setTirePattern]   = useState<string>("");
+  const [plyRating,     setPlyRating]     = useState<string>("");
+  const [addingBrand,   setAddingBrand]   = useState(false);
+  const [addingSize,    setAddingSize]    = useState(false);
+  const [newBrandValue, setNewBrandValue] = useState("");
+  const [newSizeValue,  setNewSizeValue]  = useState("");
+
+  const isTire = category === "tire";
+
+  // ── Auto-fill product name from brand + pattern + size ────────────────
+  const [nameManuallyEdited, setNameManuallyEdited] = useState(false);
+
+  // Build auto name from currently selected tire fields
+  const buildAutoName = (
+    bId: string,
+    sId: string,
+    pattern: string,
+    brands: { id: string; label: string }[],
+    sizes:  { id: string; label: string }[]
+  ): string => {
+    const brandLabel = bId !== "none" ? brands.find(b => b.id === bId)?.label : "";
+    const sizeLabel  = sId !== "none" ? sizes.find(s => s.id === sId)?.label  : "";
+    const parts = [brandLabel, pattern.trim(), sizeLabel].filter(Boolean);
+    return parts.join(" ");
+  };
+
+  // Auto-update name whenever tire fields change (if user hasn't typed manually)
+  useEffect(() => {
+    if (!isTire || nameManuallyEdited) return;
+    const autoName = buildAutoName(brandId, sizeId, tirePattern, tireBrands, tireSizes);
+    if (autoName) setName(autoName);
+  }, [brandId, sizeId, tirePattern, tireBrands, tireSizes, isTire, nameManuallyEdited]);
+
+  // Reset all state when dialog closes
   useEffect(() => {
     if (!open) {
+      setName("");
       setNameError(null);
       setNameTouched(false);
+      setNameManuallyEdited(false);
       setSalePriceError(null);
       setCostPriceError(null);
       setReorderError(null);
+      setBrandId("none"); setSizeId("none");
+      setTirePattern(""); setPlyRating("");
+      setAddingBrand(false); setAddingSize(false);
+      setNewBrandValue(""); setNewSizeValue("");
     }
   }, [open]);
 
@@ -85,10 +129,56 @@ export function CreateProductDialog({ open, onOpenChange, onCreated }: Props) {
       setSuppliers((s ?? []) as AnyRecord[]);
       setBranchId(activeBranchId ?? (b?.[0] as AnyRecord | undefined)?.branch_id as string ?? "");
     })();
+
+    // Fetch tire brand & size lookups
+    fetch("/api/lookups/tire")
+      .then(r => r.ok ? r.json() : null)
+      .then(json => {
+        if (!json) return;
+        setTireBrands((json.brands ?? []).map((b: { brand_id: string; name: string }) => ({
+          id: b.brand_id, label: b.name,
+        })));
+        setTireSizes((json.sizes ?? []).map((s: { size_id: string; label: string }) => ({
+          id: s.size_id, label: s.label,
+        })));
+      })
+      .catch(() => {/* silently skip */});
   }, [open, activeBranchId]);
+
+  /** Inline-create a new brand or size via POST /api/lookups/tire */
+  const handleAddLookup = async (type: "brand" | "size") => {
+    const value = (type === "brand" ? newBrandValue : newSizeValue).trim();
+    if (!value) return;
+    try {
+      const res = await fetch("/api/lookups/tire", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, value }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast({ title: `Failed to add ${type}`, description: json.error, variant: "destructive" });
+        return;
+      }
+      if (type === "brand") {
+        const entry = { id: json.brand_id, label: json.name };
+        setTireBrands(prev => [...prev, entry].sort((a, b) => a.label.localeCompare(b.label)));
+        setBrandId(json.brand_id);
+        setNewBrandValue(""); setAddingBrand(false);
+      } else {
+        const entry = { id: json.size_id, label: json.label };
+        setTireSizes(prev => [...prev, entry].sort((a, b) => a.label.localeCompare(b.label)));
+        setSizeId(json.size_id);
+        setNewSizeValue(""); setAddingSize(false);
+      }
+    } catch {
+      toast({ title: "Network error", variant: "destructive" });
+    }
+  };
 
   const handleNameChange = (value: string) => {
     setName(value);
+    setNameManuallyEdited(true); // user is overriding auto-fill
     if (nameTouched) {
       setNameError(validateShortText(value, { label: "Product name", minLength: 2, maxLength: 150 }));
     }
@@ -126,6 +216,11 @@ export function CreateProductDialog({ open, onOpenChange, onCreated }: Props) {
         sale_price:   Number(salePrice)   || 0,
         cost_price:   Number(costPrice)   || 0,
         reorder_level:Number(reorderLevel)|| 5,
+        // Tire-specific fields (only included when category = 'tire')
+        ...(isTire && brandId    !== "none" && { brand_id:     brandId }),
+        ...(isTire && sizeId     !== "none" && { size_id:      sizeId }),
+        ...(isTire && tirePattern.trim()    && { tire_pattern: tirePattern.trim() }),
+        ...(isTire && plyRating             && { ply_rating:   Number(plyRating) }),
       });
 
       if (!result.success) throw new Error(result.error);
@@ -145,7 +240,7 @@ export function CreateProductDialog({ open, onOpenChange, onCreated }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>New Product</DialogTitle>
         </DialogHeader>
@@ -203,6 +298,127 @@ export function CreateProductDialog({ open, onOpenChange, onCreated }: Props) {
               </SelectContent>
             </Select>
           </div>
+
+          {/* ── Tire-specific fields (shown only when category = tire) ────── */}
+          {isTire && (
+            <>
+              {/* Brand */}
+              <div className="space-y-1">
+                <Label>Brand</Label>
+                {addingBrand ? (
+                  <div className="flex gap-1">
+                    <Input
+                      autoFocus
+                      placeholder="e.g. Bridgestone"
+                      value={newBrandValue}
+                      onChange={e => setNewBrandValue(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") handleAddLookup("brand");
+                        if (e.key === "Escape") { setAddingBrand(false); setNewBrandValue(""); }
+                      }}
+                      className="h-9 text-sm"
+                    />
+                    <Button size="sm" variant="outline" className="h-9 px-2" onClick={() => handleAddLookup("brand")}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-9 px-2 text-xs" onClick={() => { setAddingBrand(false); setNewBrandValue(""); }}>
+                      ✕
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-1">
+                    <Select value={brandId} onValueChange={setBrandId}>
+                      <SelectTrigger className="flex-1 h-9 text-sm"><SelectValue placeholder="Select brand" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— None —</SelectItem>
+                        {tireBrands.map(b => (
+                          <SelectItem key={b.id} value={b.id}>{b.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" variant="outline" className="h-9 px-2 shrink-0" title="Add new brand" onClick={() => setAddingBrand(true)}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Size */}
+              <div className="space-y-1">
+                <Label>Size</Label>
+                {addingSize ? (
+                  <div className="flex gap-1">
+                    <Input
+                      autoFocus
+                      placeholder="e.g. 185/65R15"
+                      value={newSizeValue}
+                      onChange={e => setNewSizeValue(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") handleAddLookup("size");
+                        if (e.key === "Escape") { setAddingSize(false); setNewSizeValue(""); }
+                      }}
+                      className="h-9 text-sm"
+                    />
+                    <Button size="sm" variant="outline" className="h-9 px-2" onClick={() => handleAddLookup("size")}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-9 px-2 text-xs" onClick={() => { setAddingSize(false); setNewSizeValue(""); }}>
+                      ✕
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-1">
+                    <Select value={sizeId} onValueChange={setSizeId}>
+                      <SelectTrigger className="flex-1 h-9 text-sm"><SelectValue placeholder="Select size" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— None —</SelectItem>
+                        {tireSizes.map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" variant="outline" className="h-9 px-2 shrink-0" title="Add new size" onClick={() => setAddingSize(true)}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Tire Pattern */}
+              <div className="space-y-1">
+                <Label htmlFor="cp-pattern">
+                  Tire Pattern{" "}
+                  <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                </Label>
+                <Input
+                  id="cp-pattern"
+                  value={tirePattern}
+                  onChange={e => setTirePattern(e.target.value)}
+                  placeholder="e.g. Ecopia, Dueler, HT"
+                  maxLength={80}
+                />
+              </div>
+
+              {/* Ply Rating */}
+              <div className="space-y-1">
+                <Label htmlFor="cp-ply">
+                  Ply Rating{" "}
+                  <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                </Label>
+                <Input
+                  id="cp-ply"
+                  type="number"
+                  min="1"
+                  max="30"
+                  step="1"
+                  value={plyRating}
+                  onChange={e => setPlyRating(e.target.value)}
+                  placeholder="e.g. 4, 6, 8, 10"
+                />
+              </div>
+            </>
+          )}
+          {/* ── / Tire-specific fields ──────────────────────────────────────── */}
 
           {/* Sale Price */}
           <div className="space-y-1">

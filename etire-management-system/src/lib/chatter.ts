@@ -2,12 +2,21 @@
  * chatter.ts
  * ----------
  * Universal chatter/message system API.
- * Works with the `chatter_messages` table from phase1_corrective.sql.
+ * Works with the `chatter_message` table (phase1_foundation.sql).
  *
- * Features:
- *  - Add notes, log entries, and activities to any record
- *  - Fetch chatter history with author info
- *  - Mark activities as done
+ * Table: chatter_message
+ *   id            uuid  PK
+ *   record_table  text  (e.g. 'purchase_order')
+ *   record_id     uuid
+ *   author_id     uuid  → user(user_id)
+ *   message_type  chatter_message_type ('comment','state_change','system','activity_done')
+ *   subject       text
+ *   body          text  NOT NULL
+ *   old_state     text
+ *   new_state     text
+ *   attachments   jsonb  DEFAULT '[]'
+ *   is_internal   boolean DEFAULT false
+ *   created_at    timestamptz
  */
 
 import { createClient } from '@/lib/supabaseServer';
@@ -18,27 +27,24 @@ type AnyClient = any;
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-export type ChatterMessageType = 'note' | 'log' | 'activity';
-export type ActivityType = 'call' | 'email' | 'meeting' | 'todo';
+export type ChatterMessageType = 'comment' | 'state_change' | 'system' | 'activity_done';
 
 export interface ChatterMessage {
-  message_id:        string;
-  related_table:     string;
-  related_record_id: string;
-  user_id:           string | null;
-  type:              ChatterMessageType;
-  message:           string;
-  old_value:         string | null;
-  new_value:         string | null;
-  is_internal:       boolean;
-  activity_type:     ActivityType | null;
-  activity_due_date: string | null;
-  activity_done:     boolean;
-  attachments:       AttachmentMeta[];
-  created_at:        string;
+  id:            string;
+  record_table:  string;
+  record_id:     string;
+  author_id:     string | null;
+  message_type:  ChatterMessageType;
+  subject:       string | null;
+  body:          string;
+  old_state:     string | null;
+  new_state:     string | null;
+  is_internal:   boolean;
+  attachments:   AttachmentMeta[];
+  created_at:    string;
   // Joined fields
-  author_name?:      string;
-  author_username?:  string;
+  author_name?:  string;
+  author_username?: string;
 }
 
 export interface AttachmentMeta {
@@ -60,73 +66,86 @@ export interface AddActivityParams {
   relatedTable:    string;
   relatedRecordId: string;
   userId:          string;
-  activityType:    ActivityType;
+  activityType:    string;
   message:         string;
   dueDate:         string;   // ISO date string YYYY-MM-DD
 }
 
-// ── Add a note ─────────────────────────────────────────────────────────────
+// ── Add a note (comment) ───────────────────────────────────────────────────
 
-export async function addNote(params: AddNoteParams): Promise<{ id: string | null; error: string | null }> {
+export async function addNote(
+  params: AddNoteParams
+): Promise<{ id: string | null; error: string | null }> {
   const supabase: AnyClient = await createClient();
 
   const { data, error } = await supabase
-    .from('chatter_messages')
+    .from('chatter_message')
     .insert({
-      related_table:     params.relatedTable,
-      related_record_id: params.relatedRecordId,
-      user_id:           params.userId,
-      type:              'note',
-      message:           params.message,
-      is_internal:       params.isInternal ?? true,
-      attachments:       params.attachments ?? [],
+      record_table:  params.relatedTable,
+      record_id:     params.relatedRecordId,
+      author_id:     params.userId,
+      message_type:  'comment',
+      body:          params.message,
+      is_internal:   params.isInternal ?? true,
+      attachments:   params.attachments ?? [],
     })
-    .select('message_id')
+    .select('id')
     .single();
 
   if (error) return { id: null, error: error.message };
-  return { id: data.message_id, error: null };
+  return { id: data.id, error: null };
 }
 
-// ── Schedule an activity ───────────────────────────────────────────────────
+// ── Schedule an activity (logs to record_activity table) ───────────────────
 
 export async function scheduleActivity(
   params: AddActivityParams
 ): Promise<{ id: string | null; error: string | null }> {
   const supabase: AnyClient = await createClient();
 
+  // Insert into record_activity (separate table from chatter_message)
   const { data, error } = await supabase
-    .from('chatter_messages')
+    .from('record_activity')
     .insert({
-      related_table:     params.relatedTable,
-      related_record_id: params.relatedRecordId,
-      user_id:           params.userId,
-      type:              'activity',
-      message:           params.message,
-      activity_type:     params.activityType,
-      activity_due_date: params.dueDate,
-      activity_done:     false,
-      is_internal:       true,
+      record_table:  params.relatedTable,
+      record_id:     params.relatedRecordId,
+      created_by:    params.userId,
+      assigned_to:   params.userId,
+      activity_type: params.activityType,
+      summary:       params.message,
+      date_deadline: params.dueDate,
+      is_done:       false,
     })
-    .select('message_id')
+    .select('id')
     .single();
 
   if (error) return { id: null, error: error.message };
-  return { id: data.message_id, error: null };
+
+  // Also log a comment to chatter
+  await supabase.from('chatter_message').insert({
+    record_table:  params.relatedTable,
+    record_id:     params.relatedRecordId,
+    author_id:     params.userId,
+    message_type:  'comment',
+    body:          `Scheduled activity (${params.activityType}): ${params.message} — due ${params.dueDate}`,
+    is_internal:   true,
+    attachments:   [],
+  });
+
+  return { id: data.id, error: null };
 }
 
 // ── Mark activity as done ──────────────────────────────────────────────────
 
 export async function markActivityDone(
-  messageId: string
+  activityId: string
 ): Promise<{ error: string | null }> {
   const supabase: AnyClient = await createClient();
 
   const { error } = await supabase
-    .from('chatter_messages')
-    .update({ activity_done: true })
-    .eq('message_id', messageId)
-    .eq('type', 'activity');
+    .from('record_activity')
+    .update({ is_done: true, done_at: new Date().toISOString() })
+    .eq('id', activityId);
 
   return { error: error?.message ?? null };
 }
@@ -141,29 +160,27 @@ export async function getChatter(
   const supabase: AnyClient = await createClient();
 
   const { data, error } = await supabase
-    .from('chatter_messages')
+    .from('chatter_message')
     .select(`
-      message_id,
-      related_table,
-      related_record_id,
-      user_id,
-      type,
-      message,
-      old_value,
-      new_value,
+      id,
+      record_table,
+      record_id,
+      author_id,
+      message_type,
+      subject,
+      body,
+      old_state,
+      new_state,
       is_internal,
-      activity_type,
-      activity_due_date,
-      activity_done,
       attachments,
       created_at,
-      user:user_id (
+      author:author_id (
         name,
         username
       )
     `)
-    .eq('related_table', relatedTable)
-    .eq('related_record_id', relatedRecordId)
+    .eq('record_table', relatedTable)
+    .eq('record_id',    relatedRecordId)
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -172,15 +189,15 @@ export async function getChatter(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const messages = (data ?? []).map((row: any) => ({
     ...row,
-    author_name:     row.user?.name ?? null,
-    author_username: row.user?.username ?? null,
-    user:            undefined,
+    author_name:     row.author?.name ?? null,
+    author_username: row.author?.username ?? null,
+    author:          undefined,
   })) as ChatterMessage[];
 
   return { messages, error: null };
 }
 
-// ── Get open activities (for activity badge counts) ────────────────────────
+// ── Get open activities ────────────────────────────────────────────────────
 
 export async function getOpenActivities(
   relatedTable: string,
@@ -191,18 +208,17 @@ export async function getOpenActivities(
   const today = new Date().toISOString().split('T')[0];
 
   const { data, error } = await supabase
-    .from('chatter_messages')
-    .select('message_id, activity_due_date')
-    .eq('related_table', relatedTable)
-    .eq('related_record_id', relatedRecordId)
-    .eq('type', 'activity')
-    .eq('activity_done', false);
+    .from('record_activity')
+    .select('id, date_deadline')
+    .eq('record_table',  relatedTable)
+    .eq('record_id',     relatedRecordId)
+    .eq('is_done',       false);
 
   if (error) return { count: 0, overdue: 0, error: error.message };
 
   const count   = data?.length ?? 0;
-  const overdue = (data ?? []).filter((a: { activity_due_date: string | null }) =>
-    a.activity_due_date && a.activity_due_date < today
+  const overdue = (data ?? []).filter((a: { date_deadline: string | null }) =>
+    a.date_deadline && a.date_deadline < today
   ).length ?? 0;
 
   return { count, overdue, error: null };

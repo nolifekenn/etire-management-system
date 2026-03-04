@@ -48,7 +48,11 @@ export default async function middleware(request: NextRequest) {
     if (error) {
         const code = (error as { code?: string }).code
 
-        if (
+        // auth_session_missing — no cookies at all (logged-out visitor, first visit).
+        // Not an error; just means no user. The !user check below handles the redirect.
+        if (code === 'auth_session_missing') {
+            // Silently continue — no cookies to clear, login redirect handled below.
+        } else if (
             code === 'refresh_token_not_found' ||
             code === 'refresh_token_already_used' ||
             code === 'invalid_refresh_token'

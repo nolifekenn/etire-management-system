@@ -28,13 +28,14 @@ type AnyRecord = Record<string, unknown>;
 // ── Input interfaces ───────────────────────────────────────────────────────
 
 export interface ListProductsInput {
-  branch_id?:   string;
-  category?:    string;
-  low_stock?:   boolean;
-  search?:      string;
-  group_by?:    'category' | 'vehicle_type' | null;
-  page?:        number;
-  page_size?:   number;
+  branch_id?:    string;
+  category?:     string;
+  low_stock?:    boolean;
+  out_of_stock?: boolean;
+  search?:       string;
+  group_by?:     'category' | 'vehicle_type' | null;
+  page?:         number;
+  page_size?:    number;
 }
 
 export interface UpsertProductInput {
@@ -49,6 +50,8 @@ export interface UpsertProductInput {
   reorder_level:  number;
   size_id?:       string;
   brand_id?:      string;
+  tire_pattern?:  string;   // optional, shown when category = 'tire'
+  ply_rating?:    number;   // optional, shown when category = 'tire'
 }
 
 export interface AdjustmentLine {
@@ -81,6 +84,7 @@ export async function listProducts(input: ListProductsInput = {}) {
     branch_id,
     category,
     low_stock    = false,
+    out_of_stock = false,
     search       = '',
     page         = 1,
     page_size    = 50,
@@ -101,6 +105,8 @@ export async function listProducts(input: ListProductsInput = {}) {
       reorder_level,
       size_id,
       brand_id,
+      tire_pattern,
+      ply_rating,
       created_at,
       updated_at,
       tire_size:size_id ( label ),
@@ -115,15 +121,17 @@ export async function listProducts(input: ListProductsInput = {}) {
   if (branch_id) query = query.eq('branch_id', branch_id);
   if (category)  query = query.eq('category', category);
   if (search)    query = query.ilike('name', `%${search}%`);
+  if (out_of_stock) query = query.eq('stock_quantity', 0);
 
   const { data, count, error } = await query;
 
   if (error) return { success: false, error: error.message, items: [], total: 0 };
 
-  // For low_stock filter (Supabase doesn't support column-to-column comparisons cleanly in the SDK)
+  // For low_stock filter: stock_quantity > 0 AND stock_quantity < reorder_level
+  // (Supabase SDK can't do column-to-column comparisons cleanly, so we filter client-side)
   const items: AnyRecord[] = (data ?? []) as AnyRecord[];
   const filtered = low_stock
-    ? items.filter(i => Number(i.stock_quantity) < Number(i.reorder_level))
+    ? items.filter(i => Number(i.stock_quantity) > 0 && Number(i.stock_quantity) < Number(i.reorder_level))
     : items;
 
   return { success: true, items: filtered, total: count ?? filtered.length };
@@ -261,6 +269,9 @@ export async function upsertProduct(input: UpsertProductInput) {
   if (input.vehicle_type) payload.vehicle_type = input.vehicle_type;
   if (input.size_id)      payload.size_id      = input.size_id;
   if (input.brand_id)     payload.brand_id     = input.brand_id;
+  // Tire-specific — always write (allow clearing on edit)
+  payload.tire_pattern = input.tire_pattern?.trim() || null;
+  payload.ply_rating   = input.ply_rating   ?? null;
 
   let result: AnyRecord;
 
@@ -532,14 +543,36 @@ export async function listAdjustments(branchId?: string, limit = 50) {
   }
 }
 
+// ── 10. archiveProduct ────────────────────────────────────────────────────
+//
+// Soft-deletes an inventory item by setting deleted_at.
+// The item is hidden from all list views but its history is preserved.
+
+export async function archiveProduct(itemId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase: AnyClient = await createClient();
+  const { error } = await supabase
+    .from('inventory_item')
+    .update({
+      deleted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('item_id', itemId);
+  if (error) return { success: false, error: error.message };
+  revalidatePath('/inventory');
+  revalidatePath('/inventory/products');
+  return { success: true };
+}
+
 export async function getOperationCounts() {
   const supabase: AnyClient = await createClient();
 
-  const [receiptsRes, lowStockRes] = await Promise.all([
-    // Pending deliveries (receipts to process) — deliveries without validated items
+  const [salesRes, lowStockRes] = await Promise.all([
+    // Completed sales receipts
     supabase
-      .from('delivery')
-      .select('delivery_id, po_id', { count: 'exact' })
+      .from('sale')
+      .select('sale_id', { count: 'exact' })
+      .eq('state', 'done')
+      .is('deleted_at', null)
       .then((r: AnyRecord) => r),
 
     // Low stock items
@@ -550,10 +583,9 @@ export async function getOperationCounts() {
       .then((r: AnyRecord) => r),
   ]);
 
-  const deliveries   = (receiptsRes.data ?? []) as AnyRecord[];
   const allItems     = (lowStockRes.data ?? []) as AnyRecord[];
 
-  const lowStock  = allItems.filter(i => Number(i.stock_quantity) < Number(i.reorder_level));
+  const lowStock  = allItems.filter(i => Number(i.stock_quantity) > 0 && Number(i.stock_quantity) < Number(i.reorder_level));
   const outOfStock = allItems.filter(i => Number(i.stock_quantity) === 0);
 
   // Pending purchase orders
@@ -564,7 +596,7 @@ export async function getOperationCounts() {
     .is('deleted_at', null);
 
   return {
-    receipts:       deliveries.length,
+    receipts:       salesRes.count ?? 0,
     pending_pos:    (pendingPOs ?? []).length,
     low_stock:      lowStock.length,
     out_of_stock:   outOfStock.length,

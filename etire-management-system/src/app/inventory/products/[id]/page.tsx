@@ -23,6 +23,9 @@ import {
   ShoppingCart,
   ArrowLeftRight,
   Package,
+  Plus,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
@@ -42,7 +45,18 @@ import {
   getProductWithDetails,
   getInventorySmartButtons,
   upsertProduct,
+  archiveProduct,
 } from "@/lib/actions/inventory";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ChatterPanel }      from "@/components/ChatterPanel";
 import { AdjustmentDialog }  from "@/app/inventory/components/AdjustmentDialog";
 import { validateShortText, validateNumber, type FieldError } from "@/lib/validation";
@@ -148,6 +162,22 @@ export default function ProductFormPage() {
   const [editCostPrice,setEditCostPrice]= useState("");
   const [editReorder,  setEditReorder]  = useState("");
 
+  // Tire-specific edit fields
+  const [tireBrands,    setTireBrands]    = useState<{ id: string; label: string }[]>([]);
+  const [tireSizes,     setTireSizes]     = useState<{ id: string; label: string }[]>([]);
+  const [editBrandId,   setEditBrandId]   = useState("none");
+  const [editSizeId,    setEditSizeId]    = useState("none");
+  const [editTirePattern, setEditTirePattern] = useState("");
+  const [editPlyRating,   setEditPlyRating]   = useState("");
+  const [addingBrand,   setAddingBrand]   = useState(false);
+  const [addingSize,    setAddingSize]    = useState(false);
+  const [newBrandValue, setNewBrandValue] = useState("");
+  const [newSizeValue,  setNewSizeValue]  = useState("");
+
+  // Archive
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiving,   setArchiving]   = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -174,12 +204,26 @@ export default function ProductFormPage() {
       setEditSalePrice(str(p.sale_price));
       setEditCostPrice(str(p.cost_price));
       setEditReorder(str(p.reorder_level));
+      setEditBrandId(str(p.brand_id) || "none");
+      setEditSizeId(str(p.size_id) || "none");
+      setEditTirePattern(str(p.tire_pattern));
+      setEditPlyRating(p.ply_rating != null ? str(p.ply_rating) : "");
+
+      // Load tire lookups (idempotent — only if not yet loaded)
+      fetch("/api/lookups/tire")
+        .then(r => r.ok ? r.json() : null)
+        .then(json => {
+          if (!json) return;
+          setTireBrands((json.brands ?? []).map((b: { brand_id: string; name: string }) => ({ id: b.brand_id, label: b.name })));
+          setTireSizes((json.sizes ?? []).map((s: { size_id: string; label: string }) => ({ id: s.size_id, label: s.label })));
+        })
+        .catch(() => {});
     } catch {
       toast({ title: "Failed to load product", variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, [itemId]);
+  }, [itemId, router, toast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -200,6 +244,7 @@ export default function ProductFormPage() {
 
     setSaving(true);
     try {
+      const isTireEdit = editCategory === "tire";
       const result = await upsertProduct({
         item_id:      itemId,
         branch_id:    str(product.branch_id),
@@ -210,6 +255,10 @@ export default function ProductFormPage() {
         sale_price:   Number(editSalePrice),
         cost_price:   Number(editCostPrice),
         reorder_level:Number(editReorder),
+        ...(isTireEdit && editBrandId !== "none" ? { brand_id: editBrandId } : { brand_id: undefined }),
+        ...(isTireEdit && editSizeId  !== "none" ? { size_id: editSizeId   } : { size_id: undefined }),
+        tire_pattern: isTireEdit ? (editTirePattern.trim() || undefined) : undefined,
+        ply_rating:   isTireEdit && editPlyRating ? Number(editPlyRating) : undefined,
       });
 
       if (!result.success) throw new Error(result.error);
@@ -236,11 +285,68 @@ export default function ProductFormPage() {
     setEditSalePrice(str(product.sale_price));
     setEditCostPrice(str(product.cost_price));
     setEditReorder(str(product.reorder_level));
+    setEditBrandId(str(product.brand_id) || "none");
+    setEditSizeId(str(product.size_id) || "none");
+    setEditTirePattern(str(product.tire_pattern));
+    setEditPlyRating(product.ply_rating != null ? str(product.ply_rating) : "");
+    setAddingBrand(false); setAddingSize(false);
+    setNewBrandValue(""); setNewSizeValue("");
     setEditing(false);
     setNameError(null);
     setSalePriceError(null);
     setCostPriceError(null);
     setReorderError(null);
+  };
+
+  const isTireEdit = editCategory === "tire";
+
+  const handleAddLookup = async (type: "brand" | "size") => {
+    const value = (type === "brand" ? newBrandValue : newSizeValue).trim();
+    if (!value) return;
+    try {
+      const res = await fetch("/api/lookups/tire", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, value }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast({ title: `Failed to add ${type}`, description: json.error, variant: "destructive" });
+        return;
+      }
+      if (type === "brand") {
+        const entry = { id: json.brand_id, label: json.name };
+        setTireBrands(prev => [...prev, entry].sort((a, b) => a.label.localeCompare(b.label)));
+        setEditBrandId(json.brand_id);
+        setNewBrandValue(""); setAddingBrand(false);
+      } else {
+        const entry = { id: json.size_id, label: json.label };
+        setTireSizes(prev => [...prev, entry].sort((a, b) => a.label.localeCompare(b.label)));
+        setEditSizeId(json.size_id);
+        setNewSizeValue(""); setAddingSize(false);
+      }
+    } catch {
+      toast({ title: "Network error", variant: "destructive" });
+    }
+  };
+
+  const handleArchive = async () => {
+    setArchiving(true);
+    try {
+      const result = await archiveProduct(itemId);
+      if (!result.success) throw new Error(result.error);
+      toast({ title: "Product archived", description: "The product has been removed from active inventory." });
+      router.push("/inventory/products");
+    } catch (err) {
+      toast({
+        title: "Archive failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setArchiving(false);
+      setArchiveOpen(false);
+    }
   };
 
   if (loading) {
@@ -328,6 +434,15 @@ export default function ProductFormPage() {
               >
                 <Pencil className="h-4 w-4 mr-1" />
                 Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                onClick={() => setArchiveOpen(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Archive
               </Button>
             </>
           )}
@@ -512,6 +627,120 @@ export default function ProductFormPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* ── Tire-specific fields (edit only) ──────────────────── */}
+                  {editing && isTireEdit && (
+                    <div className="space-y-4 border-t border-border pt-4">
+                      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tire Attributes</h3>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Brand */}
+                        <div className="space-y-1">
+                          <Label>Brand</Label>
+                          {addingBrand ? (
+                            <div className="flex gap-1">
+                              <Input
+                                autoFocus
+                                placeholder="e.g. Bridgestone"
+                                value={newBrandValue}
+                                onChange={e => setNewBrandValue(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === "Enter") handleAddLookup("brand");
+                                  if (e.key === "Escape") { setAddingBrand(false); setNewBrandValue(""); }
+                                }}
+                                className="h-9 text-sm"
+                              />
+                              <Button size="sm" variant="outline" className="h-9 px-2" onClick={() => handleAddLookup("brand")}>
+                                <Plus className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-9 px-2 text-xs" onClick={() => { setAddingBrand(false); setNewBrandValue(""); }}>✕</Button>
+                            </div>
+                          ) : (
+                            <div className="flex gap-1">
+                              <Select value={editBrandId} onValueChange={setEditBrandId}>
+                                <SelectTrigger className="flex-1 h-9 text-sm"><SelectValue placeholder="Select brand" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">— None —</SelectItem>
+                                  {tireBrands.map(b => (
+                                    <SelectItem key={b.id} value={b.id}>{b.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button size="sm" variant="outline" className="h-9 px-2 shrink-0" title="Add new brand" onClick={() => setAddingBrand(true)}>
+                                <Plus className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Size */}
+                        <div className="space-y-1">
+                          <Label>Size</Label>
+                          {addingSize ? (
+                            <div className="flex gap-1">
+                              <Input
+                                autoFocus
+                                placeholder="e.g. 185/65R15"
+                                value={newSizeValue}
+                                onChange={e => setNewSizeValue(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === "Enter") handleAddLookup("size");
+                                  if (e.key === "Escape") { setAddingSize(false); setNewSizeValue(""); }
+                                }}
+                                className="h-9 text-sm"
+                              />
+                              <Button size="sm" variant="outline" className="h-9 px-2" onClick={() => handleAddLookup("size")}>
+                                <Plus className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-9 px-2 text-xs" onClick={() => { setAddingSize(false); setNewSizeValue(""); }}>✕</Button>
+                            </div>
+                          ) : (
+                            <div className="flex gap-1">
+                              <Select value={editSizeId} onValueChange={setEditSizeId}>
+                                <SelectTrigger className="flex-1 h-9 text-sm"><SelectValue placeholder="Select size" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">— None —</SelectItem>
+                                  {tireSizes.map(s => (
+                                    <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button size="sm" variant="outline" className="h-9 px-2 shrink-0" title="Add new size" onClick={() => setAddingSize(true)}>
+                                <Plus className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Tire Pattern */}
+                        <div className="space-y-1">
+                          <Label htmlFor="ef-pattern">Tire Pattern <span className="text-muted-foreground font-normal text-xs">(optional)</span></Label>
+                          <Input
+                            id="ef-pattern"
+                            value={editTirePattern}
+                            onChange={e => setEditTirePattern(e.target.value)}
+                            placeholder="e.g. Ecopia, Dueler, HT"
+                            maxLength={80}
+                          />
+                        </div>
+
+                        {/* Ply Rating */}
+                        <div className="space-y-1">
+                          <Label htmlFor="ef-ply">Ply Rating <span className="text-muted-foreground font-normal text-xs">(optional)</span></Label>
+                          <Input
+                            id="ef-ply"
+                            type="number"
+                            min="1"
+                            max="30"
+                            step="1"
+                            value={editPlyRating}
+                            onChange={e => setEditPlyRating(e.target.value)}
+                            placeholder="e.g. 4, 6, 8, 10"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Right: supplier / branch */}
@@ -597,19 +826,31 @@ export default function ProductFormPage() {
                     Product Attributes
                   </h3>
                   <div className="space-y-2">
-                    {Boolean(product.size_id) && (
-                      <div className="space-y-0.5">
-                        <p className="text-xs text-muted-foreground">Tire Size</p>
-                        <p className="text-sm">{str((product.tire_size as AnyRecord)?.label) || str(product.size_id)}</p>
-                      </div>
-                    )}
                     {Boolean(product.brand_id) && (
                       <div className="space-y-0.5">
                         <p className="text-xs text-muted-foreground">Brand</p>
                         <p className="text-sm">{str((product.tire_brand as AnyRecord)?.name) || str(product.brand_id)}</p>
                       </div>
                     )}
-                    {!product.size_id && !product.brand_id && (
+                    {Boolean(product.size_id) && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Size</p>
+                        <p className="text-sm">{str((product.tire_size as AnyRecord)?.label) || str(product.size_id)}</p>
+                      </div>
+                    )}
+                    {Boolean(product.tire_pattern) && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Tire Pattern</p>
+                        <p className="text-sm">{str(product.tire_pattern)}</p>
+                      </div>
+                    )}
+                    {product.ply_rating != null && (
+                      <div className="space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Ply Rating</p>
+                        <p className="text-sm">{str(product.ply_rating)}</p>
+                      </div>
+                    )}
+                    {!product.brand_id && !product.size_id && !product.tire_pattern && product.ply_rating == null && (
                       <p className="text-sm text-muted-foreground">No additional attributes</p>
                     )}
                   </div>
@@ -683,6 +924,33 @@ export default function ProductFormPage() {
         userId={user?.user_id ?? ""}
         onAdjusted={load}
       />
+
+      {/* Archive Confirmation */}
+      <AlertDialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Archive Product?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{str(product.name)}</strong> will be marked as archived and hidden from all
+              inventory lists, the POS, and reports. Its transaction history will be preserved.
+              This action can be undone by a database admin.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={archiving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleArchive}
+              disabled={archiving}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {archiving ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Archiving…</> : "Archive Product"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

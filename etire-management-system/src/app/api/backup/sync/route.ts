@@ -31,7 +31,7 @@ export async function POST() {
     meta: {
       version: '1.0',
       synced_at: new Date().toISOString(),
-      synced_by: data.session.user.id,
+      synced_by: user.id,
       type: 'cloud_sync'
     },
     tables

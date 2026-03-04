@@ -14,9 +14,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, AlertTriangle, Settings as SettingsIcon, Shield, History, DollarSign, Bell, RefreshCw, CheckCircle, XCircle, Info, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Loader2, AlertTriangle, Settings as SettingsIcon, Shield, History, DollarSign, Bell, RefreshCw, CheckCircle, XCircle, Info, Eye, EyeOff, AlertCircle, Users, ExternalLink, UserCheck, UserX } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { SystemSetting, AuditLog, Notification } from '@/lib/types';
+import Link from 'next/link';
 import { validateShortText, validatePhone, validateLongText, type FieldError } from '@/lib/validation';
 
 // Design system from POS page (keeping the button styles and animations)
@@ -159,6 +160,11 @@ export default function SettingsPage() {
   const [isNotifLoading, setIsNotifLoading] = useState(false);
   const [notifError, setNotifError] = useState<string | null>(null);
 
+  // Users state (admins only)
+  const [settingsUsers,          setSettingsUsers]          = useState<Record<string, unknown>[]>([]);
+  const [isUsersLoading,         setIsUsersLoading]         = useState(false);
+  const [usersError,             setUsersError]             = useState<string | null>(null);
+
   // System settings form state
   const [companyName, setCompanyName] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
@@ -254,13 +260,32 @@ export default function SettingsPage() {
     setIsNotifLoading(false);
   }, [user]);
 
+  const fetchSettingsUsers = useCallback(async () => {
+    setIsUsersLoading(true);
+    try {
+      const res = await fetch('/api/admin/users');
+      const result = await res.json();
+      if (res.ok) {
+        setSettingsUsers(result.data as Record<string, unknown>[]);
+        setUsersError(null);
+      } else {
+        setUsersError(result.error || 'Could not load users');
+      }
+    } catch (e: any) {
+      setUsersError(e.message);
+    } finally {
+      setIsUsersLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSystemSettings();
     fetchNotifications();
     if (user?.role === 'super_admin' || user?.role === 'branch_manager') { // Only admins and managers can see audit logs
       fetchAuditLogs();
+      fetchSettingsUsers();
     }
-  }, [fetchSystemSettings, fetchAuditLogs, fetchNotifications, user]);
+  }, [fetchSystemSettings, fetchAuditLogs, fetchNotifications, fetchSettingsUsers, user]);
 
   const handleSaveChanges = async () => {
     if (!user || !supabase) {
@@ -513,6 +538,7 @@ export default function SettingsPage() {
     fetchNotifications();
     if (user?.role === 'super_admin' || user?.role === 'branch_manager') {
       fetchAuditLogs();
+      fetchSettingsUsers();
     }
   };
 
@@ -524,9 +550,33 @@ export default function SettingsPage() {
     cashier:        { label: 'Cashier',         bg: 'bg-amber-100 text-amber-800',  desc: 'Point-of-sale and payment processing access' },
   };
 
-  const roleMeta = ROLE_META[user?.role ?? ''] ?? { label: user?.role ?? '—', bg: 'bg-slate-100 text-slate-700', desc: '' };
-  const initials = (user?.name ?? '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'branch_manager';
+  const tabCount = isAdmin ? 3 : 2;
   const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  // Initials derived from user name (e.g. "John Doe" → "JD")
+  const initials = (user?.name ?? '')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w: string) => w[0].toUpperCase())
+    .join('') || (user?.username?.[0]?.toUpperCase() ?? '?');
+
+  // Role badge metadata
+  const roleMeta: { label: string; bg: string; desc?: string } = (() => {
+    switch (user?.role) {
+      case 'super_admin':
+        return { label: 'Super Admin', bg: 'bg-purple-100 text-purple-700', desc: 'Full system access' };
+      case 'branch_manager':
+        return { label: 'Branch Manager', bg: 'bg-blue-100 text-blue-700', desc: 'Manage branch operations' };
+      case 'cashier':
+        return { label: 'Cashier', bg: 'bg-green-100 text-green-700', desc: 'Sales & POS access' };
+      case 'technician':
+        return { label: 'Technician', bg: 'bg-orange-100 text-orange-700', desc: 'Service & workshop access' };
+      default:
+        return { label: user?.role ?? 'Staff', bg: 'bg-slate-100 text-slate-600' };
+    }
+  })();
 
   if (isAuthLoading) {
     return (
@@ -554,7 +604,7 @@ export default function SettingsPage() {
 
         {/* ── Tabs ── */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full bg-muted border border-border rounded-lg p-1 mb-6" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+          <TabsList className="grid w-full bg-muted border border-border rounded-lg p-1 mb-6" style={{ gridTemplateColumns: `repeat(${tabCount}, 1fr)` }}>
             <TabsTrigger value="account" className="rounded-md data-[state=active]:bg-[#714B67] data-[state=active]:text-white">
               <SettingsIcon className="h-4 w-4 mr-2" />
               My Profile
@@ -568,6 +618,12 @@ export default function SettingsPage() {
                 </span>
               )}
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="users" className="rounded-md data-[state=active]:bg-[#714B67] data-[state=active]:text-white">
+                <Users className="h-4 w-4 mr-2" />
+                Users
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* ══════════════ PROFILE TAB ══════════════ */}
@@ -894,6 +950,145 @@ export default function SettingsPage() {
               </Card>
             )}
           </TabsContent>
+
+          {/* ══════════════ USERS TAB ══════════════ */}
+          {isAdmin && (
+            <TabsContent value="users" className="space-y-6">
+              <Card className="border border-border">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Users className="h-5 w-5 text-indigo-600" />
+                        System Users
+                      </CardTitle>
+                      <CardDescription>All users with access to this system.</CardDescription>
+                    </div>
+                    <Link href="/admin">
+                      <Button variant="outline" size="sm" className="gap-1.5">
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        Full User Management
+                      </Button>
+                    </Link>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {usersError && (
+                    <Alert variant="destructive" className="mb-4">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>{usersError}</AlertDescription>
+                    </Alert>
+                  )}
+                  {isUsersLoading ? (
+                    <div className="flex items-center gap-2 py-8 text-muted-foreground justify-center text-sm">
+                      <Loader2 className="h-5 w-5 animate-spin" /> Loading users…
+                    </div>
+                  ) : settingsUsers.length === 0 ? (
+                    <div className="text-center py-10">
+                      <Users className="h-12 w-12 text-slate-200 mx-auto mb-3" />
+                      <p className="text-slate-500 font-medium">No users found</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-600">Name</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-600">Username</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-600">Role</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-slate-600">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {settingsUsers.map((u) => {
+                            const meta = ROLE_META[String(u.role ?? '')] ?? { label: String(u.role ?? '—'), bg: 'bg-slate-100 text-slate-700' };
+                            const isActive = u.is_active !== false;
+                            return (
+                              <tr key={String(u.user_id)} className="hover:bg-slate-50">
+                                <td className="px-3 py-2 font-medium text-slate-800">{String(u.name ?? '—')}</td>
+                                <td className="px-3 py-2 font-mono text-xs text-slate-600">@{String(u.username ?? '—')}</td>
+                                <td className="px-3 py-2">
+                                  <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${meta.bg}`}>{meta.label}</span>
+                                </td>
+                                <td className="px-3 py-2">
+                                  {isActive ? (
+                                    <span className="inline-flex items-center gap-1 text-green-700 text-xs font-medium">
+                                      <UserCheck className="h-3.5 w-3.5" /> Active
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-slate-400 text-xs font-medium">
+                                      <UserX className="h-3.5 w-3.5" /> Inactive
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Company settings — admin only */}
+              <Card className="border border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Shield className="h-4 w-4 text-indigo-600" />
+                    Company Information
+                  </CardTitle>
+                  <CardDescription>Displayed on printed receipts and reports.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-slate-700 font-medium">Company Name <span className="text-red-500">*</span></Label>
+                    <input
+                      value={companyName}
+                      onChange={e => { setCompanyName(e.target.value); setCompanyNameError(validateShortText(e.target.value, { label: 'Company name', required: true, minLength: 2, maxLength: 100 })); }}
+                      maxLength={100}
+                      placeholder="Your company name"
+                      className={`flex h-10 w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400 ${companyNameError ? 'border-red-400' : 'border-slate-300'}`}
+                    />
+                    {companyNameError && <p className="text-xs text-red-500">⚠ {companyNameError}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-700 font-medium">Address</Label>
+                    <textarea
+                      value={companyAddress}
+                      onChange={e => { setCompanyAddress(e.target.value); setCompanyAddressError(validateLongText(e.target.value, { label: 'Address', maxLength: 200 })); }}
+                      maxLength={200}
+                      rows={2}
+                      placeholder="Full address"
+                      className={`flex w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400 resize-none ${companyAddressError ? 'border-red-400' : 'border-slate-300'}`}
+                    />
+                    {companyAddressError && <p className="text-xs text-red-500">⚠ {companyAddressError}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-700 font-medium">Phone</Label>
+                    <input
+                      value={companyPhone}
+                      onChange={e => { setCompanyPhone(e.target.value); setCompanyPhoneError(validatePhone(e.target.value, { label: 'Company phone' })); }}
+                      maxLength={30}
+                      placeholder="+63 9xx-xxx-xxxx"
+                      className={`flex h-10 w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400 ${companyPhoneError ? 'border-red-400' : 'border-slate-300'}`}
+                    />
+                    {companyPhoneError && <p className="text-xs text-red-500">⚠ {companyPhoneError}</p>}
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <Button
+                      onClick={handleSaveSystemSettings}
+                      disabled={isSaving || !!companyNameError || !!companyAddressError || !!companyPhoneError}
+                      className="bg-[#714B67] hover:bg-[#5a3c53] text-white px-6"
+                    >
+                      {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Save Company Info
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 
