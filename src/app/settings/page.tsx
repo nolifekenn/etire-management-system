@@ -507,8 +507,6 @@ export default function SettingsPage() {
         return { label: 'Branch Manager', bg: 'bg-blue-100 text-blue-700', desc: 'Manage branch operations' };
       case 'cashier':
         return { label: 'Cashier', bg: 'bg-green-100 text-green-700', desc: 'Sales & POS access' };
-      case 'technician':
-        return { label: 'Technician', bg: 'bg-orange-100 text-orange-700', desc: 'Service & workshop access' };
       default:
         return { label: user?.role ?? 'Staff', bg: 'bg-slate-100 text-slate-600' };
     }

@@ -230,7 +230,7 @@ export const generateHtmlReceipt = (data: ReceiptData): string => {
 
           <div class="details">
             <p>Sale ID: ${sale.sale_id.split('-')[0]!}</p>
-            <p>Date: ${formatDate(sale.sale_date)}</p>
+            <p>Date: ${formatDate(sale.sale_date ?? new Date().toISOString())}</p>
             <p>Cashier: ${cashier.name}</p>
             ${branch ? `<p>Branch: ${branch.name}</p>` : ''}
           </div>

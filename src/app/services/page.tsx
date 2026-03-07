@@ -18,7 +18,7 @@ import { useAuth }   from "@/hooks/useAuth";
 import {
   Wrench, PlusCircle, RefreshCw, LayoutList, Search,
   Loader2, ChevronRight, AlertCircle, Flame,
-  ArrowUp, Minus, TrendingDown,
+  ArrowUp, Minus, TrendingDown, User, Car, Package,
 } from "lucide-react";
 import {
   listServiceJobs,
