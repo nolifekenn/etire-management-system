@@ -11,7 +11,6 @@ import { Toaster } from '@/components/ui/toaster';
 import { useNotificationListener } from '@/hooks/useNotificationListener';
 import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary';
 import { OdooTopNav } from '@/components/layout/OdooTopNav';
-import { OdooSidebar } from '@/components/layout/OdooSidebar';
 import './globals.css';
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
@@ -19,8 +18,6 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [isHydrated, setIsHydrated] = useState(false);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-
   // Enable real-time notification toasts
   useNotificationListener();
 
@@ -117,24 +114,15 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   //  On mobile: sidebar is a slide-in drawer; main is full-width.
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[#f5f5f5]">
-      {/* Fixed top navigation bar — passes hamburger handler on mobile */}
-      <OdooTopNav onMenuToggle={() => setMobileSidebarOpen(v => !v)} />
+      {/* Fixed top navigation bar */}
+      <OdooTopNav />
 
-      {/* Fixed left icon sidebar — desktop only; mobile drawer */}
-      <OdooSidebar
-        mobileOpen={mobileSidebarOpen}
-        onMobileClose={() => setMobileSidebarOpen(false)}
-      />
-
-      {/* Main scrollable content
-          - Desktop (md+): offset left by sidebar (52px) + top nav (52px)
-          - Mobile (<md):  no left offset (sidebar is a drawer overlay)
-      */}
+      {/* Main scrollable content — offset top by nav bar (52px) */}
       <main
         className="
           absolute inset-0
           top-[52px]
-          md:left-[52px] left-0
+          left-0
           overflow-x-hidden overflow-y-auto
           bg-[#f5f5f5]
         "

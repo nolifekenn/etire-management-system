@@ -102,11 +102,10 @@ export async function POST(request: NextRequest) {
 
       if (!authLookupError && authData?.user?.email) {
         authEmail = authData.user.email;
-        try {
-          await adminClient.auth.admin.updateUserById(authId, { password });
-        } catch (passwordSyncError) {
+        // Fire-and-forget: sync the password in the background without blocking the response
+        adminClient.auth.admin.updateUserById(authId, { password }).catch((passwordSyncError: unknown) => {
           console.error("[verify-credentials] Failed to sync password:", passwordSyncError);
-        }
+        });
       } else {
         console.warn(
           "[verify-credentials] auth_id present but Supabase Auth user not found. Will create new auth user.",

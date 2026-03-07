@@ -237,14 +237,7 @@ export function OdooTopNav({ onMenuToggle }: { onMenuToggle?: () => void }) {
     <header className="fixed inset-x-0 top-0 z-30 flex h-[52px] items-center gap-3 border-b border-white/10 bg-[#714B67] px-3 shadow-sm">
       {/* ── Left: Hamburger (mobile) + App Switcher + Brand ──────────── */}
       <div className="flex items-center gap-2 shrink-0">
-        {/* Hamburger — only on mobile */}
-        <button
-          onClick={onMenuToggle}
-          aria-label="Open navigation"
-          className="flex md:hidden h-9 w-9 items-center justify-center rounded-md text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+        {/* Hamburger — hidden now that sidebar is removed */}
 
         <OdooAppSwitcher />
         <Link

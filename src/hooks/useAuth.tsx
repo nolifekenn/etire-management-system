@@ -75,8 +75,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const fetchUserProfile = async (authUserId: string): Promise<ExtendedUser | null> => {
       console.log("[useAuth] fetchUserProfile called with authUserId:", authUserId);
 
-      // Small delay to let session fully sync
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Small delay to let session fully sync (reduced from 200ms)
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       const fetchWithTimeout = async (attempt: number): Promise<ExtendedUser | null> => {
         const timeoutMs = attempt === 1 ? 5000 : 3000; // Shorter timeout on retry

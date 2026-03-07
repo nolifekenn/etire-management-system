@@ -14,11 +14,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, AlertTriangle, Settings as SettingsIcon, Shield, History, DollarSign, Bell, RefreshCw, CheckCircle, XCircle, Info, Eye, EyeOff, AlertCircle, Users, ExternalLink, UserCheck, UserX } from 'lucide-react';
+import { Loader2, AlertTriangle, Settings as SettingsIcon, Shield, History, Bell, RefreshCw, CheckCircle, XCircle, Info, Eye, EyeOff, AlertCircle, Users, ExternalLink, UserCheck, UserX } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { SystemSetting, AuditLog, Notification } from '@/lib/types';
 import Link from 'next/link';
-import { validateShortText, validatePhone, validateLongText, type FieldError } from '@/lib/validation';
+import { validateShortText, type FieldError } from '@/lib/validation';
 
 // Design system from POS page (keeping the button styles and animations)
 const buttonStyles = {
@@ -165,15 +165,7 @@ export default function SettingsPage() {
   const [isUsersLoading,         setIsUsersLoading]         = useState(false);
   const [usersError,             setUsersError]             = useState<string | null>(null);
 
-  // System settings form state
-  const [companyName, setCompanyName] = useState('');
-  const [companyAddress, setCompanyAddress] = useState('');
-  const [companyPhone, setCompanyPhone] = useState('');
-
   // System settings validation errors
-  const [companyNameError,    setCompanyNameError]    = useState<FieldError>(null);
-  const [companyAddressError, setCompanyAddressError] = useState<FieldError>(null);
-  const [companyPhoneError,   setCompanyPhoneError]   = useState<FieldError>(null);
 
 
   useEffect(() => {
@@ -203,19 +195,7 @@ export default function SettingsPage() {
       setSettingsError(null);
 
       // Populate form fields
-      (data as SystemSetting[])?.forEach(setting => {
-        switch (setting.key) {
-          case 'company_name':
-            setCompanyName(setting.value || '');
-            break;
-          case 'company_address':
-            setCompanyAddress(setting.value || '');
-            break;
-          case 'company_phone':
-            setCompanyPhone(setting.value || '');
-            break;
-        }
-      });
+      // (company settings removed — values are hardcoded in receipt generator)
     }
     setIsSettingsLoading(false);
   }, []);
@@ -421,50 +401,6 @@ export default function SettingsPage() {
       toast({ title: "Update Error", description: error.message, variant: "destructive" });
     } finally {
       setIsVerifying(false);
-      setIsSaving(false);
-    }
-  };
-
-  const handleSaveSystemSettings = async () => {
-    if (!user || !supabase) return;
-
-    // Inline validation
-    const cnErr = validateShortText(companyName,    { label: 'Company name', required: true,  minLength: 2, maxLength: 100 });
-    const caErr = validateLongText (companyAddress, { label: 'Address',      maxLength: 200 });
-    const cpErr = validatePhone    (companyPhone,   { label: 'Company phone' });
-    setCompanyNameError(cnErr);
-    setCompanyAddressError(caErr);
-    setCompanyPhoneError(cpErr);
-    if (cnErr || caErr || cpErr) return;
-
-    setIsSaving(true);
-
-    try {
-      const settings = [
-        { key: 'company_name', value: companyName },
-        { key: 'company_address', value: companyAddress },
-        { key: 'company_phone', value: companyPhone },
-      ];
-
-      for (const setting of settings) {
-        const { error } = await (supabase
-          .from('system_settings') as any)
-          .upsert({
-            key: setting.key,
-            value: setting.value,
-            updated_by: user.user_id,
-          });
-
-        if (error) {
-          throw error;
-        }
-      }
-
-      toast({ title: "Success", description: "Company information updated successfully." });
-      fetchSystemSettings();
-    } catch (error: any) {
-      toast({ title: "Save Error", description: error.message, variant: "destructive" });
-    } finally {
       setIsSaving(false);
     }
   };
@@ -1031,62 +967,6 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
 
-              {/* Company settings — admin only */}
-              <Card className="border border-border">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Shield className="h-4 w-4 text-indigo-600" />
-                    Company Information
-                  </CardTitle>
-                  <CardDescription>Displayed on printed receipts and reports.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-slate-700 font-medium">Company Name <span className="text-red-500">*</span></Label>
-                    <input
-                      value={companyName}
-                      onChange={e => { setCompanyName(e.target.value); setCompanyNameError(validateShortText(e.target.value, { label: 'Company name', required: true, minLength: 2, maxLength: 100 })); }}
-                      maxLength={100}
-                      placeholder="Your company name"
-                      className={`flex h-10 w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400 ${companyNameError ? 'border-red-400' : 'border-slate-300'}`}
-                    />
-                    {companyNameError && <p className="text-xs text-red-500">⚠ {companyNameError}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-slate-700 font-medium">Address</Label>
-                    <textarea
-                      value={companyAddress}
-                      onChange={e => { setCompanyAddress(e.target.value); setCompanyAddressError(validateLongText(e.target.value, { label: 'Address', maxLength: 200 })); }}
-                      maxLength={200}
-                      rows={2}
-                      placeholder="Full address"
-                      className={`flex w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400 resize-none ${companyAddressError ? 'border-red-400' : 'border-slate-300'}`}
-                    />
-                    {companyAddressError && <p className="text-xs text-red-500">⚠ {companyAddressError}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-slate-700 font-medium">Phone</Label>
-                    <input
-                      value={companyPhone}
-                      onChange={e => { setCompanyPhone(e.target.value); setCompanyPhoneError(validatePhone(e.target.value, { label: 'Company phone' })); }}
-                      maxLength={30}
-                      placeholder="+63 9xx-xxx-xxxx"
-                      className={`flex h-10 w-full rounded-md border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400 ${companyPhoneError ? 'border-red-400' : 'border-slate-300'}`}
-                    />
-                    {companyPhoneError && <p className="text-xs text-red-500">⚠ {companyPhoneError}</p>}
-                  </div>
-                  <div className="flex justify-end pt-2">
-                    <Button
-                      onClick={handleSaveSystemSettings}
-                      disabled={isSaving || !!companyNameError || !!companyAddressError || !!companyPhoneError}
-                      className="bg-[#714B67] hover:bg-[#5a3c53] text-white px-6"
-                    >
-                      {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      Save Company Info
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
             </TabsContent>
           )}
         </Tabs>
