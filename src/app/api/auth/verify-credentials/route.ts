@@ -14,11 +14,11 @@ interface UserRecord {
   auth_id: string | null;
   role: string;
   branch_id: string | null;
+  password: string | null;
 }
 
 const EMAIL_DOMAIN = "etire-system.local";
 
-/** Extract the best available IP from request headers (works behind proxies/Vercel). */
 function getClientIp(request: NextRequest): string {
   return (
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
@@ -30,8 +30,6 @@ function getClientIp(request: NextRequest): string {
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
 
-  // ── Brute-force protection ─────────────────────────────────────────────────
-  // Peek at the current state without consuming a slot yet.
   const peek = loginRateLimiter.peek(ip);
   if (!peek.allowed) {
     const retryAfterSec = Math.ceil((peek.resetAt - Date.now()) / 1000);
@@ -63,11 +61,13 @@ export async function POST(request: NextRequest) {
 
     const adminClient = createAdminClient();
 
+    // ── Step 1: Look up user by username + verify password against DB ──────
+    // The DB password column is the source of truth (plaintext).
+    // We validate here, then sync to Supabase Auth so signInWithPassword works.
     const { data: userRecord, error: userError } = await adminClient
       .from("user")
-      .select("user_id, username, name, auth_id, role, branch_id")
+      .select("user_id, username, name, auth_id, role, branch_id, password")
       .eq("username", username)
-      .eq("password", password)
       .is("deleted_at", null)
       .maybeSingle<UserRecord>();
 
@@ -79,53 +79,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Unknown username — consume a rate-limit slot
     if (!userRecord) {
-      // Record the failed attempt for this IP
+      loginRateLimiter.check(ip);
+      return NextResponse.json(
+        { success: false, message: "Invalid username or password." },
+        { status: 401 }
+      );
+    }
+
+    // Wrong password — consume a rate-limit slot
+    if (!userRecord.password || userRecord.password !== password) {
       const result = loginRateLimiter.check(ip);
       return NextResponse.json(
         { success: false, message: "Invalid username or password." },
         {
           status: 401,
-          headers: {
-            "X-RateLimit-Limit": "5",
-            "X-RateLimit-Remaining": String(result.remaining),
-          },
+          headers: { "X-RateLimit-Remaining": String(result.remaining) },
         }
       );
     }
 
+    // ── Step 2: Password is correct — ensure Supabase Auth is in sync ──────
     let authId = userRecord.auth_id;
     let authEmail: string | null = null;
+    const derivedEmail = `${username}@${EMAIL_DOMAIN}`;
 
     if (authId) {
       const { data: authData, error: authLookupError } = await adminClient.auth.admin.getUserById(authId);
 
       if (!authLookupError && authData?.user?.email) {
         authEmail = authData.user.email;
-        // Fire-and-forget: sync the password in the background without blocking the response
-        adminClient.auth.admin.updateUserById(authId, { password }).catch((passwordSyncError: unknown) => {
-          console.error("[verify-credentials] Failed to sync password:", passwordSyncError);
+
+        // Always sync the password so Supabase Auth matches the DB.
+        // This fixes cases where the password was changed via the admin panel
+        // (which updates the DB) but the Supabase Auth password wasn't updated.
+        await adminClient.auth.admin.updateUserById(authId, { password }).catch((err: unknown) => {
+          console.error("[verify-credentials] Password sync failed (non-fatal):", err);
         });
       } else {
-        console.warn(
-          "[verify-credentials] auth_id present but Supabase Auth user not found. Will create new auth user.",
-          { authId, username }
-        );
+        console.warn("[verify-credentials] auth_id exists but no Supabase Auth user found. Recreating.", { authId, username });
         authId = null;
       }
     }
 
     if (!authId) {
-      const derivedEmail = `${username}@${EMAIL_DOMAIN}`;
+      // No Supabase Auth account — create one now
       const { data: createdUser, error: createError } = await adminClient.auth.admin.createUser({
         email: derivedEmail,
         password,
         email_confirm: true,
-        user_metadata: {
-          username: userRecord.username,
-          name: userRecord.name,
-          role: userRecord.role,
-        },
+        user_metadata: { username: userRecord.username, name: userRecord.name, role: userRecord.role },
       });
 
       if (createError || !createdUser.user) {
@@ -139,23 +143,16 @@ export async function POST(request: NextRequest) {
       authId = createdUser.user.id;
       authEmail = createdUser.user.email ?? derivedEmail;
 
-      const { error: updateError } = await (adminClient.from("user") as any)
+      await (adminClient.from("user") as any)
         .update({ auth_id: authId })
         .eq("user_id", userRecord.user_id);
-
-      if (updateError) {
-        console.error("[verify-credentials] Failed to update auth_id in user table:", updateError);
-      }
     }
 
-    if (!authEmail) {
-      authEmail = `${username}@${EMAIL_DOMAIN}`;
-    }
-
-    // Successful authentication — clear the failed-attempt counter for this IP
+    // ── Step 3: Credentials verified and Auth is synced — clear rate limit ──
     loginRateLimiter.reset(ip);
 
-    return NextResponse.json({ success: true, email: authEmail });
+    return NextResponse.json({ success: true, email: authEmail ?? derivedEmail });
+
   } catch (error) {
     console.error("[verify-credentials] Unexpected error:", error);
     return NextResponse.json(
