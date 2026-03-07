@@ -161,13 +161,13 @@ export function CreateProductDialog({ open, onOpenChange, onCreated }: Props) {
         return;
       }
       if (type === "brand") {
-        const entry = { id: json.brand_id, label: json.name };
-        setTireBrands(prev => [...prev, entry].sort((a, b) => a.label.localeCompare(b.label)));
+        const entry = { id: json.brand_id, label: json.name ?? "" };
+        setTireBrands(prev => [...prev, entry].sort((a, b) => (a.label ?? "").localeCompare(b.label ?? "")));
         setBrandId(json.brand_id);
         setNewBrandValue(""); setAddingBrand(false);
       } else {
-        const entry = { id: json.size_id, label: json.label };
-        setTireSizes(prev => [...prev, entry].sort((a, b) => a.label.localeCompare(b.label)));
+        const entry = { id: json.size_id, label: json.label ?? "" };
+        setTireSizes(prev => [...prev, entry].sort((a, b) => (a.label ?? "").localeCompare(b.label ?? "")));
         setSizeId(json.size_id);
         setNewSizeValue(""); setAddingSize(false);
       }
