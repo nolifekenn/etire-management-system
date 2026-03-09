@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -9,7 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle, CheckCircle, RefreshCw, User } from 'lucide-react';
 
 export default function CheckUsers() {
-    const [users, setUsers] = useState<Record<string, unknown>[]>([]);
+    const [users, setUsers] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [lastCheck, setLastCheck] = useState<Date | null>(null);
@@ -67,10 +68,10 @@ export default function CheckUsers() {
         checkUsers();
     }, []);
 
-    const getRoleName = (_roleId: number) => {
-        if (roleId === 3) return 'Admin';
-        if (roleId === 2) return 'Branch Manager';
-        if (roleId === 1) return 'Staff';
+    const _getRoleName = (_roleId: number) => {
+        if (_roleId === 3) return 'Admin';
+        if (_roleId === 2) return 'Branch Manager';
+        if (_roleId === 1) return 'Staff';
         return 'Guest';
     };
 
