@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -1191,7 +1192,7 @@ export default function EnhancedBranchesPage() {
               </div>
               <AlertDialogTitle className="text-slate-900 text-center font-poppins">Confirm Deletion</AlertDialogTitle>
               <AlertDialogDescription className="text-slate-600 text-center font-poppins">
-                Are you sure you want to delete the branch "{deletingBranch?.name}"? This action cannot be undone.
+                Are you sure you want to delete the branch &quot;{deletingBranch?.name}&quot;? This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

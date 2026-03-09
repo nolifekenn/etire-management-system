@@ -139,6 +139,7 @@ export async function POST(request: NextRequest) {
       authId = createdUser.user.id;
       authEmail = createdUser.user.email ?? derivedEmail;
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: updateError } = await (adminClient.from("user") as any)
         .update({ auth_id: authId })
         .eq("user_id", userRecord.user_id);

@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { DollarSign } from 'lucide-react';
 
 interface RevenueSplitChartProps {
@@ -63,7 +64,7 @@ export function RevenueSplitChart({ data }: RevenueSplitChartProps) {
                                 axisLine={false}
                                 tickLine={false}
                             />
-                            {/* Recharts Tooltip typing can be tricky, using 'any' for payload safety */}
+                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                             <Tooltip
                                 cursor={{ fill: 'transparent' }}
                                 content={({ active, payload }: any) => {

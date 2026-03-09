@@ -62,13 +62,13 @@ export async function POST(request: Request) {
     }
 
     // 4️⃣ Post-process data to calculate line_total and profit
-    const processedData = data.map((sale: any) => {
-      const serviceFee: number = (sale.service_job as any)?.service_fee ?? 0;
+    const processedData = data.map((sale: Record<string, unknown>) => {
+      const serviceFee: number = ((sale.service_job as Record<string, unknown>)?.service_fee as number) ?? 0;
 
-      const processedItems = sale.sale_item.map((item: any) => {
-        const quantity = item.quantity || 0;
-        const price = item.price_at_sale || 0;
-        const cost = item.inventory_item?.cost_price || 0;
+      const processedItems = (sale.sale_item as Record<string, unknown>[]).map((item: Record<string, unknown>) => {
+        const quantity = (item.quantity as number) || 0;
+        const price = (item.price_at_sale as number) || 0;
+        const cost = ((item.inventory_item as Record<string, unknown>)?.cost_price as number) || 0;
 
         const line_total = quantity * price;
         const profit = (price - cost) * quantity;
@@ -106,10 +106,10 @@ export async function POST(request: Request) {
 
     // 5️⃣ Return sales data
     return NextResponse.json({ sales: processedData });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Sales report route error:", error);
     return NextResponse.json(
-      { error: error.message || "Unexpected server error" },
+      { error: error instanceof Error ? error.message : "Unexpected server error" },
       { status: 500 }
     );
   }

@@ -51,15 +51,15 @@ export async function POST(request: Request) {
     }
 
     // 5️⃣ Transform data
-    const transformed = (items || []).map((item: any) => {
-      const supplier = suppliers?.find((s) => s.supplier_id === item.supplier_id);
-      const stock_value = (item.stock_quantity || 0) * (item.cost_price || 0);
-      const potential_revenue = (item.stock_quantity || 0) * (item.sale_price || 0);
-      const low_stock = (item.stock_quantity || 0) < (item.reorder_level ?? 5);
+    const transformed = (items || []).map((item: Record<string, unknown>) => {
+      const supplier = suppliers?.find((s) => s.supplier_id === (item.supplier_id as string));
+      const stock_value = ((item.stock_quantity as number) || 0) * ((item.cost_price as number) || 0);
+      const potential_revenue = ((item.stock_quantity as number) || 0) * ((item.sale_price as number) || 0);
+      const low_stock = ((item.stock_quantity as number) || 0) < ((item.reorder_level as number) ?? 5);
 
       return {
         ...item,
-        category: item.category || "—",
+        category: (item.category as string) || "—",
         supplier: supplier?.name || "—",
         stock_value,
         potential_revenue,
@@ -68,10 +68,10 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ inventory: transformed });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Inventory report route error:", error);
     return NextResponse.json(
-      { error: error.message || "Unexpected server error" },
+      { error: error instanceof Error ? error.message : "Unexpected server error" },
       { status: 500 }
     );
   }

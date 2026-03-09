@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React from 'react';
@@ -63,6 +64,7 @@ export function TopBrandsChart({ data }: TopBrandsChartProps) {
                                 axisLine={false}
                                 tickLine={false}
                             />
+                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                             <Tooltip
                                 cursor={{ fill: '#f1f5f9' }}
                                 content={({ active, payload }: any) => {

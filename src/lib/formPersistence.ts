@@ -8,12 +8,12 @@ export const FORM_STATE_PREFIX = "etire_form_";
 
 export interface FormState {
     formId: string;
-    data: Record<string, any>;
+    data: Record<string, unknown>;
     timestamp: number;
 }
 
 // Save form state for recovery
-export function saveFormState(formId: string, data: Record<string, any>): void {
+export function saveFormState(formId: string, data: Record<string, unknown>): void {
     try {
         const formState: FormState = {
             formId,
@@ -27,7 +27,7 @@ export function saveFormState(formId: string, data: Record<string, any>): void {
 }
 
 // Retrieve a saved form state
-export function getFormState(formId: string): Record<string, any> | null {
+export function getFormState(formId: string): Record<string, unknown> | null {
     try {
         const formState = localStorage.getItem(`${FORM_STATE_PREFIX}${formId}`);
         if (!formState) return null;

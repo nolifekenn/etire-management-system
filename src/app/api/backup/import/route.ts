@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid payload. Missing tables.' }, { status: 400 });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createAdminClient() as SupabaseClient<any>;
   let restoredTables = 0;
 

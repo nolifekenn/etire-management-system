@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -9,7 +10,6 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -28,7 +28,7 @@ import { supabaseUntyped as supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/hooks/use-toast";
 import {
   Loader2, UserPlus, AlertTriangle, Eye, EyeOff, Shield, Users, RefreshCw,
-  Search, X, Filter, Edit, Trash2, CheckCircle, KeyRound, ShieldCheck
+  Search, X, Filter, Trash2, KeyRound, ShieldCheck
 } from 'lucide-react';
 import { DataTableWrapper } from '@/components/DataTableWrapper';
 import { Badge } from '@/components/ui/badge';
@@ -53,7 +53,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [_fetchError, setFetchError] = useState<string | null>(null);
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');

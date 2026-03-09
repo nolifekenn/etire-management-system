@@ -344,7 +344,7 @@ export interface AuditLog {
   action: string;
   table_name: string;
   record_id?: string;
-  new_values?: any;
+  new_values?: Record<string, unknown>;
   created_at?: string;
   // Joined data
   user?: {

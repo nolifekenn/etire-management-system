@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 // import { verifyAuthToken } from "@/lib/tokenServer";
 // import { receiptGenerator } from "@/lib/receiptGenerator";
 
-export async function POST(req: Request) {
+export async function POST(_req: Request) {
   return NextResponse.json({ error: "Receipt generation is currently disabled." }, { status: 501 });
 
   /*

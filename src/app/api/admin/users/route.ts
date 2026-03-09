@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient, createClient } from "@/lib/supabaseServer";
 
 // Verify the request comes from an authenticated admin/branch-manager.
 // Uses getUser() which always re-validates against the Supabase Auth server,
 // unlike getSession() which can return a stale/revoked cached token.
-async function verifyAdminAccessImproved(request: NextRequest) {
+async function verifyAdminAccessImproved(_request: NextRequest) {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -23,7 +24,7 @@ async function verifyAdminAccessImproved(request: NextRequest) {
         return { error: "Could not verify user profile", status: 401 };
     }
 
-    const role = (userProfile as any).role;
+    const role = (userProfile as { user_id: string; role: string }).role;
     if (role !== 'super_admin' && role !== 'branch_manager') {
         return { error: "Insufficient permissions", status: 403 };
     }
@@ -107,9 +108,9 @@ export async function POST(request: NextRequest) {
         }
 
         return NextResponse.json({ data, message: "User created successfully" });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("POST error:", err);
-        return NextResponse.json({ error: err.message || "Unknown error" }, { status: 500 });
+        return NextResponse.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
     }
 }
 
@@ -142,7 +143,7 @@ export async function PUT(request: NextRequest) {
         }
 
         // Build update object
-        const updateData: Record<string, any> = {};
+        const updateData: Record<string, unknown> = {};
         if (role !== undefined) updateData.role = role;
         if (branch_id !== undefined) updateData.branch_id = branch_id;
         if (password) updateData.password = password;
@@ -161,7 +162,7 @@ export async function PUT(request: NextRequest) {
 
         // If role or branch changed, update auth metadata too? 
         if ((role || branch_id) && existingUser.auth_id) {
-            const metadata: any = {};
+            const metadata: { role?: string; branch_id?: string } = {};
             if (role) metadata.role = role;
             if (branch_id) metadata.branch_id = branch_id;
             await adminClient.auth.admin.updateUserById(existingUser.auth_id, { user_metadata: metadata });
@@ -185,9 +186,9 @@ export async function PUT(request: NextRequest) {
         }
 
         return NextResponse.json({ data, message: "User updated successfully" });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("PUT error:", err);
-        return NextResponse.json({ error: err.message || "Unknown error" }, { status: 500 });
+        return NextResponse.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
     }
 }
 
@@ -242,8 +243,8 @@ export async function DELETE(request: NextRequest) {
         }
 
         return NextResponse.json({ message: "User deleted successfully" });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error("DELETE error:", err);
-        return NextResponse.json({ error: err.message || "Unknown error" }, { status: 500 });
+        return NextResponse.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
     }
 }

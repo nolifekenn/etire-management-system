@@ -18,8 +18,8 @@ export async function registerAction(formData: {
     address?: string;
 }) {
     console.log("registerAction called with:", formData.username);
-    const { firstName, lastName, username, password, email: contactEmail, phone, address } = formData;
-    // Casting to any to bypass TS 'never' issues with the user table
+    const { firstName, lastName, username, password } = formData;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const adminClient: any = createAdminClient();
     const authEmail = getEmail(username);
 
@@ -69,6 +69,7 @@ export async function registerAction(formData: {
                 password: password, // Keeping legacy password for now as per requirement, or we could store a placeholder
                 role: 0, // Default to Guest
                 uuid: authData.user.id
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } as any);
 
         if (dbError) {

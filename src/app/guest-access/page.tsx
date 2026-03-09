@@ -75,7 +75,7 @@ export default function GuestAccessPage() {
                                 </li>
                                 <li className="flex items-start gap-2">
                                     <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0"></div>
-                                    <span>You'll receive full access to the system</span>
+                                    <span>You&apos;ll receive full access to the system</span>
                                 </li>
                             </ul>
                         </div>

@@ -42,11 +42,11 @@ export default function ConfigCheck() {
             databaseConnection: !error,
             error: error?.message
           }));
-        } catch (error: any) {
+        } catch (error: unknown) {
           setStatus(prev => ({
             ...prev,
             databaseConnection: false,
-            error: error.message
+            error: error instanceof Error ? error.message : 'Unknown error'
           }));
         }
       }

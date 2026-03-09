@@ -85,7 +85,7 @@ export default function PurchasingPage() {
     setLoading(true);
     try {
       const result = await listPOs({
-        branchId: user?.role !== "super_admin" ? (user as any)?.branch_id ?? undefined : undefined,
+        branchId: user?.role !== "super_admin" ? (user as Record<string, unknown>)?.branch_id as string ?? undefined : undefined,
         state:    stateFilter !== "all" ? (stateFilter as POState) : undefined,
         search:   search.trim() || undefined,
         page,

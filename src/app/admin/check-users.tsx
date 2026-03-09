@@ -6,10 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, CheckCircle, XCircle, RefreshCw, User } from 'lucide-react';
+import { AlertTriangle, CheckCircle, RefreshCw, User } from 'lucide-react';
 
 export default function CheckUsers() {
-    const [users, setUsers] = useState<any[]>([]);
+    const [users, setUsers] = useState<Record<string, unknown>[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [lastCheck, setLastCheck] = useState<Date | null>(null);
@@ -67,7 +67,7 @@ export default function CheckUsers() {
         checkUsers();
     }, []);
 
-    const getRoleName = (roleId: number) => {
+    const getRoleName = (_roleId: number) => {
         if (roleId === 3) return 'Admin';
         if (roleId === 2) return 'Branch Manager';
         if (roleId === 1) return 'Staff';
@@ -159,7 +159,7 @@ export default function CheckUsers() {
                                     <ul className="list-disc list-inside mt-2 space-y-1">
                                         <li>No users have been created yet</li>
                                         <li>Users were created in a different table</li>
-                                        <li>There's still a database connection issue</li>
+                                        <li>There&apos;s still a database connection issue</li>
                                     </ul>
                                     <p className="mt-2 text-sm">
                                         Try creating a user through the registration form or check if users exist in a different table.

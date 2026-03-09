@@ -49,7 +49,7 @@ export class GlobalErrorBoundary extends Component<Props, State> {
                         </CardHeader>
                         <CardContent className="text-center space-y-4">
                             <p className="text-slate-500">
-                                we're likely tracking this issue, but you can try refreshing the page or going back to the dashboard.
+                                we&apos;re likely tracking this issue, but you can try refreshing the page or going back to the dashboard.
                             </p>
                             {this.state.error && (
                                 <div className="bg-red-50 p-3 rounded-lg text-left overflow-auto max-h-32 text-xs font-mono text-red-800 border border-red-100">

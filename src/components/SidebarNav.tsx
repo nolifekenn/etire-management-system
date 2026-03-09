@@ -72,7 +72,7 @@ interface SidebarNavProps {
 export function SidebarNav({ forceExpanded = false }: SidebarNavProps) {
   const pathname = usePathname();
   const { user, logout, activeBranchId, setActiveBranchId } = useAuth();
-  const [branches, setBranches] = useState<any[]>([]);
+  const [branches, setBranches] = useState<{ branch_id: string; name: string }[]>([]);
   const [isCollapsedState, setIsCollapsedState] = useState(false);
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
 

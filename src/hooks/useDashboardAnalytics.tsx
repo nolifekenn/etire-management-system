@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
-import { startOfMonth, endOfMonth, subMonths, format, startOfWeek, endOfWeek } from 'date-fns';
+import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
 export interface DashboardAnalytics {
     revenueSplit: {
@@ -78,9 +78,9 @@ export function useDashboardAnalytics() {
             let servicesRevenue = 0;
             let goodsRevenue = 0;
 
-            revenueData?.forEach((item: any) => {
-                const amount = item.price_at_sale * item.quantity;
-                if (item.inventory_item.category === 'service') {
+            revenueData?.forEach((item: Record<string, unknown>) => {
+                const amount = (item.price_at_sale as number) * (item.quantity as number);
+                if ((item.inventory_item as Record<string, unknown>).category === 'service') {
                     servicesRevenue += amount;
                 } else {
                     goodsRevenue += amount;
@@ -152,9 +152,9 @@ export function useDashboardAnalytics() {
             if (topItemsError) throw topItemsError;
 
             const itemCounts: Record<string, number> = {};
-            topItemsData?.forEach((row: any) => {
-                const name = row.inventory_item.name;
-                itemCounts[name] = (itemCounts[name] || 0) + row.quantity;
+            topItemsData?.forEach((row: Record<string, unknown>) => {
+                const name = (row.inventory_item as Record<string, unknown>).name as string;
+                itemCounts[name] = (itemCounts[name] || 0) + (row.quantity as number);
             });
 
             const topBrands = Object.entries(itemCounts)
@@ -174,13 +174,13 @@ export function useDashboardAnalytics() {
             if (lowStockError) throw lowStockError;
 
             const inventoryHealth = (lowStockData || [])
-                .filter((item: any) => item.quantity <= item.reorder_level)
-                .map((item: any) => ({
-                    item_id: item.item_id,
-                    name: item.name,
-                    stock_quantity: item.quantity,
-                    reorder_level: item.reorder_level,
-                    supplier_name: item.supplier_name || 'N/A'
+                .filter((item: Record<string, unknown>) => (item.quantity as number) <= (item.reorder_level as number))
+                .map((item: Record<string, unknown>) => ({
+                    item_id: item.item_id as string,
+                    name: item.name as string,
+                    stock_quantity: item.quantity as number,
+                    reorder_level: item.reorder_level as number,
+                    supplier_name: item.supplier_name as string || 'N/A'
                 }))
                 .slice(0, 10); // Limit to top 10 critical
 
@@ -215,9 +215,9 @@ export function useDashboardAnalytics() {
                 bayUtilization
             });
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Error fetching dashboard analytics:', err);
-            setError(err.message);
+            setError(err instanceof Error ? err.message : 'Unknown error');
         } finally {
             setIsLoading(false);
         }

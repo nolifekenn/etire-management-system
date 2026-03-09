@@ -10,7 +10,7 @@ import { FormattedSaleRow } from "./salesReportFormatter";
 // ---------------------------------------------------
 // 🔹 FETCH SALES REPORT
 // ---------------------------------------------------
-export async function fetchSalesReport(filters: Record<string, any>) {
+export async function fetchSalesReport(filters: Record<string, unknown>) {
   const res = await fetch("/api/reports/sales", {
     method: "POST",
     headers: {
@@ -32,7 +32,7 @@ export async function fetchSalesReport(filters: Record<string, any>) {
 // ---------------------------------------------------
 export function exportSalesReportPDF(
   rows: FormattedSaleRow[],
-  filters: Record<string, any>
+  filters: Record<string, unknown>
 ) {
   try {
     const doc = new jsPDF("p", "mm", "a4");
@@ -75,7 +75,7 @@ export function exportSalesReportPDF(
     autoTable(doc, {
       startY,
       head: [["Date", "Customer", "Item", "Qty", "Unit Price", "Line Total", "Profit"]],
-      body: tableData as any,
+      body: tableData as unknown[],
       styles: { fontSize: 9 },
       headStyles: { fillColor: [16, 185, 129] }, // Tailwind emerald-500
     });

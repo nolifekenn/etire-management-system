@@ -11,7 +11,7 @@ interface UseFormPersistenceOptions {
     formId: string;
     autoSave?: boolean;
     saveInterval?: number; // in milliseconds
-    onRestore?: (data: Record<string, any>) => void;
+    onRestore?: (data: Record<string, unknown>) => void;
 }
 
 export function useFormPersistence({
@@ -33,7 +33,7 @@ export function useFormPersistence({
     }, [formId, onRestore]);
 
     // Auto-save function
-    const saveData = useCallback((data: Record<string, any>) => {
+    const saveData = useCallback((data: Record<string, unknown>) => {
         try {
             saveFormState(formId, data);
             setLastSaved(new Date());
@@ -81,7 +81,7 @@ export function useFormPersistence({
 export function useFormFieldPersistence(
     formId: string,
     fieldName: string,
-    initialValue: any = ''
+    initialValue: unknown = ''
 ) {
     const [value, setValue] = useState(initialValue);
     const [isRestored, setIsRestored] = useState(false);
@@ -96,7 +96,7 @@ export function useFormFieldPersistence(
     }, [formId, fieldName]);
 
     // Save field value when it changes
-    const updateValue = useCallback((newValue: any) => {
+    const updateValue = useCallback((newValue: unknown) => {
         setValue(newValue);
 
         // Get current form data and update the specific field
@@ -117,8 +117,8 @@ export function useFormSubmission(formId: string) {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const submitForm = useCallback(async (
-        formData: Record<string, any>,
-        onSubmit: (data: Record<string, any>) => Promise<void>
+        formData: Record<string, unknown>,
+        onSubmit: (data: Record<string, unknown>) => Promise<void>
     ) => {
         setIsSubmitting(true);
         try {

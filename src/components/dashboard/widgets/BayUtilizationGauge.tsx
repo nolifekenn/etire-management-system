@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { Wrench } from 'lucide-react';
 
@@ -19,8 +19,6 @@ export function BayUtilizationGauge({ data }: BayUtilizationGaugeProps) {
         { name: 'Active', value: data.active },
         { name: 'Available', value: Math.max(0, data.capacity - data.active) },
     ];
-
-    const COLORS = ['#4f46e5', '#e2e8f0']; // Indigo 600 (active), Slate 200 (empty)
 
     // Color logic based on utilization
     const activeColor = data.utilization > 80 ? '#ef4444' : // Red if > 80% (busy)
@@ -64,6 +62,7 @@ export function BayUtilizationGauge({ data }: BayUtilizationGaugeProps) {
                         </Pie>
                         <Tooltip
                             cursor={{ fill: 'transparent' }}
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             content={({ active }: any) => {
                                 if (active) {
                                     return (

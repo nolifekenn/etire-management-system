@@ -33,7 +33,8 @@ interface Column {
   header: string;
   sortable?: boolean;
   align?: 'left' | 'center' | 'right';
-  render?: (value: any, item: any) => React.ReactNode;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  render?: (value: unknown, item: any) => React.ReactNode;
   accessorKey?: string; // For data access path 'user.name'
 }
 
@@ -57,7 +58,7 @@ interface DataTableWrapperProps<T> {
 
 export function DataTableWrapper<T>({
   title,
-  description,
+  // description is part of props interface but not rendered
   columns,
   data,
   onEdit,
@@ -101,6 +102,7 @@ export function DataTableWrapper<T>({
   };
 
   // Helper to get value from key (supports dot notation)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getValue = (item: any, key: string) => {
     return key.split('.').reduce((acc, k) => acc?.[k], item);
   };
@@ -122,8 +124,8 @@ export function DataTableWrapper<T>({
     // Sort
     if (sortConfig) {
       filtered.sort((a, b) => {
-        const aValue = getValue(a, sortConfig.key) || (a as any)[sortConfig.key];
-        const bValue = getValue(b, sortConfig.key) || (b as any)[sortConfig.key];
+        const aValue = getValue(a, sortConfig.key) || (a as Record<string, unknown>)[sortConfig.key];
+        const bValue = getValue(b, sortConfig.key) || (b as Record<string, unknown>)[sortConfig.key];
 
         if (aValue === null || aValue === undefined) return 1;
         if (bValue === null || bValue === undefined) return -1;
@@ -236,7 +238,7 @@ export function DataTableWrapper<T>({
                 ) : (
                   paginatedData.map((item, index) => (
                     <TableRow
-                      key={(item as any).id || (item as any).key || `row-${index}`}
+                      key={(item as Record<string, unknown>).id as string || (item as Record<string, unknown>).key as string || `row-${index}`}
                       className={`
                         border-b border-slate-50
                         transition-colors duration-150
@@ -247,7 +249,7 @@ export function DataTableWrapper<T>({
                     >
                       {columns.map((col) => {
                         const sortKey = col.accessorKey || col.key;
-                        const cellValue = getValue(item, sortKey) || (item as any)[col.key];
+                        const cellValue = getValue(item, sortKey) || (item as Record<string, unknown>)[col.key];
                         return (
                           <TableCell
                             key={String(col.key)}

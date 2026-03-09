@@ -27,7 +27,6 @@ import {
   Wrench,
   BarChart3,
   Database,
-  Menu,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth }               from "@/hooks/useAuth";
@@ -66,7 +65,7 @@ function NotifIcon({ type }: { type: Notification["type"] }) {
   return                         <Info          className="h-4 w-4 text-blue-500  shrink-0" />;
 }
 
-export function OdooTopNav({ onMenuToggle }: { onMenuToggle?: () => void }) {
+export function OdooTopNav({ onMenuToggle: _onMenuToggle }: { onMenuToggle?: () => void }) {
   const { user, logout, activeBranchId, setActiveBranchId } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);

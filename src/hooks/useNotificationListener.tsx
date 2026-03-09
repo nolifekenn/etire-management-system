@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { Notification } from '@/lib/types';
-import { Bell } from 'lucide-react';
 
 /**
  * Hook to listen for real-time notifications and show toast popups

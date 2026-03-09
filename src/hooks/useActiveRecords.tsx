@@ -35,7 +35,7 @@ export async function softDelete(
 
     return await supabase
         .from(tableName)
-        .update({ deleted_at: new Date().toISOString() } as any)
+        .update({ deleted_at: new Date().toISOString() } as Record<string, unknown>)
         .eq(idColumn, idValue);
 }
 
@@ -55,7 +55,7 @@ export async function softDeleteMany(
 
     return await supabase
         .from(tableName)
-        .update({ deleted_at: new Date().toISOString() } as any)
+        .update({ deleted_at: new Date().toISOString() } as Record<string, unknown>)
         .in(idColumn, idValues);
 }
 
@@ -71,7 +71,7 @@ export async function fetchActiveRecords(
     selectColumns: string = '*',
     orderBy?: string,
     ascending: boolean = true
-): Promise<{ data: any[] | null; error: any }> {
+): Promise<{ data: Record<string, unknown>[] | null; error: unknown }> {
     if (!supabase) return { data: null, error: new Error('Supabase client not available') };
 
     let query = supabase

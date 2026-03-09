@@ -9,7 +9,7 @@ import autoTable from "jspdf-autotable";
 // ---------------------------------------------------
 // 🔹 FETCH INVENTORY REPORT
 // ---------------------------------------------------
-export async function fetchInventoryReport(filters: Record<string, any>) {
+export async function fetchInventoryReport(filters: Record<string, unknown>) {
   const res = await fetch("/api/reports/inventory", {
     method: "POST",
     headers: {
@@ -29,7 +29,7 @@ export async function fetchInventoryReport(filters: Record<string, any>) {
 // ---------------------------------------------------
 // 🔹 PDF EXPORT
 // ---------------------------------------------------
-export function exportInventoryReportPDF(rows: any[], filters: Record<string, any>) {
+export function exportInventoryReportPDF(rows: Record<string, unknown>[], filters: Record<string, unknown>) {
   try {
     const doc = new jsPDF("p", "mm", "a4");
     doc.setFont("Helvetica", "bold");
@@ -80,7 +80,7 @@ export function exportInventoryReportPDF(rows: any[], filters: Record<string, an
 // ---------------------------------------------------
 // 🔹 CSV EXPORT
 // ---------------------------------------------------
-export function exportInventoryReportCSV(rows: any[]) {
+export function exportInventoryReportCSV(rows: Record<string, unknown>[]) {
   try {
     const headers = ["Item", "Category", "Stock", "Cost Price", "Sale Price", "Stock Value", "Potential Revenue"];
 

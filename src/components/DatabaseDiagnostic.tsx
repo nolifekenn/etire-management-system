@@ -9,12 +9,12 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 
 export default function DatabaseDiagnostic() {
-    const [diagnostics, setDiagnostics] = useState<any>({});
+    const [diagnostics, setDiagnostics] = useState<Record<string, unknown>>({});
     const [isLoading, setIsLoading] = useState(false);
 
     const runDiagnostics = async () => {
         setIsLoading(true);
-        const results: any = {};
+        const results: Record<string, unknown> = {};
 
         // Check environment variables
         results.envVars = {
