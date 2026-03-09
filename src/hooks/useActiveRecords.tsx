@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { supabase } from "@/lib/supabaseClient";
@@ -71,7 +72,7 @@ export async function fetchActiveRecords(
     selectColumns: string = '*',
     orderBy?: string,
     ascending: boolean = true
-): Promise<{ data: Record<string, unknown>[] | null; error: unknown }> {
+): Promise<{ data: any[] | null; error: any }> {
     if (!supabase) return { data: null, error: new Error('Supabase client not available') };
 
     let query = supabase

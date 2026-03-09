@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/salesReportFormatter.ts
 
 export interface FormattedSaleRow {
@@ -16,7 +17,7 @@ export interface FormattedSaleRow {
     vehicle_type?: string;
 }
 
-export function formatSalesReportData(sales: Record<string, unknown>[]): FormattedSaleRow[] {
+export function formatSalesReportData(sales: any[]): FormattedSaleRow[] {
     return sales.flatMap((sale) =>
         (sale.sale_item as Record<string, unknown>[]).map((item: Record<string, unknown>) => ({
             sale_id: sale.sale_id as string,

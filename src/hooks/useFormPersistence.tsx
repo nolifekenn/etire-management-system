@@ -78,25 +78,25 @@ export function useFormPersistence({
 }
 
 // Hook for specific form fields
-export function useFormFieldPersistence(
+export function useFormFieldPersistence<T = unknown>(
     formId: string,
     fieldName: string,
-    initialValue: unknown = ''
+    initialValue: T
 ) {
-    const [value, setValue] = useState(initialValue);
+    const [value, setValue] = useState<T>(initialValue);
     const [isRestored, setIsRestored] = useState(false);
 
     // Restore field value on mount
     useEffect(() => {
         const savedData = getFormState(formId);
         if (savedData && savedData[fieldName] !== undefined) {
-            setValue(savedData[fieldName]);
+            setValue(savedData[fieldName] as T);
             setIsRestored(true);
         }
     }, [formId, fieldName]);
 
     // Save field value when it changes
-    const updateValue = useCallback((newValue: unknown) => {
+    const updateValue = useCallback((newValue: T) => {
         setValue(newValue);
 
         // Get current form data and update the specific field

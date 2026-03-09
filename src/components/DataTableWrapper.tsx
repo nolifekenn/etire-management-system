@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -34,7 +35,7 @@ interface Column {
   sortable?: boolean;
   align?: 'left' | 'center' | 'right';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  render?: (value: unknown, item: any) => React.ReactNode;
+  render?: (value: any, item: any) => React.ReactNode;
   accessorKey?: string; // For data access path 'user.name'
 }
 

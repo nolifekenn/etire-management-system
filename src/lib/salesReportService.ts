@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/salesReportService.ts
 // ---------------------------------------------------
 // Handles API fetch + PDF + CSV export for Sales Reports
@@ -10,7 +11,7 @@ import { FormattedSaleRow } from "./salesReportFormatter";
 // ---------------------------------------------------
 // 🔹 FETCH SALES REPORT
 // ---------------------------------------------------
-export async function fetchSalesReport(filters: Record<string, unknown>) {
+export async function fetchSalesReport(filters: any) {
   const res = await fetch("/api/reports/sales", {
     method: "POST",
     headers: {
@@ -32,7 +33,7 @@ export async function fetchSalesReport(filters: Record<string, unknown>) {
 // ---------------------------------------------------
 export function exportSalesReportPDF(
   rows: FormattedSaleRow[],
-  filters: Record<string, unknown>
+  filters: any
 ) {
   try {
     const doc = new jsPDF("p", "mm", "a4");
@@ -75,7 +76,7 @@ export function exportSalesReportPDF(
     autoTable(doc, {
       startY,
       head: [["Date", "Customer", "Item", "Qty", "Unit Price", "Line Total", "Profit"]],
-      body: tableData as unknown[],
+      body: tableData as any[],
       styles: { fontSize: 9 },
       headStyles: { fillColor: [16, 185, 129] }, // Tailwind emerald-500
     });

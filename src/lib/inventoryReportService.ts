@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/inventoryReportService.ts
 // ---------------------------------------------------
 // Handles API fetch + PDF + CSV export for Inventory Reports
@@ -9,7 +10,7 @@ import autoTable from "jspdf-autotable";
 // ---------------------------------------------------
 // 🔹 FETCH INVENTORY REPORT
 // ---------------------------------------------------
-export async function fetchInventoryReport(filters: Record<string, unknown>) {
+export async function fetchInventoryReport(filters: any) {
   const res = await fetch("/api/reports/inventory", {
     method: "POST",
     headers: {
@@ -29,7 +30,7 @@ export async function fetchInventoryReport(filters: Record<string, unknown>) {
 // ---------------------------------------------------
 // 🔹 PDF EXPORT
 // ---------------------------------------------------
-export function exportInventoryReportPDF(rows: Record<string, unknown>[], filters: Record<string, unknown>) {
+export function exportInventoryReportPDF(rows: any[], filters: any) {
   try {
     const doc = new jsPDF("p", "mm", "a4");
     doc.setFont("Helvetica", "bold");
@@ -80,7 +81,7 @@ export function exportInventoryReportPDF(rows: Record<string, unknown>[], filter
 // ---------------------------------------------------
 // 🔹 CSV EXPORT
 // ---------------------------------------------------
-export function exportInventoryReportCSV(rows: Record<string, unknown>[]) {
+export function exportInventoryReportCSV(rows: any[]) {
   try {
     const headers = ["Item", "Category", "Stock", "Cost Price", "Sale Price", "Stock Value", "Potential Revenue"];
 

@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     const processedData = data.map((sale: Record<string, unknown>) => {
       const serviceFee: number = ((sale.service_job as Record<string, unknown>)?.service_fee as number) ?? 0;
 
-      const processedItems = (sale.sale_item as Record<string, unknown>[]).map((item: Record<string, unknown>) => {
+      const processedItems: Record<string, unknown>[] = (sale.sale_item as Record<string, unknown>[]).map((item: Record<string, unknown>) => {
         const quantity = (item.quantity as number) || 0;
         const price = (item.price_at_sale as number) || 0;
         const cost = ((item.inventory_item as Record<string, unknown>)?.cost_price as number) || 0;

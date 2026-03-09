@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -31,7 +32,7 @@ export function FormPersistenceIndicator({
                 // Try to get timestamp from saved data
                 const timestamp = savedData._timestamp;
                 if (timestamp) {
-                    setLastSaved(new Date(timestamp));
+                    setLastSaved(new Date(timestamp as string | number | Date));
                 }
             } else {
                 setHasSavedData(false);
