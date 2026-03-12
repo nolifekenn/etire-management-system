@@ -11,7 +11,7 @@ export default function LoginPage() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, user } = useAuth();
+  const { login, user, resetSession } = useAuth();
 
   const [isLoading, setIsLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
@@ -110,6 +110,16 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleResetSession = async () => {
+    setPendingRedirect(false);
+    setPassword('');
+    await resetSession();
+    toast({
+      title: 'Session reset',
+      description: 'Local session and cached data cleared.',
+    });
   };
 
   return (
@@ -303,6 +313,19 @@ export default function LoginPage() {
               ) : (
                 'Log in'
               )}
+            </button>
+            <button
+              type="button"
+              onClick={handleResetSession}
+              disabled={isLoading}
+              className="w-full text-xs font-semibold"
+              style={{
+                color: '#6b4a72',
+                opacity: isLoading ? 0.6 : 1,
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Reset session on this device
             </button>
           </form>
         </div>

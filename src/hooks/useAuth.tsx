@@ -18,6 +18,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
+  resetSession: () => Promise<void>;
   activeBranchId: string | null;
   setActiveBranchId: (id: string | null) => void;
   refreshUser: () => Promise<void>;
@@ -28,6 +29,7 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   login: async () => false,
   logout: () => { },
+  resetSession: async () => { },
   activeBranchId: null,
   setActiveBranchId: () => { },
   refreshUser: async () => { },
@@ -397,8 +399,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const resetSession = async () => {
+    sessionStorage.removeItem('etire_session_nonce');
+    sessionStorage.removeItem('etire_intended_path');
+    setUser(null);
+    setActiveBranchIdState(null);
+    localStorage.removeItem('etire_active_branch');
+
+    if (supabase) {
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch (error) {
+        console.error("Reset Session Error:", error);
+      }
+    }
+
+    router.replace('/login');
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, activeBranchId, setActiveBranchId, refreshUser }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, resetSession, activeBranchId, setActiveBranchId, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
