@@ -189,9 +189,9 @@ export function useDashboardAnalytics() {
             const BAY_CAPACITY = 5; // Hardcoded
             const { count: activeJobsCount, error: jobError } = await supabase
                 .from('service_job')
-                .select('*', { count: 'exact', head: true })
+                .select('job_id', { count: 'exact', head: true })
                 .eq('branch_id', activeBranchId)
-                .eq('status', 'in-progress')
+                .in('state', ['quotation', 'confirmed', 'in_progress', 'quality_check'])
                 .is('deleted_at', null);
 
             if (jobError) throw jobError;

@@ -3202,10 +3202,14 @@ export default function EnhancedCustomersPage() {
                     id="customer-phone"
                     value={customerPhone}
                     onChange={(e) => {
-                      setCustomerPhone(e.target.value);
-                      setCustomerFormErrors((p) => ({ ...p, phone: validatePhone(e.target.value, { label: 'Phone' }) }));
+                      // Strip any non-digit characters and cap at 15 digits
+                      const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 15);
+                      setCustomerPhone(digitsOnly);
+                      setCustomerFormErrors((p) => ({ ...p, phone: validatePhone(digitsOnly, { label: 'Phone' }) }));
                     }}
-                    placeholder="+1-555-0101"
+                    inputMode="numeric"
+                    maxLength={15}
+                    placeholder="09XXXXXXXXX"
                     aria-invalid={!!customerFormErrors.phone}
                     className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins${
                       customerFormErrors.phone ? ' border-red-400 focus:border-red-400 focus:ring-red-200' : ''

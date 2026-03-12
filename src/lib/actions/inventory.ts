@@ -142,7 +142,7 @@ export async function listProducts(input: ListProductsInput = {}) {
 export async function getProductWithDetails(itemId: string) {
   const supabase: AnyClient = await createClient();
 
-  const { data, error } = await supabase
+  const fetchMain = () => supabase
     .from('inventory_item')
     .select(`
       *,
@@ -153,9 +153,21 @@ export async function getProductWithDetails(itemId: string) {
     `)
     .eq('item_id', itemId)
     .is('deleted_at', null)
-    .single();
+    .maybeSingle();
+
+  let { data, error } = await fetchMain();
+
+  // Retry with increasing delays — handles the brief visibility window after a
+  // newly-created product is inserted (RLS evaluation timing, pgbouncer routing).
+  const RETRY_DELAYS_MS = [400, 700, 1000];
+  for (const delay of RETRY_DELAYS_MS) {
+    if (data || error) break;
+    await new Promise(r => setTimeout(r, delay));
+    ({ data, error } = await fetchMain());
+  }
 
   if (error) return { success: false, error: error.message, product: null };
+  if (!data)  return { success: false, error: 'Product not found', product: null };
 
   // Fetch recent delivery moves (incoming stock)
   const { data: deliveryMoves } = await supabase
@@ -298,6 +310,7 @@ export async function upsertProduct(input: UpsertProductInput) {
 
   revalidatePath('/inventory');
   revalidatePath('/inventory/products');
+  if (isNew) revalidatePath(`/inventory/products/${result.item_id as string}`);
   if (!isNew) revalidatePath(`/inventory/products/${input.item_id}`);
 
   // Audit trail

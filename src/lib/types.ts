@@ -4,7 +4,7 @@
 // ==========================================
 
 // Role types for the system
-export type UserRole = 'super_admin' | 'branch_manager' | 'staff' | 'cashier';
+export type UserRole = 'super_admin' | 'branch_manager' | 'staff' | 'cashier' | 'mechanic';
 
 // User Management
 export interface User {

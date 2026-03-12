@@ -34,6 +34,15 @@ export default function LoginPage() {
       });
       router.replace('/login');
     }
+    if (error === 'session_superseded') {
+      toast({
+        title: 'Session Ended',
+        description: 'Your session was ended because the account was logged in from another location.',
+        variant: 'destructive',
+        duration: 8000,
+      });
+      router.replace('/login');
+    }
   }, [searchParams, toast, router]);
 
   // Clean up any previously stored plaintext passwords (security fix)

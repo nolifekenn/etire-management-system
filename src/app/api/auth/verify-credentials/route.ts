@@ -117,27 +117,53 @@ export async function POST(request: NextRequest) {
 
     if (!authId) {
       const derivedEmail = `${username}@${EMAIL_DOMAIN}`;
-      const { data: createdUser, error: createError } = await adminClient.auth.admin.createUser({
-        email: derivedEmail,
-        password,
-        email_confirm: true,
-        user_metadata: {
-          username: userRecord.username,
-          name: userRecord.name,
-          role: userRecord.role,
-        },
-      });
 
-      if (createError || !createdUser.user) {
-        console.error("[verify-credentials] Failed to create Supabase Auth user:", createError);
-        return NextResponse.json(
-          { success: false, message: "Unable to prepare authentication for this account." },
-          { status: 500 }
-        );
+      // Recovery guard: before creating a new auth user, check whether one
+      // already exists for this email (e.g. stale auth_id in DB after a
+      // manual Supabase restore). If we skip this check, createUser would
+      // return "already registered" and lock the user out permanently.
+      let recoveredId: string | null = null;
+      let recoveredEmail: string | null = null;
+      const { data: usersPage } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      if (usersPage?.users) {
+        const match = usersPage.users.find((u) => u.email === derivedEmail);
+        if (match) {
+          recoveredId = match.id;
+          recoveredEmail = match.email ?? derivedEmail;
+          console.log("[verify-credentials] Recovered existing auth user by email.");
+        }
       }
 
-      authId = createdUser.user.id;
-      authEmail = createdUser.user.email ?? derivedEmail;
+      if (recoveredId) {
+        authId = recoveredId;
+        authEmail = recoveredEmail;
+        // Sync password so subsequent signInWithPassword works
+        await adminClient.auth.admin.updateUserById(authId, { password }).catch((e: unknown) =>
+          console.warn("[verify-credentials] Password sync on recovery failed:", e)
+        );
+      } else {
+        const { data: createdUser, error: createError } = await adminClient.auth.admin.createUser({
+          email: derivedEmail,
+          password,
+          email_confirm: true,
+          user_metadata: {
+            username: userRecord.username,
+            name: userRecord.name,
+            role: userRecord.role,
+          },
+        });
+
+        if (createError || !createdUser.user) {
+          console.error("[verify-credentials] Failed to create Supabase Auth user:", createError);
+          return NextResponse.json(
+            { success: false, message: "Unable to prepare authentication for this account." },
+            { status: 500 }
+          );
+        }
+
+        authId = createdUser.user.id;
+        authEmail = createdUser.user.email ?? derivedEmail;
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: updateError } = await (adminClient.from("user") as any)
@@ -153,10 +179,19 @@ export async function POST(request: NextRequest) {
       authEmail = `${username}@${EMAIL_DOMAIN}`;
     }
 
+    // Single-session enforcement: rotate the nonce so any existing session
+    // (e.g. an attacker's concurrent login) detects the mismatch on its next
+    // heartbeat check and is automatically signed out.
+    const sessionNonce = crypto.randomUUID();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (adminClient.from("user") as any)
+      .update({ current_session_nonce: sessionNonce })
+      .eq("user_id", userRecord.user_id);
+
     // Successful authentication — clear the failed-attempt counter for this IP
     loginRateLimiter.reset(ip);
 
-    return NextResponse.json({ success: true, email: authEmail });
+    return NextResponse.json({ success: true, email: authEmail, nonce: sessionNonce });
   } catch (error) {
     console.error("[verify-credentials] Unexpected error:", error);
     return NextResponse.json(

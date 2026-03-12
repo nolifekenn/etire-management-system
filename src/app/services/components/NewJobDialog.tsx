@@ -307,6 +307,16 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
 
   const removeLine = (id: string) => setLines(prev => prev.filter(l => l.id !== id));
 
+  const duplicateLine = (id: string) => {
+    const orig = lines.find(l => l.id === id);
+    if (!orig) return;
+    setLines(prev => [...prev, {
+      ...orig,
+      id:  `_new_${Date.now()}_${Math.random()}`,
+      qty: 1,
+    }]);
+  };
+
   const subtotal = lines.reduce((acc, l) => acc + l.qty * l.unit_price, 0);
   const autoDesc = lines.length > 0 ? lines.map(l => l.name).join(" / ") : "";
 
@@ -411,8 +421,12 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs">Vehicle Type</Label>
-                  <Select value={toSel(vehicleTypeId)} onValueChange={v => setVehicleTypeId(toVal(v))}>
+                  <Label className="text-xs flex items-center gap-1">
+                    <Car className="h-3 w-3" />
+                    Vehicle Type
+                    {vehicleId && <span className="ml-1 text-muted-foreground font-normal">(auto-set by vehicle)</span>}
+                  </Label>
+                  <Select value={toSel(vehicleTypeId)} onValueChange={v => setVehicleTypeId(toVal(v))} disabled={!!vehicleId}>
                     <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select type" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value={NONE}>-- None --</SelectItem>
@@ -478,7 +492,7 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
                         <th className="text-right px-3 py-1.5 text-xs font-medium text-gray-600 w-14">Qty</th>
                         <th className="text-right px-3 py-1.5 text-xs font-medium text-gray-600 w-28">Unit Price</th>
                         <th className="text-right px-3 py-1.5 text-xs font-medium text-gray-600 w-28">Subtotal</th>
-                        <th className="w-8" />
+                          <th className="w-16" />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -515,11 +529,18 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
                             P{(line.qty * line.unit_price).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                           </td>
                           <td className="px-2 py-1.5 text-center">
-                            <Button type="button" variant="ghost" size="icon"
-                              className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50"
-                              onClick={() => removeLine(line.id)}>
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                            <div className="flex items-center gap-0.5 justify-center">
+                              <Button type="button" variant="ghost" size="icon"
+                                className="h-6 w-6 text-blue-400 hover:text-blue-600 hover:bg-blue-50"
+                                onClick={() => duplicateLine(line.id)}>
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                              <Button type="button" variant="ghost" size="icon"
+                                className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50"
+                                onClick={() => removeLine(line.id)}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))}

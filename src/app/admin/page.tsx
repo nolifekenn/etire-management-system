@@ -184,7 +184,8 @@ export default function AdminPage() {
         const style = role === 'super_admin' ? 'bg-red-50 text-red-700 border-red-200' :
           role === 'branch_manager' ? 'bg-purple-50 text-purple-700 border-purple-200' :
             role === 'cashier' ? 'bg-green-50 text-green-700 border-green-200' :
-              'bg-blue-50 text-blue-700 border-blue-200';
+              role === 'mechanic' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                'bg-blue-50 text-blue-700 border-blue-200';
         const label = role.replace('_', ' ').toUpperCase();
         return <Badge variant="outline" className={style}>{label}</Badge>;
       }
@@ -359,6 +360,7 @@ export default function AdminPage() {
     managers: users.filter(u => u.role === 'branch_manager').length,
     staff: users.filter(u => u.role === 'staff').length,
     cashiers: users.filter(u => u.role === 'cashier').length,
+    mechanics: users.filter(u => u.role === 'mechanic').length,
   };
 
   if (isAuthLoading) {
@@ -397,7 +399,7 @@ export default function AdminPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className={`grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 transition-all duration-500 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        <div className={`grid grid-cols-1 md:grid-cols-5 gap-4 mb-8 transition-all duration-500 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
             <div className="flex items-center justify-between">
               <div><p className="text-sm text-slate-500 dark:text-slate-400">Total Users</p><p className="text-2xl font-bold text-slate-800 dark:text-white">{userStats.total}</p></div>
@@ -420,6 +422,12 @@ export default function AdminPage() {
             <div className="flex items-center justify-between">
               <div><p className="text-sm text-slate-500 dark:text-slate-400">Staff</p><p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{userStats.staff}</p></div>
               <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center"><Users className="h-5 w-5 text-blue-600 dark:text-blue-400" /></div>
+            </div>
+          </div>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div><p className="text-sm text-slate-500 dark:text-slate-400">Mechanics</p><p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{userStats.mechanics}</p></div>
+              <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center"><Users className="h-5 w-5 text-orange-600 dark:text-orange-400" /></div>
             </div>
           </div>
         </div>
@@ -469,6 +477,7 @@ export default function AdminPage() {
                     <SelectItem value="branch_manager">Branch Manager</SelectItem>
                     <SelectItem value="staff">Staff</SelectItem>
                     <SelectItem value="cashier">Cashier</SelectItem>
+                    <SelectItem value="mechanic">Mechanic</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -508,6 +517,7 @@ export default function AdminPage() {
                     <SelectContent className="dark:bg-slate-900 dark:border-slate-700">
                       <SelectItem value="cashier">Cashier</SelectItem>
                       <SelectItem value="staff">Staff</SelectItem>
+                      <SelectItem value="mechanic">Mechanic</SelectItem>
                       <SelectItem value="branch_manager">Branch Manager</SelectItem>
                       <SelectItem value="super_admin">Super Admin</SelectItem>
                     </SelectContent>
@@ -577,6 +587,7 @@ export default function AdminPage() {
                   <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
                     <SelectItem value="cashier">Cashier (POS Access)</SelectItem>
                     <SelectItem value="staff">Staff (Standard Access)</SelectItem>
+                    <SelectItem value="mechanic">Mechanic (Workshop Access)</SelectItem>
                     <SelectItem value="branch_manager">Branch Manager (Elevated Access)</SelectItem>
                     <SelectItem value="super_admin">Super Admin (Full Control)</SelectItem>
                   </SelectContent>

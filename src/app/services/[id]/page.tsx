@@ -301,6 +301,16 @@ function LineItemsTable({ items, editable, onChange, vehicleTypeId }: LineItemsT
 
   const removeRow = (idx: number) => onChange(items.filter((_, i) => i !== idx));
 
+  const duplicateRow = (idx: number) => {
+    const orig = items[idx];
+    const newRow: ServiceJobItemRow = {
+      ...orig,
+      service_job_item_id: `_new_${Date.now()}`,
+      quantity: 1,
+    };
+    onChange([...items.slice(0, idx + 1), newRow, ...items.slice(idx + 1)]);
+  };
+
   const subtotal = items.reduce((acc, i) => acc + i.price_at_service * i.quantity, 0);
 
   return (
@@ -385,11 +395,18 @@ function LineItemsTable({ items, editable, onChange, vehicleTypeId }: LineItemsT
                   </td>
                   {editable && (
                     <td className="px-2 py-1.5 text-center">
-                      <Button variant="ghost" size="icon"
-                        className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => removeRow(idx)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                      <div className="flex items-center gap-0.5 justify-center">
+                        <Button variant="ghost" size="icon"
+                          className="h-6 w-6 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                          onClick={() => duplicateRow(idx)}>
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon"
+                          className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => removeRow(idx)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -562,6 +579,13 @@ export default function ServiceFormPage() {
     if (!editMode || !formCustomerId) { setFormVehicles([]); return; }
     getVehiclesByCustomer(formCustomerId).then(setFormVehicles);
   }, [formCustomerId, editMode]);
+
+  // Auto-set vehicle type when the selected vehicle changes in edit mode
+  useEffect(() => {
+    if (!editMode || !formVehicleId) return;
+    const veh = formVehicles.find(v => v.vehicle_id === formVehicleId);
+    if (veh?.vehicle_type_id) setFormVehicleTypeId(veh.vehicle_type_id);
+  }, [formVehicleId, formVehicles, editMode]);
 
   // ── Save ───────────────────────────────────────────────────────────────────
 
@@ -768,13 +792,20 @@ export default function ServiceFormPage() {
               </>
             )}
 
-            {!editMode && nextStates.filter(s => s !== "cancelled").map(ns => (
-              <Button key={ns} size="sm" className="gap-1.5"
-                disabled={saving} onClick={() => handleTransitionClick(ns)}>
-                <CheckCircle2 className="h-4 w-4" />
-                {TRANSITION_LABELS[ns] ?? SERVICE_STATE_LABELS[ns]}
-              </Button>
-            ))}
+            {!editMode && nextStates.filter(s => s !== "cancelled").map(ns => {
+              const isRestart = job.state === "quality_check" && ns === "in_progress";
+              const label = isRestart
+                ? "Restart Service"
+                : (TRANSITION_LABELS[ns] ?? SERVICE_STATE_LABELS[ns]);
+              return (
+                <Button key={ns} size="sm"
+                  className={cn("gap-1.5", isRestart ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500" : "")}
+                  disabled={saving} onClick={() => handleTransitionClick(ns)}>
+                  <CheckCircle2 className="h-4 w-4" />
+                  {label}
+                </Button>
+              );
+            })}
 
             {!editMode && nextStates.includes("cancelled") && job.state !== "cancelled" && (
               <Button variant="destructive" size="sm"
@@ -836,7 +867,7 @@ export default function ServiceFormPage() {
                 </CardHeader>
                 <CardContent className="px-4 pb-4">
                   <div className="mb-4 space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Job Description</Label>
+                    <Label className="text-xs text-muted-foreground">Job Description <span className="text-red-500">*</span></Label>
                     {editMode ? (
                       <div>
                         <Textarea
@@ -932,11 +963,15 @@ export default function ServiceFormPage() {
 
                       {/* Vehicle Type */}
                       <div className="space-y-1.5">
-                        <Label className="text-xs">Vehicle Type</Label>
+                        <Label className="text-xs">
+                          Vehicle Type
+                          {formVehicleId && <span className="ml-1 text-muted-foreground font-normal text-[10px]">(auto-set)</span>}
+                        </Label>
                         <select
                           value={formVehicleTypeId}
                           onChange={e => setFormVehicleTypeId(e.target.value)}
-                          className="w-full text-sm border border-input rounded-md px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                          disabled={!!formVehicleId}
+                          className="w-full text-sm border border-input rounded-md px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                           <option value="">— None —</option>
                           {formVehTypes.map(vt => (
@@ -1154,6 +1189,8 @@ export default function ServiceFormPage() {
               <AlertDialogTitle>
                 {transitionTarget === "completed"
                   ? "⚠️ Mark as Done & Consume Stock?"
+                  : job?.state === "quality_check" && transitionTarget === "in_progress"
+                  ? "Restart Service?"
                   : `Confirm: ${SERVICE_STATE_LABELS[transitionTarget]}`}
               </AlertDialogTitle>
               <AlertDialogDescription>
@@ -1166,7 +1203,9 @@ export default function ServiceFormPage() {
               <AlertDialogCancel>Go Back</AlertDialogCancel>
               <AlertDialogAction onClick={confirmTransition} disabled={saving}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {TRANSITION_LABELS[transitionTarget] ?? "Proceed"}
+                {job?.state === "quality_check" && transitionTarget === "in_progress"
+                  ? "Restart Service"
+                  : TRANSITION_LABELS[transitionTarget] ?? "Proceed"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
