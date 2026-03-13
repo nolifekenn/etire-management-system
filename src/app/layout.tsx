@@ -9,6 +9,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { useNotificationListener } from '@/hooks/useNotificationListener';
 import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary';
 import { OdooTopNav } from '@/components/layout/OdooTopNav';
+import { UserRole } from '@/lib/types';
 import './globals.css';
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
@@ -18,6 +19,58 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
   // Enable real-time notification toasts
   useNotificationListener();
+
+  const isPublicRoute = (path: string) => path === '/login' || path === '/guest-access';
+
+  const canAccessPath = (role: UserRole, path: string) => {
+    if (role === 'super_admin') return true;
+
+    const allowedPrefixesByRole: Record<UserRole, string[]> = {
+      super_admin: ['/'],
+      branch_manager: [
+        '/',
+        '/dashboard',
+        '/inventory',
+        '/pos',
+        '/services',
+        '/customers',
+        '/purchasing',
+        '/reports',
+        '/branches',
+        '/backup',
+        '/settings',
+        '/admin',
+        '/sales',
+        '/receipt',
+      ],
+      staff: [
+        '/',
+        '/dashboard',
+        '/inventory',
+        '/pos',
+        '/services',
+        '/customers',
+        '/purchasing',
+        '/receipt',
+      ],
+      cashier: [
+        '/',
+        '/dashboard',
+        '/pos',
+        '/customers',
+        '/receipt',
+      ],
+      mechanic: [
+        '/',
+        '/dashboard',
+        '/services',
+        '/receipt',
+      ],
+    };
+
+    const allowedPrefixes = allowedPrefixesByRole[role] ?? [];
+    return allowedPrefixes.some(prefix => path === prefix || path.startsWith(`${prefix}/`));
+  };
 
   // Auto-logout on inactivity (30 min)
   useEffect(() => {
@@ -55,7 +108,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isHydrated || isLoading) return;
 
-    if (!user && pathname !== '/login') {
+    if (!user && !isPublicRoute(pathname)) {
       // Save the current path in sessionStorage so we can return after login
       if (typeof window !== 'undefined') {
         const fullPath = pathname + window.location.search;
@@ -77,6 +130,13 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
         router.push('/dashboard');
       }
     }
+
+    if (user && !isPublicRoute(pathname)) {
+      const allowed = canAccessPath(user.role, pathname);
+      if (!allowed) {
+        router.replace('/dashboard');
+      }
+    }
   }, [user, isLoading, pathname, router, isHydrated]);
 
   // Show spinner during hydration / auth loading
@@ -89,12 +149,16 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user && pathname !== '/login') {
+  if (!user && !isPublicRoute(pathname)) {
+    return null; // Will redirect
+  }
+
+  if (user && !isPublicRoute(pathname) && !canAccessPath(user.role, pathname)) {
     return null; // Will redirect
   }
 
   // Public / auth routes — no shell
-  if (pathname === '/login' || pathname === '/guest-access') {
+  if (isPublicRoute(pathname)) {
     return <>{children}</>;
   }
 

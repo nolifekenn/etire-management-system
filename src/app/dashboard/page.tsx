@@ -130,6 +130,56 @@ function DonutTooltip({ active, payload }: any) {
 export default function DashboardPage() {
   const { user, activeBranchId } = useAuth();
 
+  const canAccessPath = (role: string | undefined, path: string) => {
+    if (!role) return false;
+    if (role === 'super_admin') return true;
+
+    const allowedPrefixesByRole: Record<string, string[]> = {
+      branch_manager: [
+        '/',
+        '/dashboard',
+        '/inventory',
+        '/pos',
+        '/services',
+        '/customers',
+        '/purchasing',
+        '/reports',
+        '/branches',
+        '/backup',
+        '/settings',
+        '/admin',
+        '/sales',
+        '/receipt',
+      ],
+      staff: [
+        '/',
+        '/dashboard',
+        '/inventory',
+        '/pos',
+        '/services',
+        '/customers',
+        '/purchasing',
+        '/receipt',
+      ],
+      cashier: [
+        '/',
+        '/dashboard',
+        '/pos',
+        '/customers',
+        '/receipt',
+      ],
+      mechanic: [
+        '/',
+        '/dashboard',
+        '/services',
+        '/receipt',
+      ],
+    };
+
+    const allowedPrefixes = allowedPrefixesByRole[role] ?? [];
+    return allowedPrefixes.some(prefix => path === prefix || path.startsWith(`${prefix}/`));
+  };
+
   const [chartDays,    setChartDays]    = useState<number>(30);
   const [summary,      setSummary]      = useState<ExecutiveSummary | null>(null);
   const [chartData,    setChartData]    = useState<RevenueCOGSPoint[]>([]);
@@ -231,12 +281,14 @@ export default function DashboardPage() {
             <RefreshCw className="h-3.5 w-3.5" />
             Refresh
           </Button>
-          <Link href="/reports">
-            <Button size="sm" className="gap-1.5">
-              <BarChart2 className="h-3.5 w-3.5" />
-              Full Reports
-            </Button>
-          </Link>
+          {canAccessPath(user?.role, '/reports') && (
+            <Link href="/reports">
+              <Button size="sm" className="gap-1.5">
+                <BarChart2 className="h-3.5 w-3.5" />
+                Full Reports
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -257,7 +309,7 @@ export default function DashboardPage() {
           subtitle={loadingKPIs ? undefined : `${summary?.total_sales_count ?? 0} transactions`}
           trend={summary?.revenue_mom_pct ?? null}
           icon={<DollarSign className="h-4 w-4" />}
-          href="/sales"
+          href={canAccessPath(user?.role, '/sales') ? '/sales' : undefined}
           loading={loadingKPIs}
           color="ring-blue-500/20"
         />
@@ -266,7 +318,7 @@ export default function DashboardPage() {
           value={loadingKPIs ? '…' : fmtCompact(summary?.inventory_value ?? 0)}
           subtitle={loadingKPIs ? undefined : `${summary?.inventory_item_count ?? 0} SKUs on hand`}
           icon={<Package className="h-4 w-4" />}
-          href="/inventory"
+          href={canAccessPath(user?.role, '/inventory') ? '/inventory' : undefined}
           loading={loadingKPIs}
           color="ring-emerald-500/20"
         />
@@ -275,7 +327,7 @@ export default function DashboardPage() {
           value={loadingKPIs ? '…' : String(summary?.open_pos_count ?? 0)}
           subtitle="Awaiting receipt / approval"
           icon={<ShoppingCart className="h-4 w-4" />}
-          href="/purchasing?filter=status:pending"
+          href={canAccessPath(user?.role, '/purchasing') ? '/purchasing?filter=status:pending' : undefined}
           loading={loadingKPIs}
           color="ring-amber-500/20"
         />
@@ -284,7 +336,7 @@ export default function DashboardPage() {
           value={loadingKPIs ? '…' : String(summary?.pending_services ?? 0)}
           subtitle="Quotation · In-Progress · QC"
           icon={<Wrench className="h-4 w-4" />}
-          href="/services"
+          href={canAccessPath(user?.role, '/services') ? '/services' : undefined}
           loading={loadingKPIs}
           color="ring-violet-500/20"
         />
@@ -415,11 +467,13 @@ export default function DashboardPage() {
               Workshop Analytics
               <Badge variant="outline" className="text-xs ml-1">Completed Jobs</Badge>
             </CardTitle>
-            <Link href="/services/list?state=completed">
-              <Button variant="ghost" size="sm" className="text-xs gap-1">
-                View All <ArrowUpRight className="h-3 w-3" />
-              </Button>
-            </Link>
+            {canAccessPath(user?.role, '/services') && (
+              <Link href="/services/list?state=completed">
+                <Button variant="ghost" size="sm" className="text-xs gap-1">
+                  View All <ArrowUpRight className="h-3 w-3" />
+                </Button>
+              </Link>
+            )}
           </div>
         </CardHeader>
         <CardContent>

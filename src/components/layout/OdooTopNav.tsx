@@ -169,14 +169,66 @@ export function OdooTopNav({ onMenuToggle: _onMenuToggle }: { onMenuToggle?: () 
     { id: 'backup',       label: 'Backup',             desc: 'Database backup and export',         href: '/backup',                icon: <Database          className="h-4 w-4 text-neutral-500" />, tags: 'export data' },
   ];
 
+  const canAccessPath = (role: string | undefined, path: string) => {
+    if (!role) return false;
+    if (role === 'super_admin') return true;
+
+    const allowedPrefixesByRole: Record<string, string[]> = {
+      branch_manager: [
+        '/',
+        '/dashboard',
+        '/inventory',
+        '/pos',
+        '/services',
+        '/customers',
+        '/purchasing',
+        '/reports',
+        '/branches',
+        '/backup',
+        '/settings',
+        '/admin',
+        '/sales',
+        '/receipt',
+      ],
+      staff: [
+        '/',
+        '/dashboard',
+        '/inventory',
+        '/pos',
+        '/services',
+        '/customers',
+        '/purchasing',
+        '/receipt',
+      ],
+      cashier: [
+        '/',
+        '/dashboard',
+        '/pos',
+        '/customers',
+        '/receipt',
+      ],
+      mechanic: [
+        '/',
+        '/dashboard',
+        '/services',
+        '/receipt',
+      ],
+    };
+
+    const allowedPrefixes = allowedPrefixesByRole[role] ?? [];
+    return allowedPrefixes.some(prefix => path === prefix || path.startsWith(`${prefix}/`));
+  };
+
+  const visibleItems = NAV_ITEMS.filter(item => canAccessPath(user?.role, item.href));
+
   const q = searchValue.toLowerCase().trim();
   const searchResults = q
-    ? NAV_ITEMS.filter(n =>
+    ? visibleItems.filter(n =>
         n.label.toLowerCase().includes(q) ||
         n.desc.toLowerCase().includes(q) ||
         n.tags.toLowerCase().includes(q)
       )
-    : NAV_ITEMS;
+    : visibleItems;
 
   // Reset highlight when query changes
   useEffect(() => setHighlightedIdx(0), [searchValue]);
