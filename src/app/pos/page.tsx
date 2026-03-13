@@ -883,7 +883,7 @@ export default function POSPage() {
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
               )}
             >
-              {cat}
+              <span className="capitalize">{cat}</span>
             </button>
           ))}
         </div>
