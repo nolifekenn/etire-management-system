@@ -13,7 +13,7 @@ import { UserRole } from '@/lib/types';
 import './globals.css';
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isHydrated, setIsHydrated] = useState(false);
@@ -72,33 +72,71 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     return allowedPrefixes.some(prefix => path === prefix || path.startsWith(`${prefix}/`));
   };
 
-  // Auto-logout on inactivity (30 min)
+  // Auto-logout on inactivity (30 min) and max session age (24 hours)
   useEffect(() => {
     if (!user) return;
 
-    let timeout: NodeJS.Timeout;
+    const INACTIVITY_MS = 30 * 60 * 1000;
+    const MAX_SESSION_MS = 24 * 60 * 60 * 1000;
+    const sessionUserKey = 'etire_session_user_id';
+    const sessionStartKey = 'etire_session_started_at';
+    const lastActivityKey = 'etire_last_activity';
+
+    const now = Date.now();
+    const storedUserId = localStorage.getItem(sessionUserKey);
+    if (!storedUserId || storedUserId !== user.user_id) {
+      localStorage.setItem(sessionUserKey, user.user_id);
+      localStorage.setItem(sessionStartKey, String(now));
+      localStorage.setItem(lastActivityKey, String(now));
+    } else {
+      if (!localStorage.getItem(sessionStartKey)) {
+        localStorage.setItem(sessionStartKey, String(now));
+      }
+      if (!localStorage.getItem(lastActivityKey)) {
+        localStorage.setItem(lastActivityKey, String(now));
+      }
+    }
+
+    let checkInterval: NodeJS.Timeout;
 
     const resetTimer = () => {
-      clearTimeout(timeout);
-      timeout = setTimeout(async () => {
-        const confirmed = window.confirm("Your session has expired. Press OK to return to login.");
+      localStorage.setItem(lastActivityKey, String(Date.now()));
+    };
+
+    const checkExpiry = async () => {
+      const startAt = Number(localStorage.getItem(sessionStartKey) || 0);
+      const lastActivity = Number(localStorage.getItem(lastActivityKey) || 0);
+      const current = Date.now();
+
+      if (startAt && current - startAt >= MAX_SESSION_MS) {
+        await logout();
+        router.replace('/login');
+        return;
+      }
+
+      if (lastActivity && current - lastActivity >= INACTIVITY_MS) {
+        const confirmed = window.confirm("Your session has expired due to inactivity. Press OK to return to login.");
         if (confirmed) {
-          await fetch("/api/logout");
-          router.replace("/login");
+          await logout();
+          router.replace('/login');
+        } else {
+          resetTimer();
         }
-      }, 30 * 60 * 1000);
+      }
     };
 
     window.addEventListener("mousemove", resetTimer);
     window.addEventListener("keydown", resetTimer);
     resetTimer();
 
+    checkInterval = setInterval(checkExpiry, 60 * 1000);
+
     return () => {
       window.removeEventListener("mousemove", resetTimer);
       window.removeEventListener("keydown", resetTimer);
-      clearTimeout(timeout);
+      clearInterval(checkInterval);
     };
-  }, [user, router]);
+  }, [user, router, logout]);
 
   useEffect(() => {
     setIsHydrated(true);

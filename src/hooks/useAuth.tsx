@@ -384,6 +384,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     // Clear client state immediately so the UI reflects logged-out state.
     sessionStorage.removeItem('etire_session_nonce');
+    localStorage.removeItem('etire_session_user_id');
+    localStorage.removeItem('etire_session_started_at');
+    localStorage.removeItem('etire_last_activity');
     setUser(null);
     setActiveBranchIdState(null);
     localStorage.removeItem('etire_active_branch');
@@ -402,6 +405,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const resetSession = async () => {
     sessionStorage.removeItem('etire_session_nonce');
     sessionStorage.removeItem('etire_intended_path');
+    localStorage.removeItem('etire_session_user_id');
+    localStorage.removeItem('etire_session_started_at');
+    localStorage.removeItem('etire_last_activity');
     setUser(null);
     setActiveBranchIdState(null);
     localStorage.removeItem('etire_active_branch');
