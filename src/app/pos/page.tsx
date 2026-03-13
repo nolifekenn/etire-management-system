@@ -243,6 +243,8 @@ const PaymentModal: React.FC<{
   const [method,   setMethod]   = useState<PaymentMethod>('cash');
   const [tendered, setTendered] = useState<string>('');
 
+  const MAX_ALLOWED = 120_000;
+
   const tenderedNum = parseFloat(tendered) || 0;
   const change      = Math.max(0, tenderedNum - orderTotal);
 
@@ -292,8 +294,20 @@ const PaymentModal: React.FC<{
               <Input
                 type="number"
                 min="0"
+                max={MAX_ALLOWED}
                 value={tendered}
-                onChange={e => setTendered(e.target.value)}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val === '') { setTendered(''); return; }
+                  const num = parseFloat(val);
+                  if (Number.isNaN(num)) return;
+                  if (num > MAX_ALLOWED) {
+                    setTendered(String(MAX_ALLOWED));
+                    toast({ title: 'Value too large', description: 'Maximum allowed is ₱ 120,000.', variant: 'destructive' });
+                  } else {
+                    setTendered(val);
+                  }
+                }}
                 placeholder={String(orderTotal)}
                 className="text-lg font-semibold"
                 autoFocus
@@ -315,10 +329,14 @@ const PaymentModal: React.FC<{
             Cancel
           </Button>
           <Button
-            onClick={() => onValidate(method, tenderedNum || orderTotal)}
+            onClick={() => {
+              const tenderToUse = Math.min(method === 'cash' ? (tenderedNum || orderTotal) : orderTotal, MAX_ALLOWED);
+              onValidate(method, tenderToUse);
+            }}
             disabled={
               submitting ||
-              (method === 'cash' && tenderedNum > 0 && tenderedNum < orderTotal)
+              (method === 'cash' && tenderedNum > 0 && tenderedNum < orderTotal) ||
+              (method === 'cash' && tenderedNum > MAX_ALLOWED)
             }
           >
             {submitting ? (
