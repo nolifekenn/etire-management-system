@@ -717,9 +717,15 @@ const vehicleColumns: Column[] = [
       const vehicleName = value.name;
       const VehicleIcon = getVehicleIcon(vehicleName);
       return (
-        <Badge variant="outline" className="flex items-center gap-1 bg-slate-100 text-slate-700 border-slate-300 capitalize font-poppins">
-          <VehicleIcon className="h-3 w-3" />
-          {vehicleName}
+        <Badge
+          variant="outline"
+          className="flex items-center gap-1 bg-slate-100 text-slate-700 border-slate-300 capitalize font-poppins w-20 px-2 py-0.5 overflow-hidden"
+          title={vehicleName}
+        >
+          <VehicleIcon className="h-3 w-3 flex-shrink-0" />
+          <span className="min-w-0 overflow-hidden whitespace-nowrap truncate text-xs">
+            {vehicleName}
+          </span>
         </Badge>
       );
     },
