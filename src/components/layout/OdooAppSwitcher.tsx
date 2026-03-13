@@ -39,7 +39,6 @@ const MODULES: AppModule[] = [
   { href: "/reports",    label: "Reports",      icon: BarChart,        color: "bg-teal-500",    minRole: "branch_manager" },
   { href: "/branches",   label: "Branches",     icon: Building2,       color: "bg-indigo-500",  minRole: "branch_manager" },
   { href: "/backup",     label: "Backup",       icon: Database,        color: "bg-slate-500",   minRole: "branch_manager" },
-  { href: "/settings",   label: "Settings",     icon: Settings,        color: "bg-gray-500",    minRole: "branch_manager" },
   { href: "/admin",      label: "Admin",        icon: Shield,          color: "bg-red-500",     minRole: "super_admin" },
 ];
 
