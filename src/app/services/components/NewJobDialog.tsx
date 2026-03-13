@@ -382,94 +382,107 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
           <div className="space-y-5 py-1">
 
             {/* Assignment */}
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                Vehicle &amp; Assignment
-              </p>
-              <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+              Vehicle &amp; Assignment
+            </p>
+            {/* Added items-end to the grid to keep all input baselines level */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3 items-end">
 
-                <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1"><User className="h-3 w-3" />Customer</Label>
-                  <Select value={toSel(customerId)} onValueChange={v => setCustomerId(toVal(v))}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Walk-in" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE}>-- Walk-in --</SelectItem>
-                      {customers.map(c => (
-                        <SelectItem key={c.customer_id} value={c.customer_id}>
-                          {c.name}{c.phone ? ` / ${c.phone}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1"><Car className="h-3 w-3" />Vehicle</Label>
-                  <Select value={toSel(vehicleId)} onValueChange={v => setVehicleId(toVal(v))} disabled={!customerId}>
-                    <SelectTrigger className="h-8 text-sm">
-                      <SelectValue placeholder={customerId ? "Select" : "Select customer first"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE}>-- None --</SelectItem>
-                      {vehicles.map(v => (
-                        <SelectItem key={v.vehicle_id} value={v.vehicle_id}>
-                          {v.plate_number}{v.make ? ` / ${v.make}` : ""}{v.model ? ` ${v.model}` : ""}{v.year ? ` (${v.year})` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1">
-                    <Car className="h-3 w-3" />
-                    Vehicle Type
-                    {vehicleId && <span className="ml-1 text-muted-foreground font-normal">(auto-set by vehicle)</span>}
-                  </Label>
-                  <Select value={toSel(vehicleTypeId)} onValueChange={v => setVehicleTypeId(toVal(v))} disabled={!!vehicleId}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select type" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE}>-- None --</SelectItem>
-                      {vehTypes.map(vt => (
-                        <SelectItem key={vt.value} value={vt.value}>{vt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1"><Wrench className="h-3 w-3" />Mechanic</Label>
-                  <Select value={toSel(mechanicId)} onValueChange={v => setMechanicId(toVal(v))}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Unassigned" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE}>-- Unassigned --</SelectItem>
-                      {mechanics.map(m => (
-                        <SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs">Priority</Label>
-                  <Select value={priority} onValueChange={(v: "low"|"normal"|"high"|"urgent") => setPriority(v)}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1"><Clock className="h-3 w-3" />Est. Completion</Label>
-                  <Input type="datetime-local" className="h-8 text-sm" value={estCompletion} onChange={e => setEstCompletion(e.target.value)} />
-                </div>
-
+              {/* Customer */}
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1 h-4"><User className="h-3 w-3" />Customer</Label>
+                <Select value={toSel(customerId)} onValueChange={v => setCustomerId(toVal(v))}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Walk-in" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>-- Walk-in --</SelectItem>
+                    {customers.map(c => (
+                      <SelectItem key={c.customer_id} value={c.customer_id}>
+                        {c.name}{c.phone ? ` / ${c.phone}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
+              {/* Vehicle */}
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1 h-4"><Car className="h-3 w-3" />Vehicle</Label>
+                <Select value={toSel(vehicleId)} onValueChange={v => setVehicleId(toVal(v))} disabled={!customerId}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder={customerId ? "Select" : "Select customer first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>-- None --</SelectItem>
+                    {vehicles.map(v => (
+                      <SelectItem key={v.vehicle_id} value={v.vehicle_id}>
+                        {v.plate_number}{v.make ? ` / ${v.make}` : ""}{v.model ? ` ${v.model}` : ""}{v.year ? ` (${v.year})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Vehicle Type */}
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1 h-4">
+                  <Car className="h-3 w-3" />
+                  Vehicle Type
+                  {vehicleId && <span className="ml-1 text-[10px] text-muted-foreground font-normal">(auto-set)</span>}
+                </Label>
+                <Select value={toSel(vehicleTypeId)} onValueChange={v => setVehicleTypeId(toVal(v))} disabled={!!vehicleId}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select type" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>-- None --</SelectItem>
+                    {vehTypes.map(vt => (
+                      <SelectItem key={vt.value} value={vt.value}>{vt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Mechanic */}
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1 h-4"><Wrench className="h-3 w-3" />Mechanic</Label>
+                <Select value={toSel(mechanicId)} onValueChange={v => setMechanicId(toVal(v))}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>-- Unassigned --</SelectItem>
+                    {mechanics.map(m => (
+                      <SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Priority */}
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center h-4">Priority</Label>
+                <Select value={priority} onValueChange={(v: "low"|"normal"|"high"|"urgent") => setPriority(v)}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Est. Completion */}
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1 h-4"><Clock className="h-3 w-3" />Est. Completion</Label>
+                {/* Removed mt-1 here */}
+                <Input 
+                  type="datetime-local" 
+                  className="h-8 text-sm" 
+                  value={estCompletion} 
+                  onChange={e => setEstCompletion(e.target.value)} 
+                />
+              </div>
+
             </div>
+          </div>
 
             {/* Services */}
             <div>
