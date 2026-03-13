@@ -1124,6 +1124,49 @@ export default function EnhancedCustomersPage() {
   const [color, setColor] = useState('');
   const [selectedVehicleType, setSelectedVehicleType] = useState('');
 
+    // Plate helpers — improved for deletion handling and numeric length cap
+  const formatPlateOnType = (input: string) => {
+    if (!input) return '';
+    const up = input.toUpperCase();
+    let s = up.replace(/\s+/g, '-').replace(/[^A-Z0-9-]/g, '').replace(/-+/g, '-');
+
+    if (s.includes('-')) {
+      const [L = '', R = ''] = s.split('-', 2);
+      const left = L.replace(/[^A-Z]/g, '').slice(0, 4);
+      const right = R.replace(/[^0-9]/g, '').slice(0, 4);
+      return right ? `${left}-${right}` : left;
+    }
+
+    // If user pasted/typed contiguous letters+digits like ABC1234 => split
+    const m = s.match(/^([A-Z]{1,4})(\d{1,4})$/);
+    if (m) return `${m[1]}-${m[2]}`;
+
+    if (/^[A-Z]{4,}$/.test(s)) return s.slice(0, 4) + '-';
+
+    const letters = s.replace(/[^A-Z]/g, '').slice(0, 4);
+    const numbers = s.replace(/[^0-9]/g, '').slice(0, 4);
+    return numbers ? `${letters}-${numbers}` : letters;
+  };
+    
+  const normalizePlateForStorage = (val: string) => {
+    if (!val) return '';
+    let s = val.toUpperCase().replace(/\s+/g, '-').replace(/[^A-Z0-9-]/g, '');
+    s = s.replace(/-+/g, '-').replace(/(^-|-$)/g, '');
+    if (!s.includes('-')) {
+      const m = s.match(/^([A-Z]{1,4})(\d{1,4})$/);
+      if (m) return `${m[1]}-${m[2]}`;
+    }
+    const [L = '', R = ''] = s.split('-', 2);
+    const left = L.replace(/[^A-Z]/g, '').slice(0, 4);
+    const right = R.replace(/[^0-9]/g, '').slice(0, 4);
+    return right ? `${left}-${right}` : left;
+  };
+  
+  const isPlateValidForSave = (val: string) => {
+    const s = normalizePlateForStorage(val);
+    return /^[A-Z]{1,4}-\d{1,4}$/.test(s);
+  };
+
   // Form validation errors
   const [customerFormErrors, setCustomerFormErrors] = useState<{ name?: FieldError; phone?: FieldError }>({});
   const [vehicleFormErrors,  setVehicleFormErrors]  = useState<{ plateNumber?: FieldError; make?: FieldError; model?: FieldError; color?: FieldError }>({});
@@ -1152,6 +1195,39 @@ export default function EnhancedCustomersPage() {
     setMounted(true);
     fetchData();
   }, [activeBranchId]);
+
+  // Handler to attach to the plate input
+  const handlePlateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value || '';
+    const prev = plateNumber || '';
+    const isDeleting = raw.length < prev.length;
+    const lastChar = raw.slice(-1);
+
+    let formatted = '';
+
+    if (!isDeleting && (lastChar === ' ' || lastChar === '-')) {
+      // User explicitly pressed space or dash -> force separator if letters exist
+      const letters = raw.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+      formatted = letters ? `${letters}-` : '';
+    } else if (isDeleting) {
+      // On delete, be permissive and avoid auto-inserting a dash
+      formatted = raw.toUpperCase().replace(/\s+/g, '-').replace(/[^A-Z0-9-]/g, '').replace(/-+/g, '-');
+      const [L = '', R = ''] = formatted.split('-', 2);
+      const left = L.replace(/[^A-Z]/g, '').slice(0, 4);
+      const right = R.replace(/[^0-9]/g, '').slice(0, 4);
+      formatted = right ? `${left}-${right}` : left;
+    } else {
+      // Normal typing: apply smart formatting (auto-insert after 4 letters, split letters+digits, cap nums)
+      formatted = formatPlateOnType(raw);
+    }
+
+    setPlateNumber(formatted);
+    setVehicleFormErrors((p) => ({
+      ...p,
+      plateNumber: validateShortText(formatted, { label: 'Plate number', required: true, minLength: 3, maxLength: 20, blockDangerousChars: false })
+    }));
+  };
+
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -2089,9 +2165,17 @@ export default function EnhancedCustomersPage() {
 
     setIsVehicleLoading(true);
 
+    // Normalize and validate plate before saving
+    const normalizedPlate = normalizePlateForStorage(plateNumber);
+    if (!isPlateValidForSave(normalizedPlate)) {
+      toast({ title: 'Invalid plate', description: 'Plate must be in the format LETTERS-NUMBERS (e.g. ABC-1234).', variant: 'destructive' });
+      setIsVehicleLoading(false);
+      return;
+    }
+
     const vehicleData = {
       customer_id: selectedCustomer,
-      plate_number: plateNumber,
+      plate_number: normalizedPlate,
       make: make || null,
       model: model || null,
       color: color || null,
@@ -3268,10 +3352,7 @@ export default function EnhancedCustomersPage() {
                 <Input
                   id="plate-number"
                   value={plateNumber}
-                  onChange={(e) => {
-                    setPlateNumber(e.target.value);
-                    setVehicleFormErrors((p) => ({ ...p, plateNumber: validateShortText(e.target.value, { label: 'Plate number', required: true, minLength: 3, maxLength: 20, blockDangerousChars: false }) }));
-                  }}
+                  onChange={handlePlateChange}
                   placeholder="ABC-1234"
                   maxLength={20}
                   aria-invalid={!!vehicleFormErrors.plateNumber}
