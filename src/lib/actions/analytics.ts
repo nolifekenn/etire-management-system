@@ -18,6 +18,7 @@
  */
 
 import { createClient }  from '@/lib/supabaseServer';
+import { isOpenPurchaseOrder } from '@/lib/poUtils';
 import { subDays, format } from 'date-fns';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -107,15 +108,19 @@ export async function getExecutiveSummary(
       (acc, i) => acc + Number(i.stock_quantity ?? 0) * Number(i.cost_price ?? 0), 0
     );
 
-    // ── Open POs: status in pending/approved/ordered ──────────────────
+    // ── Open POs: treat both legacy status and current state values as open ──
     let poQ = supabase
       .from('purchase_order')
-      .select('po_id', { count: 'exact', head: true })
-      .in('status', ['pending', 'approved', 'ordered'])   // valid values in purchase_order.status enum
+      .select('po_id, state, status')
       .is('deleted_at', null);
     if (branch_id) poQ = poQ.eq('branch_id', branch_id);
 
-    const { count: openPOs } = await poQ;
+    const { data: poData, error: poErr } = await poQ;
+    if (poErr) throw poErr;
+
+    const openPOs = (poData ?? []).filter((po: AnyRecord) =>
+      isOpenPurchaseOrder((po.state ?? po.status) as string | null | undefined)
+    ).length;
 
     // ── Pending services: jobs in active states ───────────────────────
     let sjQ = supabase
@@ -135,7 +140,7 @@ export async function getExecutiveSummary(
         total_sales_count:    salesCount,
         inventory_value:      inventoryValue,
         inventory_item_count: invData?.length ?? 0,
-        open_pos_count:       openPOs ?? 0,
+        open_pos_count:       openPOs,
         pending_services:     pendingServices ?? 0,
         revenue_mom_pct:      revenueMoM != null ? Math.round(revenueMoM * 10) / 10 : null,
       },

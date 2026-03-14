@@ -250,7 +250,7 @@ function SalesTable({
               (sorted as unknown as SalesReportRow[]).map(row => (
                 <tr key={row.sale_id} className="border-t hover:bg-muted/30 transition-colors">
                     <td className="px-3 py-2 font-mono text-xs text-blue-600">
-                    <a href={`/receipt/${row.sale_id}`} className="hover:underline inline-flex items-center gap-1">
+                    <a href={`/receipt/${row.sale_id}`} className="inline-flex items-center gap-1 hover:no-underline">
                       {row.sale_number ?? '—'} <ArrowUpRight className="h-3 w-3 opacity-60" />
                     </a>
                   </td>
@@ -425,9 +425,13 @@ function ServicesTable({
               (sorted as unknown as ServiceReportRow[]).map(row => (
                 <tr key={row.job_id} className="border-t hover:bg-muted/30 transition-colors">
                   <td className="px-3 py-2 font-mono text-xs text-violet-600">
-                    <a href={`/services/${row.job_id}`} className="hover:underline inline-flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => window.location.assign(`/services/${row.job_id}`)}
+                      className="inline-flex items-center gap-1 hover:no-underline"
+                    >
                       {row.job_number ?? '—'} <ArrowUpRight className="h-3 w-3 opacity-60" />
-                    </a>
+                    </button>
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
                     {format(new Date(row.job_date), 'MMM dd, yyyy')}

@@ -109,7 +109,7 @@ export default function ForecastPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <nav className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-            <button onClick={() => router.push("/inventory")} className="hover:underline flex items-center gap-1">
+            <button onClick={() => router.push("/inventory")} className="flex items-center gap-1 hover:no-underline">
               <ChevronLeft className="h-3 w-3" />Inventory
             </button>
             <span>/</span>

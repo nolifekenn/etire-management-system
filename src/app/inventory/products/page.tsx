@@ -117,9 +117,9 @@ export default function ProductListPage() {
   const stockBadge = (item: AnyRecord) => {
     const qty    = Number(item.stock_quantity);
     const reorder = Number(item.reorder_level ?? 5);
-    if (qty === 0)       return <Badge className="bg-red-100 text-red-700 border-red-200">Out of Stock</Badge>;
-    if (qty < reorder)   return <Badge className="bg-amber-100 text-amber-700 border-amber-200">{qty} ▼</Badge>;
-    return <span className="text-sm font-medium text-foreground">{qty}</span>;
+    if (qty === 0)       return <Badge className="inline-flex min-w-[7.5rem] justify-center rounded-full border-red-200 bg-red-100 text-red-700">Out of Stock</Badge>;
+    if (qty < reorder)   return <Badge className="inline-flex min-w-[7.5rem] justify-center rounded-full border-amber-200 bg-amber-100 text-amber-700">{qty} Low Stock</Badge>;
+    return <Badge className="inline-flex min-w-[7.5rem] justify-center rounded-full border-green-200 bg-green-100 text-green-700">{qty} In Stock</Badge>;
   };
 
   const fmt = (n: unknown) =>
@@ -276,7 +276,7 @@ export default function ProductListPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <nav className="text-xs text-muted-foreground mb-1">
-            <button onClick={() => router.push("/inventory")} className="hover:underline">Inventory</button>
+            <button onClick={() => router.push("/inventory")} className="hover:no-underline">Inventory</button>
             <span className="mx-1">/</span>
             <span>Products</span>
           </nav>
@@ -376,7 +376,7 @@ export default function ProductListPage() {
       {/* Table */}
       <div className="flex-1 overflow-auto rounded-lg border border-border">
         <table className="w-full text-sm">
-          <thead className="bg-muted/50 sticky top-0 z-10">
+          <thead className="sticky top-0 z-10 bg-background shadow-sm">
             <tr>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground w-1/3">Product</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Category</th>
@@ -569,6 +569,19 @@ export default function ProductListPage() {
                                 </div>
                               </div>
                             </div>
+                          </div>
+
+                          <div className="mt-4 flex items-center justify-end border-t border-border pt-3">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                router.push(`/inventory/products/${itemId}`);
+                              }}
+                            >
+                              Open Edit / Archive
+                            </Button>
                           </div>
                         </td>
                       </tr>

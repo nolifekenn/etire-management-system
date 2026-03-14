@@ -21,13 +21,15 @@ interface SecureVoidModalProps {
     onClose: () => void;
     onAuthorized: () => void;
     actionDescription?: string;
+    requiredBranchId?: string;
 }
 
 export function SecureVoidModal({
     isOpen,
     onClose,
     onAuthorized,
-    actionDescription = "Only managers or admins can perform this action."
+    actionDescription = "Only managers or admins can perform this action.",
+    requiredBranchId,
 }: SecureVoidModalProps) {
     const [pin, setPin] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -48,7 +50,7 @@ export function SecureVoidModal({
             // Security Check: Query for a user with this PIN who is a manager or admin
             const { data, error } = await supabase
                 .from('user')
-                .select('user_id, role, name')
+                .select('user_id, role, name, branch_id')
                 .in('role', ['branch_manager', 'super_admin'])
                 .eq('pin', pin)
                 .is('deleted_at', null)
@@ -57,6 +59,13 @@ export function SecureVoidModal({
             if (error) {
                 console.error("Verification error:", error);
                 setError("Verification failed. Please try again.");
+            } else if (
+                data &&
+                requiredBranchId &&
+                data.role === 'branch_manager' &&
+                data.branch_id !== requiredBranchId
+            ) {
+                setError("This action must be authorized by a manager from the product's branch.");
             } else if (data) {
                 // Success
                 toast({

@@ -230,7 +230,7 @@ export default function InventoryReceiptsPage() {
                       <Link
                         href={`/receipt/${str(sale.sale_id)}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1.5 text-xs text-[#714B67] hover:underline whitespace-nowrap"
+                        className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs text-[#714B67] hover:no-underline"
                       >
                         <ReceiptText className="h-3.5 w-3.5" />
                         Receipt

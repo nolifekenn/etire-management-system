@@ -654,7 +654,7 @@ export default function SaleFormPage() {
                 </Badge>
                 <Link
                   href={`/receipt/${saleId}`}
-                  className="inline-flex items-center gap-1.5 text-sm text-[#714B67] hover:underline"
+                  className="inline-flex items-center gap-1.5 text-sm text-[#714B67] hover:no-underline"
                 >
                   <ReceiptText className="h-4 w-4" />
                   Print Receipt

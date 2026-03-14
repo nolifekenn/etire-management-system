@@ -106,7 +106,7 @@
 
   /* Links */
   a {
-    @apply text-primary hover:underline;
+    @apply text-primary no-underline;
   }
 
   /* Media */

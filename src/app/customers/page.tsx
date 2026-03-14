@@ -872,11 +872,15 @@ const EnhancedEmptyState = ({
 const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[], vehicles: any[], tireHistory: any[] }) => {
   const totalCustomers = customers.length;
   const totalVehicles = vehicles.length;
-  const recentServices = tireHistory.filter(history =>
-    new Date(history.service_date).getMonth() === new Date().getMonth()
-  ).length;
+  const now = new Date();
+  const isCurrentMonth = (serviceDate?: string | null) => {
+    if (!serviceDate) return false;
+    const parsed = new Date(serviceDate);
+    return parsed.getMonth() === now.getMonth() && parsed.getFullYear() === now.getFullYear();
+  };
+  const recentServices = tireHistory.filter(history => isCurrentMonth(history.service_date)).length;
   const vehiclesWithRecentService = [...new Set(tireHistory
-    .filter(history => new Date(history.service_date).getMonth() === new Date().getMonth())
+    .filter(history => isCurrentMonth(history.service_date))
     .map(history => history.vehicle_id)
   )].length;
 
@@ -1383,14 +1387,90 @@ export default function EnhancedCustomersPage() {
     if (!supabase) return;
     setIsHistoryLoading(true);
 
-    const { data, error } = await supabase
-      .rpc('get_tire_history_complete');
+    const inferServiceType = (description: string): string => {
+      const text = description.toLowerCase();
+      if (text.includes('rotat')) return 'rotation';
+      if (text.includes('balanc')) return 'balancing';
+      if (text.includes('replace')) return 'replacement';
+      return 'repair';
+    };
+
+    let query = supabase
+      .from('service_job')
+      .select(`
+        job_id,
+        job_number,
+        job_description,
+        job_date,
+        state,
+        status,
+        notes,
+        created_at,
+        user_id,
+        user:user_id ( user_id, name ),
+        vehicle:vehicle_id (
+          vehicle_id,
+          customer_id,
+          vehicle_type_id,
+          plate_number,
+          make,
+          model,
+          year,
+          color,
+          customer:customer_id ( customer_id, name, phone, branch_id )
+        ),
+        service_job_item (
+          item_id,
+          quantity,
+          catalog_item:item_id ( item_id, name, category )
+        )
+      `)
+      .is('deleted_at', null)
+      .order('job_date', { ascending: false });
+
+    if (activeBranchId) {
+      query = query.eq('branch_id', activeBranchId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       setHistoryError(`Could not fetch tire history: ${error.message}`);
       setTireHistory([]);
     } else {
-      setTireHistory((data || []) as TireHistory[]);
+      const mappedHistory = ((data || []) as any[])
+        .map((job) => {
+          const rawState = String(job.state ?? job.status ?? '').toLowerCase();
+          if (!['completed', 'invoiced', 'paid'].includes(rawState)) {
+            return null;
+          }
+
+          const tireItems = ((job.service_job_item || []) as any[])
+            .filter((line) => String(line?.catalog_item?.category ?? '').toLowerCase() === 'tire')
+            .map((line) => ({
+              item_id: line?.catalog_item?.item_id ?? line?.item_id,
+              name: line?.catalog_item?.name ?? 'Unknown item',
+              quantity: Number(line?.quantity ?? 1),
+            }))
+            .filter((line) => Boolean(line.item_id));
+
+          return {
+            history_id: `svc-${job.job_id}`,
+            vehicle_id: job.vehicle?.vehicle_id ?? undefined,
+            item_id: tireItems[0]?.item_id,
+            service_type: inferServiceType(String(job.job_description ?? '')),
+            service_date: job.job_date ?? job.created_at,
+            notes: job.notes ?? job.job_description ?? null,
+            created_by: job.user_id,
+            created_at: job.created_at,
+            vehicle: job.vehicle ?? undefined,
+            items: tireItems.length > 0 ? tireItems : undefined,
+            user: job.user ?? undefined,
+          } as TireHistory;
+        })
+        .filter(Boolean) as TireHistory[];
+
+      setTireHistory(mappedHistory);
       setHistoryError(null);
     }
     setIsHistoryLoading(false);
@@ -2656,7 +2736,7 @@ export default function EnhancedCustomersPage() {
                     {filteredHistory.length === 0 ? (
                       <EnhancedEmptyState
                         type="history"
-                        onAddNew={() => { }}
+                        onAddNew={() => handleTabChange('vehicles')}
                         onClearFilters={clearHistoryFilters}
                       />
                     ) : (

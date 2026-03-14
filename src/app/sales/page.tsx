@@ -253,7 +253,7 @@ export default function SalesListPage() {
                       <Link
                         href={`/receipt/${str(sale.sale_id)}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1 text-[#714B67] hover:underline"
+                        className="inline-flex items-center gap-1 text-[#714B67] hover:no-underline"
                       >
                         <ReceiptText className="h-3.5 w-3.5" />
                         {str(sale.sale_number) || '—'}

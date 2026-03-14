@@ -16,6 +16,7 @@
  */
 
 import { createClient }    from '@/lib/supabaseServer';
+import { isOpenPurchaseOrder } from '@/lib/poUtils';
 import { revalidatePath }  from 'next/cache';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -625,16 +626,19 @@ export async function getOperationCounts() {
   const lowStock  = allItems.filter(i => Number(i.stock_quantity) > 0 && Number(i.stock_quantity) < Number(i.reorder_level));
   const outOfStock = allItems.filter(i => Number(i.stock_quantity) === 0);
 
-  // Pending purchase orders
-  const { data: pendingPOs } = await supabase
+  // Active purchase orders
+  const { data: purchaseOrders } = await supabase
     .from('purchase_order')
-    .select('po_id')
-    .in('status', ['pending', 'approved', 'ordered'])
+    .select('po_id, state, status')
     .is('deleted_at', null);
+
+  const pendingPOs = (purchaseOrders ?? []).filter((po: AnyRecord) =>
+    isOpenPurchaseOrder((po.state ?? po.status) as string | null | undefined)
+  );
 
   return {
     receipts:       salesRes.count ?? 0,
-    pending_pos:    (pendingPOs ?? []).length,
+    pending_pos:    pendingPOs.length,
     low_stock:      lowStock.length,
     out_of_stock:   outOfStock.length,
     total_products: allItems.length,

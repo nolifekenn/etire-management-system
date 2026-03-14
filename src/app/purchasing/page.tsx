@@ -78,6 +78,19 @@ export default function PurchasingPage() {
   const [stateFilter, setStateFilter] = useState("all");
   const [loading, setLoading]         = useState(true);
   const [createOpen, setCreateOpen]   = useState(false);
+  const canCreatePO = user?.role === "super_admin" || user?.role === "branch_manager";
+
+  const handleOpenCreate = () => {
+    if (!canCreatePO) {
+      toast({
+        title: "Manager approval required",
+        description: "You are not permitted to create purchase orders. Only a manager can do this.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setCreateOpen(true);
+  };
 
   //  Fetch 
 
@@ -123,7 +136,7 @@ export default function PurchasingPage() {
           <Button
             size="sm"
             className="gap-1.5 bg-purple-600 hover:bg-purple-700 text-white"
-            onClick={() => setCreateOpen(true)}
+            onClick={handleOpenCreate}
           >
             <PlusCircle className="h-4 w-4" />
             New
@@ -220,7 +233,7 @@ export default function PurchasingPage() {
                   <td colSpan={7} className="py-16 text-center">
                     <Package className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-40" />
                     <p className="text-sm text-muted-foreground">No purchase orders found.</p>
-                    <Button variant="outline" size="sm" className="mt-3" onClick={() => setCreateOpen(true)}>
+                    <Button variant="outline" size="sm" className="mt-3" onClick={handleOpenCreate}>
                       <PlusCircle className="h-4 w-4 mr-2" />
                       Create your first RFQ
                     </Button>
@@ -289,7 +302,13 @@ export default function PurchasingPage() {
       {/* Dialog */}
       <CreateRFQDialog
         open={createOpen}
-        onOpenChange={setCreateOpen}
+        onOpenChange={(open) => {
+          if (open) {
+            handleOpenCreate();
+            return;
+          }
+          setCreateOpen(false);
+        }}
         onCreated={(poId) => {
           setCreateOpen(false);
           router.push(`/purchasing/${poId}`);

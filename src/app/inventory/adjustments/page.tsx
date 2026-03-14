@@ -133,9 +133,9 @@ export default function AdjustmentsPage() {
   const stockBadge = (item: AnyRecord) => {
     const qty     = Number(item.stock_quantity);
     const reorder = Number(item.reorder_level ?? 5);
-    if (qty === 0)     return <Badge className="bg-red-100 text-red-700 border-red-200 gap-1"><PackageX className="h-3 w-3" />Out of Stock</Badge>;
-    if (qty < reorder) return <Badge className="bg-amber-100 text-amber-700 border-amber-200 gap-1"><AlertTriangle className="h-3 w-3" />{qty} ▼</Badge>;
-    return <span className="text-sm font-medium">{qty}</span>;
+    if (qty === 0)     return <Badge className="inline-flex min-w-[7.5rem] justify-center gap-1 rounded-full border-red-200 bg-red-100 text-red-700"><PackageX className="h-3 w-3" />Out of Stock</Badge>;
+    if (qty < reorder) return <Badge className="inline-flex min-w-[7.5rem] justify-center gap-1 rounded-full border-amber-200 bg-amber-100 text-amber-700"><AlertTriangle className="h-3 w-3" />{qty} Low Stock</Badge>;
+    return <Badge className="inline-flex min-w-[7.5rem] justify-center rounded-full border-green-200 bg-green-100 text-green-700">{qty} In Stock</Badge>;
   };
 
   const deltaIcon = (delta: number) => {
@@ -153,7 +153,7 @@ export default function AdjustmentsPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <nav className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-            <button onClick={() => router.push("/inventory")} className="hover:underline flex items-center gap-1">
+            <button onClick={() => router.push("/inventory")} className="flex items-center gap-1 hover:no-underline">
               <ChevronLeft className="h-3 w-3" />Inventory
             </button>
             <span>/</span>
@@ -209,7 +209,7 @@ export default function AdjustmentsPage() {
       {/* Product Table */}
       <div className="overflow-auto rounded-lg border border-border">
         <table className="w-full text-sm">
-          <thead className="bg-muted/50 sticky top-0 z-10">
+          <thead className="sticky top-0 z-10 bg-background shadow-sm">
             <tr>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground w-2/5">Product</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Category</th>
