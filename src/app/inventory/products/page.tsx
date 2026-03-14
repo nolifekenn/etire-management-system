@@ -376,14 +376,18 @@ export default function ProductListPage() {
       {/* Table */}
       <div className="flex-1 overflow-auto rounded-lg border border-border">
         <table className="w-full text-sm">
+<<<<<<< HEAD
           <thead className="sticky top-0 z-10 bg-background shadow-sm">
+=======
+          <thead className="bg-[#714B67] sticky top-0 z-10">
+>>>>>>> 81351a0b187ac92f64bf65cdf238a9a9f52f1fb8
             <tr>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-1/3">Product</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Category</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vehicle</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Sale Price</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Cost</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">On Hand</th>
+              <th className="px-4 py-3 text-left font-medium text-white w-1/3">Product</th>
+              <th className="px-4 py-3 text-left font-medium text-white">Category</th>
+              <th className="px-4 py-3 text-left font-medium text-white">Vehicle</th>
+              <th className="px-4 py-3 text-right font-medium text-white">Sale Price</th>
+              <th className="px-4 py-3 text-right font-medium text-white">Cost</th>
+              <th className="px-4 py-3 text-right font-medium text-white">On Hand</th>
             </tr>
           </thead>
           <tbody>
