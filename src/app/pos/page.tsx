@@ -256,7 +256,7 @@ const PaymentModal: React.FC<{
   ];
 
   return (
-    <Dialog open={open} onOpenChange={open ? undefined : onClose}>
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Payment</DialogTitle>
