@@ -180,6 +180,7 @@ export default function ProductFormPage() {
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archiving,   setArchiving]   = useState(false);
   const [archiveAuthOpen, setArchiveAuthOpen] = useState(false);
+  const [editAuthOpen, setEditAuthOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!itemId) {
@@ -368,6 +369,22 @@ export default function ProductFormPage() {
     }
   };
 
+  const startEditing = () => {
+    setEditing(true);
+    setNameError(null);
+    setSalePriceError(null);
+    setCostPriceError(null);
+    setReorderError(null);
+  };
+
+  const requestEdit = () => {
+    if (user?.role === "super_admin" || user?.role === "branch_manager") {
+      startEditing();
+      return;
+    }
+    setEditAuthOpen(true);
+  };
+
   const requestArchive = () => {
     if (user?.role === "super_admin" || user?.role === "branch_manager") {
       setArchiveOpen(true);
@@ -451,13 +468,7 @@ export default function ProductFormPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setEditing(true);
-                  setNameError(null);
-                  setSalePriceError(null);
-                  setCostPriceError(null);
-                  setReorderError(null);
-                }}
+                onClick={requestEdit}
               >
                 <Pencil className="h-4 w-4 mr-1" />
                 Edit
@@ -950,6 +961,14 @@ export default function ProductFormPage() {
         branchId={str(product.branch_id) || activeBranchId || ""}
         userId={user?.user_id ?? ""}
         onAdjusted={load}
+      />
+
+      <SecureVoidModal
+        isOpen={editAuthOpen}
+        onClose={() => setEditAuthOpen(false)}
+        onAuthorized={startEditing}
+        requiredBranchId={str(product.branch_id) || activeBranchId || undefined}
+        actionDescription="This product can only be edited by a manager from the product's branch."
       />
 
       <SecureVoidModal

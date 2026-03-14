@@ -203,6 +203,8 @@ CREATE TABLE public.inventory_item (
   description_purchase text,
   weight_kg numeric DEFAULT 0,
   uom text DEFAULT 'unit'::text,
+  tire_pattern text,
+  ply_rating smallint,
   CONSTRAINT inventory_item_pkey PRIMARY KEY (item_id),
   CONSTRAINT inventory_item_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branch(branch_id),
   CONSTRAINT inventory_item_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.supplier(supplier_id),
@@ -236,6 +238,18 @@ CREATE TABLE public.ir_sequence (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT ir_sequence_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.notification (
+  notification_id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  title text NOT NULL,
+  message text NOT NULL,
+  type text NOT NULL CHECK (type = ANY (ARRAY['info'::text, 'warning'::text, 'error'::text, 'success'::text])),
+  is_read boolean NOT NULL DEFAULT false,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  deleted_at timestamp with time zone,
+  CONSTRAINT notification_pkey PRIMARY KEY (notification_id),
+  CONSTRAINT notification_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.user(user_id)
+);
 CREATE TABLE public.payment_transactions (
   transaction_id uuid NOT NULL DEFAULT gen_random_uuid(),
   po_id uuid NOT NULL,
@@ -261,7 +275,7 @@ CREATE TABLE public.purchase_order (
   user_id uuid NOT NULL,
   order_date date NOT NULL DEFAULT CURRENT_DATE,
   expected_delivery_date date,
-  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'approved'::text, 'ordered'::text, 'delivered'::text, 'cancelled'::text])),
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['draft'::text, 'sent'::text, 'purchase'::text, 'locked'::text, 'cancelled'::text, 'pending'::text, 'approved'::text, 'ordered'::text, 'delivered'::text])),
   payment_method text DEFAULT 'cash'::text CHECK (payment_method = ANY (ARRAY['cash'::text, 'credit'::text])),
   payment_status text DEFAULT 'pending'::text CHECK (payment_status = ANY (ARRAY['pending'::text, 'paid'::text, 'partial'::text, 'overdue'::text, 'cancelled'::text])),
   notes text,
@@ -476,12 +490,15 @@ CREATE TABLE public.user (
   branch_id uuid,
   name character varying NOT NULL,
   username character varying NOT NULL UNIQUE,
-  role character varying NOT NULL CHECK (role::text = ANY (ARRAY['super_admin'::character varying, 'branch_manager'::character varying, 'staff'::character varying, 'cashier'::character varying]::text[])),
+  role character varying NOT NULL CHECK (role::text = ANY (ARRAY['super_admin'::character varying::text, 'branch_manager'::character varying::text, 'staff'::character varying::text, 'cashier'::character varying::text, 'mechanic'::character varying::text])),
   created_at timestamp with time zone DEFAULT now(),
   deleted_at timestamp with time zone,
   updated_at timestamp with time zone DEFAULT now(),
   password text NOT NULL DEFAULT ''::text,
+  pin text,
+  current_session_nonce text,
   CONSTRAINT user_pkey PRIMARY KEY (user_id),
+  CONSTRAINT user_pin_role_check CHECK (((pin IS NULL) OR (pin ~ '^[0-9]{6}$'::text)) AND ((pin IS NULL) OR (role::text = 'branch_manager'::text))),
   CONSTRAINT user_auth_id_fkey FOREIGN KEY (auth_id) REFERENCES auth.users(id),
   CONSTRAINT user_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branch(branch_id)
 );
@@ -495,6 +512,7 @@ CREATE TABLE public.vehicle (
   year integer,
   created_at timestamp with time zone DEFAULT now(),
   deleted_at timestamp with time zone,
+  color character varying,
   CONSTRAINT vehicle_pkey PRIMARY KEY (vehicle_id),
   CONSTRAINT vehicle_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customer(customer_id),
   CONSTRAINT vehicle_vehicle_type_id_fkey FOREIGN KEY (vehicle_type_id) REFERENCES public.vehicle_type(vehicle_type_id)

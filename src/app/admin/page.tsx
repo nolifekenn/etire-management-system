@@ -73,6 +73,7 @@ export default function AdminPage() {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [role, setRole] = useState<UserRole>('staff');
   const [branchId, setBranchId] = useState<string>('unassigned_dummy_val');
   const [showPassword, setShowPassword] = useState(false);
@@ -129,6 +130,7 @@ export default function AdminPage() {
     setName('');
     setUsername('');
     setPassword('');
+    setPin('');
     setRole('staff');
     setBranchId('unassigned_dummy_val');
     setEditingUser(null);
@@ -146,6 +148,7 @@ export default function AdminPage() {
     setName(userToEdit.name);
     setUsername(userToEdit.username);
     setPassword('');
+    setPin('');
     setBranchId(userToEdit.branch_id || 'unassigned_dummy_val');
     setIsEditUserDialogOpen(true);
   };
@@ -220,12 +223,22 @@ export default function AdminPage() {
   ], [branches]);
 
   const handleSubmit = async () => {
+    const effectiveRole: UserRole = editingUser ? editingUser.role : role;
+
     if (!name || !username) {
       toast({ title: "Validation Error", description: "Name and Username are required.", variant: "destructive" });
       return;
     }
     if (!editingUser && !password) {
       toast({ title: "Validation Error", description: "Password is required for new users.", variant: "destructive" });
+      return;
+    }
+    if (pin && !/^\d{6}$/.test(pin)) {
+      toast({ title: "Validation Error", description: "PIN must be exactly 6 digits.", variant: "destructive" });
+      return;
+    }
+    if (effectiveRole !== 'branch_manager' && pin) {
+      toast({ title: "Validation Error", description: "PIN can only be assigned to branch managers.", variant: "destructive" });
       return;
     }
 
@@ -240,6 +253,10 @@ export default function AdminPage() {
 
         if (password) {
           updatePayload.password = password;
+          hasChanges = true;
+        }
+        if (editingUser.role === 'branch_manager' && pin) {
+          updatePayload.pin = pin;
           hasChanges = true;
         }
 
@@ -283,6 +300,7 @@ export default function AdminPage() {
             name,
             username,
             password,
+            pin: role === 'branch_manager' ? (pin || null) : null,
             role,
             branch_id: finalBranchId
           }),
@@ -556,6 +574,25 @@ export default function AdminPage() {
                   </Button>
                 </div>
               </div>
+
+              {((editingUser && editingUser.role === 'branch_manager') || (!editingUser && role === 'branch_manager')) ? (
+                <div className="space-y-2">
+                  <Label className="dark:text-slate-300">{editingUser ? 'Manager PIN (Optional)' : 'Initial Manager PIN'}</Label>
+                  <Input
+                    type="password"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Exactly 6 digits"
+                    className="dark:bg-slate-950 dark:border-slate-700"
+                  />
+                  <p className="text-xs text-muted-foreground">Used for branch manager authorization prompts (archive/edit approvals).</p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">PIN is only available for branch manager accounts.</p>
+              )}
             </div>
             <DialogFooter>
               <Button onClick={handleSubmit} disabled={isLoading} className={buttonStyles.primary}>

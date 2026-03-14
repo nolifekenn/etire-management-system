@@ -2,7 +2,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient, createClient } from "@/lib/supabaseServer";
 
-// Verify the request comes from an authenticated admin/branch-manager.
+const PIN_REGEX = /^\d{6}$/;
+
+// Verify the request comes from an authenticated super admin.
 // Uses getUser() which always re-validates against the Supabase Auth server,
 // unlike getSession() which can return a stale/revoked cached token.
 async function verifyAdminAccessImproved(_request: NextRequest) {
@@ -25,7 +27,7 @@ async function verifyAdminAccessImproved(_request: NextRequest) {
     }
 
     const role = (userProfile as { user_id: string; role: string }).role;
-    if (role !== 'super_admin' && role !== 'branch_manager') {
+    if (role !== 'super_admin') {
         return { error: "Insufficient permissions", status: 403 };
     }
 
@@ -62,10 +64,21 @@ export async function POST(request: NextRequest) {
 
     try {
         const body = await request.json();
-        const { name, username, password, role, branch_id } = body;
+        const { name, username, password, pin, role, branch_id } = body;
+        const normalizedRole = String(role || 'staff');
+        const pinInput = pin == null ? '' : String(pin).trim();
+        const normalizedPin = pinInput === '' ? null : pinInput;
 
         if (!name || !username || !password) {
             return NextResponse.json({ error: "Name, username, and password are required" }, { status: 400 });
+        }
+
+        if (normalizedPin && !PIN_REGEX.test(normalizedPin)) {
+            return NextResponse.json({ error: "PIN must be exactly 6 digits" }, { status: 400 });
+        }
+
+        if (normalizedRole !== 'branch_manager' && normalizedPin) {
+            return NextResponse.json({ error: "PIN can only be set for branch managers" }, { status: 400 });
         }
 
         const adminClient = createAdminClient();
@@ -91,9 +104,10 @@ export async function POST(request: NextRequest) {
                 name,
                 username,
                 password, // Legacy field
-                role: role || 'staff', // Default to string 'staff'
+                role: normalizedRole,
                 auth_id: authData.user.id, // Using auth_id
-                branch_id: branch_id || null
+                branch_id: branch_id || null,
+                pin: normalizedRole === 'branch_manager' ? normalizedPin : null
             })
             .select()
             .single();
@@ -123,10 +137,17 @@ export async function PUT(request: NextRequest) {
 
     try {
         const body = await request.json();
-        const { user_id, role, password, branch_id } = body;
+        const { user_id, role, password, pin, branch_id } = body;
+        const pinWasProvided = pin !== undefined;
+        const pinInput = pin == null ? '' : String(pin).trim();
+        const normalizedInputPin = pinInput === '' ? null : pinInput;
 
         if (!user_id) {
             return NextResponse.json({ error: "user_id is required" }, { status: 400 });
+        }
+
+        if (normalizedInputPin && !PIN_REGEX.test(normalizedInputPin)) {
+            return NextResponse.json({ error: "PIN must be exactly 6 digits" }, { status: 400 });
         }
 
         const adminClient = createAdminClient();
@@ -134,7 +155,7 @@ export async function PUT(request: NextRequest) {
         // Get the user to find their auth uuid (auth_id)
         const { data: existingUser, error: fetchError } = await (adminClient
             .from('user') as any)
-            .select('auth_id') // Keeping consistent with POST
+            .select('auth_id, role, pin')
             .eq('user_id', user_id)
             .single();
 
@@ -147,6 +168,22 @@ export async function PUT(request: NextRequest) {
         if (role !== undefined) updateData.role = role;
         if (branch_id !== undefined) updateData.branch_id = branch_id;
         if (password) updateData.password = password;
+
+        const targetRole = String(role ?? existingUser.role);
+
+        if (targetRole === 'branch_manager') {
+            if (pinWasProvided) {
+                updateData.pin = normalizedInputPin;
+            }
+        } else {
+            if (pinWasProvided && normalizedInputPin) {
+                return NextResponse.json({ error: "PIN can only be set for branch managers" }, { status: 400 });
+            }
+
+            if (existingUser.pin !== null || pinWasProvided) {
+                updateData.pin = null;
+            }
+        }
 
         if (password && existingUser.auth_id) {
             const { error: authError } = await adminClient.auth.admin.updateUserById(
