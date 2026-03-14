@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus, Pencil, Trash2, Search, Building2, ArrowLeft, ChevronRight } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Search, Building2, ArrowLeft, ChevronRight, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,11 +15,21 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { listVendors, createVendor, updateVendor, deleteVendor, VendorInput } from "@/lib/actions/purchasing";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { validateShortText, validateLongText, validateEmail, validatePhone, validateUrl, type FieldError } from "@/lib/validation";
+
+// ── TIN validator (9–12 numeric digits) ──────────────────────
+function validateTIN(value: string): FieldError {
+  if (!value || value.trim() === "") return null; // optional field
+  const digitsOnly = value.replace(/[-\s]/g, "");
+  if (!/^\d+$/.test(digitsOnly)) return "TIN must contain only numbers (and optional dashes)";
+  if (digitsOnly.length < 9 || digitsOnly.length > 12) return "TIN must be 9–12 digits";
+  return null;
+}
 
 // ── Payment term options ─────────────────────────────────────
 const PAYMENT_TERMS = [
@@ -75,6 +85,26 @@ const emptyForm: VendorInput = {
 export default function VendorsPage() {
   const router  = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  // ── Role gate: only Managers & Super Admin ──────────────────
+  const canAccessVendors = user?.role === "super_admin" || user?.role === "branch_manager";
+
+  if (user && !canAccessVendors) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 p-6 text-center">
+        <ShieldAlert className="h-12 w-12 text-destructive opacity-60" />
+        <h2 className="text-xl font-semibold text-foreground">Access Denied</h2>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          Vendor management is restricted to Managers and Super Admins.
+          Contact your manager if you need access.
+        </p>
+        <Button variant="outline" onClick={() => router.push("/purchasing")}>
+          <ArrowLeft className="h-4 w-4 mr-2" /> Back to Purchasing
+        </Button>
+      </div>
+    );
+  }
 
   const [vendors, setVendors]       = useState<Vendor[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -147,7 +177,7 @@ export default function VendorsPage() {
     if (key === "email")          err = validateEmail(val,    { label: "Email" });
     if (key === "website")        err = validateUrl(val,      { label: "Website" });
     if (key === "city")           err = validateShortText(val, { label: "City",            required: false, minLength: 2, maxLength: 50  });
-    if (key === "vat")            err = validateShortText(val, { label: "VAT / TIN",        required: false, minLength: 3, maxLength: 30, blockDangerousChars: false });
+    if (key === "vat")            err = validateTIN(val);
     if (key === "address")        err = validateShortText(val, { label: "Address",          required: false, minLength: 2, maxLength: 200 });
     if (key === "notes")          err = validateLongText(val, { label: "Notes",             maxLength: 500 });
     setFormErrors((prev) => ({ ...prev, [key]: err }));
@@ -164,7 +194,7 @@ export default function VendorsPage() {
       email:          validateEmail(form.email ?? "",               { label: "Email" }),
       website:        validateUrl(form.website ?? "",              { label: "Website" }),
       city:           validateShortText(form.city ?? "",           { label: "City",            required: false, minLength: 2, maxLength: 50  }),
-      vat:            validateShortText(form.vat ?? "",            { label: "VAT / TIN",        required: false, minLength: 3, maxLength: 30, blockDangerousChars: false }),
+      vat:            validateTIN(form.vat ?? ""),
       address:        validateShortText(form.address ?? "",        { label: "Address",          required: false, minLength: 2, maxLength: 200 }),
       notes:          validateLongText(form.notes ?? "",           { label: "Notes",             maxLength: 500 }),
     };
@@ -326,12 +356,12 @@ export default function VendorsPage() {
 
       {/* ── Create / Edit Dialog ────────────────────────────────────────── */}
       <Dialog open={dialogOpen} onOpenChange={(v) => { if (!v) setDialogOpen(false); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg w-[95vw]">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Vendor" : "New Vendor"}</DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 gap-4 py-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2 max-h-[70vh] overflow-y-auto pr-1">
             {/* Name — full width */}
             <div className="col-span-2 space-y-1.5">
               <Label>Name <span className="text-destructive">*</span></Label>
@@ -415,7 +445,8 @@ export default function VendorsPage() {
                 value={form.vat}
                 onChange={(e) => field("vat", e.target.value)}
                 placeholder="000-000-000-000"
-                maxLength={30}
+                inputMode="numeric"
+                maxLength={15}
                 aria-invalid={!!formErrors.vat}
                 className={formErrors.vat ? "border-red-400 focus-visible:ring-red-300" : ""}
               />

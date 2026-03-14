@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useCallback, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -83,8 +83,8 @@ export default function PurchasingPage() {
   const handleOpenCreate = () => {
     if (!canCreatePO) {
       toast({
-        title: "Manager approval required",
-        description: "You are not permitted to create purchase orders. Only a manager can do this.",
+        title: "Permission Denied",
+        description: "You do not have permission to start a quotation. Only Managers and Super Admins can create purchase orders.",
         variant: "destructive",
       });
       return;
@@ -141,12 +141,14 @@ export default function PurchasingPage() {
             <PlusCircle className="h-4 w-4" />
             New
           </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 text-[#714B67] border-[#714B67] hover:bg-purple-50" asChild>
-            <Link href="/purchasing/vendors">
-              <Building2 className="h-4 w-4" />
-              Vendors
-            </Link>
-          </Button>
+          {(user?.role === "super_admin" || user?.role === "branch_manager") && (
+            <Button variant="outline" size="sm" className="gap-1.5 text-[#714B67] border-[#714B67] hover:bg-purple-50" asChild>
+              <Link href="/purchasing/vendors">
+                <Building2 className="h-4 w-4" />
+                Vendors
+              </Link>
+            </Button>
+          )}
           <Button variant="ghost" size="icon" onClick={fetchOrders} title="Refresh">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
@@ -233,10 +235,12 @@ export default function PurchasingPage() {
                   <td colSpan={7} className="py-16 text-center">
                     <Package className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-40" />
                     <p className="text-sm text-muted-foreground">No purchase orders found.</p>
-                    <Button variant="outline" size="sm" className="mt-3" onClick={handleOpenCreate}>
-                      <PlusCircle className="h-4 w-4 mr-2" />
-                      Create your first RFQ
-                    </Button>
+                    {canCreatePO && (
+                      <Button variant="outline" size="sm" className="mt-3" onClick={handleOpenCreate}>
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Create your first RFQ
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ) : (
