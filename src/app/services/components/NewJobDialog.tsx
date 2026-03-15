@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Loader2, Wrench, User, Car, Clock, Package,
-  Plus, Trash2, ChevronDown, PenLine,
+  Plus, Minus, Trash2, ChevronDown, PenLine,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -545,9 +545,16 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
                             <div className="flex items-center gap-0.5 justify-center">
                               <Button type="button" variant="ghost" size="icon"
                                 className="h-6 w-6 text-blue-400 hover:text-blue-600 hover:bg-blue-50"
-                                onClick={() => duplicateLine(line.id)}>
+                                onClick={() => updateLine(line.id, "qty", line.qty + 1)}>
                                 <Plus className="h-3 w-3" />
                               </Button>
+                            
+                              <Button type="button" variant="ghost" size="icon"
+                                className="h-6 w-6 text-amber-500 hover:text-amber-700 hover:bg-amber-50"
+                                onClick={() => updateLine(line.id, "qty", Math.max(1, line.qty - 1))}>
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                            
                               <Button type="button" variant="ghost" size="icon"
                                 className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50"
                                 onClick={() => removeLine(line.id)}>
