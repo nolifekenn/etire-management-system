@@ -267,10 +267,27 @@ export async function upsertProduct(input: UpsertProductInput) {
   const supabase: AnyClient = await createClient();
 
   const isNew = !input.item_id;
+  const normalizedName = input.name.trim();
+
+  // Prevent duplicate active product names (case-insensitive), including edits.
+  let duplicateQuery = supabase
+    .from('inventory_item')
+    .select('item_id')
+    .is('deleted_at', null)
+    .ilike('name', normalizedName)
+    .limit(1);
+
+  if (!isNew) {
+    duplicateQuery = duplicateQuery.neq('item_id', input.item_id!);
+  }
+
+  const { data: duplicateItem, error: duplicateError } = await duplicateQuery.maybeSingle();
+  if (duplicateError) return { success: false, error: duplicateError.message };
+  if (duplicateItem) return { success: false, error: 'A product with this name already exists.' };
 
   const payload: AnyRecord = {
     branch_id:    input.branch_id,
-    name:         input.name,
+    name:         normalizedName,
     category:     input.category,
     cost_price:   input.cost_price,
     sale_price:   input.sale_price,

@@ -205,12 +205,32 @@ export function CreateProductDialog({ open, onOpenChange, onCreated }: Props) {
     if (nameErr || saleErr || costErr || reorderErr) return;
     if (!branchId) return toast({ title: "Branch is required", variant: "destructive" });
 
+    const normalizedName = name.trim();
+
+    // Fast client-side duplicate check. Server action also enforces this.
+    const { data: existingProduct, error: dupCheckError } = await supabase
+      .from("inventory_item")
+      .select("item_id")
+      .is("deleted_at", null)
+      .ilike("name", normalizedName)
+      .limit(1)
+      .maybeSingle();
+
+    if (!dupCheckError && existingProduct) {
+      toast({
+        title: "Duplicate product name",
+        description: "A product with this name already exists.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSubmitting(true);
     try {
       const result = await upsertProduct({
         branch_id:    branchId,
         supplier_id:  (supplierId && supplierId !== "none") ? supplierId : undefined,
-        name:         name.trim(),
+        name:         normalizedName,
         category:     category as "tire" | "tool" | "accessory" | "service",
         vehicle_type: vehicleType as "car" | "motor" | "truck",
         sale_price:   Number(salePrice)   || 0,

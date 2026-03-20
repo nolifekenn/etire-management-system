@@ -271,7 +271,7 @@ export default function ProductListPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4 p-6 h-full">
+    <div className="flex flex-col gap-4 p-6">
       {/* Header bar */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
@@ -393,7 +393,7 @@ export default function ProductListPage() {
       )}
 
       {/* Table */}
-      <div className="flex-1 overflow-auto rounded-lg border border-border bg-white">
+      <div className="overflow-x-auto overflow-y-visible rounded-lg border border-border bg-white">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 sticky top-0 z-10 border-b border-border">
             <tr>
