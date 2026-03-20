@@ -499,11 +499,15 @@ export default function AdminPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 w-full sm:w-auto sm:ml-auto">
+                {filteredUsers.length} user{filteredUsers.length === 1 ? '' : 's'} shown
+              </p>
             </div>
 
             <DataTableWrapper
               columns={columns}
               data={filteredUsers.map(u => ({ ...u, id: u.user_id }))}
+              showHeader={false}
             />
           </div>
         </div>

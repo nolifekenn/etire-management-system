@@ -50,8 +50,6 @@ import autoTable from 'jspdf-autotable';
 
 type AnyRecord = Record<string, unknown>;
 
-type CategoryType = "tire" | "tool" | "accessory" | "service";
-
 const CATEGORY_COLORS: Record<string, string> = {
   tire:      "bg-blue-100   text-blue-800",
   tool:      "bg-amber-100  text-amber-800",
@@ -86,7 +84,7 @@ export default function ProductListPage() {
   const [category, setCategory] = useState<string>("all");
   const [filter,   setFilter]   = useState<string>(params.get("filter") ?? "all");
 
-  const load = useCallback(async (p = page) => {
+  const load = useCallback(async (p: number) => {
     setLoading(true);
     try {
       const res = await listProducts({
@@ -107,10 +105,10 @@ export default function ProductListPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, category, filter, page]);
+  }, [search, category, filter, toast]);
 
-  useEffect(() => { load(1); setPage(1); }, [search, category, filter]);
-  useEffect(() => { load(page); }, [page]);
+  useEffect(() => { setPage(1); load(1); }, [search, category, filter, load]);
+  useEffect(() => { load(page); }, [page, load]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -303,6 +301,12 @@ export default function ProductListPage() {
         </div>
       </div>
 
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button variant="outline" size="sm" className="h-8" onClick={() => router.push('/inventory/products')}>Products</Button>
+        <Button variant="ghost" size="sm" className="h-8" onClick={() => router.push('/inventory/adjustments')}>Adjustments</Button>
+        <Button variant="ghost" size="sm" className="h-8" onClick={() => router.push('/inventory/forecast')}>Stock Forecast</Button>
+      </div>
+
       {/* Toolbar: search + filters */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
@@ -346,6 +350,10 @@ export default function ProductListPage() {
             <SelectItem value="out_of_stock">Out of Stock</SelectItem>
           </SelectContent>
         </Select>
+
+        <span className="ml-auto text-xs text-muted-foreground">
+          {loading ? 'Loading items...' : `${items.length} of ${total} items`}
+        </span>
       </div>
 
       {/* Active filter badges */}
@@ -374,16 +382,16 @@ export default function ProductListPage() {
       )}
 
       {/* Table */}
-      <div className="flex-1 overflow-auto rounded-lg border border-border">
+      <div className="flex-1 overflow-auto rounded-lg border border-border bg-white">
         <table className="w-full text-sm">
-          <thead className="bg-[#714B67] sticky top-0 z-10">
+          <thead className="bg-muted/50 sticky top-0 z-10 border-b border-border">
             <tr>
-              <th className="px-4 py-3 text-left font-medium text-white w-1/3">Product</th>
-              <th className="px-4 py-3 text-left font-medium text-white">Category</th>
-              <th className="px-4 py-3 text-left font-medium text-white">Vehicle</th>
-              <th className="px-4 py-3 text-right font-medium text-white">Sale Price</th>
-              <th className="px-4 py-3 text-right font-medium text-white">Cost</th>
-              <th className="px-4 py-3 text-right font-medium text-white">On Hand</th>
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide font-semibold text-muted-foreground w-1/3">Product</th>
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide font-semibold text-muted-foreground">Category</th>
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide font-semibold text-muted-foreground">Vehicle</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">Sale Price</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">Cost</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">On Hand</th>
             </tr>
           </thead>
           <tbody>
@@ -595,9 +603,9 @@ export default function ProductListPage() {
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <div className="flex items-center justify-between text-sm text-muted-foreground border-t border-border pt-3">
         <span>
-          {loading ? "Loading…" : `${items.length} of ${total} products`}
+          {loading ? 'Loading...' : `Showing ${total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-${(page - 1) * PAGE_SIZE + items.length} of ${total}`}
         </span>
         <div className="flex items-center gap-2">
           <Button
@@ -607,7 +615,7 @@ export default function ProductListPage() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-xs">Page {page} / {totalPages}</span>
+          <span className="text-xs">Page {page} of {totalPages}</span>
           <Button
             variant="outline" size="sm"
             disabled={page >= totalPages || loading}

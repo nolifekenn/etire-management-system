@@ -14,6 +14,7 @@ import {
   Loader2,
   RefreshCw,
   ChevronLeft,
+  ChevronRight,
   AlertTriangle,
   PackageX,
   TrendingUp,
@@ -67,6 +68,8 @@ export default function ForecastPage() {
   const [loading, setLoading] = useState(true);
   const [crit,    setCrit]    = useState("all");
   const [search,  setSearch]  = useState("");
+  const [page,    setPage]    = useState(1);
+  const PAGE_SIZE = 15;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -92,6 +95,7 @@ export default function ForecastPage() {
   const displayed = rows.filter(r =>
     !search || r.name.toLowerCase().includes(search.toLowerCase()),
   );
+  useEffect(() => { setPage(1); }, [search, crit, displayed.length]);
 
   // Summary counts
   const counts = CRIT_ALL_KEYS.slice(1).reduce<Record<string, number>>((acc, k) => {
@@ -101,6 +105,8 @@ export default function ForecastPage() {
 
   const fmtDays = (d: number) => d >= 9999 ? "∞" : `${d}d`;
   const fmtQty  = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  const totalPages = Math.max(1, Math.ceil(displayed.length / PAGE_SIZE));
+  const pagedDisplayed = displayed.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -127,6 +133,12 @@ export default function ForecastPage() {
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </Button>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button variant="ghost" size="sm" className="h-8" onClick={() => router.push('/inventory/products')}>Products</Button>
+        <Button variant="ghost" size="sm" className="h-8" onClick={() => router.push('/inventory/adjustments')}>Adjustments</Button>
+        <Button variant="outline" size="sm" className="h-8" onClick={() => router.push('/inventory/forecast')}>Stock Forecast</Button>
       </div>
 
       {/* Summary cards */}
@@ -178,23 +190,23 @@ export default function ForecastPage() {
             ))}
           </SelectContent>
         </Select>
-        <span className="text-xs text-muted-foreground">{displayed.length} item{displayed.length !== 1 ? "s" : ""}</span>
+        <span className="ml-auto text-xs text-muted-foreground">{displayed.length} item{displayed.length !== 1 ? "s" : ""}</span>
       </div>
 
       {/* Table */}
-      <div className="overflow-auto rounded-lg border border-border">
+      <div className="overflow-auto rounded-lg border border-border bg-white">
         <table className="w-full text-sm">
-          <thead className="bg-muted/50 sticky top-0 z-10">
+          <thead className="bg-muted/50 sticky top-0 z-10 border-b border-border">
             <tr>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-1/3">Product</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Criticality</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">On Hand</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Days Left</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Daily Demand</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Sold 30d</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Sold 90d</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Reorder Level</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Suggested</th>
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide font-semibold text-muted-foreground w-1/3">Product</th>
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide font-semibold text-muted-foreground">Criticality</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">On Hand</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">Days Left</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">Daily Demand</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">Sold 30d</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">Sold 90d</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">Reorder Level</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">Suggested</th>
             </tr>
           </thead>
           <tbody>
@@ -212,7 +224,7 @@ export default function ForecastPage() {
                     : "No items match the current filter."}
                 </td>
               </tr>
-            ) : displayed.map(row => {
+            ) : pagedDisplayed.map(row => {
               const cfg  = CRIT_CONFIG[row.criticality] ?? CRIT_CONFIG.HEALTHY;
               const Icon = cfg.icon;
               const reorderFlag = row.reorder_level_needs_update && row.suggested_reorder_level > row.current_reorder_level;
@@ -286,6 +298,21 @@ export default function ForecastPage() {
             })}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>
+          Showing {displayed.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, displayed.length)} of {displayed.length}
+        </span>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-xs">Page {page} of {totalPages}</span>
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Legend */}

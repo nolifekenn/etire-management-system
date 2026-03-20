@@ -133,6 +133,8 @@ export default function PurchasingPage() {
         <Package className="h-5 w-5 text-purple-600 shrink-0" />
         <h1 className="text-base font-semibold text-foreground">Purchase Orders</h1>
         <div className="ml-auto flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="h-8" onClick={() => router.push('/purchasing')}>Orders</Button>
+          <Button variant="ghost" size="sm" className="h-8" onClick={() => router.push('/inventory/products')}>Inventory</Button>
           <Button
             size="sm"
             className="gap-1.5 bg-purple-600 hover:bg-purple-700 text-white"
@@ -212,7 +214,7 @@ export default function PurchasingPage() {
         <div className="rounded-lg border border-border bg-white overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-gray-50 text-xs text-muted-foreground">
+              <tr className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
                 <th className="text-left px-4 py-2.5 font-medium">Reference</th>
                 <th className="text-left px-4 py-2.5 font-medium">Vendor</th>
                 <th className="text-left px-4 py-2.5 font-medium hidden sm:table-cell">Branch</th>
@@ -288,13 +290,16 @@ export default function PurchasingPage() {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {count > 0 && (
           <div className="flex items-center justify-between text-sm">
-            <p className="text-muted-foreground">Page {page} of {totalPages}</p>
+            <p className="text-muted-foreground">
+              Showing {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, count)} of {count}
+            </p>
             <div className="flex items-center gap-1">
               <Button variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
+              <span className="text-xs text-muted-foreground px-1">Page {page} of {Math.max(totalPages, 1)}</span>
               <Button variant="outline" size="icon" className="h-8 w-8" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
                 <ChevronRight className="h-4 w-4" />
               </Button>

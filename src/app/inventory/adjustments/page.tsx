@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
   Search,
   ChevronLeft,
+  ChevronRight,
   AlertTriangle,
   PackageX,
   ArrowUp,
@@ -77,6 +78,8 @@ export default function AdjustmentsPage() {
   // Recent adjustments history
   const [history,      setHistory]     = useState<AnyRecord[]>([]);
   const [loadingHist,  setLoadingHist] = useState(true);
+  const [page,         setPage]        = useState(1);
+  const PAGE_SIZE = 15;
 
   // ── Data loaders ────────────────────────────────────────────────────────
 
@@ -112,6 +115,7 @@ export default function AdjustmentsPage() {
 
   useEffect(() => { loadItems(); }, [loadItems]);
   useEffect(() => { loadHistory(); }, [loadHistory]);
+  useEffect(() => { setPage(1); }, [search, category, items.length]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
 
@@ -143,6 +147,8 @@ export default function AdjustmentsPage() {
     if (delta < 0) return <ArrowDown className="h-3.5 w-3.5 text-red-600   inline" />;
     return              <Minus    className="h-3.5 w-3.5 text-slate-400 inline" />;
   };
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const pagedItems = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -178,6 +184,12 @@ export default function AdjustmentsPage() {
         </Button>
       </div>
 
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button variant="ghost" size="sm" className="h-8" onClick={() => router.push('/inventory/products')}>Products</Button>
+        <Button variant="outline" size="sm" className="h-8" onClick={() => router.push('/inventory/adjustments')}>Adjustments</Button>
+        <Button variant="ghost" size="sm" className="h-8" onClick={() => router.push('/inventory/forecast')}>Stock Forecast</Button>
+      </div>
+
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
@@ -207,15 +219,15 @@ export default function AdjustmentsPage() {
       </div>
 
       {/* Product Table */}
-      <div className="overflow-auto rounded-lg border border-border">
+      <div className="overflow-auto rounded-lg border border-border bg-white">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-background shadow-sm">
+          <thead className="sticky top-0 z-10 bg-muted/50 border-b border-border">
             <tr>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-2/5">Product</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Category</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">On Hand</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Reorder Level</th>
-              <th className="px-4 py-3 text-center font-medium text-muted-foreground w-32">Action</th>
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide font-semibold text-muted-foreground w-2/5">Product</th>
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide font-semibold text-muted-foreground">Category</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">On Hand</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">Reorder Level</th>
+              <th className="px-4 py-3 text-center text-xs uppercase tracking-wide font-semibold text-muted-foreground w-32">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -231,7 +243,7 @@ export default function AdjustmentsPage() {
                   No products found
                 </td>
               </tr>
-            ) : items.map(item => (
+            ) : pagedItems.map(item => (
               <tr key={String(item.item_id)} className="border-t border-border hover:bg-muted/30 transition-colors">
                 <td className="px-4 py-3">
                   <p className="font-medium text-foreground">{String(item.name)}</p>
@@ -267,6 +279,21 @@ export default function AdjustmentsPage() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>
+          Showing {items.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, items.length)} of {items.length}
+        </span>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-xs">Page {page} of {totalPages}</span>
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Adjustment History */}

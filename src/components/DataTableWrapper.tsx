@@ -34,7 +34,6 @@ interface Column {
   header: string;
   sortable?: boolean;
   align?: 'left' | 'center' | 'right';
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   render?: (value: any, item: any) => React.ReactNode;
   accessorKey?: string; // For data access path 'user.name'
 }
@@ -103,7 +102,6 @@ export function DataTableWrapper<T>({
   };
 
   // Helper to get value from key (supports dot notation)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getValue = (item: any, key: string) => {
     return key.split('.').reduce((acc, k) => acc?.[k], item);
   };
@@ -146,6 +144,8 @@ export function DataTableWrapper<T>({
     (currentPage - 1) * rowsPerPage,
     currentPage * rowsPerPage
   );
+  const rangeStart = processedData.length === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1;
+  const rangeEnd = Math.min(currentPage * rowsPerPage, processedData.length);
 
   const handleSort = (key: string) => {
     setSortConfig(current => {
@@ -157,9 +157,9 @@ export function DataTableWrapper<T>({
   };
 
   return (
-    <Card className={`bg-white border-slate-100 transition-all duration-300 hover:shadow-xl rounded-none overflow-hidden ${className || ''}`}>
+    <Card className={`bg-white border border-slate-200 rounded-xl overflow-hidden ${className || ''}`}>
       {showHeader && (
-        <CardHeader className="pb-4 pt-6 px-6 flex flex-row items-center justify-between border-b border-slate-50">
+        <CardHeader className="pb-4 pt-5 px-6 flex flex-row items-center justify-between border-b border-slate-200">
           <div className="flex flex-col gap-1">
             {title && <CardTitle className="text-lg font-bold text-slate-800">{title}</CardTitle>}
           </div>
@@ -173,10 +173,13 @@ export function DataTableWrapper<T>({
                   placeholder="Search..."
                   value={searchTerm}
                   onChange={(e) => handleSearchChange(e.target.value)}
-                  className="pl-9 h-9 text-sm bg-slate-50 border-slate-200 focus:bg-white transition-all"
+                  className="pl-9 h-9 text-sm bg-white border-slate-200"
                 />
               </div>
             )}
+            <span className="text-xs font-medium text-slate-500">
+              {processedData.length.toLocaleString()} item{processedData.length === 1 ? '' : 's'}
+            </span>
           </div>
         </CardHeader>
       )}
@@ -187,13 +190,13 @@ export function DataTableWrapper<T>({
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-gradient-to-r from-slate-50 to-indigo-50/20 border-b border-slate-200">
+                <TableRow className="bg-slate-50 border-b border-slate-200">
                   {columns.map((col) => {
                     const sortKey = col.accessorKey || col.key;
                     return (
                       <TableHead
                         key={String(col.key)}
-                        className={`text-slate-700 font-semibold text-xs uppercase tracking-wider py-3 px-4 h-10 ${col.sortable ? 'cursor-pointer hover:bg-slate-100 select-none transition-colors' : ''
+                        className={`text-slate-600 font-semibold text-xs uppercase tracking-wider py-3 px-4 h-10 ${col.sortable ? 'cursor-pointer hover:bg-slate-100 select-none transition-colors' : ''
                           } ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
                         onClick={() => col.sortable && handleSort(sortKey)}
                       >
@@ -241,9 +244,9 @@ export function DataTableWrapper<T>({
                     <TableRow
                       key={(item as Record<string, unknown>).id as string || (item as Record<string, unknown>).key as string || `row-${index}`}
                       className={`
-                        border-b border-slate-50
+                        border-b border-slate-100
                         transition-colors duration-150
-                        hover:bg-indigo-50/30
+                        hover:bg-slate-50
                         ${onRowClick ? 'cursor-pointer' : ''}
                       `}
                       onClick={() => onRowClick?.(item)}
@@ -320,27 +323,27 @@ export function DataTableWrapper<T>({
       {/* Pagination Footer */}
       {processedData.length > 0 && (
         <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">Rows per page</span>
-            <Select
-              value={String(rowsPerPage)}
-              onValueChange={handleRowsPerPageChange}
-            >
-              <SelectTrigger className="h-8 w-[70px] text-xs bg-white border-slate-200">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {rowsPerPageOptions.map(opt => (
-                  <SelectItem key={opt} value={String(opt)} className="text-xs">{opt}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <span className="text-xs text-slate-500">
+            Showing {rangeStart.toLocaleString()}-{rangeEnd.toLocaleString()} of {processedData.length.toLocaleString()}
+          </span>
 
           <div className="flex items-center gap-4">
-            <span className="text-xs text-slate-500">
-              Page {currentPage} of {totalPages}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500">Rows per page</span>
+              <Select
+                value={String(rowsPerPage)}
+                onValueChange={handleRowsPerPageChange}
+              >
+                <SelectTrigger className="h-8 w-[70px] text-xs bg-white border-slate-200">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {rowsPerPageOptions.map(opt => (
+                    <SelectItem key={opt} value={String(opt)} className="text-xs">{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex gap-1">
               <Button
                 variant="outline"
