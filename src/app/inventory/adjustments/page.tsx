@@ -66,7 +66,6 @@ export default function AdjustmentsPage() {
 
   // Products list state
   const [items,        setItems]       = useState<AnyRecord[]>([]);
-  const [totalItems,   setTotalItems]  = useState(0);
   const [loadingItems, setLoadingItems]= useState(true);
   const [search,       setSearch]      = useState("");
   const [category,     setCategory]    = useState("all");
@@ -79,7 +78,7 @@ export default function AdjustmentsPage() {
   const [history,      setHistory]     = useState<AnyRecord[]>([]);
   const [loadingHist,  setLoadingHist] = useState(true);
   const [page,         setPage]        = useState(1);
-  const PAGE_SIZE = 15;
+  const [rowsPerPage,  setRowsPerPage] = useState(50);
 
   // ── Data loaders ────────────────────────────────────────────────────────
 
@@ -93,7 +92,6 @@ export default function AdjustmentsPage() {
         page_size: 200,
       });
       setItems(res.items as AnyRecord[]);
-      setTotalItems(res.total);
     } catch {
       toast({ title: "Failed to load products", variant: "destructive" });
     } finally {
@@ -115,7 +113,7 @@ export default function AdjustmentsPage() {
 
   useEffect(() => { loadItems(); }, [loadItems]);
   useEffect(() => { loadHistory(); }, [loadHistory]);
-  useEffect(() => { setPage(1); }, [search, category, items.length]);
+  useEffect(() => { setPage(1); }, [search, category, items.length, rowsPerPage]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
 
@@ -147,8 +145,8 @@ export default function AdjustmentsPage() {
     if (delta < 0) return <ArrowDown className="h-3.5 w-3.5 text-red-600   inline" />;
     return              <Minus    className="h-3.5 w-3.5 text-slate-400 inline" />;
   };
-  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
-  const pagedItems = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(items.length / rowsPerPage));
+  const pagedItems = items.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -213,9 +211,19 @@ export default function AdjustmentsPage() {
             <SelectItem value="service">Service</SelectItem>
           </SelectContent>
         </Select>
-        <span className="text-xs text-muted-foreground ml-2">
-          {totalItems} product{totalItems !== 1 ? "s" : ""}
-        </span>
+        <div className="ml-auto shrink-0">
+          <Select value={String(rowsPerPage)} onValueChange={(value) => setRowsPerPage(Number(value))}>
+            <SelectTrigger className="h-9 w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">Show: 5 items</SelectItem>
+              <SelectItem value="10">Show: 10 items</SelectItem>
+              <SelectItem value="20">Show: 20 items</SelectItem>
+              <SelectItem value="50">Show: 50 items</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Product Table */}
@@ -283,7 +291,7 @@ export default function AdjustmentsPage() {
 
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>
-          Showing {items.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, items.length)} of {items.length}
+          Showing {items.length === 0 ? 0 : (page - 1) * rowsPerPage + 1}-{Math.min(page * rowsPerPage, items.length)} of {items.length}
         </span>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>

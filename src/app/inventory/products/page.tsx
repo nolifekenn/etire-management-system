@@ -63,7 +63,8 @@ const VEHICLE_LABELS: Record<string, string> = {
   truck: "Truck",
 };
 
-const PAGE_SIZE = 50;
+const DEFAULT_ROWS_PER_PAGE = 50;
+const ROWS_PER_PAGE_OPTIONS = [5, 10, 20, 50] as const;
 
 // ── Component ──────────────────────────────────────────────────────────────
 
@@ -75,6 +76,7 @@ export default function ProductListPage() {
   const [items, setItems]           = useState<AnyRecord[]>([]);
   const [total, setTotal]           = useState(0);
   const [page, setPage]             = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState<number>(DEFAULT_ROWS_PER_PAGE);
   const [loading, setLoading]       = useState(true);
   const [showCreate,  setShowCreate]  = useState(false);
   const [expandedId,  setExpandedId]  = useState<string | null>(null);
@@ -93,7 +95,7 @@ export default function ProductListPage() {
         low_stock:    filter === "low_stock",
         out_of_stock: filter === "out_of_stock",
         page:         p,
-        page_size:    PAGE_SIZE,
+        page_size:    rowsPerPage,
       });
 
       const rows = res.items as AnyRecord[];
@@ -105,12 +107,12 @@ export default function ProductListPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, category, filter, toast]);
+  }, [search, category, filter, rowsPerPage, toast]);
 
-  useEffect(() => { setPage(1); load(1); }, [search, category, filter, load]);
+  useEffect(() => { setPage(1); load(1); }, [search, category, filter, rowsPerPage, load]);
   useEffect(() => { load(page); }, [page, load]);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / rowsPerPage));
 
   const stockBadge = (item: AnyRecord) => {
     const qty    = Number(item.stock_quantity);
@@ -351,9 +353,18 @@ export default function ProductListPage() {
           </SelectContent>
         </Select>
 
-        <span className="ml-auto text-xs text-muted-foreground">
-          {loading ? 'Loading items...' : `${items.length} of ${total} items`}
-        </span>
+        <div className="ml-auto shrink-0">
+          <Select value={String(rowsPerPage)} onValueChange={(value) => setRowsPerPage(Number(value))}>
+            <SelectTrigger className="h-9 w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ROWS_PER_PAGE_OPTIONS.map(option => (
+                <SelectItem key={option} value={String(option)}>Show: {option} items</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Active filter badges */}
@@ -605,7 +616,7 @@ export default function ProductListPage() {
       {/* Pagination */}
       <div className="flex items-center justify-between text-sm text-muted-foreground border-t border-border pt-3">
         <span>
-          {loading ? 'Loading...' : `Showing ${total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-${(page - 1) * PAGE_SIZE + items.length} of ${total}`}
+          {loading ? 'Loading...' : `Showing ${total === 0 ? 0 : (page - 1) * rowsPerPage + 1}-${(page - 1) * rowsPerPage + items.length} of ${total}`}
         </span>
         <div className="flex items-center gap-2">
           <Button

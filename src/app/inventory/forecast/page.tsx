@@ -69,7 +69,7 @@ export default function ForecastPage() {
   const [crit,    setCrit]    = useState("all");
   const [search,  setSearch]  = useState("");
   const [page,    setPage]    = useState(1);
-  const PAGE_SIZE = 15;
+  const [rowsPerPage, setRowsPerPage] = useState(50);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,7 +95,7 @@ export default function ForecastPage() {
   const displayed = rows.filter(r =>
     !search || r.name.toLowerCase().includes(search.toLowerCase()),
   );
-  useEffect(() => { setPage(1); }, [search, crit, displayed.length]);
+  useEffect(() => { setPage(1); }, [search, crit, displayed.length, rowsPerPage]);
 
   // Summary counts
   const counts = CRIT_ALL_KEYS.slice(1).reduce<Record<string, number>>((acc, k) => {
@@ -105,8 +105,8 @@ export default function ForecastPage() {
 
   const fmtDays = (d: number) => d >= 9999 ? "∞" : `${d}d`;
   const fmtQty  = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 1 });
-  const totalPages = Math.max(1, Math.ceil(displayed.length / PAGE_SIZE));
-  const pagedDisplayed = displayed.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(displayed.length / rowsPerPage));
+  const pagedDisplayed = displayed.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -190,7 +190,19 @@ export default function ForecastPage() {
             ))}
           </SelectContent>
         </Select>
-        <span className="ml-auto text-xs text-muted-foreground">{displayed.length} item{displayed.length !== 1 ? "s" : ""}</span>
+        <div className="ml-auto shrink-0">
+          <Select value={String(rowsPerPage)} onValueChange={(value) => setRowsPerPage(Number(value))}>
+            <SelectTrigger className="h-9 w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">Show: 5 items</SelectItem>
+              <SelectItem value="10">Show: 10 items</SelectItem>
+              <SelectItem value="20">Show: 20 items</SelectItem>
+              <SelectItem value="50">Show: 50 items</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Table */}
@@ -302,7 +314,7 @@ export default function ForecastPage() {
 
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>
-          Showing {displayed.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, displayed.length)} of {displayed.length}
+          Showing {displayed.length === 0 ? 0 : (page - 1) * rowsPerPage + 1}-{Math.min(page * rowsPerPage, displayed.length)} of {displayed.length}
         </span>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
