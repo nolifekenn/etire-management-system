@@ -122,25 +122,26 @@ export default function SalesListPage() {
 
   // ── new quotation ──────────────────────────────────────────────────────────
 
+  const branchId = auth?.activeBranchId ?? user?.branch_id ?? '';
+  
   const handleNewQuotation = async () => {
-    if (!user?.id) return;
+    if (!user?.user_id) return;
     setCreating(true);
     try {
       const result = await createQuotation({
-        branch_id: branch?.branch_id ?? '',
-        user_id:   String(user.id),
+        branch_id: branchId ?? '',
+        user_id:   String(user.user_id),
         lines:     [],
       });
       if (result.success && result.saleId) {
-        // Audit log: new quotation created
         if (user?.user_id && supabase) {
           await supabase.from('audit_log').insert({
-            user_id: String(user.user_id),
-            action: 'INSERT',
-            table_name: 'sale',
-            record_id: result.saleId,
-            old_values: null,
-            new_values: { branch_id: branch?.branch_id ?? '', status: 'draft', lines: [] },
+            user_id:       String(user.user_id),
+            action:        'INSERT',
+            table_name:    'sale',
+            record_id:     result.saleId,
+            old_values:    null,
+            new_values:    { branch_id: branchId ?? '', status: 'draft', lines: [] },
             record_number: null,
           });
         }
@@ -152,7 +153,6 @@ export default function SalesListPage() {
       setCreating(false);
     }
   };
-
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   // ──────────────────────────────────────────────────────────────────────────
