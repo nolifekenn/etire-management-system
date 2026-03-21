@@ -133,8 +133,6 @@ export default function PurchasingPage() {
         <Package className="h-5 w-5 text-purple-600 shrink-0" />
         <h1 className="text-base font-semibold text-foreground">Purchase Orders</h1>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="h-8" onClick={() => router.push('/purchasing')}>Orders</Button>
-          <Button variant="ghost" size="sm" className="h-8" onClick={() => router.push('/inventory/products')}>Inventory</Button>
           <Button
             size="sm"
             className="gap-1.5 bg-purple-600 hover:bg-purple-700 text-white"
