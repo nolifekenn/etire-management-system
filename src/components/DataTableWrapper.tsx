@@ -54,6 +54,7 @@ interface DataTableWrapperProps<T> {
   searchTerm?: string;
   onSearchTermChange?: (term: string) => void;
   showHeader?: boolean;
+  showFooter?: boolean;
 }
 
 export function DataTableWrapper<T>({
@@ -72,6 +73,7 @@ export function DataTableWrapper<T>({
   searchTerm: externalSearchTerm,
   onSearchTermChange,
   showHeader = true,
+  showFooter = true,
 }: DataTableWrapperProps<T>) {
   const [internalSearchTerm, setInternalSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -321,7 +323,7 @@ export function DataTableWrapper<T>({
       </CardContent>
 
       {/* Pagination Footer */}
-      {processedData.length > 0 && (
+      {showFooter && processedData.length > 0 && (
         <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50">
           <span className="text-xs text-slate-500">
             Showing {rangeStart.toLocaleString()}-{rangeEnd.toLocaleString()} of {processedData.length.toLocaleString()}

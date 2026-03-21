@@ -244,9 +244,9 @@ const CustomerAdvancedFilters = ({
   const hasActiveFilters = filters.search;
 
   return (
-    <div className="bg-white p-5 border-b border-slate-200">
+    <div className="bg-white p-3 border-b border-slate-200">
       {/* Removed mb-5 to reduce spacing */}
-      <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-end gap-2">
         <div className="flex-1 relative">
           <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Search Customers</Label>
           <div className="relative group">
@@ -370,9 +370,9 @@ const VehicleAdvancedFilters = ({
   const hasActiveFilters = filters.search || filters.customer !== 'all' || filters.vehicleType !== 'all';
 
   return (
-    <div className="bg-white p-5 border-b border-slate-200">
+    <div className="bg-white p-3 border-b border-slate-200">
       {/* Removed mb-5 to reduce spacing */}
-      <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-end gap-2">
         <div className="flex-1 relative">
           <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Search Vehicles</Label>
           <div className="relative group">
@@ -534,9 +534,9 @@ const HistoryAdvancedFilters = ({
   const hasActiveFilters = filters.search || filters.serviceType !== 'all';
 
   return (
-    <div className="bg-white p-5 border-b border-slate-200">
+    <div className="bg-white p-3 border-b border-slate-200">
       {/* Removed mb-5 to reduce spacing */}
-      <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-end gap-2">
         <div className="flex-1 relative">
           <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Search History</Label>
           <div className="relative group">
@@ -1138,7 +1138,7 @@ export default function EnhancedCustomersPage() {
   const formatPlateOnType = (input: string) => {
     if (!input) return '';
     const up = input.toUpperCase();
-    let s = up.replace(/\s+/g, '-').replace(/[^A-Z0-9-]/g, '').replace(/-+/g, '-');
+    const s = up.replace(/\s+/g, '-').replace(/[^A-Z0-9-]/g, '').replace(/-+/g, '-');
 
     if (s.includes('-')) {
       const [L = '', R = ''] = s.split('-', 2);
@@ -2552,15 +2552,6 @@ export default function EnhancedCustomersPage() {
         {/* Stats Overview */}
         <StatsOverview customers={customers} vehicles={vehicles} tireHistory={tireHistory} />
 
-        {/* QuickActions */}
-        <QuickActions
-          onAddCustomer={handleOpenCustomerDialog}
-          onAddVehicle={handleOpenVehicleDialog}
-          onExportData={handleExportData}
-          onExportPDF={handleExportPDF}
-        />
-
-
         <div className="mb-4">
           <EnhancedTabs value={activeTab} onValueChange={handleTabChange}>
 
@@ -2573,18 +2564,20 @@ export default function EnhancedCustomersPage() {
                 </div>
               ) : (
                 <Card>
-                  <CardHeader className="py-2 px-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium">
-                        Customer Management
-                        <span className="ml-2 text-muted-foreground font-normal">
-                          {customerFilters.search ? (
-                            <>({filteredCustomers.length} of {customers.length})</>
-                          ) : (
-                            <>({customers.length} customers)</>
-                          )}
-                        </span>
-                      </CardTitle>
+                  <CardHeader className="py-2 px-3 border-b border-slate-200">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button onClick={handleOpenCustomerDialog} size="sm" className="gap-2">
+                        <UserPlus className="h-4 w-4" />
+                        Add
+                      </Button>
+                      <Button onClick={handleExportData} variant="outline" size="sm" className="gap-2">
+                        <Download className="h-4 w-4" />
+                        CSV
+                      </Button>
+                      <Button onClick={handleExportPDF} size="sm" className="gap-2 bg-[#714B67] hover:bg-[#5a3c53] text-white">
+                        <FileText className="h-4 w-4" />
+                        PDF
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -2606,7 +2599,7 @@ export default function EnhancedCustomersPage() {
                     ) : (
                       <>
                         <DataTableWrapper
-                          className="w-full"
+                          className="w-full rounded-none border-0"
                           columns={customerColumns}
                           data={displayedCustomers.map(customer => ({
                             ...customer,
@@ -2614,6 +2607,8 @@ export default function EnhancedCustomersPage() {
                           }))}
                           onEdit={handleEditCustomer}
                           onDelete={(item) => handleDeleteItem(item, 'customer')}
+                          showHeader={false}
+                          showFooter={false}
                         />
 
                         {/* NEW PAGINATION CONTROLS */}
@@ -2640,18 +2635,20 @@ export default function EnhancedCustomersPage() {
                 </div>
               ) : (
                 <Card>
-                  <CardHeader className="py-2 px-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium">
-                        Vehicle Management
-                        <span className="ml-2 text-muted-foreground font-normal">
-                          {vehicleFilters.search || vehicleFilters.customer !== 'all' || vehicleFilters.vehicleType !== 'all' ? (
-                            <>({filteredVehicles.length} of {vehicles.length})</>
-                          ) : (
-                            <>({vehicles.length} vehicles)</>
-                          )}
-                        </span>
-                      </CardTitle>
+                  <CardHeader className="py-2 px-3 border-b border-slate-200">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button onClick={handleOpenVehicleDialog} variant="outline" size="sm" className="gap-2">
+                        <Car className="h-4 w-4" />
+                        Add
+                      </Button>
+                      <Button onClick={handleExportData} variant="outline" size="sm" className="gap-2">
+                        <Download className="h-4 w-4" />
+                        CSV
+                      </Button>
+                      <Button onClick={handleExportPDF} size="sm" className="gap-2 bg-[#714B67] hover:bg-[#5a3c53] text-white">
+                        <FileText className="h-4 w-4" />
+                        PDF
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -2675,7 +2672,7 @@ export default function EnhancedCustomersPage() {
                     ) : (
                       <>
                         <DataTableWrapper
-                          className="w-full"
+                          className="w-full rounded-none border-0"
                           columns={vehicleColumns}
                           data={displayedVehicles.map(vehicle => ({
                             ...vehicle,
@@ -2683,6 +2680,8 @@ export default function EnhancedCustomersPage() {
                           }))}
                           onEdit={handleEditVehicle}
                           onDelete={(item) => handleDeleteItem(item, 'vehicle')}
+                          showHeader={false}
+                          showFooter={false}
                         />
 
                         {/* NEW PAGINATION CONTROLS */}
@@ -2709,18 +2708,20 @@ export default function EnhancedCustomersPage() {
                 </div>
               ) : (
                 <Card>
-                  <CardHeader className="py-2 px-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium">
-                        Tire Service History
-                        <span className="ml-2 text-muted-foreground font-normal">
-                          {historyFilters.search || historyFilters.serviceType !== 'all' ? (
-                            <>({filteredHistory.length} of {tireHistory.length})</>
-                          ) : (
-                            <>({tireHistory.length} records)</>
-                          )}
-                        </span>
-                      </CardTitle>
+                  <CardHeader className="py-2 px-3 border-b border-slate-200">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button onClick={() => handleTabChange('vehicles')} variant="outline" size="sm" className="gap-2">
+                        <Wrench className="h-4 w-4" />
+                        Add
+                      </Button>
+                      <Button onClick={handleExportData} variant="outline" size="sm" className="gap-2">
+                        <Download className="h-4 w-4" />
+                        CSV
+                      </Button>
+                      <Button onClick={handleExportPDF} size="sm" className="gap-2 bg-[#714B67] hover:bg-[#5a3c53] text-white">
+                        <FileText className="h-4 w-4" />
+                        PDF
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -2742,7 +2743,7 @@ export default function EnhancedCustomersPage() {
                     ) : (
                       <>
                         <DataTableWrapper
-                          className="w-full"
+                          className="w-full rounded-none border-0"
                           columns={historyColumns}
                           data={displayedHistory.map((h, idx) => ({
                             ...h,
@@ -2752,6 +2753,8 @@ export default function EnhancedCustomersPage() {
                             created_by_name: h.user?.name ?? '',
                           }))}
                           onDelete={(item) => handleDeleteItem(item, 'history')}
+                          showHeader={false}
+                          showFooter={false}
                         />
 
                         {/* NEW PAGINATION CONTROLS */}
@@ -2825,11 +2828,21 @@ export default function EnhancedCustomersPage() {
 
                   {/* ── Customer CRM List ── */}
                   <Card>
-                    <CardHeader className="py-2 px-4">
-                      <CardTitle className="text-sm font-medium font-poppins">
-                        Customer Overview
-                        <span className="ml-2 text-muted-foreground font-normal">({crmCustomers.length} customers)</span>
-                      </CardTitle>
+                    <CardHeader className="py-2 px-4 border-b border-slate-200">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button onClick={handleOpenCustomerDialog} size="sm" className="gap-2">
+                          <UserPlus className="h-4 w-4" />
+                          Add
+                        </Button>
+                        <Button onClick={handleExportData} variant="outline" size="sm" className="gap-2">
+                          <Download className="h-4 w-4" />
+                          CSV
+                        </Button>
+                        <Button onClick={handleExportPDF} size="sm" className="gap-2 bg-[#714B67] hover:bg-[#5a3c53] text-white">
+                          <FileText className="h-4 w-4" />
+                          PDF
+                        </Button>
+                      </div>
                     </CardHeader>
                     <CardContent className="p-0">
                       <div className="overflow-x-auto">
@@ -2904,13 +2917,18 @@ export default function EnhancedCustomersPage() {
 
                   {/* ── Win-Back List ── */}
                   <Card>
-                    <CardHeader className="py-2 px-4">
+                    <CardHeader className="py-2 px-4 border-b border-slate-200">
                       <div className="flex items-center justify-between flex-wrap gap-2">
-                        <CardTitle className="text-sm font-medium font-poppins flex items-center gap-2">
-                          <RotateCcw className="h-4 w-4 text-orange-500" />
-                          Win-Back List
-                          <span className="text-muted-foreground font-normal">({winBackCustomers.length} customers)</span>
-                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                          <Button onClick={handleExportData} variant="outline" size="sm" className="gap-2">
+                            <Download className="h-4 w-4" />
+                            CSV
+                          </Button>
+                          <Button onClick={handleExportPDF} size="sm" className="gap-2 bg-[#714B67] hover:bg-[#5a3c53] text-white">
+                            <FileText className="h-4 w-4" />
+                            PDF
+                          </Button>
+                        </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-slate-500 font-poppins">Inactive for ≥</span>
                           <Select value={String(winBackDays)} onValueChange={v => setWinBackDays(Number(v))}>
