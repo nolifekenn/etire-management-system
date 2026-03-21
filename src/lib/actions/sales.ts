@@ -554,7 +554,7 @@ export async function voidSale(saleId: string, userId: string, reason: string) {
     .update({
       state:      'cancelled',
       note:       reason,
-      deleted_at: new Date().toISOString(),
+      // deleted_at: new Date().toISOString(),
     })
     .eq('sale_id', saleId)
     .in('state', ['draft', 'confirmed']);   // cannot void a 'done' POS sale

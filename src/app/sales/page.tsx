@@ -272,7 +272,7 @@ export default function SalesListPage() {
                       {formatCurrency(sale.total_amount)}
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={sale.status} />
+                      <StatusBadge status={sale.state} />
                     </TableCell>
                   </TableRow>
                 );
