@@ -73,6 +73,7 @@ export default function AdminPage() {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [role, setRole] = useState<UserRole>('staff');
   const [branchId, setBranchId] = useState<string>('unassigned_dummy_val');
   const [showPassword, setShowPassword] = useState(false);
@@ -129,6 +130,7 @@ export default function AdminPage() {
     setName('');
     setUsername('');
     setPassword('');
+    setPin('');
     setRole('staff');
     setBranchId('unassigned_dummy_val');
     setEditingUser(null);
@@ -146,6 +148,7 @@ export default function AdminPage() {
     setName(userToEdit.name);
     setUsername(userToEdit.username);
     setPassword('');
+    setPin('');
     setBranchId(userToEdit.branch_id || 'unassigned_dummy_val');
     setIsEditUserDialogOpen(true);
   };
@@ -184,7 +187,8 @@ export default function AdminPage() {
         const style = role === 'super_admin' ? 'bg-red-50 text-red-700 border-red-200' :
           role === 'branch_manager' ? 'bg-purple-50 text-purple-700 border-purple-200' :
             role === 'cashier' ? 'bg-green-50 text-green-700 border-green-200' :
-              'bg-blue-50 text-blue-700 border-blue-200';
+              role === 'mechanic' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                'bg-blue-50 text-blue-700 border-blue-200';
         const label = role.replace('_', ' ').toUpperCase();
         return <Badge variant="outline" className={style}>{label}</Badge>;
       }
@@ -219,12 +223,22 @@ export default function AdminPage() {
   ], [branches]);
 
   const handleSubmit = async () => {
+    const effectiveRole: UserRole = editingUser ? editingUser.role : role;
+
     if (!name || !username) {
       toast({ title: "Validation Error", description: "Name and Username are required.", variant: "destructive" });
       return;
     }
     if (!editingUser && !password) {
       toast({ title: "Validation Error", description: "Password is required for new users.", variant: "destructive" });
+      return;
+    }
+    if (pin && !/^\d{6}$/.test(pin)) {
+      toast({ title: "Validation Error", description: "PIN must be exactly 6 digits.", variant: "destructive" });
+      return;
+    }
+    if (effectiveRole !== 'branch_manager' && pin) {
+      toast({ title: "Validation Error", description: "PIN can only be assigned to branch managers.", variant: "destructive" });
       return;
     }
 
@@ -239,6 +253,10 @@ export default function AdminPage() {
 
         if (password) {
           updatePayload.password = password;
+          hasChanges = true;
+        }
+        if (editingUser.role === 'branch_manager' && pin) {
+          updatePayload.pin = pin;
           hasChanges = true;
         }
 
@@ -282,6 +300,7 @@ export default function AdminPage() {
             name,
             username,
             password,
+            pin: role === 'branch_manager' ? (pin || null) : null,
             role,
             branch_id: finalBranchId
           }),
@@ -359,6 +378,7 @@ export default function AdminPage() {
     managers: users.filter(u => u.role === 'branch_manager').length,
     staff: users.filter(u => u.role === 'staff').length,
     cashiers: users.filter(u => u.role === 'cashier').length,
+    mechanics: users.filter(u => u.role === 'mechanic').length,
   };
 
   if (isAuthLoading) {
@@ -397,7 +417,7 @@ export default function AdminPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className={`grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 transition-all duration-500 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        <div className={`grid grid-cols-1 md:grid-cols-5 gap-4 mb-8 transition-all duration-500 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
             <div className="flex items-center justify-between">
               <div><p className="text-sm text-slate-500 dark:text-slate-400">Total Users</p><p className="text-2xl font-bold text-slate-800 dark:text-white">{userStats.total}</p></div>
@@ -420,6 +440,12 @@ export default function AdminPage() {
             <div className="flex items-center justify-between">
               <div><p className="text-sm text-slate-500 dark:text-slate-400">Staff</p><p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{userStats.staff}</p></div>
               <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center"><Users className="h-5 w-5 text-blue-600 dark:text-blue-400" /></div>
+            </div>
+          </div>
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div><p className="text-sm text-slate-500 dark:text-slate-400">Mechanics</p><p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{userStats.mechanics}</p></div>
+              <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center"><Users className="h-5 w-5 text-orange-600 dark:text-orange-400" /></div>
             </div>
           </div>
         </div>
@@ -469,14 +495,19 @@ export default function AdminPage() {
                     <SelectItem value="branch_manager">Branch Manager</SelectItem>
                     <SelectItem value="staff">Staff</SelectItem>
                     <SelectItem value="cashier">Cashier</SelectItem>
+                    <SelectItem value="mechanic">Mechanic</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 w-full sm:w-auto sm:ml-auto">
+                {filteredUsers.length} user{filteredUsers.length === 1 ? '' : 's'} shown
+              </p>
             </div>
 
             <DataTableWrapper
               columns={columns}
               data={filteredUsers.map(u => ({ ...u, id: u.user_id }))}
+              showHeader={false}
             />
           </div>
         </div>
@@ -508,6 +539,7 @@ export default function AdminPage() {
                     <SelectContent className="dark:bg-slate-900 dark:border-slate-700">
                       <SelectItem value="cashier">Cashier</SelectItem>
                       <SelectItem value="staff">Staff</SelectItem>
+                      <SelectItem value="mechanic">Mechanic</SelectItem>
                       <SelectItem value="branch_manager">Branch Manager</SelectItem>
                       <SelectItem value="super_admin">Super Admin</SelectItem>
                     </SelectContent>
@@ -546,6 +578,25 @@ export default function AdminPage() {
                   </Button>
                 </div>
               </div>
+
+              {((editingUser && editingUser.role === 'branch_manager') || (!editingUser && role === 'branch_manager')) ? (
+                <div className="space-y-2">
+                  <Label className="dark:text-slate-300">{editingUser ? 'Manager PIN (Optional)' : 'Initial Manager PIN'}</Label>
+                  <Input
+                    type="password"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Exactly 6 digits"
+                    className="dark:bg-slate-950 dark:border-slate-700"
+                  />
+                  <p className="text-xs text-muted-foreground">Used for branch manager authorization prompts (archive/edit approvals).</p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">PIN is only available for branch manager accounts.</p>
+              )}
             </div>
             <DialogFooter>
               <Button onClick={handleSubmit} disabled={isLoading} className={buttonStyles.primary}>
@@ -577,6 +628,7 @@ export default function AdminPage() {
                   <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
                     <SelectItem value="cashier">Cashier (POS Access)</SelectItem>
                     <SelectItem value="staff">Staff (Standard Access)</SelectItem>
+                    <SelectItem value="mechanic">Mechanic (Workshop Access)</SelectItem>
                     <SelectItem value="branch_manager">Branch Manager (Elevated Access)</SelectItem>
                     <SelectItem value="super_admin">Super Admin (Full Control)</SelectItem>
                   </SelectContent>

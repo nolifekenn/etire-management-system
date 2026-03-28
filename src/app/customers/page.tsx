@@ -244,9 +244,9 @@ const CustomerAdvancedFilters = ({
   const hasActiveFilters = filters.search;
 
   return (
-    <div className="bg-white p-5 border-b border-slate-200">
+    <div className="bg-white p-3 border-b border-slate-200">
       {/* Removed mb-5 to reduce spacing */}
-      <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-end gap-2">
         <div className="flex-1 relative">
           <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Search Customers</Label>
           <div className="relative group">
@@ -370,9 +370,9 @@ const VehicleAdvancedFilters = ({
   const hasActiveFilters = filters.search || filters.customer !== 'all' || filters.vehicleType !== 'all';
 
   return (
-    <div className="bg-white p-5 border-b border-slate-200">
+    <div className="bg-white p-3 border-b border-slate-200">
       {/* Removed mb-5 to reduce spacing */}
-      <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-end gap-2">
         <div className="flex-1 relative">
           <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Search Vehicles</Label>
           <div className="relative group">
@@ -534,9 +534,9 @@ const HistoryAdvancedFilters = ({
   const hasActiveFilters = filters.search || filters.serviceType !== 'all';
 
   return (
-    <div className="bg-white p-5 border-b border-slate-200">
+    <div className="bg-white p-3 border-b border-slate-200">
       {/* Removed mb-5 to reduce spacing */}
-      <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-end gap-2">
         <div className="flex-1 relative">
           <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Search History</Label>
           <div className="relative group">
@@ -717,9 +717,15 @@ const vehicleColumns: Column[] = [
       const vehicleName = value.name;
       const VehicleIcon = getVehicleIcon(vehicleName);
       return (
-        <Badge variant="outline" className="flex items-center gap-1 bg-slate-100 text-slate-700 border-slate-300 capitalize font-poppins">
-          <VehicleIcon className="h-3 w-3" />
-          {vehicleName}
+        <Badge
+          variant="outline"
+          className="flex items-center gap-1 bg-slate-100 text-slate-700 border-slate-300 capitalize font-poppins w-20 px-2 py-0.5 overflow-hidden"
+          title={vehicleName}
+        >
+          <VehicleIcon className="h-3 w-3 flex-shrink-0" />
+          <span className="min-w-0 overflow-hidden whitespace-nowrap truncate text-xs">
+            {vehicleName}
+          </span>
         </Badge>
       );
     },
@@ -866,11 +872,15 @@ const EnhancedEmptyState = ({
 const StatsOverview = ({ customers, vehicles, tireHistory }: { customers: any[], vehicles: any[], tireHistory: any[] }) => {
   const totalCustomers = customers.length;
   const totalVehicles = vehicles.length;
-  const recentServices = tireHistory.filter(history =>
-    new Date(history.service_date).getMonth() === new Date().getMonth()
-  ).length;
+  const now = new Date();
+  const isCurrentMonth = (serviceDate?: string | null) => {
+    if (!serviceDate) return false;
+    const parsed = new Date(serviceDate);
+    return parsed.getMonth() === now.getMonth() && parsed.getFullYear() === now.getFullYear();
+  };
+  const recentServices = tireHistory.filter(history => isCurrentMonth(history.service_date)).length;
   const vehiclesWithRecentService = [...new Set(tireHistory
-    .filter(history => new Date(history.service_date).getMonth() === new Date().getMonth())
+    .filter(history => isCurrentMonth(history.service_date))
     .map(history => history.vehicle_id)
   )].length;
 
@@ -1124,6 +1134,49 @@ export default function EnhancedCustomersPage() {
   const [color, setColor] = useState('');
   const [selectedVehicleType, setSelectedVehicleType] = useState('');
 
+    // Plate helpers — improved for deletion handling and numeric length cap
+  const formatPlateOnType = (input: string) => {
+    if (!input) return '';
+    const up = input.toUpperCase();
+    const s = up.replace(/\s+/g, '-').replace(/[^A-Z0-9-]/g, '').replace(/-+/g, '-');
+
+    if (s.includes('-')) {
+      const [L = '', R = ''] = s.split('-', 2);
+      const left = L.replace(/[^A-Z]/g, '').slice(0, 4);
+      const right = R.replace(/[^0-9]/g, '').slice(0, 4);
+      return right ? `${left}-${right}` : left;
+    }
+
+    // If user pasted/typed contiguous letters+digits like ABC1234 => split
+    const m = s.match(/^([A-Z]{1,4})(\d{1,4})$/);
+    if (m) return `${m[1]}-${m[2]}`;
+
+    if (/^[A-Z]{4,}$/.test(s)) return s.slice(0, 4) + '-';
+
+    const letters = s.replace(/[^A-Z]/g, '').slice(0, 4);
+    const numbers = s.replace(/[^0-9]/g, '').slice(0, 4);
+    return numbers ? `${letters}-${numbers}` : letters;
+  };
+    
+  const normalizePlateForStorage = (val: string) => {
+    if (!val) return '';
+    let s = val.toUpperCase().replace(/\s+/g, '-').replace(/[^A-Z0-9-]/g, '');
+    s = s.replace(/-+/g, '-').replace(/(^-|-$)/g, '');
+    if (!s.includes('-')) {
+      const m = s.match(/^([A-Z]{1,4})(\d{1,4})$/);
+      if (m) return `${m[1]}-${m[2]}`;
+    }
+    const [L = '', R = ''] = s.split('-', 2);
+    const left = L.replace(/[^A-Z]/g, '').slice(0, 4);
+    const right = R.replace(/[^0-9]/g, '').slice(0, 4);
+    return right ? `${left}-${right}` : left;
+  };
+  
+  const isPlateValidForSave = (val: string) => {
+    const s = normalizePlateForStorage(val);
+    return /^[A-Z]{1,4}-\d{1,4}$/.test(s);
+  };
+
   // Form validation errors
   const [customerFormErrors, setCustomerFormErrors] = useState<{ name?: FieldError; phone?: FieldError }>({});
   const [vehicleFormErrors,  setVehicleFormErrors]  = useState<{ plateNumber?: FieldError; make?: FieldError; model?: FieldError; color?: FieldError }>({});
@@ -1152,6 +1205,39 @@ export default function EnhancedCustomersPage() {
     setMounted(true);
     fetchData();
   }, [activeBranchId]);
+
+  // Handler to attach to the plate input
+  const handlePlateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value || '';
+    const prev = plateNumber || '';
+    const isDeleting = raw.length < prev.length;
+    const lastChar = raw.slice(-1);
+
+    let formatted = '';
+
+    if (!isDeleting && (lastChar === ' ' || lastChar === '-')) {
+      // User explicitly pressed space or dash -> force separator if letters exist
+      const letters = raw.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+      formatted = letters ? `${letters}-` : '';
+    } else if (isDeleting) {
+      // On delete, be permissive and avoid auto-inserting a dash
+      formatted = raw.toUpperCase().replace(/\s+/g, '-').replace(/[^A-Z0-9-]/g, '').replace(/-+/g, '-');
+      const [L = '', R = ''] = formatted.split('-', 2);
+      const left = L.replace(/[^A-Z]/g, '').slice(0, 4);
+      const right = R.replace(/[^0-9]/g, '').slice(0, 4);
+      formatted = right ? `${left}-${right}` : left;
+    } else {
+      // Normal typing: apply smart formatting (auto-insert after 4 letters, split letters+digits, cap nums)
+      formatted = formatPlateOnType(raw);
+    }
+
+    setPlateNumber(formatted);
+    setVehicleFormErrors((p) => ({
+      ...p,
+      plateNumber: validateShortText(formatted, { label: 'Plate number', required: true, minLength: 3, maxLength: 20, blockDangerousChars: false })
+    }));
+  };
+
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -1301,14 +1387,90 @@ export default function EnhancedCustomersPage() {
     if (!supabase) return;
     setIsHistoryLoading(true);
 
-    const { data, error } = await supabase
-      .rpc('get_tire_history_complete');
+    const inferServiceType = (description: string): string => {
+      const text = description.toLowerCase();
+      if (text.includes('rotat')) return 'rotation';
+      if (text.includes('balanc')) return 'balancing';
+      if (text.includes('replace')) return 'replacement';
+      return 'repair';
+    };
+
+    let query = supabase
+      .from('service_job')
+      .select(`
+        job_id,
+        job_number,
+        job_description,
+        job_date,
+        state,
+        status,
+        notes,
+        created_at,
+        user_id,
+        user:user_id ( user_id, name ),
+        vehicle:vehicle_id (
+          vehicle_id,
+          customer_id,
+          vehicle_type_id,
+          plate_number,
+          make,
+          model,
+          year,
+          color,
+          customer:customer_id ( customer_id, name, phone, branch_id )
+        ),
+        service_job_item (
+          item_id,
+          quantity,
+          catalog_item:item_id ( item_id, name, category )
+        )
+      `)
+      .is('deleted_at', null)
+      .order('job_date', { ascending: false });
+
+    if (activeBranchId) {
+      query = query.eq('branch_id', activeBranchId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       setHistoryError(`Could not fetch tire history: ${error.message}`);
       setTireHistory([]);
     } else {
-      setTireHistory((data || []) as TireHistory[]);
+      const mappedHistory = ((data || []) as any[])
+        .map((job) => {
+          const rawState = String(job.state ?? job.status ?? '').toLowerCase();
+          if (!['completed', 'invoiced', 'paid'].includes(rawState)) {
+            return null;
+          }
+
+          const tireItems = ((job.service_job_item || []) as any[])
+            .filter((line) => String(line?.catalog_item?.category ?? '').toLowerCase() === 'tire')
+            .map((line) => ({
+              item_id: line?.catalog_item?.item_id ?? line?.item_id,
+              name: line?.catalog_item?.name ?? 'Unknown item',
+              quantity: Number(line?.quantity ?? 1),
+            }))
+            .filter((line) => Boolean(line.item_id));
+
+          return {
+            history_id: `svc-${job.job_id}`,
+            vehicle_id: job.vehicle?.vehicle_id ?? undefined,
+            item_id: tireItems[0]?.item_id,
+            service_type: inferServiceType(String(job.job_description ?? '')),
+            service_date: job.job_date ?? job.created_at,
+            notes: job.notes ?? job.job_description ?? null,
+            created_by: job.user_id,
+            created_at: job.created_at,
+            vehicle: job.vehicle ?? undefined,
+            items: tireItems.length > 0 ? tireItems : undefined,
+            user: job.user ?? undefined,
+          } as TireHistory;
+        })
+        .filter(Boolean) as TireHistory[];
+
+      setTireHistory(mappedHistory);
       setHistoryError(null);
     }
     setIsHistoryLoading(false);
@@ -2089,9 +2251,17 @@ export default function EnhancedCustomersPage() {
 
     setIsVehicleLoading(true);
 
+    // Normalize and validate plate before saving
+    const normalizedPlate = normalizePlateForStorage(plateNumber);
+    if (!isPlateValidForSave(normalizedPlate)) {
+      toast({ title: 'Invalid plate', description: 'Plate must be in the format LETTERS-NUMBERS (e.g. ABC-1234).', variant: 'destructive' });
+      setIsVehicleLoading(false);
+      return;
+    }
+
     const vehicleData = {
       customer_id: selectedCustomer,
-      plate_number: plateNumber,
+      plate_number: normalizedPlate,
       make: make || null,
       model: model || null,
       color: color || null,
@@ -2382,15 +2552,6 @@ export default function EnhancedCustomersPage() {
         {/* Stats Overview */}
         <StatsOverview customers={customers} vehicles={vehicles} tireHistory={tireHistory} />
 
-        {/* QuickActions */}
-        <QuickActions
-          onAddCustomer={handleOpenCustomerDialog}
-          onAddVehicle={handleOpenVehicleDialog}
-          onExportData={handleExportData}
-          onExportPDF={handleExportPDF}
-        />
-
-
         <div className="mb-4">
           <EnhancedTabs value={activeTab} onValueChange={handleTabChange}>
 
@@ -2403,18 +2564,20 @@ export default function EnhancedCustomersPage() {
                 </div>
               ) : (
                 <Card>
-                  <CardHeader className="py-2 px-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium">
-                        Customer Management
-                        <span className="ml-2 text-muted-foreground font-normal">
-                          {customerFilters.search ? (
-                            <>({filteredCustomers.length} of {customers.length})</>
-                          ) : (
-                            <>({customers.length} customers)</>
-                          )}
-                        </span>
-                      </CardTitle>
+                  <CardHeader className="py-2 px-3 border-b border-slate-200">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button onClick={handleOpenCustomerDialog} size="sm" className="gap-2">
+                        <UserPlus className="h-4 w-4" />
+                        Add
+                      </Button>
+                      <Button onClick={handleExportData} variant="outline" size="sm" className="gap-2">
+                        <Download className="h-4 w-4" />
+                        CSV
+                      </Button>
+                      <Button onClick={handleExportPDF} size="sm" className="gap-2 bg-[#714B67] hover:bg-[#5a3c53] text-white">
+                        <FileText className="h-4 w-4" />
+                        PDF
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -2436,7 +2599,7 @@ export default function EnhancedCustomersPage() {
                     ) : (
                       <>
                         <DataTableWrapper
-                          className="w-full"
+                          className="w-full rounded-none border-0"
                           columns={customerColumns}
                           data={displayedCustomers.map(customer => ({
                             ...customer,
@@ -2444,6 +2607,8 @@ export default function EnhancedCustomersPage() {
                           }))}
                           onEdit={handleEditCustomer}
                           onDelete={(item) => handleDeleteItem(item, 'customer')}
+                          showHeader={false}
+                          showFooter={false}
                         />
 
                         {/* NEW PAGINATION CONTROLS */}
@@ -2470,18 +2635,20 @@ export default function EnhancedCustomersPage() {
                 </div>
               ) : (
                 <Card>
-                  <CardHeader className="py-2 px-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium">
-                        Vehicle Management
-                        <span className="ml-2 text-muted-foreground font-normal">
-                          {vehicleFilters.search || vehicleFilters.customer !== 'all' || vehicleFilters.vehicleType !== 'all' ? (
-                            <>({filteredVehicles.length} of {vehicles.length})</>
-                          ) : (
-                            <>({vehicles.length} vehicles)</>
-                          )}
-                        </span>
-                      </CardTitle>
+                  <CardHeader className="py-2 px-3 border-b border-slate-200">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button onClick={handleOpenVehicleDialog} variant="outline" size="sm" className="gap-2">
+                        <Car className="h-4 w-4" />
+                        Add
+                      </Button>
+                      <Button onClick={handleExportData} variant="outline" size="sm" className="gap-2">
+                        <Download className="h-4 w-4" />
+                        CSV
+                      </Button>
+                      <Button onClick={handleExportPDF} size="sm" className="gap-2 bg-[#714B67] hover:bg-[#5a3c53] text-white">
+                        <FileText className="h-4 w-4" />
+                        PDF
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -2505,7 +2672,7 @@ export default function EnhancedCustomersPage() {
                     ) : (
                       <>
                         <DataTableWrapper
-                          className="w-full"
+                          className="w-full rounded-none border-0"
                           columns={vehicleColumns}
                           data={displayedVehicles.map(vehicle => ({
                             ...vehicle,
@@ -2513,6 +2680,8 @@ export default function EnhancedCustomersPage() {
                           }))}
                           onEdit={handleEditVehicle}
                           onDelete={(item) => handleDeleteItem(item, 'vehicle')}
+                          showHeader={false}
+                          showFooter={false}
                         />
 
                         {/* NEW PAGINATION CONTROLS */}
@@ -2539,18 +2708,20 @@ export default function EnhancedCustomersPage() {
                 </div>
               ) : (
                 <Card>
-                  <CardHeader className="py-2 px-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium">
-                        Tire Service History
-                        <span className="ml-2 text-muted-foreground font-normal">
-                          {historyFilters.search || historyFilters.serviceType !== 'all' ? (
-                            <>({filteredHistory.length} of {tireHistory.length})</>
-                          ) : (
-                            <>({tireHistory.length} records)</>
-                          )}
-                        </span>
-                      </CardTitle>
+                  <CardHeader className="py-2 px-3 border-b border-slate-200">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button onClick={() => handleTabChange('vehicles')} variant="outline" size="sm" className="gap-2">
+                        <Wrench className="h-4 w-4" />
+                        Add
+                      </Button>
+                      <Button onClick={handleExportData} variant="outline" size="sm" className="gap-2">
+                        <Download className="h-4 w-4" />
+                        CSV
+                      </Button>
+                      <Button onClick={handleExportPDF} size="sm" className="gap-2 bg-[#714B67] hover:bg-[#5a3c53] text-white">
+                        <FileText className="h-4 w-4" />
+                        PDF
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -2566,13 +2737,13 @@ export default function EnhancedCustomersPage() {
                     {filteredHistory.length === 0 ? (
                       <EnhancedEmptyState
                         type="history"
-                        onAddNew={() => { }}
+                        onAddNew={() => handleTabChange('vehicles')}
                         onClearFilters={clearHistoryFilters}
                       />
                     ) : (
                       <>
                         <DataTableWrapper
-                          className="w-full"
+                          className="w-full rounded-none border-0"
                           columns={historyColumns}
                           data={displayedHistory.map((h, idx) => ({
                             ...h,
@@ -2582,6 +2753,8 @@ export default function EnhancedCustomersPage() {
                             created_by_name: h.user?.name ?? '',
                           }))}
                           onDelete={(item) => handleDeleteItem(item, 'history')}
+                          showHeader={false}
+                          showFooter={false}
                         />
 
                         {/* NEW PAGINATION CONTROLS */}
@@ -2655,11 +2828,21 @@ export default function EnhancedCustomersPage() {
 
                   {/* ── Customer CRM List ── */}
                   <Card>
-                    <CardHeader className="py-2 px-4">
-                      <CardTitle className="text-sm font-medium font-poppins">
-                        Customer Overview
-                        <span className="ml-2 text-muted-foreground font-normal">({crmCustomers.length} customers)</span>
-                      </CardTitle>
+                    <CardHeader className="py-2 px-4 border-b border-slate-200">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button onClick={handleOpenCustomerDialog} size="sm" className="gap-2">
+                          <UserPlus className="h-4 w-4" />
+                          Add
+                        </Button>
+                        <Button onClick={handleExportData} variant="outline" size="sm" className="gap-2">
+                          <Download className="h-4 w-4" />
+                          CSV
+                        </Button>
+                        <Button onClick={handleExportPDF} size="sm" className="gap-2 bg-[#714B67] hover:bg-[#5a3c53] text-white">
+                          <FileText className="h-4 w-4" />
+                          PDF
+                        </Button>
+                      </div>
                     </CardHeader>
                     <CardContent className="p-0">
                       <div className="overflow-x-auto">
@@ -2734,13 +2917,18 @@ export default function EnhancedCustomersPage() {
 
                   {/* ── Win-Back List ── */}
                   <Card>
-                    <CardHeader className="py-2 px-4">
+                    <CardHeader className="py-2 px-4 border-b border-slate-200">
                       <div className="flex items-center justify-between flex-wrap gap-2">
-                        <CardTitle className="text-sm font-medium font-poppins flex items-center gap-2">
-                          <RotateCcw className="h-4 w-4 text-orange-500" />
-                          Win-Back List
-                          <span className="text-muted-foreground font-normal">({winBackCustomers.length} customers)</span>
-                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                          <Button onClick={handleExportData} variant="outline" size="sm" className="gap-2">
+                            <Download className="h-4 w-4" />
+                            CSV
+                          </Button>
+                          <Button onClick={handleExportPDF} size="sm" className="gap-2 bg-[#714B67] hover:bg-[#5a3c53] text-white">
+                            <FileText className="h-4 w-4" />
+                            PDF
+                          </Button>
+                        </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-slate-500 font-poppins">Inactive for ≥</span>
                           <Select value={String(winBackDays)} onValueChange={v => setWinBackDays(Number(v))}>
@@ -3202,10 +3390,14 @@ export default function EnhancedCustomersPage() {
                     id="customer-phone"
                     value={customerPhone}
                     onChange={(e) => {
-                      setCustomerPhone(e.target.value);
-                      setCustomerFormErrors((p) => ({ ...p, phone: validatePhone(e.target.value, { label: 'Phone' }) }));
+                      // Strip any non-digit characters and cap at 15 digits
+                      const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 15);
+                      setCustomerPhone(digitsOnly);
+                      setCustomerFormErrors((p) => ({ ...p, phone: validatePhone(digitsOnly, { label: 'Phone' }) }));
                     }}
-                    placeholder="+1-555-0101"
+                    inputMode="numeric"
+                    maxLength={15}
+                    placeholder="09XXXXXXXXX"
                     aria-invalid={!!customerFormErrors.phone}
                     className={`border-slate-300 focus:border-purple-500 hover:border-cyan-500 focus:ring-2 focus:ring-purple-200 transition-all duration-300 bg-white font-poppins${
                       customerFormErrors.phone ? ' border-red-400 focus:border-red-400 focus:ring-red-200' : ''
@@ -3264,10 +3456,7 @@ export default function EnhancedCustomersPage() {
                 <Input
                   id="plate-number"
                   value={plateNumber}
-                  onChange={(e) => {
-                    setPlateNumber(e.target.value);
-                    setVehicleFormErrors((p) => ({ ...p, plateNumber: validateShortText(e.target.value, { label: 'Plate number', required: true, minLength: 3, maxLength: 20, blockDangerousChars: false }) }));
-                  }}
+                  onChange={handlePlateChange}
                   placeholder="ABC-1234"
                   maxLength={20}
                   aria-invalid={!!vehicleFormErrors.plateNumber}

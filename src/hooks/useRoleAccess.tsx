@@ -12,6 +12,7 @@ const ROLE_HIERARCHY: Record<UserRole, number> = {
   'branch_manager': 50,
   'staff': 20,
   'cashier': 10,
+  'mechanic': 15,
 };
 
 /**
@@ -22,6 +23,7 @@ const ROLE_NAMES: Record<UserRole, string> = {
   'branch_manager': 'Branch Manager',
   'staff': 'Staff',
   'cashier': 'Cashier',
+  'mechanic': 'Mechanic',
 };
 
 /**
@@ -32,6 +34,7 @@ const ROLE_COLORS: Record<UserRole, string> = {
   'branch_manager': 'text-purple-600',
   'staff': 'text-blue-600',
   'cashier': 'text-green-600',
+  'mechanic': 'text-orange-600',
 };
 
 /**
@@ -42,6 +45,7 @@ const ROLE_BADGE_STYLES: Record<UserRole, string> = {
   'branch_manager': 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800',
   'staff': 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800',
   'cashier': 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800',
+  'mechanic': 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800',
 };
 
 export const useRoleAccess = () => {

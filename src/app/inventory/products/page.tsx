@@ -50,8 +50,6 @@ import autoTable from 'jspdf-autotable';
 
 type AnyRecord = Record<string, unknown>;
 
-type CategoryType = "tire" | "tool" | "accessory" | "service";
-
 const CATEGORY_COLORS: Record<string, string> = {
   tire:      "bg-blue-100   text-blue-800",
   tool:      "bg-amber-100  text-amber-800",
@@ -65,7 +63,8 @@ const VEHICLE_LABELS: Record<string, string> = {
   truck: "Truck",
 };
 
-const PAGE_SIZE = 50;
+const DEFAULT_ROWS_PER_PAGE = 50;
+const ROWS_PER_PAGE_OPTIONS = [5, 10, 20, 50] as const;
 
 // ── Component ──────────────────────────────────────────────────────────────
 
@@ -77,6 +76,7 @@ export default function ProductListPage() {
   const [items, setItems]           = useState<AnyRecord[]>([]);
   const [total, setTotal]           = useState(0);
   const [page, setPage]             = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState<number>(DEFAULT_ROWS_PER_PAGE);
   const [loading, setLoading]       = useState(true);
   const [showCreate,  setShowCreate]  = useState(false);
   const [expandedId,  setExpandedId]  = useState<string | null>(null);
@@ -86,7 +86,7 @@ export default function ProductListPage() {
   const [category, setCategory] = useState<string>("all");
   const [filter,   setFilter]   = useState<string>(params.get("filter") ?? "all");
 
-  const load = useCallback(async (p = page) => {
+  const load = useCallback(async (p: number) => {
     setLoading(true);
     try {
       const res = await listProducts({
@@ -95,7 +95,7 @@ export default function ProductListPage() {
         low_stock:    filter === "low_stock",
         out_of_stock: filter === "out_of_stock",
         page:         p,
-        page_size:    PAGE_SIZE,
+        page_size:    rowsPerPage,
       });
 
       const rows = res.items as AnyRecord[];
@@ -107,19 +107,19 @@ export default function ProductListPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, category, filter, page]);
+  }, [search, category, filter, rowsPerPage, toast]);
 
-  useEffect(() => { load(1); setPage(1); }, [search, category, filter]);
-  useEffect(() => { load(page); }, [page]);
+  useEffect(() => { setPage(1); load(1); }, [search, category, filter, rowsPerPage, load]);
+  useEffect(() => { load(page); }, [page, load]);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / rowsPerPage));
 
   const stockBadge = (item: AnyRecord) => {
     const qty    = Number(item.stock_quantity);
     const reorder = Number(item.reorder_level ?? 5);
-    if (qty === 0)       return <Badge className="bg-red-100 text-red-700 border-red-200">Out of Stock</Badge>;
-    if (qty < reorder)   return <Badge className="bg-amber-100 text-amber-700 border-amber-200">{qty} ▼</Badge>;
-    return <span className="text-sm font-medium text-foreground">{qty}</span>;
+    if (qty === 0)       return <Badge className="inline-flex min-w-[7.5rem] justify-center rounded-full border-red-200 bg-red-100 text-red-700">Out of Stock</Badge>;
+    if (qty < reorder)   return <Badge className="inline-flex min-w-[7.5rem] justify-center rounded-full border-amber-200 bg-amber-100 text-amber-700">{qty} Low Stock</Badge>;
+    return <Badge className="inline-flex min-w-[7.5rem] justify-center rounded-full border-green-200 bg-green-100 text-green-700">{qty} In Stock</Badge>;
   };
 
   const fmt = (n: unknown) =>
@@ -271,12 +271,12 @@ export default function ProductListPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4 p-6 h-full">
+    <div className="flex flex-col gap-4 p-6">
       {/* Header bar */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <nav className="text-xs text-muted-foreground mb-1">
-            <button onClick={() => router.push("/inventory")} className="hover:underline">Inventory</button>
+            <button onClick={() => router.push("/inventory")} className="hover:no-underline">Inventory</button>
             <span className="mx-1">/</span>
             <span>Products</span>
           </nav>
@@ -301,6 +301,12 @@ export default function ProductListPage() {
             New Product
           </Button>
         </div>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button variant="outline" size="sm" className="h-8" onClick={() => router.push('/inventory/products')}>Products</Button>
+        <Button variant="ghost" size="sm" className="h-8" onClick={() => router.push('/inventory/adjustments')}>Adjustments</Button>
+        <Button variant="ghost" size="sm" className="h-8" onClick={() => router.push('/inventory/forecast')}>Stock Forecast</Button>
       </div>
 
       {/* Toolbar: search + filters */}
@@ -346,6 +352,19 @@ export default function ProductListPage() {
             <SelectItem value="out_of_stock">Out of Stock</SelectItem>
           </SelectContent>
         </Select>
+
+        <div className="ml-auto shrink-0">
+          <Select value={String(rowsPerPage)} onValueChange={(value) => setRowsPerPage(Number(value))}>
+            <SelectTrigger className="h-9 w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ROWS_PER_PAGE_OPTIONS.map(option => (
+                <SelectItem key={option} value={String(option)}>Show: {option} items</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Active filter badges */}
@@ -374,16 +393,16 @@ export default function ProductListPage() {
       )}
 
       {/* Table */}
-      <div className="flex-1 overflow-auto rounded-lg border border-border">
+      <div className="overflow-x-auto overflow-y-visible rounded-lg border border-border bg-white">
         <table className="w-full text-sm">
-          <thead className="bg-muted/50 sticky top-0 z-10">
+          <thead className="bg-muted/50 sticky top-0 z-10 border-b border-border">
             <tr>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-1/3">Product</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Category</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Vehicle</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Sale Price</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Cost</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">On Hand</th>
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide font-semibold text-muted-foreground w-1/3">Product</th>
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide font-semibold text-muted-foreground">Category</th>
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide font-semibold text-muted-foreground">Vehicle</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">Sale Price</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">Cost</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">On Hand</th>
             </tr>
           </thead>
           <tbody>
@@ -570,6 +589,19 @@ export default function ProductListPage() {
                               </div>
                             </div>
                           </div>
+
+                          <div className="mt-4 flex items-center justify-end border-t border-border pt-3">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                router.push(`/inventory/products/${itemId}`);
+                              }}
+                            >
+                              Open Edit / Archive
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     )}
@@ -582,9 +614,9 @@ export default function ProductListPage() {
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <div className="flex items-center justify-between text-sm text-muted-foreground border-t border-border pt-3">
         <span>
-          {loading ? "Loading…" : `${items.length} of ${total} products`}
+          {loading ? 'Loading...' : `Showing ${total === 0 ? 0 : (page - 1) * rowsPerPage + 1}-${(page - 1) * rowsPerPage + items.length} of ${total}`}
         </span>
         <div className="flex items-center gap-2">
           <Button
@@ -594,7 +626,7 @@ export default function ProductListPage() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-xs">Page {page} / {totalPages}</span>
+          <span className="text-xs">Page {page} of {totalPages}</span>
           <Button
             variant="outline" size="sm"
             disabled={page >= totalPages || loading}

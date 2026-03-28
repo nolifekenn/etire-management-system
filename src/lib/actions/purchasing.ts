@@ -21,6 +21,14 @@ import {
   POState,
 } from '@/lib/stateTransitions';
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+/** Validate a TIN value: 9–12 numeric digits (dashes/spaces allowed but stripped). */
+function isValidTIN(value: string): boolean {
+  const digitsOnly = value.replace(/[-\s]/g, '');
+  return /^\d{9,12}$/.test(digitsOnly);
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface POLineInput {
@@ -67,6 +75,19 @@ export interface ValidateReceiptInput {
 export async function createRFQ(input: CreateRFQInput) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase: any = await createClient();
+
+  // ── Server-side role guard: only managers & super admin can create RFQs
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  if (authUser) {
+    const { data: profile } = await supabase
+      .from('user')
+      .select('role')
+      .eq('user_id', authUser.id)
+      .single();
+    if (profile && (profile.role === 'staff' || profile.role === 'mechanic')) {
+      return { success: false, error: 'Insufficient permissions. Only Managers and Super Admins can create quotations.' };
+    }
+  }
 
   const totalAmount = input.lines.reduce(
     (sum, l) => sum + l.quantity * l.unit_cost,
@@ -468,6 +489,10 @@ export async function listVendors(search?: string): Promise<{ vendors: Record<st
 }
 
 export async function createVendor(input: VendorInput): Promise<{ vendor: Record<string, unknown> | null; error: string | null }> {
+  // Server-side TIN validation
+  if (input.vat && input.vat.trim() !== '' && !isValidTIN(input.vat)) {
+    return { vendor: null, error: 'TIN must be 9–12 numeric digits.' };
+  }
   const supabase = await createClient();
   const { data, error } = await (supabase as any)
     .from('supplier')
@@ -490,6 +515,10 @@ export async function createVendor(input: VendorInput): Promise<{ vendor: Record
 }
 
 export async function updateVendor(vendorId: string, input: Partial<VendorInput> & { is_active?: boolean }): Promise<{ error: string | null }> {
+  // Server-side TIN validation
+  if (input.vat !== undefined && input.vat.trim() !== '' && !isValidTIN(input.vat)) {
+    return { error: 'TIN must be 9–12 numeric digits.' };
+  }
   const supabase = await createClient();
   const { error } = await (supabase as any)
     .from('supplier')

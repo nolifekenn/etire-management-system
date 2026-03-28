@@ -16,6 +16,7 @@
  */
 
 import { createClient }    from '@/lib/supabaseServer';
+import { isOpenPurchaseOrder } from '@/lib/poUtils';
 import { revalidatePath }  from 'next/cache';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -142,7 +143,7 @@ export async function listProducts(input: ListProductsInput = {}) {
 export async function getProductWithDetails(itemId: string) {
   const supabase: AnyClient = await createClient();
 
-  const { data, error } = await supabase
+  const fetchMain = () => supabase
     .from('inventory_item')
     .select(`
       *,
@@ -153,9 +154,21 @@ export async function getProductWithDetails(itemId: string) {
     `)
     .eq('item_id', itemId)
     .is('deleted_at', null)
-    .single();
+    .maybeSingle();
+
+  let { data, error } = await fetchMain();
+
+  // Retry with increasing delays — handles the brief visibility window after a
+  // newly-created product is inserted (RLS evaluation timing, pgbouncer routing).
+  const RETRY_DELAYS_MS = [400, 700, 1000];
+  for (const delay of RETRY_DELAYS_MS) {
+    if (data || error) break;
+    await new Promise(r => setTimeout(r, delay));
+    ({ data, error } = await fetchMain());
+  }
 
   if (error) return { success: false, error: error.message, product: null };
+  if (!data)  return { success: false, error: 'Product not found', product: null };
 
   // Fetch recent delivery moves (incoming stock)
   const { data: deliveryMoves } = await supabase
@@ -254,10 +267,27 @@ export async function upsertProduct(input: UpsertProductInput) {
   const supabase: AnyClient = await createClient();
 
   const isNew = !input.item_id;
+  const normalizedName = input.name.trim();
+
+  // Prevent duplicate active product names (case-insensitive), including edits.
+  let duplicateQuery = supabase
+    .from('inventory_item')
+    .select('item_id')
+    .is('deleted_at', null)
+    .ilike('name', normalizedName)
+    .limit(1);
+
+  if (!isNew) {
+    duplicateQuery = duplicateQuery.neq('item_id', input.item_id!);
+  }
+
+  const { data: duplicateItem, error: duplicateError } = await duplicateQuery.maybeSingle();
+  if (duplicateError) return { success: false, error: duplicateError.message };
+  if (duplicateItem) return { success: false, error: 'A product with this name already exists.' };
 
   const payload: AnyRecord = {
     branch_id:    input.branch_id,
-    name:         input.name,
+    name:         normalizedName,
     category:     input.category,
     cost_price:   input.cost_price,
     sale_price:   input.sale_price,
@@ -298,6 +328,7 @@ export async function upsertProduct(input: UpsertProductInput) {
 
   revalidatePath('/inventory');
   revalidatePath('/inventory/products');
+  if (isNew) revalidatePath(`/inventory/products/${result.item_id as string}`);
   if (!isNew) revalidatePath(`/inventory/products/${input.item_id}`);
 
   // Audit trail
@@ -612,16 +643,19 @@ export async function getOperationCounts() {
   const lowStock  = allItems.filter(i => Number(i.stock_quantity) > 0 && Number(i.stock_quantity) < Number(i.reorder_level));
   const outOfStock = allItems.filter(i => Number(i.stock_quantity) === 0);
 
-  // Pending purchase orders
-  const { data: pendingPOs } = await supabase
+  // Active purchase orders
+  const { data: purchaseOrders } = await supabase
     .from('purchase_order')
-    .select('po_id')
-    .in('status', ['pending', 'approved', 'ordered'])
+    .select('po_id, state, status')
     .is('deleted_at', null);
+
+  const pendingPOs = (purchaseOrders ?? []).filter((po: AnyRecord) =>
+    isOpenPurchaseOrder((po.state ?? po.status) as string | null | undefined)
+  );
 
   return {
     receipts:       salesRes.count ?? 0,
-    pending_pos:    (pendingPOs ?? []).length,
+    pending_pos:    pendingPOs.length,
     low_stock:      lowStock.length,
     out_of_stock:   outOfStock.length,
     total_products: allItems.length,

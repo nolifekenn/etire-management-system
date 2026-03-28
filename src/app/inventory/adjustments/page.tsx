@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
   Search,
   ChevronLeft,
+  ChevronRight,
   AlertTriangle,
   PackageX,
   ArrowUp,
@@ -65,7 +66,6 @@ export default function AdjustmentsPage() {
 
   // Products list state
   const [items,        setItems]       = useState<AnyRecord[]>([]);
-  const [totalItems,   setTotalItems]  = useState(0);
   const [loadingItems, setLoadingItems]= useState(true);
   const [search,       setSearch]      = useState("");
   const [category,     setCategory]    = useState("all");
@@ -77,6 +77,8 @@ export default function AdjustmentsPage() {
   // Recent adjustments history
   const [history,      setHistory]     = useState<AnyRecord[]>([]);
   const [loadingHist,  setLoadingHist] = useState(true);
+  const [page,         setPage]        = useState(1);
+  const [rowsPerPage,  setRowsPerPage] = useState(50);
 
   // ── Data loaders ────────────────────────────────────────────────────────
 
@@ -90,7 +92,6 @@ export default function AdjustmentsPage() {
         page_size: 200,
       });
       setItems(res.items as AnyRecord[]);
-      setTotalItems(res.total);
     } catch {
       toast({ title: "Failed to load products", variant: "destructive" });
     } finally {
@@ -112,6 +113,7 @@ export default function AdjustmentsPage() {
 
   useEffect(() => { loadItems(); }, [loadItems]);
   useEffect(() => { loadHistory(); }, [loadHistory]);
+  useEffect(() => { setPage(1); }, [search, category, items.length, rowsPerPage]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
 
@@ -133,9 +135,9 @@ export default function AdjustmentsPage() {
   const stockBadge = (item: AnyRecord) => {
     const qty     = Number(item.stock_quantity);
     const reorder = Number(item.reorder_level ?? 5);
-    if (qty === 0)     return <Badge className="bg-red-100 text-red-700 border-red-200 gap-1"><PackageX className="h-3 w-3" />Out of Stock</Badge>;
-    if (qty < reorder) return <Badge className="bg-amber-100 text-amber-700 border-amber-200 gap-1"><AlertTriangle className="h-3 w-3" />{qty} ▼</Badge>;
-    return <span className="text-sm font-medium">{qty}</span>;
+    if (qty === 0)     return <Badge className="inline-flex min-w-[7.5rem] justify-center gap-1 rounded-full border-red-200 bg-red-100 text-red-700"><PackageX className="h-3 w-3" />Out of Stock</Badge>;
+    if (qty < reorder) return <Badge className="inline-flex min-w-[7.5rem] justify-center gap-1 rounded-full border-amber-200 bg-amber-100 text-amber-700"><AlertTriangle className="h-3 w-3" />{qty} Low Stock</Badge>;
+    return <Badge className="inline-flex min-w-[7.5rem] justify-center rounded-full border-green-200 bg-green-100 text-green-700">{qty} In Stock</Badge>;
   };
 
   const deltaIcon = (delta: number) => {
@@ -143,6 +145,8 @@ export default function AdjustmentsPage() {
     if (delta < 0) return <ArrowDown className="h-3.5 w-3.5 text-red-600   inline" />;
     return              <Minus    className="h-3.5 w-3.5 text-slate-400 inline" />;
   };
+  const totalPages = Math.max(1, Math.ceil(items.length / rowsPerPage));
+  const pagedItems = items.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -153,7 +157,7 @@ export default function AdjustmentsPage() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <nav className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-            <button onClick={() => router.push("/inventory")} className="hover:underline flex items-center gap-1">
+            <button onClick={() => router.push("/inventory")} className="flex items-center gap-1 hover:no-underline">
               <ChevronLeft className="h-3 w-3" />Inventory
             </button>
             <span>/</span>
@@ -176,6 +180,12 @@ export default function AdjustmentsPage() {
           <RefreshCw className={`h-4 w-4 mr-2 ${loadingItems ? "animate-spin" : ""}`} />
           Refresh
         </Button>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button variant="ghost" size="sm" className="h-8" onClick={() => router.push('/inventory/products')}>Products</Button>
+        <Button variant="outline" size="sm" className="h-8" onClick={() => router.push('/inventory/adjustments')}>Adjustments</Button>
+        <Button variant="ghost" size="sm" className="h-8" onClick={() => router.push('/inventory/forecast')}>Stock Forecast</Button>
       </div>
 
       {/* Toolbar */}
@@ -201,21 +211,31 @@ export default function AdjustmentsPage() {
             <SelectItem value="service">Service</SelectItem>
           </SelectContent>
         </Select>
-        <span className="text-xs text-muted-foreground ml-2">
-          {totalItems} product{totalItems !== 1 ? "s" : ""}
-        </span>
+        <div className="ml-auto shrink-0">
+          <Select value={String(rowsPerPage)} onValueChange={(value) => setRowsPerPage(Number(value))}>
+            <SelectTrigger className="h-9 w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">Show: 5 items</SelectItem>
+              <SelectItem value="10">Show: 10 items</SelectItem>
+              <SelectItem value="20">Show: 20 items</SelectItem>
+              <SelectItem value="50">Show: 50 items</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Product Table */}
-      <div className="overflow-auto rounded-lg border border-border">
+      <div className="overflow-auto rounded-lg border border-border bg-white">
         <table className="w-full text-sm">
-          <thead className="bg-muted/50 sticky top-0 z-10">
+          <thead className="sticky top-0 z-10 bg-muted/50 border-b border-border">
             <tr>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-2/5">Product</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Category</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">On Hand</th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Reorder Level</th>
-              <th className="px-4 py-3 text-center font-medium text-muted-foreground w-32">Action</th>
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide font-semibold text-muted-foreground w-2/5">Product</th>
+              <th className="px-4 py-3 text-left text-xs uppercase tracking-wide font-semibold text-muted-foreground">Category</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">On Hand</th>
+              <th className="px-4 py-3 text-right text-xs uppercase tracking-wide font-semibold text-muted-foreground">Reorder Level</th>
+              <th className="px-4 py-3 text-center text-xs uppercase tracking-wide font-semibold text-muted-foreground w-32">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -231,7 +251,7 @@ export default function AdjustmentsPage() {
                   No products found
                 </td>
               </tr>
-            ) : items.map(item => (
+            ) : pagedItems.map(item => (
               <tr key={String(item.item_id)} className="border-t border-border hover:bg-muted/30 transition-colors">
                 <td className="px-4 py-3">
                   <p className="font-medium text-foreground">{String(item.name)}</p>
@@ -267,6 +287,21 @@ export default function AdjustmentsPage() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <span>
+          Showing {items.length === 0 ? 0 : (page - 1) * rowsPerPage + 1}-{Math.min(page * rowsPerPage, items.length)} of {items.length}
+        </span>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-xs">Page {page} of {totalPages}</span>
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Adjustment History */}

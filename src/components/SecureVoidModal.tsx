@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Lock, AlertTriangle, Loader2, ShieldCheck } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 
 interface SecureVoidModalProps {
@@ -21,13 +20,15 @@ interface SecureVoidModalProps {
     onClose: () => void;
     onAuthorized: () => void;
     actionDescription?: string;
+    requiredBranchId?: string;
 }
 
 export function SecureVoidModal({
     isOpen,
     onClose,
     onAuthorized,
-    actionDescription = "Only managers or admins can perform this action."
+    actionDescription = "Only branch managers from the same branch can perform this action.",
+    requiredBranchId,
 }: SecureVoidModalProps) {
     const [pin, setPin] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -41,27 +42,33 @@ export function SecureVoidModal({
             return;
         }
 
+        if (!/^\d{6}$/.test(pin)) {
+            setError("PIN must be exactly 6 numeric digits.");
+            return;
+        }
+
+        if (!requiredBranchId) {
+            setError("Branch context is required to verify manager authorization.");
+            return;
+        }
+
         setIsLoading(true);
         setError("");
 
         try {
-            // Security Check: Query for a user with this PIN who is a manager or admin
-            const { data, error } = await supabase
-                .from('user')
-                .select('user_id, role, name')
-                .in('role', ['branch_manager', 'super_admin'])
-                .eq('pin', pin)
-                .is('deleted_at', null)
-                .maybeSingle();
+            const response = await fetch('/api/auth/verify-manager-pin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pin, requiredBranchId }),
+            });
 
-            if (error) {
-                console.error("Verification error:", error);
-                setError("Verification failed. Please try again.");
-            } else if (data) {
+            const result = await response.json();
+
+            if (response.ok && result?.success) {
                 // Success
                 toast({
                     title: "Authorized",
-                    description: `Action authorized by ${data.name}`,
+                    description: `Action authorized by ${result.authorizedBy?.name ?? 'Branch Manager'}`,
                     variant: "default",
                     className: "bg-green-50 border-green-200 text-green-800"
                 });
@@ -69,7 +76,7 @@ export function SecureVoidModal({
                 onAuthorized();
                 onClose();
             } else {
-                setError("Invalid PIN or unauthorized user.");
+                setError(result?.error || "Invalid PIN or no branch manager found for this branch.");
             }
         } catch (err) {
             console.error("Exception during verification:", err);
@@ -103,7 +110,7 @@ export function SecureVoidModal({
                 <form onSubmit={handleVerify} className="space-y-4 py-4">
                     <div className="space-y-2">
                         <Label htmlFor="pin" className="text-center block text-slate-600">
-                            Enter Manager PIN
+                            Enter Branch Manager PIN
                         </Label>
                         <div className="relative">
                             <Input
@@ -113,8 +120,7 @@ export function SecureVoidModal({
                                 className="text-center text-2xl tracking-[0.5em] h-14 font-bold border-slate-300 focus:border-red-400 focus:ring-red-100"
                                 value={pin}
                                 onChange={(e) => {
-                                    // Only allow numbers if desired, or any char
-                                    setPin(e.target.value);
+                                    setPin(e.target.value.replace(/\D/g, ''));
                                     setError("");
                                 }}
                                 maxLength={6}
@@ -144,7 +150,7 @@ export function SecureVoidModal({
                         <Button
                             type="submit"
                             variant="destructive"
-                            disabled={isLoading || pin.length < 1}
+                            disabled={isLoading || pin.length !== 6}
                             className="w-full sm:w-auto bg-red-600 hover:bg-red-700"
                         >
                             {isLoading ? (
@@ -153,7 +159,7 @@ export function SecureVoidModal({
                                     Verifying...
                                 </>
                             ) : (
-                                "Authorize Void"
+                                "Authorize"
                             )}
                         </Button>
                     </DialogFooter>

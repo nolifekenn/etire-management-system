@@ -224,7 +224,9 @@ export default function ServicesKanbanPage() {
   const columnJobs = (state: ServiceState) =>
     filteredJobs.filter(j => j.state === state);
 
-  const totalActive = jobs.length;
+  const totalActive = jobs.filter(
+    j => j.state !== 'invoiced' && j.state !== 'completed' && j.state !== 'cancelled'
+  ).length;
 
   //  Handlers 
 

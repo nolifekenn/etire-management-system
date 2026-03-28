@@ -182,6 +182,16 @@ export function CreateRFQDialog({ open, onOpenChange, onCreated }: CreateRFQDial
   }
 
   function selectItem(tempId: string, itemId: string) {
+    const duplicateExists = lines.some((line) => line.tempId !== tempId && line.item_id === itemId);
+    if (duplicateExists) {
+      toast({
+        title: "Duplicate product",
+        description: "This product is already added in the order lines.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const found = items.find((i) => i.item_id === itemId);
     if (!found) return;
     setLines((prev) => prev.map((l) =>
@@ -229,6 +239,22 @@ export function CreateRFQDialog({ open, onOpenChange, onCreated }: CreateRFQDial
     if (validLines.length === 0) {
       toast({ title: "Add at least one line item", variant: "destructive" });
       return;
+    }
+
+    const selectedItemIds = validLines
+      .map((line) => line.item_id)
+      .filter((itemId): itemId is string => Boolean(itemId));
+    const duplicateSelectedItems = new Set<string>();
+    for (const itemId of selectedItemIds) {
+      if (duplicateSelectedItems.has(itemId)) {
+        toast({
+          title: "Duplicate product",
+          description: "Remove duplicate products before saving this RFQ.",
+          variant: "destructive",
+        });
+        return;
+      }
+      duplicateSelectedItems.add(itemId);
     }
 
     setSaving(true);
@@ -329,10 +355,10 @@ export function CreateRFQDialog({ open, onOpenChange, onCreated }: CreateRFQDial
               </div>
 
               <div className="rounded-md border border-border overflow-hidden">
-                <table className="w-full text-sm">
+                <table className="w-full table-fixed text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-border text-xs text-muted-foreground">
-                      <th className="px-3 py-2 text-left font-medium">Product</th>
+                      <th className="px-3 py-2 text-left font-medium w-[46%]">Product</th>
                       <th className="px-3 py-2 text-center font-medium w-20">Qty</th>
                       <th className="px-3 py-2 text-right font-medium w-28">Unit Cost</th>
                       <th className="px-3 py-2 text-right font-medium w-28">Subtotal</th>
@@ -342,7 +368,7 @@ export function CreateRFQDialog({ open, onOpenChange, onCreated }: CreateRFQDial
                   <tbody>
                     {lines.map((line) => (
                       <tr key={line.tempId} className="border-b border-border last:border-0">
-                        <td className="px-3 py-2">
+                        <td className="px-3 py-2 align-top min-w-0">
                           <Select
                             value={line.item_id ?? "__custom__"}
                             onValueChange={(v) => {
@@ -350,13 +376,15 @@ export function CreateRFQDialog({ open, onOpenChange, onCreated }: CreateRFQDial
                               else { selectItem(line.tempId, v); }
                             }}
                           >
-                            <SelectTrigger className="h-8 text-xs">
+                            <SelectTrigger className="h-8 text-xs w-full min-w-0">
                               <SelectValue placeholder="Choose product..." />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="max-w-[var(--radix-select-trigger-width)]">
                               <SelectItem value="__custom__">— Custom item —</SelectItem>
-                              {items.map((i) => (
-                                <SelectItem key={i.item_id} value={i.item_id}>{i.name}</SelectItem>
+                              {items
+                                .filter((i) => i.item_id === line.item_id || !lines.some((l) => l.tempId !== line.tempId && l.item_id === i.item_id))
+                                .map((i) => (
+                                  <SelectItem key={i.item_id} value={i.item_id}>{i.name}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>

@@ -18,6 +18,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
+  resetSession: () => Promise<void>;
   activeBranchId: string | null;
   setActiveBranchId: (id: string | null) => void;
   refreshUser: () => Promise<void>;
@@ -28,6 +29,7 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   login: async () => false,
   logout: () => { },
+  resetSession: async () => { },
   activeBranchId: null,
   setActiveBranchId: () => { },
   refreshUser: async () => { },
@@ -265,6 +267,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [router]);
 
+  // Heartbeat: every 60 s, compare the local session nonce against the DB value.
+  // If they differ, another login has rotated the nonce, meaning this session was
+  // superseded — sign the current device out immediately.
+  useEffect(() => {
+    if (!user || !supabase) return;
+
+    const checkNonce = async () => {
+      const storedNonce = sessionStorage.getItem('etire_session_nonce');
+      if (!storedNonce) return; // No nonce stored locally — nothing to compare
+
+      const { data, error } = await supabase
+        .from('user')
+        .select('current_session_nonce')
+        .eq('user_id', user.user_id)
+        .maybeSingle();
+
+      if (error || !data) return; // Transient network issue — don't kick out; retry next tick
+
+      if (data.current_session_nonce !== storedNonce) {
+        console.warn('[useAuth] Session nonce mismatch — this session has been superseded by a newer login.');
+        sessionStorage.removeItem('etire_session_nonce');
+        setUser(null);
+        setActiveBranchIdState(null);
+        localStorage.removeItem('etire_active_branch');
+        await supabase.auth.signOut({ scope: 'local' });
+        router.push('/login?error=session_superseded');
+      }
+    };
+
+    const interval = setInterval(checkNonce, 60_000);
+    return () => clearInterval(interval);
+  }, [user, router]);
+
   // ... login and logout (modified to clear local storage on logout) ...
 
   const login = async (username: string, password: string): Promise<boolean> => {
@@ -296,6 +331,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.error("[useAuth] Supabase sign-in failed:", error.message);
         return false;
       }
+
+      // Persist the session nonce so the heartbeat can detect if this session
+      // is later superseded by another login (account takeover detection).
+      if (payload?.nonce) {
+        sessionStorage.setItem('etire_session_nonce', String(payload.nonce));
+      }
+
       return true;
     } catch (err) {
       console.error("[useAuth] Unexpected login error:", err);
@@ -340,9 +382,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = async () => {
-    // Clear state immediately so the UI reflects the logged-out state right away.
-    // The SIGNED_OUT event from onAuthStateChange will fire shortly after and
-    // also call router.push('/login') as a fallback.
+    // Clear client state immediately so the UI reflects logged-out state.
+    sessionStorage.removeItem('etire_session_nonce');
+    localStorage.removeItem('etire_session_user_id');
+    localStorage.removeItem('etire_session_started_at');
+    localStorage.removeItem('etire_last_activity');
     setUser(null);
     setActiveBranchIdState(null);
     localStorage.removeItem('etire_active_branch');
@@ -350,14 +394,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     if (!supabase) return;
     try {
-      await supabase.auth.signOut();
+      // scope: 'local' ends only this device's session.
+      // Other concurrent sessions are handled by the nonce rotation on login.
+      await supabase.auth.signOut({ scope: 'local' });
     } catch (error) {
       console.error("Logout Error:", error);
     }
   };
 
+  const resetSession = async () => {
+    sessionStorage.removeItem('etire_session_nonce');
+    sessionStorage.removeItem('etire_intended_path');
+    localStorage.removeItem('etire_session_user_id');
+    localStorage.removeItem('etire_session_started_at');
+    localStorage.removeItem('etire_last_activity');
+    setUser(null);
+    setActiveBranchIdState(null);
+    localStorage.removeItem('etire_active_branch');
+
+    if (supabase) {
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch (error) {
+        console.error("Reset Session Error:", error);
+      }
+    }
+
+    router.replace('/login');
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, activeBranchId, setActiveBranchId, refreshUser }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, resetSession, activeBranchId, setActiveBranchId, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

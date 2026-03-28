@@ -50,6 +50,7 @@ const ROLE_HIERARCHY: Record<UserRole, number> = {
   'super_admin': 100,
   'branch_manager': 50,
   'staff': 20,
+  'mechanic': 15,
   'cashier': 10,
 };
 

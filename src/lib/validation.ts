@@ -203,14 +203,13 @@ export function validatePhone(
 
   // Allow: +63 900 000 0000, 09XX-XXX-XXXX, +1-555-0101, etc.
   // Must contain at least 7 digits, only digits/spaces/dashes/parens/plus allowed
-  const phoneRe = /^[+\d][\d\s\-()+]{5,19}$/;
+  const phoneRe = /^\d+$/;
   if (!phoneRe.test(trimmed)) {
-    return `${label} is not a valid phone number.`;
+    return `${label} must contain digits only (no spaces, dashes, or special characters).`;
   }
 
-  const digits = trimmed.replace(/\D/g, "");
-  if (digits.length < 7 || digits.length > 15) {
-    return `${label} must have between 7 and 15 digits.`;
+  if (trimmed.length < 7 || trimmed.length > 15) {
+    return `${label} must be between 7 and 15 digits.`;
   }
 
   return null;

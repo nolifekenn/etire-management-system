@@ -205,12 +205,32 @@ export function CreateProductDialog({ open, onOpenChange, onCreated }: Props) {
     if (nameErr || saleErr || costErr || reorderErr) return;
     if (!branchId) return toast({ title: "Branch is required", variant: "destructive" });
 
+    const normalizedName = name.trim();
+
+    // Fast client-side duplicate check. Server action also enforces this.
+    const { data: existingProduct, error: dupCheckError } = await supabase
+      .from("inventory_item")
+      .select("item_id")
+      .is("deleted_at", null)
+      .ilike("name", normalizedName)
+      .limit(1)
+      .maybeSingle();
+
+    if (!dupCheckError && existingProduct) {
+      toast({
+        title: "Duplicate product name",
+        description: "A product with this name already exists.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSubmitting(true);
     try {
       const result = await upsertProduct({
         branch_id:    branchId,
         supplier_id:  (supplierId && supplierId !== "none") ? supplierId : undefined,
-        name:         name.trim(),
+        name:         normalizedName,
         category:     category as "tire" | "tool" | "accessory" | "service",
         vehicle_type: vehicleType as "car" | "motor" | "truck",
         sale_price:   Number(salePrice)   || 0,
@@ -326,11 +346,11 @@ export function CreateProductDialog({ open, onOpenChange, onCreated }: Props) {
                     </Button>
                   </div>
                 ) : (
-                  <div className="flex gap-1">
+                  <div className="flex min-w-0 gap-1">
                     <Select value={brandId} onValueChange={setBrandId}>
-                      <SelectTrigger className="flex-1 h-9 text-sm"><SelectValue placeholder="Select brand" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">— None —</SelectItem>
+                      <SelectTrigger className={`h-9 flex-1 min-w-0 text-sm ${brandId === "none" ? "text-muted-foreground" : ""}`}><SelectValue placeholder="Select brand" /></SelectTrigger>
+                      <SelectContent className="max-h-72 w-[var(--radix-select-trigger-width)]">
+                        <SelectItem value="none" className="text-muted-foreground">— None —</SelectItem>
                         {tireBrands.map(b => (
                           <SelectItem key={b.id} value={b.id}>{b.label}</SelectItem>
                         ))}
@@ -367,11 +387,11 @@ export function CreateProductDialog({ open, onOpenChange, onCreated }: Props) {
                     </Button>
                   </div>
                 ) : (
-                  <div className="flex gap-1">
+                  <div className="flex min-w-0 gap-1">
                     <Select value={sizeId} onValueChange={setSizeId}>
-                      <SelectTrigger className="flex-1 h-9 text-sm"><SelectValue placeholder="Select size" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">— None —</SelectItem>
+                      <SelectTrigger className={`h-9 flex-1 min-w-0 text-sm ${sizeId === "none" ? "text-muted-foreground" : ""}`}><SelectValue placeholder="Select size" /></SelectTrigger>
+                      <SelectContent className="max-h-72 w-[var(--radix-select-trigger-width)]">
+                        <SelectItem value="none" className="text-muted-foreground">— None —</SelectItem>
                         {tireSizes.map(s => (
                           <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
                         ))}

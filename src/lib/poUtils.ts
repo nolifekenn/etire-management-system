@@ -47,6 +47,15 @@ export const PO_STATE_COLORS: Record<POState, string> = {
   cancelled: 'bg-red-100 text-red-700',
 };
 
+export const OPEN_PURCHASE_ORDER_STATES = [
+  'draft',
+  'sent',
+  'purchase',
+  'pending',
+  'approved',
+  'ordered',
+] as const;
+
 // ── Validation helpers ─────────────────────────────────────────────────────
 
 export function canTransitionPO(current: POState, next: POState): boolean {
@@ -55,4 +64,9 @@ export function canTransitionPO(current: POState, next: POState): boolean {
 
 export function getNextPOStates(current: POState): POState[] {
   return PO_TRANSITIONS[current] ?? [];
+}
+
+export function isOpenPurchaseOrder(stateOrStatus?: string | null): boolean {
+  if (!stateOrStatus) return false;
+  return OPEN_PURCHASE_ORDER_STATES.includes(stateOrStatus as (typeof OPEN_PURCHASE_ORDER_STATES)[number]);
 }

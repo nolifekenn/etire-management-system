@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AuditTrailPanel }      from "@/components/AuditTrailPanel";
 import { AdjustmentDialog }  from "@/app/inventory/components/AdjustmentDialog";
+import { SecureVoidModal } from "@/components/SecureVoidModal";
 import { validateShortText, validateNumber, type FieldError } from "@/lib/validation";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -135,7 +136,8 @@ function SmartButton({ btn, onClick }: { btn: SmartBtn; onClick: () => void }) {
 // ── Page ────────────────────────────────────────────────────────────────────
 
 export default function ProductFormPage() {
-  const { id: itemId } = useParams<{ id: string }>();
+  const params = useParams<{ id: string | string[] }>();
+  const itemId = Array.isArray(params?.id) ? params.id[0] : (params?.id ?? "");
   const router = useRouter();
   const { toast } = useToast();
   const { user, activeBranchId } = useAuth();
@@ -177,14 +179,20 @@ export default function ProductFormPage() {
   // Archive
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archiving,   setArchiving]   = useState(false);
+  const [archiveAuthOpen, setArchiveAuthOpen] = useState(false);
+  const [editAuthOpen, setEditAuthOpen] = useState(false);
 
   const load = useCallback(async () => {
+    if (!itemId) {
+      setLoading(false);
+      toast({ title: "Invalid product link", variant: "destructive" });
+      router.push("/inventory/products");
+      return;
+    }
+
     setLoading(true);
     try {
-      const [detailRes, btnRes] = await Promise.all([
-        getProductWithDetails(itemId),
-        getInventorySmartButtons(itemId),
-      ]);
+      const detailRes = await getProductWithDetails(itemId);
 
       if (!detailRes.success || !detailRes.product) {
         toast({ title: "Product not found", variant: "destructive" });
@@ -192,9 +200,16 @@ export default function ProductFormPage() {
         return;
       }
 
+      let btnRes: SmartBtn[] = [];
+      try {
+        btnRes = (await getInventorySmartButtons(itemId)) as SmartBtn[];
+      } catch {
+        btnRes = [];
+      }
+
       setProduct(detailRes.product);
       setMoves(detailRes.moves ?? []);
-      setSmartBtns(btnRes as SmartBtn[]);
+      setSmartBtns(btnRes);
 
       // Seed edit fields
       const p = detailRes.product;
@@ -230,8 +245,14 @@ export default function ProductFormPage() {
   const handleSave = async () => {
     if (!product) return;
 
+    const isTireEdit = editCategory === "tire";
+    const selectedBrand = tireBrands.find((brand) => brand.id === editBrandId)?.label?.trim() ?? "";
+    const selectedSize = tireSizes.find((size) => size.id === editSizeId)?.label?.trim() ?? "";
+    const composedTireName = [selectedBrand, selectedSize].filter(Boolean).join(" ").trim();
+    const finalName = isTireEdit && composedTireName ? composedTireName : editName.trim();
+
     // Validate name before saving
-    const nameErr     = validateShortText(editName,      { label: "Product name",  minLength: 2, maxLength: 150 });
+    const nameErr     = validateShortText(finalName,     { label: "Product name",  minLength: 2, maxLength: 150 });
     const saleErr     = validateNumber(editSalePrice,    { label: "Sale price",    required: false, min: 0 });
     const costErr     = validateNumber(editCostPrice,    { label: "Cost price",    required: false, min: 0 });
     const reorderErr  = validateNumber(editReorder,      { label: "Reorder level", required: true,  min: 0, integer: true });
@@ -244,12 +265,11 @@ export default function ProductFormPage() {
 
     setSaving(true);
     try {
-      const isTireEdit = editCategory === "tire";
       const result = await upsertProduct({
         item_id:      itemId,
         branch_id:    str(product.branch_id),
         supplier_id:  str(product.supplier_id) || undefined,
-        name:         editName,
+        name:         finalName,
         category:     editCategory as "tire" | "tool" | "accessory" | "service",
         vehicle_type: editVehicle as "car" | "motor" | "truck",
         sale_price:   Number(editSalePrice),
@@ -349,6 +369,30 @@ export default function ProductFormPage() {
     }
   };
 
+  const startEditing = () => {
+    setEditing(true);
+    setNameError(null);
+    setSalePriceError(null);
+    setCostPriceError(null);
+    setReorderError(null);
+  };
+
+  const requestEdit = () => {
+    if (user?.role === "super_admin" || user?.role === "branch_manager") {
+      startEditing();
+      return;
+    }
+    setEditAuthOpen(true);
+  };
+
+  const requestArchive = () => {
+    if (user?.role === "super_admin" || user?.role === "branch_manager") {
+      setArchiveOpen(true);
+      return;
+    }
+    setArchiveAuthOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -424,13 +468,7 @@ export default function ProductFormPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setEditing(true);
-                  setNameError(null);
-                  setSalePriceError(null);
-                  setCostPriceError(null);
-                  setReorderError(null);
-                }}
+                onClick={requestEdit}
               >
                 <Pencil className="h-4 w-4 mr-1" />
                 Edit
@@ -439,7 +477,7 @@ export default function ProductFormPage() {
                 variant="outline"
                 size="sm"
                 className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                onClick={() => setArchiveOpen(true)}
+                onClick={requestArchive}
               >
                 <Trash2 className="h-4 w-4 mr-1" />
                 Archive
@@ -923,6 +961,22 @@ export default function ProductFormPage() {
         branchId={str(product.branch_id) || activeBranchId || ""}
         userId={user?.user_id ?? ""}
         onAdjusted={load}
+      />
+
+      <SecureVoidModal
+        isOpen={editAuthOpen}
+        onClose={() => setEditAuthOpen(false)}
+        onAuthorized={startEditing}
+        requiredBranchId={str(product.branch_id) || activeBranchId || undefined}
+        actionDescription="This product can only be edited by a manager from the product's branch."
+      />
+
+      <SecureVoidModal
+        isOpen={archiveAuthOpen}
+        onClose={() => setArchiveAuthOpen(false)}
+        onAuthorized={() => setArchiveOpen(true)}
+        requiredBranchId={str(product.branch_id) || activeBranchId || undefined}
+        actionDescription="This product can only be archived by a manager from the product's branch."
       />
 
       {/* Archive Confirmation */}

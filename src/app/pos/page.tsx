@@ -73,6 +73,8 @@ interface BranchInfo {
   phone?:    string;
 }
 
+type TaxPreset = 'none' | 'vat' | 'custom';
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Custom TireIcon
 // ──────────────────────────────────────────────────────────────────────────────
@@ -102,7 +104,13 @@ const TireIcon: React.FC<{ className?: string }> = ({ className }) => (
 
 const ANONYMOUS_CUSTOMER_ID = 'anonymous_customer';
 const ALL_CATEGORIES        = '__all__';
+const ALL_VEHICLES          = '__all_vehicle__';
 const DEFAULT_TAX_RATE      = 12;   // VAT %
+const VEHICLE_TYPE_LABELS: Record<string, string> = {
+  car: 'Car',
+  motor: 'Motorcycle',
+  truck: 'Truck',
+};
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -243,6 +251,8 @@ const PaymentModal: React.FC<{
   const [method,   setMethod]   = useState<PaymentMethod>('cash');
   const [tendered, setTendered] = useState<string>('');
 
+  const MAX_ALLOWED = 120_000;
+
   const tenderedNum = parseFloat(tendered) || 0;
   const change      = Math.max(0, tenderedNum - orderTotal);
 
@@ -254,7 +264,7 @@ const PaymentModal: React.FC<{
   ];
 
   return (
-    <Dialog open={open} onOpenChange={open ? undefined : onClose}>
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Payment</DialogTitle>
@@ -292,8 +302,20 @@ const PaymentModal: React.FC<{
               <Input
                 type="number"
                 min="0"
+                max={MAX_ALLOWED}
                 value={tendered}
-                onChange={e => setTendered(e.target.value)}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val === '') { setTendered(''); return; }
+                  const num = parseFloat(val);
+                  if (Number.isNaN(num)) return;
+                  if (num > MAX_ALLOWED) {
+                    setTendered(String(MAX_ALLOWED));
+                    toast({ title: 'Value too large', description: 'Maximum allowed is ₱ 120,000.', variant: 'destructive' });
+                  } else {
+                    setTendered(val);
+                  }
+                }}
                 placeholder={String(orderTotal)}
                 className="text-lg font-semibold"
                 autoFocus
@@ -315,10 +337,14 @@ const PaymentModal: React.FC<{
             Cancel
           </Button>
           <Button
-            onClick={() => onValidate(method, tenderedNum || orderTotal)}
+            onClick={() => {
+              const tenderToUse = Math.min(method === 'cash' ? (tenderedNum || orderTotal) : orderTotal, MAX_ALLOWED);
+              onValidate(method, tenderToUse);
+            }}
             disabled={
               submitting ||
-              (method === 'cash' && tenderedNum > 0 && tenderedNum < orderTotal)
+              (method === 'cash' && tenderedNum > 0 && tenderedNum < orderTotal) ||
+              (method === 'cash' && tenderedNum > MAX_ALLOWED)
             }
           >
             {submitting ? (
@@ -411,19 +437,19 @@ const SalesHistoryDrawer: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
-        <DialogHeader className="px-5 pt-5 pb-3 border-b">
+      <DialogContent className="flex h-[88vh] w-[min(96vw,1200px)] max-w-none flex-col p-0">
+        <DialogHeader className="border-b px-5 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <History className="h-5 w-5 text-[#714B67]" />
-              <DialogTitle className="text-lg font-bold text-[#714B67]">Sales History</DialogTitle>
+              <History className="h-5 w-5 text-foreground" />
+              <DialogTitle className="text-lg font-semibold text-foreground">Sales History</DialogTitle>
             </div>
           </div>
           <div className="flex items-center gap-2 mt-2">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
               <input
-                className="w-full rounded-md border border-gray-200 pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#714B67]/30"
+                className="w-full rounded-md border border-gray-200 pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
                 placeholder="Search by sale # or customer…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -434,7 +460,7 @@ const SalesHistoryDrawer: React.FC<{
                 </button>
               )}
             </div>
-            <span className="text-xs text-gray-400 whitespace-nowrap">{filtered.length} records</span>
+            <span className="whitespace-nowrap text-xs text-gray-400">{filtered.length} records</span>
           </div>
         </DialogHeader>
 
@@ -445,12 +471,12 @@ const SalesHistoryDrawer: React.FC<{
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-300">
-              <History className="h-12 w-12 mb-2 opacity-40" />
+              <History className="mb-2 h-12 w-12 opacity-40" />
               <p className="text-sm text-gray-400">No sales found</p>
             </div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 sticky top-0">
+              <thead className="sticky top-0 bg-white">
                 <tr>
                   <th className="px-4 py-2.5 text-left font-medium text-gray-500 text-xs">Sale #</th>
                   <th className="px-4 py-2.5 text-left font-medium text-gray-500 text-xs">Customer</th>
@@ -463,17 +489,17 @@ const SalesHistoryDrawer: React.FC<{
                 {filtered.map(sale => (
                   <React.Fragment key={sale.sale_id}>
                     <tr
-                      className="border-t border-gray-100 hover:bg-purple-50/40 cursor-pointer transition-colors"
+                      className="cursor-pointer border-t border-gray-100 transition-colors hover:bg-gray-50"
                       onClick={() => setExpanded(prev => prev === sale.sale_id ? null : sale.sale_id)}
                     >
-                      <td className="px-4 py-2.5 font-semibold text-[#714B67]">
+                      <td className="px-4 py-2.5 font-semibold text-foreground">
                         {sale.sale_number ?? '—'}
                       </td>
                       <td className="px-4 py-2.5 text-gray-700">
                         {sale.customer?.name ?? <span className="text-gray-400 italic">Walk-in</span>}
                       </td>
                       <td className="px-4 py-2.5">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${payBadge(sale.payment_method)}`}>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${payBadge(sale.payment_method)}`}>
                           {sale.payment_method}
                         </span>
                       </td>
@@ -488,9 +514,9 @@ const SalesHistoryDrawer: React.FC<{
                       </td>
                     </tr>
                     {expanded === sale.sale_id && (
-                      <tr className="bg-purple-50/30">
+                      <tr className="bg-gray-50">
                         <td colSpan={5} className="px-6 pb-3 pt-1">
-                          <div className="text-xs text-gray-500 font-medium mb-1.5 mt-1">Items</div>
+                          <div className="mb-1.5 mt-1 text-xs font-medium text-gray-500">Items</div>
                           <div className="space-y-1">
                             {(sale.sale_item ?? []).map((si, idx) => (
                               <div key={idx} className="flex justify-between text-xs text-gray-700">
@@ -500,7 +526,7 @@ const SalesHistoryDrawer: React.FC<{
                             ))}
                           </div>
                           {(sale.discount_amount > 0 || sale.tax_amount > 0) && (
-                            <div className="mt-2 pt-2 border-t border-purple-100 space-y-0.5">
+                            <div className="mt-2 space-y-0.5 border-t border-gray-200 pt-2">
                               {sale.discount_amount > 0 && (
                                 <div className="flex justify-between text-xs text-red-500">
                                   <span>Discount</span>
@@ -515,7 +541,7 @@ const SalesHistoryDrawer: React.FC<{
                               )}
                             </div>
                           )}
-                          <div className="flex justify-between text-xs font-bold text-[#714B67] mt-1.5 pt-1.5 border-t border-purple-100">
+                          <div className="mt-1.5 flex justify-between border-t border-gray-200 pt-1.5 text-xs font-bold text-foreground">
                             <span>Total</span>
                             <span>{formatCurrency(sale.total_amount)}</span>
                           </div>
@@ -550,10 +576,12 @@ export default function POSPage() {
   const [loading,     setLoading]     = useState(true);
   const [search,      setSearch]      = useState('');
   const [category,    setCategory]    = useState(ALL_CATEGORIES);
+  const [vehicleType, setVehicleType] = useState(ALL_VEHICLES);
   const [cart,        setCart]        = useState<CartLine[]>([]);
   const [customerId,  setCustomerId]  = useState<string>(ANONYMOUS_CUSTOMER_ID);
   const [discount,    setDiscount]    = useState(0);
-  const [applyTax,    setApplyTax]    = useState(false);
+  const [taxPreset,   setTaxPreset]   = useState<TaxPreset>('none');
+  const [taxRate,     setTaxRate]     = useState<string>(String(DEFAULT_TAX_RATE));
   const [showPayment, setShowPayment] = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -602,16 +630,27 @@ export default function POSPage() {
     return Array.from(set).sort();
   }, [products]);
 
+  const vehicleTypes = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach(product => {
+      if (product.vehicle_type) set.add(product.vehicle_type);
+    });
+    return Array.from(set).sort();
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
     return products.filter(p =>
       (category === ALL_CATEGORIES || p.category === category) &&
+      (vehicleType === ALL_VEHICLES || p.vehicle_type === vehicleType) &&
       (!search || p.name.toLowerCase().includes(search.toLowerCase())),
     );
-  }, [products, category, search]);
+  }, [products, category, vehicleType, search]);
 
   const subtotal    = cart.reduce((s, l) => s + l.price * l.quantity + l.installationFee, 0);
   const discountAmt = (subtotal * discount) / 100;
-  const taxAmt      = applyTax ? ((subtotal - discountAmt) * DEFAULT_TAX_RATE) / 100 : 0;
+  const parsedTaxRate = Math.max(0, Number(taxRate) || 0);
+  const activeTaxRate = taxPreset === 'none' ? 0 : parsedTaxRate;
+  const taxAmt      = activeTaxRate > 0 ? ((subtotal - discountAmt) * activeTaxRate) / 100 : 0;
   const orderTotal  = subtotal - discountAmt + taxAmt;
 
   // ── cart helpers ───────────────────────────────────────────────────────────
@@ -647,7 +686,8 @@ export default function POSPage() {
   const clearCart = () => {
     setCart([]);
     setDiscount(0);
-    setApplyTax(false);
+    setTaxPreset('none');
+    setTaxRate(String(DEFAULT_TAX_RATE));
     setCustomerId(ANONYMOUS_CUSTOMER_ID);
   };
 
@@ -775,7 +815,7 @@ export default function POSPage() {
   // ──────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col md:flex-row h-screen w-full overflow-hidden bg-gray-100">
+    <div className="flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden bg-gray-100 md:flex-row">
 
       {/* ── Mobile tab bar ─────────────────────────────────────────────────── */}
       <div className="flex md:hidden border-b bg-white shrink-0">
@@ -806,13 +846,13 @@ export default function POSPage() {
 
       {/* ── LEFT — Product browser ─────────────────────────────────────────── */}
       <div className={cn(
-        'flex flex-1 flex-col overflow-hidden',
+        'flex min-w-0 flex-1 flex-col overflow-hidden',
         showCart ? 'hidden md:flex' : 'flex',
       )}>
 
         {/* Search bar */}
-        <div className="flex items-center gap-3 border-b bg-white px-4 py-2">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex flex-wrap items-center gap-3 border-b bg-white px-4 py-2">
+          <div className="relative min-w-[220px] flex-1 md:max-w-sm">
             <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <Input
               placeholder="Search products…"
@@ -821,6 +861,28 @@ export default function POSPage() {
               className="pl-8 h-8 text-sm"
             />
           </div>
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger className="h-8 w-[160px] text-sm">
+              <SelectValue placeholder="Type of item" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_CATEGORIES}>All item types</SelectItem>
+              <SelectItem value="tire">Tire</SelectItem>
+              <SelectItem value="tool">Tool</SelectItem>
+              <SelectItem value="accessory">Accessory</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={vehicleType} onValueChange={setVehicleType}>
+            <SelectTrigger className="h-8 w-[170px] text-sm">
+              <SelectValue placeholder="Type of vehicle" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_VEHICLES}>All vehicles</SelectItem>
+              <SelectItem value="car">Car</SelectItem>
+              <SelectItem value="motor">Motorcycle</SelectItem>
+              <SelectItem value="truck">Truck</SelectItem>
+            </SelectContent>
+          </Select>
           <button
             onClick={loadData}
             className="rounded p-1.5 text-gray-500 hover:bg-gray-100"
@@ -841,7 +903,7 @@ export default function POSPage() {
           </p>
         </div>
 
-        {/* Category pills */}
+        {/* Quick item filters */}
         <div className="flex gap-2 overflow-x-auto border-b bg-white px-4 py-2 scrollbar-thin">
           <button
             onClick={() => setCategory(ALL_CATEGORIES)}
@@ -854,7 +916,7 @@ export default function POSPage() {
           >
             All
           </button>
-          {categories.map(cat => (
+          {categories.filter(cat => ['tire', 'tool', 'accessory'].includes(cat)).map(cat => (
             <button
               key={cat}
               onClick={() => setCategory(cat)}
@@ -865,7 +927,7 @@ export default function POSPage() {
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
               )}
             >
-              {cat}
+              <span className="capitalize">{cat}</span>
             </button>
           ))}
         </div>
@@ -893,8 +955,8 @@ export default function POSPage() {
 
       {/* ── RIGHT — Order sidebar ──────────────────────────────────────────── */}
       <div className={cn(
-        'flex flex-col border-l bg-white shadow-lg',
-        'w-full md:w-80 xl:w-96',
+        'flex min-w-0 flex-col border-l bg-white shadow-lg',
+        'w-full md:w-[22rem] xl:w-[26rem]',
         !showCart ? 'hidden md:flex' : 'flex',
       )}>
 
@@ -988,23 +1050,59 @@ export default function POSPage() {
           )}
 
           {/* Tax toggle */}
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <button
-              onClick={() => setApplyTax(v => !v)}
-              className={cn(
-                'relative h-4 w-7 rounded-full transition-colors',
-                applyTax ? 'bg-blue-500' : 'bg-gray-200',
-              )}
-            >
-              <span
-                className={cn(
-                  'absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform',
-                  applyTax ? 'translate-x-3.5' : 'translate-x-0.5',
-                )}
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 text-sm text-gray-500">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="font-medium text-gray-700">Tax</span>
+              {activeTaxRate > 0 && <span>{formatCurrency(taxAmt)}</span>}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={taxPreset === 'vat' ? 'default' : 'outline'}
+                className="h-7 px-2 text-xs"
+                onClick={() => {
+                  setTaxPreset('vat');
+                  setTaxRate(String(DEFAULT_TAX_RATE));
+                }}
+              >
+                VAT {DEFAULT_TAX_RATE}%
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={taxPreset === 'custom' ? 'default' : 'outline'}
+                className="h-7 px-2 text-xs"
+                onClick={() => {
+                  setTaxPreset('custom');
+                  if (Number(taxRate) <= 0) setTaxRate(String(DEFAULT_TAX_RATE));
+                }}
+              >
+                Custom
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={taxPreset === 'none' ? 'secondary' : 'outline'}
+                className="h-7 px-2 text-xs"
+                onClick={() => setTaxPreset('none')}
+              >
+                None
+              </Button>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={taxRate}
+                onChange={(event) => {
+                  setTaxPreset('custom');
+                  setTaxRate(event.target.value);
+                }}
+                className="ml-auto h-7 w-20 text-right text-xs"
+                aria-label="Custom tax percentage"
               />
-            </button>
-            <span>VAT {DEFAULT_TAX_RATE}%</span>
-            {applyTax && <span className="ml-auto">{formatCurrency(taxAmt)}</span>}
+              <span className="text-xs">%</span>
+            </div>
           </div>
 
           <Separator />

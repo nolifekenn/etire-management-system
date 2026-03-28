@@ -12,6 +12,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabaseServer';
+import { isOpenPurchaseOrder } from '@/lib/poUtils';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyClient = any;
@@ -130,7 +131,7 @@ export async function getSupplierSmartButtons(
   const items      = itemsRes.data ?? [];
   const totalSpend = orders.reduce((acc, o) => acc + Number(o.total_amount ?? 0), 0);
   const openOrders = orders.filter(o =>
-    ['draft','sent','purchase','pending','approved','ordered'].includes(o.state ?? o.status)
+    isOpenPurchaseOrder((o.state ?? o.status) as string | null | undefined)
   ).length;
 
   return [

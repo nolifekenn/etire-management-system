@@ -915,6 +915,7 @@ export async function getServiceFormOptions(branchId?: string, customerId?: stri
     supabase
       .from('user')
       .select('user_id, name, role')
+      .eq('role', 'mechanic')
       .is('deleted_at', null)
       .order('name', { ascending: true }),
     supabase

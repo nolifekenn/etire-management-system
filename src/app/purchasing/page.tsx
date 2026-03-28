@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useCallback, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -78,6 +78,19 @@ export default function PurchasingPage() {
   const [stateFilter, setStateFilter] = useState("all");
   const [loading, setLoading]         = useState(true);
   const [createOpen, setCreateOpen]   = useState(false);
+  const canCreatePO = user?.role === "super_admin" || user?.role === "branch_manager";
+
+  const handleOpenCreate = () => {
+    if (!canCreatePO) {
+      toast({
+        title: "Permission Denied",
+        description: "You do not have permission to start a quotation. Only Managers and Super Admins can create purchase orders.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setCreateOpen(true);
+  };
 
   //  Fetch 
 
@@ -123,17 +136,19 @@ export default function PurchasingPage() {
           <Button
             size="sm"
             className="gap-1.5 bg-purple-600 hover:bg-purple-700 text-white"
-            onClick={() => setCreateOpen(true)}
+            onClick={handleOpenCreate}
           >
             <PlusCircle className="h-4 w-4" />
             New
           </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 text-[#714B67] border-[#714B67] hover:bg-purple-50" asChild>
-            <Link href="/purchasing/vendors">
-              <Building2 className="h-4 w-4" />
-              Vendors
-            </Link>
-          </Button>
+          {(user?.role === "super_admin" || user?.role === "branch_manager") && (
+            <Button variant="outline" size="sm" className="gap-1.5 text-[#714B67] border-[#714B67] hover:bg-purple-50" asChild>
+              <Link href="/purchasing/vendors">
+                <Building2 className="h-4 w-4" />
+                Vendors
+              </Link>
+            </Button>
+          )}
           <Button variant="ghost" size="icon" onClick={fetchOrders} title="Refresh">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
@@ -197,7 +212,7 @@ export default function PurchasingPage() {
         <div className="rounded-lg border border-border bg-white overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-gray-50 text-xs text-muted-foreground">
+              <tr className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
                 <th className="text-left px-4 py-2.5 font-medium">Reference</th>
                 <th className="text-left px-4 py-2.5 font-medium">Vendor</th>
                 <th className="text-left px-4 py-2.5 font-medium hidden sm:table-cell">Branch</th>
@@ -220,10 +235,12 @@ export default function PurchasingPage() {
                   <td colSpan={7} className="py-16 text-center">
                     <Package className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-40" />
                     <p className="text-sm text-muted-foreground">No purchase orders found.</p>
-                    <Button variant="outline" size="sm" className="mt-3" onClick={() => setCreateOpen(true)}>
-                      <PlusCircle className="h-4 w-4 mr-2" />
-                      Create your first RFQ
-                    </Button>
+                    {canCreatePO && (
+                      <Button variant="outline" size="sm" className="mt-3" onClick={handleOpenCreate}>
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Create your first RFQ
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ) : (
@@ -271,13 +288,16 @@ export default function PurchasingPage() {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {count > 0 && (
           <div className="flex items-center justify-between text-sm">
-            <p className="text-muted-foreground">Page {page} of {totalPages}</p>
+            <p className="text-muted-foreground">
+              Showing {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, count)} of {count}
+            </p>
             <div className="flex items-center gap-1">
               <Button variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
+              <span className="text-xs text-muted-foreground px-1">Page {page} of {Math.max(totalPages, 1)}</span>
               <Button variant="outline" size="icon" className="h-8 w-8" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -289,7 +309,13 @@ export default function PurchasingPage() {
       {/* Dialog */}
       <CreateRFQDialog
         open={createOpen}
-        onOpenChange={setCreateOpen}
+        onOpenChange={(open) => {
+          if (open) {
+            handleOpenCreate();
+            return;
+          }
+          setCreateOpen(false);
+        }}
         onCreated={(poId) => {
           setCreateOpen(false);
           router.push(`/purchasing/${poId}`);

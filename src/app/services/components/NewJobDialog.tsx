@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Loader2, Wrench, User, Car, Clock, Package,
-  Plus, Trash2, ChevronDown, PenLine,
+  Plus, Minus, Trash2, ChevronDown, PenLine,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -307,6 +307,16 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
 
   const removeLine = (id: string) => setLines(prev => prev.filter(l => l.id !== id));
 
+  const duplicateLine = (id: string) => {
+    const orig = lines.find(l => l.id === id);
+    if (!orig) return;
+    setLines(prev => [...prev, {
+      ...orig,
+      id:  `_new_${Date.now()}_${Math.random()}`,
+      qty: 1,
+    }]);
+  };
+
   const subtotal = lines.reduce((acc, l) => acc + l.qty * l.unit_price, 0);
   const autoDesc = lines.length > 0 ? lines.map(l => l.name).join(" / ") : "";
 
@@ -372,90 +382,107 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
           <div className="space-y-5 py-1">
 
             {/* Assignment */}
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                Vehicle &amp; Assignment
-              </p>
-              <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+              Vehicle &amp; Assignment
+            </p>
+            {/* Added items-end to the grid to keep all input baselines level */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3 items-end">
 
-                <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1"><User className="h-3 w-3" />Customer</Label>
-                  <Select value={toSel(customerId)} onValueChange={v => setCustomerId(toVal(v))}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Walk-in" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE}>-- Walk-in --</SelectItem>
-                      {customers.map(c => (
-                        <SelectItem key={c.customer_id} value={c.customer_id}>
-                          {c.name}{c.phone ? ` / ${c.phone}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1"><Car className="h-3 w-3" />Vehicle</Label>
-                  <Select value={toSel(vehicleId)} onValueChange={v => setVehicleId(toVal(v))} disabled={!customerId}>
-                    <SelectTrigger className="h-8 text-sm">
-                      <SelectValue placeholder={customerId ? "Select" : "Select customer first"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE}>-- None --</SelectItem>
-                      {vehicles.map(v => (
-                        <SelectItem key={v.vehicle_id} value={v.vehicle_id}>
-                          {v.plate_number}{v.make ? ` / ${v.make}` : ""}{v.model ? ` ${v.model}` : ""}{v.year ? ` (${v.year})` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs">Vehicle Type</Label>
-                  <Select value={toSel(vehicleTypeId)} onValueChange={v => setVehicleTypeId(toVal(v))}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select type" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE}>-- None --</SelectItem>
-                      {vehTypes.map(vt => (
-                        <SelectItem key={vt.value} value={vt.value}>{vt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1"><Wrench className="h-3 w-3" />Mechanic</Label>
-                  <Select value={toSel(mechanicId)} onValueChange={v => setMechanicId(toVal(v))}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Unassigned" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE}>-- Unassigned --</SelectItem>
-                      {mechanics.map(m => (
-                        <SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs">Priority</Label>
-                  <Select value={priority} onValueChange={(v: "low"|"normal"|"high"|"urgent") => setPriority(v)}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="normal">Normal</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1"><Clock className="h-3 w-3" />Est. Completion</Label>
-                  <Input type="datetime-local" className="h-8 text-sm" value={estCompletion} onChange={e => setEstCompletion(e.target.value)} />
-                </div>
-
+              {/* Customer */}
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1 h-4"><User className="h-3 w-3" />Customer</Label>
+                <Select value={toSel(customerId)} onValueChange={v => setCustomerId(toVal(v))}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Walk-in" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>-- Walk-in --</SelectItem>
+                    {customers.map(c => (
+                      <SelectItem key={c.customer_id} value={c.customer_id}>
+                        {c.name}{c.phone ? ` / ${c.phone}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
+              {/* Vehicle */}
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1 h-4"><Car className="h-3 w-3" />Vehicle</Label>
+                <Select value={toSel(vehicleId)} onValueChange={v => setVehicleId(toVal(v))} disabled={!customerId}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder={customerId ? "Select" : "Select customer first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>-- None --</SelectItem>
+                    {vehicles.map(v => (
+                      <SelectItem key={v.vehicle_id} value={v.vehicle_id}>
+                        {v.plate_number}{v.make ? ` / ${v.make}` : ""}{v.model ? ` ${v.model}` : ""}{v.year ? ` (${v.year})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Vehicle Type */}
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1 h-4">
+                  <Car className="h-3 w-3" />
+                  Vehicle Type
+                  {vehicleId && <span className="ml-1 text-[10px] text-muted-foreground font-normal">(auto-set)</span>}
+                </Label>
+                <Select value={toSel(vehicleTypeId)} onValueChange={v => setVehicleTypeId(toVal(v))} disabled={!!vehicleId}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select type" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>-- None --</SelectItem>
+                    {vehTypes.map(vt => (
+                      <SelectItem key={vt.value} value={vt.value}>{vt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Mechanic */}
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1 h-4"><Wrench className="h-3 w-3" />Mechanic</Label>
+                <Select value={toSel(mechanicId)} onValueChange={v => setMechanicId(toVal(v))}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>-- Unassigned --</SelectItem>
+                    {mechanics.map(m => (
+                      <SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Priority */}
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center h-4">Priority</Label>
+                <Select value={priority} onValueChange={(v: "low"|"normal"|"high"|"urgent") => setPriority(v)}>
+                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Est. Completion */}
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1 h-4"><Clock className="h-3 w-3" />Est. Completion</Label>
+                {/* Removed mt-1 here */}
+                <Input 
+                  type="datetime-local" 
+                  className="h-8 text-sm" 
+                  value={estCompletion} 
+                  onChange={e => setEstCompletion(e.target.value)} 
+                />
+              </div>
+
             </div>
+          </div>
 
             {/* Services */}
             <div>
@@ -478,7 +505,7 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
                         <th className="text-right px-3 py-1.5 text-xs font-medium text-gray-600 w-14">Qty</th>
                         <th className="text-right px-3 py-1.5 text-xs font-medium text-gray-600 w-28">Unit Price</th>
                         <th className="text-right px-3 py-1.5 text-xs font-medium text-gray-600 w-28">Subtotal</th>
-                        <th className="w-8" />
+                          <th className="w-16" />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -515,11 +542,25 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
                             P{(line.qty * line.unit_price).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                           </td>
                           <td className="px-2 py-1.5 text-center">
-                            <Button type="button" variant="ghost" size="icon"
-                              className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50"
-                              onClick={() => removeLine(line.id)}>
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                            <div className="flex items-center gap-0.5 justify-center">
+                              <Button type="button" variant="ghost" size="icon"
+                                className="h-6 w-6 text-blue-400 hover:text-blue-600 hover:bg-blue-50"
+                                onClick={() => updateLine(line.id, "qty", line.qty + 1)}>
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            
+                              <Button type="button" variant="ghost" size="icon"
+                                className="h-6 w-6 text-amber-500 hover:text-amber-700 hover:bg-amber-50"
+                                onClick={() => updateLine(line.id, "qty", Math.max(1, line.qty - 1))}>
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                            
+                              <Button type="button" variant="ghost" size="icon"
+                                className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50"
+                                onClick={() => removeLine(line.id)}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))}

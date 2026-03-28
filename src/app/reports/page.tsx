@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   DollarSign, Package, Wrench, RefreshCw,
   Loader2, Search, AlertTriangle, ChevronUp, ChevronDown,
-  ArrowUpRight, Filter, FileSpreadsheet, FileText,
+  ArrowUpRight, Filter, FileSpreadsheet, FileText, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { format, subDays, startOfMonth, endOfMonth, startOfYear } from 'date-fns';
 import jsPDF from 'jspdf';
@@ -36,6 +36,7 @@ import {
 
 type ReportTab = 'sales' | 'inventory' | 'services';
 type SortDir   = 'asc' | 'desc';
+const REPORT_PAGE_SIZE = 15;
 
 // ── Formatting ────────────────────────────────────────────────────────────────
 
@@ -201,6 +202,7 @@ function SalesTable({
 }: { rows: SalesReportRow[]; loading: boolean; search: string }) {
   const [sortCol, setSortCol] = useState('sale_date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => rows.filter(r =>
     !search ||
@@ -209,6 +211,7 @@ function SalesTable({
   ), [rows, search]);
 
   const sorted = useSortedData(filtered as unknown as Record<string, unknown>[], sortCol, sortDir);
+  useEffect(() => { setPage(1); }, [search, rows.length]);
 
   const handleSort = (col: string) => {
     if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -217,6 +220,8 @@ function SalesTable({
 
   const totalRevenue  = filtered.reduce((a, r) => a + r.total_amount, 0);
   const totalDiscount = filtered.reduce((a, r) => a + r.discount, 0);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / REPORT_PAGE_SIZE));
+  const pagedRows = (sorted as unknown as SalesReportRow[]).slice((page - 1) * REPORT_PAGE_SIZE, page * REPORT_PAGE_SIZE);
 
   return (
     <>
@@ -247,10 +252,10 @@ function SalesTable({
             ) : sorted.length === 0 ? (
               <tr><td colSpan={9} className="py-12 text-center text-muted-foreground text-sm">No sales data found</td></tr>
             ) : (
-              (sorted as unknown as SalesReportRow[]).map(row => (
+              pagedRows.map(row => (
                 <tr key={row.sale_id} className="border-t hover:bg-muted/30 transition-colors">
                     <td className="px-3 py-2 font-mono text-xs text-blue-600">
-                    <a href={`/receipt/${row.sale_id}`} className="hover:underline inline-flex items-center gap-1">
+                    <a href={`/receipt/${row.sale_id}`} className="inline-flex items-center gap-1 hover:no-underline">
                       {row.sale_number ?? '—'} <ArrowUpRight className="h-3 w-3 opacity-60" />
                     </a>
                   </td>
@@ -274,6 +279,22 @@ function SalesTable({
           </tbody>
         </table>
       </div>
+      {!loading && sorted.length > 0 && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-border pt-3">
+          <span>
+            Showing {(page - 1) * REPORT_PAGE_SIZE + 1}-{Math.min(page * REPORT_PAGE_SIZE, sorted.length)} of {sorted.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" className="h-7 w-7" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </Button>
+            <span>Page {page} of {totalPages}</span>
+            <Button variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -285,6 +306,7 @@ function InventoryTable({
 }: { rows: InventoryReportRow[]; loading: boolean; search: string }) {
   const [sortCol, setSortCol] = useState('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => rows.filter(r =>
     !search ||
@@ -294,6 +316,7 @@ function InventoryTable({
   ), [rows, search]);
 
   const sorted = useSortedData(filtered as unknown as Record<string, unknown>[], sortCol, sortDir);
+  useEffect(() => { setPage(1); }, [search, rows.length]);
 
   const handleSort = (col: string) => {
     if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -302,6 +325,8 @@ function InventoryTable({
 
   const totalValue   = filtered.reduce((a, r) => a + r.stock_value, 0);
   const lowStockCnt  = filtered.filter(r => r.is_low_stock).length;
+  const totalPages = Math.max(1, Math.ceil(sorted.length / REPORT_PAGE_SIZE));
+  const pagedRows = (sorted as unknown as InventoryReportRow[]).slice((page - 1) * REPORT_PAGE_SIZE, page * REPORT_PAGE_SIZE);
 
   return (
     <>
@@ -333,7 +358,7 @@ function InventoryTable({
             ) : sorted.length === 0 ? (
               <tr><td colSpan={11} className="py-12 text-center text-muted-foreground text-sm">No inventory data found</td></tr>
             ) : (
-              (sorted as unknown as InventoryReportRow[]).map(row => (
+              pagedRows.map(row => (
                 <tr
                   key={row.item_id}
                   className={`border-t transition-colors ${row.is_low_stock ? 'bg-red-50/50 hover:bg-red-50' : 'hover:bg-muted/30'}`}
@@ -360,6 +385,22 @@ function InventoryTable({
           </tbody>
         </table>
       </div>
+      {!loading && sorted.length > 0 && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-border pt-3">
+          <span>
+            Showing {(page - 1) * REPORT_PAGE_SIZE + 1}-{Math.min(page * REPORT_PAGE_SIZE, sorted.length)} of {sorted.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" className="h-7 w-7" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </Button>
+            <span>Page {page} of {totalPages}</span>
+            <Button variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -371,6 +412,7 @@ function ServicesTable({
 }: { rows: ServiceReportRow[]; loading: boolean; search: string }) {
   const [sortCol, setSortCol] = useState('job_date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => rows.filter(r =>
     !search ||
@@ -380,6 +422,7 @@ function ServicesTable({
   ), [rows, search]);
 
   const sorted = useSortedData(filtered as unknown as Record<string, unknown>[], sortCol, sortDir);
+  useEffect(() => { setPage(1); }, [search, rows.length]);
 
   const handleSort = (col: string) => {
     if (col === sortCol) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -389,6 +432,8 @@ function ServicesTable({
   const totalValue  = filtered.reduce((a, r) => a + r.total_value, 0);
   const partsValue  = filtered.reduce((a, r) => a + r.parts_value, 0);
   const laborValue  = filtered.reduce((a, r) => a + r.labor_value, 0);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / REPORT_PAGE_SIZE));
+  const pagedRows = (sorted as unknown as ServiceReportRow[]).slice((page - 1) * REPORT_PAGE_SIZE, page * REPORT_PAGE_SIZE);
 
   return (
     <>
@@ -422,12 +467,16 @@ function ServicesTable({
             ) : sorted.length === 0 ? (
               <tr><td colSpan={12} className="py-12 text-center text-muted-foreground text-sm">No service data found</td></tr>
             ) : (
-              (sorted as unknown as ServiceReportRow[]).map(row => (
+              pagedRows.map(row => (
                 <tr key={row.job_id} className="border-t hover:bg-muted/30 transition-colors">
                   <td className="px-3 py-2 font-mono text-xs text-violet-600">
-                    <a href={`/services/${row.job_id}`} className="hover:underline inline-flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => window.location.assign(`/services/${row.job_id}`)}
+                      className="inline-flex items-center gap-1 hover:no-underline"
+                    >
                       {row.job_number ?? '—'} <ArrowUpRight className="h-3 w-3 opacity-60" />
-                    </a>
+                    </button>
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
                     {format(new Date(row.job_date), 'MMM dd, yyyy')}
@@ -452,6 +501,22 @@ function ServicesTable({
           </tbody>
         </table>
       </div>
+      {!loading && sorted.length > 0 && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-border pt-3">
+          <span>
+            Showing {(page - 1) * REPORT_PAGE_SIZE + 1}-{Math.min(page * REPORT_PAGE_SIZE, sorted.length)} of {sorted.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" className="h-7 w-7" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </Button>
+            <span>Page {page} of {totalPages}</span>
+            <Button variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -810,7 +875,7 @@ export default function ReportsPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-[1600px] mx-auto">
+    <div className="p-4 md:p-6 space-y-4 max-w-[1600px] mx-auto bg-slate-50 min-h-screen">
 
       {/* ── Header ───────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -848,22 +913,22 @@ export default function ReportsPage() {
 
       {/* ── Tab Bar ──────────────────────────────────────────────────── */}
       <Tabs value={activeTab} onValueChange={v => setActiveTab(v as ReportTab)}>
-        <TabsList className="h-9">
-          <TabsTrigger value="sales" className="gap-1.5 text-sm">
+        <TabsList className="h-10 bg-transparent border-b border-slate-200 rounded-none w-full justify-start p-0 gap-6">
+          <TabsTrigger value="sales" className="h-10 rounded-none border-b-2 border-transparent px-1 gap-1.5 text-sm text-slate-600 data-[state=active]:text-slate-900 data-[state=active]:border-slate-900 data-[state=active]:bg-transparent shadow-none">
             <DollarSign className="h-3.5 w-3.5" /> Sales
           </TabsTrigger>
-          <TabsTrigger value="inventory" className="gap-1.5 text-sm">
+          <TabsTrigger value="inventory" className="h-10 rounded-none border-b-2 border-transparent px-1 gap-1.5 text-sm text-slate-600 data-[state=active]:text-slate-900 data-[state=active]:border-slate-900 data-[state=active]:bg-transparent shadow-none">
             <Package className="h-3.5 w-3.5" /> Inventory
           </TabsTrigger>
-          <TabsTrigger value="services" className="gap-1.5 text-sm">
+          <TabsTrigger value="services" className="h-10 rounded-none border-b-2 border-transparent px-1 gap-1.5 text-sm text-slate-600 data-[state=active]:text-slate-900 data-[state=active]:border-slate-900 data-[state=active]:bg-transparent shadow-none">
             <Wrench className="h-3.5 w-3.5" /> Services
           </TabsTrigger>
         </TabsList>
       </Tabs>
 
       {/* ── Filter Bar ───────────────────────────────────────────────── */}
-      <Card>
-        <CardContent className="py-3 flex flex-wrap gap-2 items-center">
+      <Card className="border border-slate-200 shadow-sm">
+        <CardContent className="py-3 flex flex-wrap gap-2 items-center bg-white rounded-xl">
           <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
 
           {/* Date range — not shown for inventory */}
@@ -960,15 +1025,18 @@ export default function ReportsPage() {
           )}
 
           {/* Search */}
-          <div className="relative ml-auto">
+          <div className="relative ml-auto min-w-[280px]">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search…"
-              className="h-8 pl-8 text-xs w-44"
+              className="h-8 pl-8 text-xs w-full"
             />
           </div>
+          <span className="text-xs text-muted-foreground">
+            {activeTab === 'sales' ? salesRows.length : activeTab === 'inventory' ? invRows.length : svcRows.length} items
+          </span>
         </CardContent>
       </Card>
 
