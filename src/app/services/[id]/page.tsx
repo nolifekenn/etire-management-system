@@ -2,16 +2,15 @@
 /**
  * src/app/services/[id]/page.tsx
  * ─────────────────────────────────────────────────────────────────────────────
- * Service Job Form View — Odoo-style split-pane layout
+ * Service Job Form View — Responsive split / stacked layout
  *
- * Layout:
- *   ┌─ Header status bar + action buttons ──────────────────────┐
- *   │  Smart Buttons row                                        │
- *   ├─ Main tabs (left ~65%) ─────────┬─ Chatter (right ~35%) ─┤
- *   │  Parts & Labor                  │  chatter_messages        │
- *   │  Vehicle Information            │                          │
- *   │  Diagnostics / Notes            │                          │
- *   └─────────────────────────────────┴──────────────────────────┘
+ * Responsive changes:
+ * - Body stacks to column on small screens; chatter moves below main tabs.
+ * - Right chatter becomes full-width below sm breakpoint.
+ * - Tabs list is horizontally scrollable on small screens.
+ * - Selects and inputs expand to full width on small screens.
+ * - Line items table keeps desktop table on sm+ and shows stacked cards on xs.
+ * - Dialogs use responsive widths (Dialog component already handles fullscreen on mobile).
  */
 
 import { useState, useEffect, useCallback, useTransition } from "react";
@@ -58,8 +57,6 @@ import {
   type ServiceReceiptData, type ServiceReceiptLine,
 } from "@/lib/receiptGenerator";
 
-// ── State bar config ─────────────────────────────────────────────────────────
-
 const STATE_ORDER: ServiceState[] = [
   "quotation", "confirmed", "in_progress", "quality_check", "completed", "invoiced",
 ];
@@ -77,7 +74,7 @@ function StateStatusBar({ current }: { current: ServiceState }) {
   const currentIdx = STATE_ORDER.indexOf(current);
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1 flex-wrap">
       {STATE_ORDER.map((s, idx) => {
         const isDone    = idx < currentIdx;
         const isCurrent = idx === currentIdx;
@@ -105,8 +102,6 @@ function StateStatusBar({ current }: { current: ServiceState }) {
   );
 }
 
-// ── Smart button row ─────────────────────────────────────────────────────────
-
 const ICON_MAP: Record<string, React.ElementType> = {
   Package:        Package,
   MessageSquare:  MessageSquare,
@@ -133,8 +128,6 @@ function SmartButton({ btn, onClick }: { btn: SmartButtonData; onClick?: () => v
     </button>
   );
 }
-
-// ── Catalog Item Picker Dialog ───────────────────────────────────────────────
 
 interface CatalogPickerDialogProps {
   open:          boolean;
@@ -187,7 +180,7 @@ function CatalogPickerDialog({ open, onClose, vehicleTypeId, onSelect }: Catalog
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="w-full sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-4 w-4 text-primary" />
@@ -203,7 +196,7 @@ function CatalogPickerDialog({ open, onClose, vehicleTypeId, onSelect }: Catalog
           <Input
             autoFocus
             placeholder="Search by name or SKU…"
-            className="pl-8"
+            className="pl-8 w-full"
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
@@ -251,8 +244,6 @@ function CatalogPickerDialog({ open, onClose, vehicleTypeId, onSelect }: Catalog
     </Dialog>
   );
 }
-
-// ── Parts & Labor table ──────────────────────────────────────────────────────
 
 interface LineItemsTableProps {
   items:          ServiceJobItemRow[];
@@ -315,7 +306,8 @@ function LineItemsTable({ items, editable, onChange, vehicleTypeId }: LineItemsT
 
   return (
     <div className="space-y-2">
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
+      {/* Desktop table */}
+      <div className="overflow-x-auto rounded-lg border border-gray-200 hidden sm:block">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -416,6 +408,38 @@ function LineItemsTable({ items, editable, onChange, vehicleTypeId }: LineItemsT
         </table>
       </div>
 
+      {/* Mobile stacked lines */}
+      <div className="sm:hidden space-y-2">
+        {items.length === 0 ? (
+          <div className="text-center py-4 text-muted-foreground text-xs">
+            No parts or labor lines yet.{editable ? " Tap \"Add Line\" to start." : ""}
+          </div>
+        ) : items.map((row, idx) => (
+          <div key={row.service_job_item_id} className="border rounded-lg p-3 bg-white">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-sm font-medium truncate">{row.item_name || "—"}</p>
+                  <Badge variant="outline" className="text-[10px] capitalize">{row.item_category}</Badge>
+                </div>
+                <div className="text-xs text-muted-foreground flex flex-wrap gap-3">
+                  <span className="font-mono">{row.quantity} × ₱{row.price_at_service.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+              <div className="flex-shrink-0 text-right">
+                <div className="text-sm font-semibold">₱{(row.price_at_service * row.quantity).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
+                {editable && (
+                  <div className="flex gap-1 mt-2">
+                    <Button variant="ghost" size="icon" onClick={() => duplicateRow(idx)}><Plus className="h-3 w-3" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => removeRow(idx)}><Trash2 className="h-3 w-3" /></Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <div className="flex items-center justify-between">
         {editable && (
           <div className="flex items-center gap-2">
@@ -446,8 +470,6 @@ function LineItemsTable({ items, editable, onChange, vehicleTypeId }: LineItemsT
   );
 }
 
-// ── Priority config ───────────────────────────────────────────────────────────
-
 const PRIORITY_ICONS: Record<string, React.ElementType> = {
   urgent: Flame, high: ArrowUp, normal: Minus, low: TrendingDown,
 };
@@ -458,8 +480,6 @@ const PRIORITY_CLASSES: Record<string, string> = {
   low:    "bg-sky-100 text-sky-700",
 };
 
-// ── Transition button labels ──────────────────────────────────────────────────
-
 const TRANSITION_LABELS: Partial<Record<ServiceState, string>> = {
   confirmed:     "Confirm Job",
   in_progress:   "Start Service",
@@ -469,8 +489,6 @@ const TRANSITION_LABELS: Partial<Record<ServiceState, string>> = {
   cancelled:     "Cancel Job",
   quotation:     "Reopen to Draft",
 };
-
-// ── Main Form View ────────────────────────────────────────────────────────────
 
 export default function ServiceFormPage() {
   const params    = useParams();
@@ -488,41 +506,33 @@ export default function ServiceFormPage() {
   const [editMode,  setEditMode]  = useState(false);
   const [activeTab, setActiveTab] = useState("parts");
 
-  // Editable form state — basic
   const [formDesc,     setFormDesc]     = useState("");
   const [formNotes,    setFormNotes]    = useState("");
   const [formDiag,     setFormDiag]     = useState("");
   const [formPriority, setFormPriority] = useState<"low" | "normal" | "high" | "urgent">("normal");
   const [editItems,    setEditItems]    = useState<ServiceJobItemRow[]>([]);
 
-  // Validation errors for editable fields
   const [formDescError,  setFormDescError]  = useState<FieldError>(null);
   const [formNotesError, setFormNotesError] = useState<FieldError>(null);
   const [formDiagError,  setFormDiagError]  = useState<FieldError>(null);
 
-  // Editable form state — relational fields
   const [formCustomerId,    setFormCustomerId]    = useState<string>("");
   const [formVehicleId,     setFormVehicleId]     = useState<string>("");
   const [formVehicleTypeId, setFormVehicleTypeId] = useState<string>("");
   const [formMechanicId,    setFormMechanicId]    = useState<string>("");
   const [formEstCompletion, setFormEstCompletion] = useState<string>("");
 
-  // Reference data for dropdowns
   const [formCustomers,  setFormCustomers]  = useState<ServiceFormCustomer[]>([]);
   const [formMechanics,  setFormMechanics]  = useState<ServiceFormMechanic[]>([]);
   const [formVehicles,   setFormVehicles]   = useState<ServiceFormVehicle[]>([]);
   const [formVehTypes,   setFormVehTypes]   = useState<{ value: string; label: string }[]>([]);
   const [loadingOpts,    setLoadingOpts]    = useState(false);
 
-  // Dialog state
   const [cancelOpen,       setCancelOpen]       = useState(false);
   const [cancelReason,     setCancelReason]     = useState("");
   const [transitionTarget, setTransitionTarget] = useState<ServiceState | null>(null);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_isPending, startTransition] = useTransition();
-
-  // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchJob = useCallback(async () => {
     setLoading(true);
@@ -556,7 +566,6 @@ export default function ServiceFormPage() {
 
   useEffect(() => { fetchJob(); }, [fetchJob]);
 
-  // Load dropdown options when entering edit mode
   useEffect(() => {
     if (!editMode) return;
     setLoadingOpts(true);
@@ -565,7 +574,6 @@ export default function ServiceFormPage() {
         setFormCustomers(opts.customers);
         setFormMechanics(opts.mechanics);
         setFormVehTypes([...opts.vehicleTypes]);
-        // Also load vehicles for the current customer
         if (formCustomerId) {
           return getVehiclesByCustomer(formCustomerId).then(setFormVehicles);
         }
@@ -574,25 +582,20 @@ export default function ServiceFormPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editMode]);
 
-  // Reload vehicles when customer changes in edit mode
   useEffect(() => {
     if (!editMode || !formCustomerId) { setFormVehicles([]); return; }
     getVehiclesByCustomer(formCustomerId).then(setFormVehicles);
   }, [formCustomerId, editMode]);
 
-  // Auto-set vehicle type when the selected vehicle changes in edit mode
   useEffect(() => {
     if (!editMode || !formVehicleId) return;
     const veh = formVehicles.find(v => v.vehicle_id === formVehicleId);
     if (veh?.vehicle_type_id) setFormVehicleTypeId(veh.vehicle_type_id);
   }, [formVehicleId, formVehicles, editMode]);
 
-  // ── Save ───────────────────────────────────────────────────────────────────
-
   const handleSave = async () => {
     if (!job) return;
 
-    // Inline validation
     const descErr  = validateShortText(formDesc,  { label: 'Job description', required: true,  minLength: 2,  maxLength: 200 });
     const notesErr = validateLongText (formNotes, { label: 'Internal notes',  maxLength: 500 });
     const diagErr  = validateLongText (formDiag,  { label: 'Diagnostics',     maxLength: 1000 });
@@ -639,8 +642,6 @@ export default function ServiceFormPage() {
     }
   };
 
-  // ── Transition ─────────────────────────────────────────────────────────────
-
   const handleTransitionClick = (nextState: ServiceState) => {
     if (nextState === "cancelled") { setCancelOpen(true); return; }
     setTransitionTarget(nextState);
@@ -684,8 +685,6 @@ export default function ServiceFormPage() {
     }
   };
 
-  // ── Print Invoice ──────────────────────────────────────────────────────────
-
   const handlePrintInvoice = () => {
     if (!job) return;
     const receiptLines: ServiceReceiptLine[] = items.map(it => ({
@@ -711,8 +710,6 @@ export default function ServiceFormPage() {
     printReceipt(html);
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -728,23 +725,22 @@ export default function ServiceFormPage() {
   const PriorityIcon = PRIORITY_ICONS[job.priority] ?? Minus;
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-gray-50">
 
-      {/* ── Header ── */}
-      <header className="bg-white border-b border-gray-200 px-6 py-3 shrink-0">
-        <div className="flex items-center justify-between gap-4 mb-3">
-          <div className="flex items-center gap-3">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 shrink-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
             <Button variant="ghost" size="sm" className="gap-1 -ml-2"
               onClick={() => router.push("/services")}>
               <ArrowLeft className="h-4 w-4" />
-              Workshop
+              <span className="hidden sm:inline">Workshop</span>
             </Button>
-            <Separator orientation="vertical" className="h-5" />
+            <Separator orientation="vertical" className="hidden sm:block h-5" />
             <div className="flex items-center gap-2">
               <Wrench className="h-5 w-5 text-primary" />
               <h1 className="text-lg font-bold text-gray-900">{job.job_number ?? "New Job"}</h1>
-              <span className={cn("px-2 py-0.5 rounded-full text-xs font-semibold inline-flex items-center gap-1",
-                PRIORITY_CLASSES[job.priority])}>
+              <span className={cn("px-2 py-0.5 rounded-full text-xs font-semibold inline-flex items-center gap-1", PRIORITY_CLASSES[job.priority])}>
                 <PriorityIcon className="h-3 w-3" />
                 {job.priority}
               </span>
@@ -752,7 +748,7 @@ export default function ServiceFormPage() {
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" size="sm" onClick={fetchJob}>
               <RefreshCw className="h-3.5 w-3.5" />
             </Button>
@@ -760,14 +756,14 @@ export default function ServiceFormPage() {
             {["completed", "invoiced"].includes(job.state) && (
               <Button variant="outline" size="sm" className="gap-1.5" onClick={handlePrintInvoice}>
                 <Printer className="h-4 w-4" />
-                Print Invoice
+                <span className="hidden sm:inline">Print Invoice</span>
               </Button>
             )}
 
             {canEdit && !editMode && (
               <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditMode(true)}>
                 <Edit3 className="h-4 w-4" />
-                Edit
+                <span className="hidden sm:inline">Edit</span>
               </Button>
             )}
 
@@ -787,7 +783,7 @@ export default function ServiceFormPage() {
                 </Button>
                 <Button size="sm" className="gap-1.5" onClick={handleSave} disabled={saving}>
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  Save
+                  <span className="hidden sm:inline">Save</span>
                 </Button>
               </>
             )}
@@ -802,7 +798,7 @@ export default function ServiceFormPage() {
                   className={cn("gap-1.5", isRestart ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500" : "")}
                   disabled={saving} onClick={() => handleTransitionClick(ns)}>
                   <CheckCircle2 className="h-4 w-4" />
-                  {label}
+                  <span className="hidden sm:inline">{label}</span>
                 </Button>
               );
             })}
@@ -810,7 +806,7 @@ export default function ServiceFormPage() {
             {!editMode && nextStates.includes("cancelled") && job.state !== "cancelled" && (
               <Button variant="destructive" size="sm"
                 disabled={saving} onClick={() => setCancelOpen(true)}>
-                Cancel Job
+                <span className="hidden sm:inline">Cancel Job</span>
               </Button>
             )}
           </div>
@@ -819,9 +815,9 @@ export default function ServiceFormPage() {
         <StateStatusBar current={job.state} />
       </header>
 
-      {/* ── Smart Buttons ── */}
+      {/* Smart Buttons */}
       {smartBtns.length > 0 && (
-        <div className="bg-white border-b border-gray-200 px-6 py-2 flex items-center gap-3 shrink-0 overflow-x-auto">
+        <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-2 flex items-center gap-3 shrink-0 overflow-x-auto">
           {smartBtns.map(btn => (
             <SmartButton
               key={btn.label}
@@ -832,25 +828,21 @@ export default function ServiceFormPage() {
         </div>
       )}
 
-      {/* ── Body ── */}
-      <div className="flex-1 flex gap-4 p-6 overflow-hidden min-h-0">
-
-        {/* Left: Tabs */}
+      {/* Body: stack on mobile, two-column on sm+ */}
+      <div className="flex-1 flex flex-col sm:flex-row gap-4 p-4 sm:p-6 overflow-hidden min-h-0">
+        {/* Left: Tabs (main content) */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
-            <TabsList className="w-full justify-start rounded-none border-b border-gray-200 bg-transparent h-auto p-0 shrink-0">
-              <TabsTrigger value="parts"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">
+            <TabsList className="w-full justify-start rounded-none border-b border-gray-200 bg-transparent h-auto p-0 shrink-0 overflow-x-auto">
+              <TabsTrigger value="parts" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm whitespace-nowrap">
                 <Package className="h-4 w-4 mr-1.5" />
                 Parts & Labor
               </TabsTrigger>
-              <TabsTrigger value="vehicle"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">
+              <TabsTrigger value="vehicle" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm whitespace-nowrap">
                 <Car className="h-4 w-4 mr-1.5" />
                 Vehicle Info
               </TabsTrigger>
-              <TabsTrigger value="notes"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">
+              <TabsTrigger value="notes" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm whitespace-nowrap">
                 <Edit3 className="h-4 w-4 mr-1.5" />
                 Diagnostics & Notes
               </TabsTrigger>
@@ -882,13 +874,8 @@ export default function ServiceFormPage() {
                           className={`text-sm${formDescError ? ' border-red-400 focus-visible:ring-red-300' : ''}`}
                         />
                         <div className="flex justify-between mt-0.5">
-                          {formDescError
-                            ? <p className="text-xs text-red-500">⚠ {formDescError}</p>
-                            : <span />}
-                          <p className={`text-xs ${
-                            formDesc.length > 200 ? 'text-red-500 font-medium' :
-                            formDesc.length > 170 ? 'text-amber-500' : 'text-muted-foreground'
-                          }`}>{formDesc.length}/200</p>
+                          {formDescError ? <p className="text-xs text-red-500">⚠ {formDescError}</p> : <span />}
+                          <p className={`text-xs ${formDesc.length > 200 ? 'text-red-500 font-medium' : formDesc.length > 170 ? 'text-amber-500' : 'text-muted-foreground'}`}>{formDesc.length}/200</p>
                         </div>
                       </div>
                     ) : (
@@ -924,8 +911,6 @@ export default function ServiceFormPage() {
                     </div>
                   ) : editMode ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-                      {/* Customer */}
                       <div className="space-y-1.5">
                         <Label className="text-xs flex items-center gap-1"><User className="h-3 w-3" />Customer</Label>
                         <select
@@ -942,7 +927,6 @@ export default function ServiceFormPage() {
                         </select>
                       </div>
 
-                      {/* Vehicle */}
                       <div className="space-y-1.5">
                         <Label className="text-xs flex items-center gap-1"><Car className="h-3 w-3" />Vehicle (Plate)</Label>
                         <select
@@ -961,12 +945,8 @@ export default function ServiceFormPage() {
                         {!formCustomerId && <p className="text-xs text-muted-foreground">Select a customer first</p>}
                       </div>
 
-                      {/* Vehicle Type */}
                       <div className="space-y-1.5">
-                        <Label className="text-xs">
-                          Vehicle Type
-                          {formVehicleId && <span className="ml-1 text-muted-foreground font-normal text-[10px]">(auto-set)</span>}
-                        </Label>
+                        <Label className="text-xs">Vehicle Type {formVehicleId && <span className="ml-1 text-muted-foreground text-[10px]">(auto-set)</span>}</Label>
                         <select
                           value={formVehicleTypeId}
                           onChange={e => setFormVehicleTypeId(e.target.value)}
@@ -980,7 +960,6 @@ export default function ServiceFormPage() {
                         </select>
                       </div>
 
-                      {/* Mechanic */}
                       <div className="space-y-1.5">
                         <Label className="text-xs flex items-center gap-1"><Wrench className="h-3 w-3" />Assigned Mechanic</Label>
                         <select
@@ -997,17 +976,15 @@ export default function ServiceFormPage() {
                         </select>
                       </div>
 
-                      {/* Estimated Completion */}
                       <div className="space-y-1.5 col-span-full sm:col-span-1">
                         <Label className="text-xs flex items-center gap-1"><Clock className="h-3 w-3" />Estimated Completion</Label>
                         <Input
                           type="datetime-local"
                           value={formEstCompletion}
                           onChange={e => setFormEstCompletion(e.target.value)}
-                          className="text-sm"
+                          className="text-sm w-full"
                         />
                       </div>
-
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-4">
@@ -1062,13 +1039,8 @@ export default function ServiceFormPage() {
                           className={`text-sm${formDiagError ? ' border-red-400 focus-visible:ring-red-300' : ''}`}
                         />
                         <div className="flex justify-between mt-0.5">
-                          {formDiagError
-                            ? <p className="text-xs text-red-500">⚠ {formDiagError}</p>
-                            : <span />}
-                          <p className={`text-xs ${
-                            formDiag.length > 1000 ? 'text-red-500 font-medium' :
-                            formDiag.length > 850 ? 'text-amber-500' : 'text-muted-foreground'
-                          }`}>{formDiag.length}/1000</p>
+                          {formDiagError ? <p className="text-xs text-red-500">⚠ {formDiagError}</p> : <span />}
+                          <p className={`text-xs ${formDiag.length > 1000 ? 'text-red-500 font-medium' : formDiag.length > 850 ? 'text-amber-500' : 'text-muted-foreground'}`}>{formDiag.length}/1000</p>
                         </div>
                       </div>
                     ) : (
@@ -1093,13 +1065,8 @@ export default function ServiceFormPage() {
                           className={`text-sm${formNotesError ? ' border-red-400 focus-visible:ring-red-300' : ''}`}
                         />
                         <div className="flex justify-between mt-0.5">
-                          {formNotesError
-                            ? <p className="text-xs text-red-500">⚠ {formNotesError}</p>
-                            : <span />}
-                          <p className={`text-xs ${
-                            formNotes.length > 500 ? 'text-red-500 font-medium' :
-                            formNotes.length > 425 ? 'text-amber-500' : 'text-muted-foreground'
-                          }`}>{formNotes.length}/500</p>
+                          {formNotesError ? <p className="text-xs text-red-500">⚠ {formNotesError}</p> : <span />}
+                          <p className={`text-xs ${formNotes.length > 500 ? 'text-red-500 font-medium' : formNotes.length > 425 ? 'text-amber-500' : 'text-muted-foreground'}`}>{formNotes.length}/500</p>
                         </div>
                       </div>
                     ) : (
@@ -1113,7 +1080,7 @@ export default function ServiceFormPage() {
                     {editMode ? (
                       <Select value={formPriority}
                         onValueChange={(v: "low" | "normal" | "high" | "urgent") => setFormPriority(v)}>
-                        <SelectTrigger className="w-40 h-8 text-sm">
+                        <SelectTrigger className="w-full sm:w-40 h-8 text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1124,10 +1091,7 @@ export default function ServiceFormPage() {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <span className={cn(
-                        "inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium",
-                        PRIORITY_CLASSES[job.priority]
-                      )}>
+                      <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium", PRIORITY_CLASSES[job.priority])}>
                         <PriorityIcon className="h-3 w-3" />
                         {job.priority}
                       </span>
@@ -1139,8 +1103,8 @@ export default function ServiceFormPage() {
           </Tabs>
         </div>
 
-        {/* Right: Chatter */}
-        <div className="w-80 shrink-0 flex flex-col min-h-0">
+        {/* Right: Chatter — becomes full-width below sm */}
+        <div className="w-full sm:w-80 shrink-0 flex flex-col min-h-0 mt-4 sm:mt-0">
           <AuditTrailPanel
             relatedTable="service_job"
             relatedRecordId={jobId}
@@ -1149,7 +1113,7 @@ export default function ServiceFormPage() {
         </div>
       </div>
 
-      {/* ── Cancel Dialog ── */}
+      {/* Cancel Dialog */}
       <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1181,7 +1145,6 @@ export default function ServiceFormPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ── Transition Confirm Dialog ── */}
       {transitionTarget && transitionTarget !== "cancelled" && (
         <AlertDialog open={!!transitionTarget} onOpenChange={() => setTransitionTarget(null)}>
           <AlertDialogContent>
@@ -1214,8 +1177,6 @@ export default function ServiceFormPage() {
     </div>
   );
 }
-
-// ── Helper: read-only info field ──────────────────────────────────────────────
 
 function InfoField({
   label, value, icon, mono = false,
