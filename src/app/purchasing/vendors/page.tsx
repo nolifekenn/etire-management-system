@@ -90,22 +90,6 @@ export default function VendorsPage() {
   // ── Role gate: only Managers & Super Admin ──────────────────
   const canAccessVendors = user?.role === "super_admin" || user?.role === "branch_manager";
 
-  if (user && !canAccessVendors) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 p-6 text-center">
-        <ShieldAlert className="h-12 w-12 text-destructive opacity-60" />
-        <h2 className="text-xl font-semibold text-foreground">Access Denied</h2>
-        <p className="text-sm text-muted-foreground max-w-sm">
-          Vendor management is restricted to Managers and Super Admins.
-          Contact your manager if you need access.
-        </p>
-        <Button variant="outline" onClick={() => router.push("/purchasing")}>
-          <ArrowLeft className="h-4 w-4 mr-2" /> Back to Purchasing
-        </Button>
-      </div>
-    );
-  }
-
   const [vendors, setVendors]       = useState<Vendor[]>([]);
   const [loading, setLoading]       = useState(true);
   const [search, setSearch]         = useState("");
@@ -139,6 +123,22 @@ export default function VendorsPage() {
     const t = setTimeout(() => load(search || undefined), 350);
     return () => clearTimeout(t);
   }, [search, load]);
+
+  if (user && !canAccessVendors) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 p-6 text-center">
+        <ShieldAlert className="h-12 w-12 text-destructive opacity-60" />
+        <h2 className="text-xl font-semibold text-foreground">Access Denied</h2>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          Vendor management is restricted to Managers and Super Admins.
+          Contact your manager if you need access.
+        </p>
+        <Button variant="outline" onClick={() => router.push("/purchasing")}>
+          <ArrowLeft className="h-4 w-4 mr-2" /> Back to Purchasing
+        </Button>
+      </div>
+    );
+  }
 
   // ── Dialog helpers ────────────────────────────────────────────────────────
 
@@ -241,7 +241,7 @@ export default function VendorsPage() {
   return (
     <div className="bg-background min-h-screen">
       {/* Breadcrumb top bar */}
-      <div className="border-b border-border bg-white px-6 py-3 flex items-center gap-3 sticky top-0 z-10">
+      <div className="border-b border-border bg-white px-4 sm:px-6 py-3 flex items-center gap-3 sticky top-0 z-10">
         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => router.push("/purchasing")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
@@ -252,9 +252,9 @@ export default function VendorsPage() {
           <span className="font-semibold text-sm text-[#714B67]">Vendors</span>
         </div>
       </div>
-      <div className="flex flex-col gap-6 p-6">
+      <div className="flex flex-col gap-6 p-4 sm:p-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3">
             <Building2 className="h-5 w-5 text-[#714B67]" />
             <div>
@@ -263,8 +263,8 @@ export default function VendorsPage() {
             </div>
           </div>
           <Button
-            className="bg-[#714B67] hover:bg-[#5a3c53] text-white gap-2"
             onClick={openCreate}
+            className="bg-[#714B67] hover:bg-[#5a3c53] text-white gap-2 w-full sm:w-auto"
           >
             <Plus className="h-4 w-4" /> New Vendor
           </Button>
@@ -272,7 +272,7 @@ export default function VendorsPage() {
 
         {/* Toolbar */}
         <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
+          <div className="relative w-full sm:flex-1 sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-9"
@@ -284,8 +284,9 @@ export default function VendorsPage() {
         </div>
 
         {/* Table */}
-        <div className="rounded-lg border border-border overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="rounded-lg border border-border overflow-hidden bg-white">
+          <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full text-sm min-w-[920px]">
             <thead>
               <tr className="bg-muted/50 border-b border-border text-xs text-muted-foreground">
                 <th className="px-4 py-3 text-left font-medium">Name</th>
@@ -344,6 +345,50 @@ export default function VendorsPage() {
               ))}
             </tbody>
           </table>
+          </div>
+
+          <div className="sm:hidden p-3 space-y-2">
+            {loading ? (
+              <div className="py-10 text-center">
+                <Loader2 className="h-6 w-6 animate-spin text-[#714B67] mx-auto" />
+              </div>
+            ) : vendors.length === 0 ? (
+              <p className="py-8 text-center text-muted-foreground text-sm">No vendors found. Click &ldquo;New Vendor&rdquo; to add one.</p>
+            ) : vendors.map((v) => (
+              <div key={v.supplier_id} className="rounded-lg border border-border p-3 bg-card">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium break-words">{v.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{v.contact_person || "—"}</p>
+                  </div>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] bg-purple-50 text-[#714B67] border border-purple-200">
+                    {paymentTermLabel(v.payment_terms)}
+                  </span>
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                  <p>Phone: {v.phone || "—"}</p>
+                  <p className="break-all">Email: {v.email || "—"}</p>
+                  <p>City: {v.city || "—"}</p>
+                </div>
+                <div className="mt-3 flex items-center justify-end gap-1">
+                  <button
+                    onClick={() => openEdit(v)}
+                    className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    title="Edit vendor"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setDeleteTarget(v)}
+                    className="p-1.5 rounded hover:bg-red-50 text-muted-foreground hover:text-destructive transition-colors"
+                    title="Remove vendor"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Summary */}

@@ -414,9 +414,9 @@ export default function ProductFormPage() {
     <div className="flex flex-col gap-0 h-full overflow-hidden">
 
       {/* ── Status bar ──────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-card">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6 py-3 border-b border-border bg-card gap-3">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-sm min-w-0">
           <button
             onClick={() => router.push("/inventory/products")}
             className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
@@ -431,7 +431,7 @@ export default function ProductFormPage() {
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           {editing ? (
             <>
               <Button
@@ -489,10 +489,10 @@ export default function ProductFormPage() {
 
       {/* ── Main content (scrollable) ────────────────────────────────────── */}
       <div className="flex-1 overflow-auto">
-        <div className="max-w-5xl mx-auto px-6 py-6 space-y-6">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
           {/* Product title + stock badge */}
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-foreground">
                 {editing ? (
@@ -524,7 +524,7 @@ export default function ProductFormPage() {
                   </div>
                 ) : str(product.name)}
               </h1>
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex flex-wrap items-center gap-2 mt-2">
                 <Badge className={CATEGORY_COLORS[str(product.category)] ?? "bg-gray-100 text-gray-800"}>
                   {str(product.category)}
                 </Badge>
@@ -537,7 +537,7 @@ export default function ProductFormPage() {
             </div>
 
             {/* On Hand count — prominent */}
-            <div className="text-right shrink-0">
+            <div className="text-left sm:text-right shrink-0">
               <p className="text-xs text-muted-foreground">On Hand</p>
               <p className={`text-4xl font-bold ${isOut ? "text-red-600" : isLow ? "text-amber-600" : "text-green-600"}`}>
                 {qty}
@@ -560,11 +560,11 @@ export default function ProductFormPage() {
           )}
 
           {/* Tabs */}
-          <Tabs defaultValue="general">
-            <TabsList>
-              <TabsTrigger value="general">General Information</TabsTrigger>
-              <TabsTrigger value="inventory">Inventory</TabsTrigger>
-              <TabsTrigger value="moves">Product Moves</TabsTrigger>
+            <Tabs defaultValue="general">
+              <TabsList className="w-full justify-start overflow-x-auto">
+                <TabsTrigger value="general">General Information</TabsTrigger>
+                <TabsTrigger value="inventory">Inventory</TabsTrigger>
+                <TabsTrigger value="moves">Product Moves</TabsTrigger>
             </TabsList>
 
             {/* ── General Information ─────────────────────────────────── */}

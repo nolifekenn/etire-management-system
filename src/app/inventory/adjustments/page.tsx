@@ -151,7 +151,7 @@ export default function AdjustmentsPage() {
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6 p-4 sm:p-6">
 
       {/* Header */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -176,6 +176,7 @@ export default function AdjustmentsPage() {
           size="sm"
           onClick={() => { loadItems(); loadHistory(); }}
           disabled={loadingItems}
+          className="w-full sm:w-auto"
         >
           <RefreshCw className={`h-4 w-4 mr-2 ${loadingItems ? "animate-spin" : ""}`} />
           Refresh
@@ -190,7 +191,7 @@ export default function AdjustmentsPage() {
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search products…"
@@ -211,9 +212,9 @@ export default function AdjustmentsPage() {
             <SelectItem value="service">Service</SelectItem>
           </SelectContent>
         </Select>
-        <div className="ml-auto shrink-0">
+        <div className="w-full sm:w-auto sm:ml-auto shrink-0">
           <Select value={String(rowsPerPage)} onValueChange={(value) => setRowsPerPage(Number(value))}>
-            <SelectTrigger className="h-9 w-[130px]">
+            <SelectTrigger className="h-9 w-full sm:w-[130px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -227,8 +228,9 @@ export default function AdjustmentsPage() {
       </div>
 
       {/* Product Table */}
-      <div className="overflow-auto rounded-lg border border-border bg-white">
-        <table className="w-full text-sm">
+      <div className="rounded-lg border border-border bg-white overflow-hidden">
+        <div className="hidden sm:block overflow-auto">
+        <table className="w-full text-sm min-w-[760px]">
           <thead className="sticky top-0 z-10 bg-muted/50 border-b border-border">
             <tr>
               <th className="px-4 py-3 text-left text-xs uppercase tracking-wide font-semibold text-muted-foreground w-2/5">Product</th>
@@ -287,9 +289,51 @@ export default function AdjustmentsPage() {
             ))}
           </tbody>
         </table>
+        </div>
+
+        <div className="sm:hidden p-3 space-y-3">
+          {loadingItems ? (
+            <div className="py-12 text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+            </div>
+          ) : items.length === 0 ? (
+            <p className="py-8 text-center text-muted-foreground text-sm">No products found</p>
+          ) : (
+            pagedItems.map(item => (
+              <div key={String(item.item_id)} className="rounded-lg border border-border p-3 bg-card">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-foreground break-words">{String(item.name)}</p>
+                    {(Boolean(item.tire_brand) || Boolean(item.tire_size)) && (
+                      <p className="text-xs text-muted-foreground mt-0.5 break-words">
+                        {[String((item.tire_brand as AnyRecord)?.name ?? ""), String((item.tire_size as AnyRecord)?.label ?? "")].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
+                  </div>
+                  <Badge className={`text-xs ${CATEGORY_COLORS[String(item.category)] ?? "bg-gray-100 text-gray-800"}`}>
+                    {String(item.category)}
+                  </Badge>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  {stockBadge(item)}
+                  <span className="text-xs text-muted-foreground">Reorder: {String(item.reorder_level ?? 5)}</span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleOpenAdj(item)}
+                  className="h-8 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 mt-3 w-full"
+                >
+                  <SlidersHorizontal className="h-3 w-3 mr-1" />
+                  Adjust
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-muted-foreground">
         <span>
           Showing {items.length === 0 ? 0 : (page - 1) * rowsPerPage + 1}-{Math.min(page * rowsPerPage, items.length)} of {items.length}
         </span>
