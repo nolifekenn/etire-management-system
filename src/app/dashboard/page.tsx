@@ -70,13 +70,13 @@ function KpiCard({ title, value, subtitle, trend, icon, href, loading, color = '
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         ) : (
           <>
-            <div className="text-2xl font-bold tracking-tight">{value}</div>
-            <div className="flex items-center gap-2 mt-1">
-              {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+            <div className="text-xl sm:text-2xl font-bold tracking-tight break-words">{value}</div>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+              {subtitle && <p className="text-xs text-muted-foreground break-words">{subtitle}</p>}
               {trend != null && (
                 <Badge
                   variant="outline"
-                  className={`text-xs px-1 py-0 ${trend >= 0 ? 'text-emerald-600 border-emerald-300' : 'text-red-500 border-red-300'}`}
+                  className={`text-[10px] sm:text-xs px-1 py-0 ${trend >= 0 ? 'text-emerald-600 border-emerald-300' : 'text-red-500 border-red-300'}`}
                 >
                   {trend >= 0 ? <TrendingUp className="h-3 w-3 mr-0.5 inline" /> : <TrendingDown className="h-3 w-3 mr-0.5 inline" />}
                   {Math.abs(trend).toFixed(1)}% MoM
@@ -276,14 +276,14 @@ export default function DashboardPage() {
             {activeBranchId && <span className="ml-2 text-xs text-muted-foreground">· Branch filtered</span>}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={refresh} className="gap-1.5">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <Button variant="outline" size="sm" onClick={refresh} className="gap-1.5 w-full sm:w-auto">
             <RefreshCw className="h-3.5 w-3.5" />
             Refresh
           </Button>
           {canAccessPath(user?.role, '/reports') && (
             <Link href="/reports">
-              <Button size="sm" className="gap-1.5">
+              <Button size="sm" className="gap-1.5 w-full sm:w-auto">
                 <BarChart2 className="h-3.5 w-3.5" />
                 Full Reports
               </Button>
@@ -348,10 +348,10 @@ export default function DashboardPage() {
         {/* Revenue vs COGS bar chart (2/3 width) */}
         <Card className="xl:col-span-2">
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="text-base">Revenue vs COGS</CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                   Gross Margin: <span className="font-semibold text-foreground">{grossMarginPct}%</span>
                   {' · '}Revenue: <span className="font-semibold">{fmtCompact(totalChartRevenue)}</span>
                   {' · '}COGS: <span className="font-semibold">{fmtCompact(totalChartCOGS)}</span>
@@ -361,7 +361,7 @@ export default function DashboardPage() {
                 value={String(chartDays)}
                 onValueChange={v => setChartDays(Number(v))}
               >
-                <SelectTrigger className="h-7 w-24 text-xs">
+                <SelectTrigger className="h-7 w-full sm:w-24 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -384,7 +384,7 @@ export default function DashboardPage() {
                 No sales data in this period
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={220}>
+              <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
                   <XAxis
                     dataKey="date"
@@ -461,12 +461,12 @@ export default function DashboardPage() {
       {/* ── Workshop Analytics Row ───────────────────────────────────────── */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Wrench className="h-4 w-4 text-violet-500" />
-              Workshop Analytics
-              <Badge variant="outline" className="text-xs ml-1">Completed Jobs</Badge>
-            </CardTitle>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Wrench className="h-4 w-4 text-violet-500" />
+                Workshop Analytics
+                <Badge variant="outline" className="text-xs ml-1">Completed Jobs</Badge>
+              </CardTitle>
             {canAccessPath(user?.role, '/services') && (
               <Link href="/services/list?state=completed">
                 <Button variant="ghost" size="sm" className="text-xs gap-1">
