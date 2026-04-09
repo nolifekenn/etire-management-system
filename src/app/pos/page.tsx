@@ -669,12 +669,18 @@ export default function POSPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    let productQuery = supabase
+      .from('inventory_item')
+      .select('*')
+      .is('deleted_at', null)
+      .order('name');
+
+    if (activeBranchId) {
+      productQuery = productQuery.eq('branch_id', activeBranchId);
+    }
+
     const [{ data: prodData }, { data: custData }] = await Promise.all([
-      supabase
-        .from('inventory_item')
-        .select('*')
-        .is('deleted_at', null)
-        .order('name'),
+      productQuery,
       supabase
         .from('customer')
         .select('customer_id, name, phone')
@@ -684,7 +690,7 @@ export default function POSPage() {
     setProducts((prodData ?? []) as InventoryItem[]);
     setCustomers((custData ?? []) as Customer[]);
     setLoading(false);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadData(); }, [loadData]);
 

@@ -8,6 +8,7 @@ import {
   exportInventoryReportPDF,
   exportInventoryReportCSV,
 } from "@/lib/inventoryReportService";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { StatCard } from "@/components/StatCard";
 import { DataTableWrapper } from "@/components/DataTableWrapper";
@@ -70,10 +71,12 @@ interface InventoryReportRow {
 
 export default function InventoryReportCard() {
   const { toast } = useToast();
+  const { user, activeBranchId } = useAuth();
+  const isSuperAdmin = user?.role === "super_admin";
   
   // --- STATE ---
   const [filters, setFilters] = useState<InventoryFilters>({
-    branch_id: "all",
+    branch_id: activeBranchId ?? "all",
     supplier_id: "all",
     category: "",
   });
@@ -90,7 +93,20 @@ export default function InventoryReportCard() {
   const [totalPages, setTotalPages] = useState(1);
 
   // Filter state
-  const [localFilters, setLocalFilters] = useState<InventoryFilters>(filters);
+  const [localFilters, setLocalFilters] = useState<InventoryFilters>({
+    branch_id: activeBranchId ?? "all",
+    supplier_id: "all",
+    category: "",
+  });
+
+  useEffect(() => {
+    const branchValue = activeBranchId ?? "all";
+
+    if (!isSuperAdmin) {
+      setFilters((prev) => ({ ...prev, branch_id: branchValue }));
+      setLocalFilters((prev) => ({ ...prev, branch_id: branchValue }));
+    }
+  }, [activeBranchId, isSuperAdmin]);
 
   // Modal State
   const [modalState, setModalState] = useState<{
@@ -139,10 +155,14 @@ export default function InventoryReportCard() {
     try {
       setLoading(true);
       setCurrentPage(1); // Reset to first page
+
+      const resolvedBranchId = isSuperAdmin
+        ? (localFilters.branch_id === "all" ? (activeBranchId ?? "") : localFilters.branch_id)
+        : (activeBranchId ?? "");
       
       const apiFilters: InventoryFilters = {
         ...localFilters,
-        branch_id: localFilters.branch_id === "all" ? "" : localFilters.branch_id,
+        branch_id: resolvedBranchId,
         supplier_id: localFilters.supplier_id === "all" ? "" : localFilters.supplier_id,
       };
       
@@ -210,7 +230,7 @@ export default function InventoryReportCard() {
 
   const clearFilters = () => {
     setLocalFilters({
-      branch_id: "all",
+      branch_id: isSuperAdmin ? "all" : (activeBranchId ?? "all"),
       supplier_id: "all",
       category: "",
     });
@@ -296,13 +316,14 @@ export default function InventoryReportCard() {
                 <Select
                   value={localFilters.branch_id}
                   onValueChange={(value) => setLocalFilters({ ...localFilters, branch_id: value })}
+                  disabled={!isSuperAdmin}
                 >
                   <SelectTrigger className="border-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 h-10">
                     <Building className="h-4 w-4 mr-2 text-slate-400" />
                     <SelectValue placeholder="All Branches" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Branches</SelectItem>
+                    {isSuperAdmin && <SelectItem value="all">All Branches</SelectItem>}
                     {branches.map((b) => (
                       <SelectItem key={b.branch_id} value={b.branch_id}>
                         {b.name}

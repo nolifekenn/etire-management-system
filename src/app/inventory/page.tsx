@@ -12,7 +12,7 @@
  * Plus a quick-access section to Products and Adjustments.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   PackageCheck,
@@ -30,6 +30,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { getOperationCounts } from "@/lib/actions/inventory";
 
@@ -60,23 +61,24 @@ interface OperationCard {
 export default function InventoryPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { activeBranchId } = useAuth();
 
   const [counts, setCounts]   = useState<OperationCounts | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await getOperationCounts();
+      const result = await getOperationCounts(activeBranchId ?? undefined);
       setCounts(result);
     } catch {
       toast({ title: "Failed to load inventory overview", variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeBranchId, toast]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const cards: OperationCard[] = counts ? [
     {

@@ -618,24 +618,37 @@ export async function archiveProduct(itemId: string): Promise<{ success: boolean
   return { success: true };
 }
 
-export async function getOperationCounts() {
+export async function getOperationCounts(branchId?: string) {
   const supabase: AnyClient = await createClient();
+
+  let salesQuery = supabase
+    .from('sale')
+    .select('sale_id', { count: 'exact' })
+    .eq('state', 'done')
+    .is('deleted_at', null);
+
+  let inventoryQuery = supabase
+    .from('inventory_item')
+    .select('item_id, stock_quantity, reorder_level', { count: 'exact' })
+    .is('deleted_at', null);
+
+  let purchaseOrdersQuery = supabase
+    .from('purchase_order')
+    .select('po_id, state, status')
+    .is('deleted_at', null);
+
+  if (branchId) {
+    salesQuery = salesQuery.eq('branch_id', branchId);
+    inventoryQuery = inventoryQuery.eq('branch_id', branchId);
+    purchaseOrdersQuery = purchaseOrdersQuery.eq('branch_id', branchId);
+  }
 
   const [salesRes, lowStockRes] = await Promise.all([
     // Completed sales receipts
-    supabase
-      .from('sale')
-      .select('sale_id', { count: 'exact' })
-      .eq('state', 'done')
-      .is('deleted_at', null)
-      .then((r: AnyRecord) => r),
+    salesQuery.then((r: AnyRecord) => r),
 
     // Low stock items
-    supabase
-      .from('inventory_item')
-      .select('item_id, stock_quantity, reorder_level', { count: 'exact' })
-      .is('deleted_at', null)
-      .then((r: AnyRecord) => r),
+    inventoryQuery.then((r: AnyRecord) => r),
   ]);
 
   const allItems     = (lowStockRes.data ?? []) as AnyRecord[];
@@ -644,10 +657,7 @@ export async function getOperationCounts() {
   const outOfStock = allItems.filter(i => Number(i.stock_quantity) === 0);
 
   // Active purchase orders
-  const { data: purchaseOrders } = await supabase
-    .from('purchase_order')
-    .select('po_id, state, status')
-    .is('deleted_at', null);
+  const { data: purchaseOrders } = await purchaseOrdersQuery;
 
   const pendingPOs = (purchaseOrders ?? []).filter((po: AnyRecord) =>
     isOpenPurchaseOrder((po.state ?? po.status) as string | null | undefined)
