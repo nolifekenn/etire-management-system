@@ -902,10 +902,25 @@ export interface ServiceFormVehicle {
   vehicle_type_id: string | null;
 }
 
+export interface ServiceFormCatalogItem {
+  item_id:    string;
+  name:       string;
+  category:   string;
+  sale_price: number;
+  sku:        string | null;
+}
+
+interface ServiceCatalogManageInput {
+  item_id?: string;
+  name: string;
+  sku?: string | null;
+  sale_price: number;
+}
+
 export async function getServiceFormOptions(branchId?: string, customerId?: string) {
   const supabase: AnyClient = await createClient();
 
-  const [custRes, mechRes, vtRes] = await Promise.all([
+  const [custRes, mechRes, vtRes, catalogRes] = await Promise.all([
     supabase
       .from('customer')
       .select('customer_id, name, phone')
@@ -921,6 +936,12 @@ export async function getServiceFormOptions(branchId?: string, customerId?: stri
     supabase
       .from('vehicle_type')
       .select('vehicle_type_id, name')
+      .order('name', { ascending: true }),
+    supabase
+      .from('catalog_item')
+      .select('item_id, name, category, sale_price, sku')
+      .eq('category', 'service')
+      .is('deleted_at', null)
       .order('name', { ascending: true }),
   ]);
 
@@ -939,6 +960,7 @@ export async function getServiceFormOptions(branchId?: string, customerId?: stri
     customers:    (custRes.data   ?? []) as ServiceFormCustomer[],
     mechanics:    (mechRes.data   ?? []) as ServiceFormMechanic[],
     vehicles,
+    catalogItems: (catalogRes.data ?? []) as ServiceFormCatalogItem[],
     vehicleTypes: ((vtRes.data ?? []) as { vehicle_type_id: string; name: string }[]).map(vt => ({
       value: vt.vehicle_type_id,
       label: vt.name.charAt(0).toUpperCase() + vt.name.slice(1),
@@ -1064,4 +1086,102 @@ export async function searchCatalogItems(
       cost_price: Number(r.cost_price ?? 0),
     })),
   };
+}
+
+// ── Settings: Service Catalog Management (server-side bypass with role guard) ─
+
+async function _getCallerRole(): Promise<string | null> {
+  const supabase: AnyClient = await createClient();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+
+  if (!authUser?.id) return null;
+
+  const { data: row } = await supabase
+    .from('user')
+    .select('role')
+    .eq('auth_id', authUser.id)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  return (row?.role as string | undefined) ?? null;
+}
+
+async function _assertCatalogManagerRole(): Promise<{ ok: true } | { ok: false; error: string }> {
+  const role = await _getCallerRole();
+  if (role === 'super_admin' || role === 'branch_manager') return { ok: true };
+  return { ok: false, error: 'You do not have permission to manage services.' };
+}
+
+export async function listServiceCatalogForSettings(): Promise<{
+  success: boolean;
+  items: ServiceFormCatalogItem[];
+  error?: string;
+}> {
+  const access = await _assertCatalogManagerRole();
+  if (!access.ok) return { success: false, items: [], error: access.error };
+
+  const admin: AnyClient = createAdminClient();
+  const { data, error } = await admin
+    .from('catalog_item')
+    .select('item_id, name, category, sale_price, sku')
+    .eq('category', 'service')
+    .is('deleted_at', null)
+    .order('name', { ascending: true });
+
+  if (error) return { success: false, items: [], error: error.message };
+  return { success: true, items: (data ?? []) as ServiceFormCatalogItem[] };
+}
+
+export async function upsertServiceCatalogItem(input: ServiceCatalogManageInput): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const access = await _assertCatalogManagerRole();
+  if (!access.ok) return { success: false, error: access.error };
+
+  const admin: AnyClient = createAdminClient();
+  const payload = {
+    name: input.name.trim(),
+    sku: input.sku?.trim() || null,
+    category: 'service',
+    cost_price: 0,
+    sale_price: Number(input.sale_price),
+    deleted_at: null,
+  };
+
+  const qb = input.item_id
+    ? admin.from('catalog_item').update(payload).eq('item_id', input.item_id)
+    : admin.from('catalog_item').insert(payload);
+
+  const { error } = await qb;
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath('/settings');
+  revalidatePath('/services');
+  revalidatePath('/services/list');
+  return { success: true };
+}
+
+export async function archiveServiceCatalogItem(itemId: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const access = await _assertCatalogManagerRole();
+  if (!access.ok) return { success: false, error: access.error };
+
+  const admin: AnyClient = createAdminClient();
+  const { error } = await admin
+    .from('catalog_item')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('item_id', itemId)
+    .eq('category', 'service');
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath('/settings');
+  revalidatePath('/services');
+  revalidatePath('/services/list');
+  return { success: true };
 }

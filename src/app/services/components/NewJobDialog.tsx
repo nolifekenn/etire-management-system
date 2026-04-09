@@ -33,6 +33,7 @@ import {
   getServiceFormOptions,
   getVehiclesByCustomer,
   type CreateServiceJobInput,
+  type ServiceFormCatalogItem,
   type ServiceFormCustomer,
   type ServiceFormMechanic,
   type ServiceFormVehicle,
@@ -58,26 +59,12 @@ const CATEGORY_BADGE: Record<string, string> = {
   tool:      "bg-gray-100 text-gray-600",
 };
 
-const PRESET_SERVICES: { name: string; category: string; unit_price: number }[] = [
-  { name: "Tire Installation (per tire)",  category: "service", unit_price: 150  },
-  { name: "Tire Rotation",                 category: "service", unit_price: 200  },
-  { name: "Wheel Balancing (per wheel)",   category: "service", unit_price: 150  },
-  { name: "Four-Wheel Alignment",          category: "service", unit_price: 800  },
-  { name: "Flat Tire Repair (Patch)",      category: "service", unit_price: 150  },
-  { name: "Flat Tire Repair (Plug)",       category: "service", unit_price: 100  },
-  { name: "Nitrogen Inflation (per tire)", category: "service", unit_price: 80   },
-  { name: "TPMS Sensor Service",           category: "service", unit_price: 350  },
-  { name: "Valve Stem Replacement",        category: "service", unit_price: 80   },
-  { name: "Tire Disposal Fee (per tire)",  category: "service", unit_price: 50   },
-  { name: "Visual Inspection",             category: "service", unit_price: 0    },
-  { name: "Emergency Road Service Call",   category: "service", unit_price: 500  },
-];
-
 interface ServicePickerProps {
-  onSelect: (item: { name: string; category: string; unit_price: number }) => void;
+  items: ServiceFormCatalogItem[];
+  onSelect: (item: { item_id: string | null; name: string; category: string; unit_price: number }) => void;
 }
 
-function ServicePickerPopover({ onSelect }: ServicePickerProps) {
+function ServicePickerPopover({ items, onSelect }: ServicePickerProps) {
   const [open,          setOpen]          = useState(false);
   const [showCustom,    setShowCustom]    = useState(false);
   const [customName,    setCustomName]    = useState("");
@@ -90,7 +77,7 @@ function ServicePickerPopover({ onSelect }: ServicePickerProps) {
     if (showCustom && customNameRef.current) customNameRef.current.focus();
   }, [showCustom]);
 
-  const addPreset = (svc: { name: string; category: string; unit_price: number }) => {
+  const addPreset = (svc: { item_id: string; name: string; category: string; unit_price: number }) => {
     onSelect(svc);
     setOpen(false);
   };
@@ -103,7 +90,7 @@ function ServicePickerPopover({ onSelect }: ServicePickerProps) {
     setCustomNameErr(nErr);
     setCustomPriceErr(pErr);
     if (nErr || pErr) return;
-    onSelect({ name, category: "service", unit_price: isNaN(price) ? 0 : price });
+    onSelect({ item_id: null, name, category: "service", unit_price: isNaN(price) ? 0 : price });
     setCustomName("");
     setCustomPrice("");
     setCustomNameErr(null);
@@ -145,19 +132,25 @@ function ServicePickerPopover({ onSelect }: ServicePickerProps) {
 
           {/* Preset list */}
           <div className="max-h-56 overflow-y-auto">
-            {PRESET_SERVICES.map((svc, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => addPreset(svc)}
-                className="w-full flex items-center justify-between px-3 py-2 hover:bg-blue-50 transition-colors text-left gap-2"
-              >
-                <span className="text-sm text-gray-800">{svc.name}</span>
-                <span className="shrink-0 text-xs font-semibold text-gray-600">
-                  {svc.unit_price === 0 ? "Free" : `P${svc.unit_price.toLocaleString("en-PH")}`}
-                </span>
-              </button>
-            ))}
+            {items.length === 0 ? (
+              <div className="px-3 py-4 text-sm text-muted-foreground">
+                No service catalog items found.
+              </div>
+            ) : (
+              items.map((svc) => (
+                <button
+                  key={svc.item_id}
+                  type="button"
+                  onClick={() => addPreset({ item_id: svc.item_id, name: svc.name, category: svc.category, unit_price: Number(svc.sale_price ?? 0) })}
+                  className="w-full flex items-center justify-between px-3 py-2 hover:bg-blue-50 transition-colors text-left gap-2"
+                >
+                  <span className="text-sm text-gray-800">{svc.name}</span>
+                  <span className="shrink-0 text-xs font-semibold text-gray-600">
+                    {Number(svc.sale_price ?? 0) === 0 ? "Free" : `P${Number(svc.sale_price ?? 0).toLocaleString("en-PH")}`}
+                  </span>
+                </button>
+              ))
+            )}
           </div>
 
           {/* Custom section */}
@@ -252,6 +245,7 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
   const [mechanics, setMechanics] = useState<ServiceFormMechanic[]>([]);
   const [vehicles,  setVehicles]  = useState<ServiceFormVehicle[]>([]);
   const [vehTypes,  setVehTypes]  = useState<{ value: string; label: string }[]>([]);
+  const [catalogItems, setCatalogItems] = useState<ServiceFormCatalogItem[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -261,6 +255,7 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
         setCustomers(opts.customers);
         setMechanics(opts.mechanics);
         setVehTypes([...opts.vehicleTypes]);
+        setCatalogItems(opts.catalogItems);
       })
       .finally(() => setLoadingOpts(false));
   }, [open, branchId]);
@@ -626,7 +621,10 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
               
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-2 gap-2">
                 <div className="w-full sm:w-auto">
-                  <ServicePickerPopover onSelect={line => addLine({ item_id: null, name: line.name, category: line.category, unit_price: line.unit_price })} />
+                  <ServicePickerPopover
+                    items={catalogItems}
+                    onSelect={line => addLine({ item_id: line.item_id, name: line.name, category: line.category, unit_price: line.unit_price })}
+                  />
                 </div>
                 {lines.length > 0 && (
                   <div className="text-sm font-semibold text-gray-800 ml-auto">
