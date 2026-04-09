@@ -150,16 +150,16 @@ export default function InventoryPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-5 sm:gap-6 p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Inventory</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Overview of operations, stock levels, and product master data
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+        <Button variant="outline" size="sm" onClick={load} disabled={loading} className="w-full sm:w-auto">
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </Button>
@@ -177,7 +177,7 @@ export default function InventoryPage() {
             <span className="text-sm">Loading operations overview</span>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {cards.map(card => {
               const Icon = card.icon;
               return (
@@ -185,7 +185,7 @@ export default function InventoryPage() {
                   key={card.title}
                   onClick={() => router.push(card.href)}
                   className={`
-                    group relative text-left rounded-xl border-2 p-5 transition-all duration-200
+                    group relative text-left rounded-xl border-2 p-4 sm:p-5 transition-all duration-200
                     hover:shadow-md hover:scale-[1.02] cursor-pointer
                     ${card.urgent ? card.bg : "bg-card border-border"}
                   `}
@@ -211,9 +211,9 @@ export default function InventoryPage() {
                     {card.description}
                   </p>
 
-                  <div className="mt-4 flex items-end justify-between">
+                  <div className="mt-3 sm:mt-4 flex items-end justify-between">
                     <div>
-                      <span className={`text-3xl font-bold ${card.urgent ? card.color : "text-foreground"}`}>
+                      <span className={`text-2xl sm:text-3xl font-bold ${card.urgent ? card.color : "text-foreground"}`}>
                         {card.count}
                       </span>
                       <span className="text-xs text-muted-foreground ml-1">{card.countLabel}</span>
@@ -229,7 +229,7 @@ export default function InventoryPage() {
 
       {/* Total products stat */}
       {counts && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
           <Package className="h-4 w-4" />
           <span>
             <strong className="text-foreground">{counts.total_products}</strong> total products in catalogue
@@ -242,7 +242,7 @@ export default function InventoryPage() {
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
           Master Data &amp; Tools
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
           {quickLinks.map(link => {
             const Icon = link.icon;
             return (

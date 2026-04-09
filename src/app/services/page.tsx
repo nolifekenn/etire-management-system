@@ -1,13 +1,20 @@
 "use client";
 /**
  * src/app/services/page.tsx
- * 
+ *
  * Workshop Kanban Board  Default Services Route
  *
  * Columns: Draft Quotation | Confirmed | In Progress | Quality Check | Done
  * Each card links to /services/[id] for the full Form View.
  * List view available at /services/list.
+ *
+ * Responsive changes:
+ * - Header elements wrap and search expands on small screens.
+ * - Kanban columns stack vertically on xs (mobile) and become horizontal on sm+.
+ * - Column widths constrained on sm+ and full-width on mobile.
+ * - Column card scroll height reduced on mobile.
  */
+
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button }    from "@/components/ui/button";
@@ -62,7 +69,7 @@ function PriorityBadge({ priority }: { priority: string }) {
 
 function KanbanCard({ job, onClick }: { job: ServiceJobRow; onClick: () => void }) {
   const descSnippet = job.job_description.length > 70
-    ? job.job_description.slice(0, 70) + ""
+    ? job.job_description.slice(0, 70) + "…"
     : job.job_description;
 
   return (
@@ -140,7 +147,7 @@ function KanbanColumn({
   onCardClick: (job: ServiceJobRow) => void;
 }) {
   return (
-    <div className={`flex flex-col min-w-[240px] max-w-[280px] flex-1 bg-gray-50 rounded-xl border-t-4 ${colorClass} border border-gray-200 border-t-4`}>
+    <div className={`flex flex-col w-full sm:min-w-[240px] sm:max-w-[280px] flex-1 bg-gray-50 rounded-xl ${colorClass} border border-gray-200`}>
       {/* Column header */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-200 bg-white rounded-t-xl">
         <span className={`h-2 w-2 rounded-full ${dot} shrink-0`} />
@@ -151,7 +158,7 @@ function KanbanColumn({
       </div>
 
       {/* Cards */}
-      <div className="flex flex-col gap-2 p-2 flex-1 overflow-y-auto max-h-[calc(100vh-220px)]">
+      <div className="flex flex-col gap-2 p-2 flex-1 overflow-y-auto max-h-[60vh] sm:max-h-[calc(100vh-220px)]">
         {jobs.length === 0 ? (
           <div className="text-center py-8 text-xs text-muted-foreground">
             No jobs
@@ -240,7 +247,7 @@ export default function ServicesKanbanPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-gray-50">
       {/*  Top bar  */}
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-3">
@@ -251,12 +258,12 @@ export default function ServicesKanbanPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-1 max-w-xs">
-          <div className="relative flex-1">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="relative flex-1 min-w-0">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Search jobs, plates, customers"
-              className="pl-8 h-8 text-sm"
+              className="pl-8 h-8 text-sm w-full"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -290,22 +297,27 @@ export default function ServicesKanbanPage() {
 
       {/*  Kanban body  */}
       {loading ? (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center p-6">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : (
-        <main className="flex-1 overflow-x-auto p-6">
-          <div className="flex gap-4 min-h-full">
+        <main className="flex-1 overflow-auto p-6">
+          {/* 
+            On mobile: stack columns vertically.
+            On sm+ screens: row of columns with horizontal scrolling if needed.
+          */}
+          <div className="flex flex-col sm:flex-row gap-4 min-h-full">
             {KANBAN_COLUMNS.map(col => (
-              <KanbanColumn
-                key={col.state}
-                state={col.state}
-                label={col.label}
-                dot={col.dot}
-                colorClass={col.color}
-                jobs={columnJobs(col.state)}
-                onCardClick={handleCardClick}
-              />
+              <div key={col.state} className="w-full sm:w-auto">
+                <KanbanColumn
+                  state={col.state}
+                  label={col.label}
+                  dot={col.dot}
+                  colorClass={col.color}
+                  jobs={columnJobs(col.state)}
+                  onCardClick={handleCardClick}
+                />
+              </div>
             ))}
           </div>
         </main>

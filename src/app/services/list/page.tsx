@@ -1,9 +1,17 @@
 ﻿"use client";
 /**
  * src/app/services/list/page.tsx
- * 
+ *
  * Services List View  High-density data table with group-by and filtering.
  * Navigate to /services for the Kanban view, /services/[id] for each job.
+ *
+ * Responsive changes:
+ * - Header search and controls wrap on small screens.
+ * - Table view shown on sm+ screens with overflow-x-auto to prevent column bleed.
+ * - Mechanic column hidden below md breakpoint to reduce crowding.
+ * - Mobile cards (stacked) shown on xs screens for touch-friendly interaction.
+ * - State filter chips scroll horizontally instead of wrapping.
+ * - Group headers remain interactive on mobile.
  */
 
 import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
@@ -25,7 +33,7 @@ import { type ServiceState, SERVICE_STATE_LABELS, SERVICE_STATE_COLORS } from "@
 import { cn } from "@/lib/utils";
 import { NewJobDialog } from "@/app/services/components/NewJobDialog";
 
-//  Group-by options 
+//  Group-by options
 
 type GroupBy = "none" | "state" | "priority" | "mechanic";
 type SortKey  = "job_date" | "job_number" | "customer_name" | "priority" | "total_amount";
@@ -50,17 +58,17 @@ const PRIORITY_ICONS: Record<string, React.ElementType> = {
 
 // Badge chip state filter config (service-specific)
 const STATE_FILTERS: { value: ServiceState | "all"; label: string; activeClass: string }[] = [
-  { value: "all",           label: "All",          activeClass: "bg-gray-800 text-white border-gray-800"             },
-  { value: "quotation",     label: "Draft",         activeClass: "bg-gray-200 text-gray-800 border-gray-300"          },
-  { value: "confirmed",     label: "Confirmed",     activeClass: "bg-blue-100 text-blue-800 border-blue-300"          },
-  { value: "in_progress",   label: "In Progress",   activeClass: "bg-amber-100 text-amber-800 border-amber-300"       },
-  { value: "quality_check", label: "QC",            activeClass: "bg-purple-100 text-purple-800 border-purple-300"    },
-  { value: "completed",     label: "Done",          activeClass: "bg-green-100 text-green-800 border-green-300"       },
-  { value: "invoiced",      label: "Invoiced",      activeClass: "bg-teal-100 text-teal-800 border-teal-300"          },
-  { value: "cancelled",     label: "Cancelled",     activeClass: "bg-red-100 text-red-800 border-red-300"             },
+  { value: "all",           label: "All",          activeClass: "bg-gray-800 text-white border-gray-800"          },
+  { value: "quotation",     label: "Draft",         activeClass: "bg-gray-200 text-gray-800 border-gray-300"       },
+  { value: "confirmed",     label: "Confirmed",     activeClass: "bg-blue-100 text-blue-800 border-blue-300"       },
+  { value: "in_progress",   label: "In Progress",   activeClass: "bg-amber-100 text-amber-800 border-amber-300"    },
+  { value: "quality_check", label: "QC",            activeClass: "bg-purple-100 text-purple-800 border-purple-300" },
+  { value: "completed",     label: "Done",          activeClass: "bg-green-100 text-green-800 border-green-300"    },
+  { value: "invoiced",      label: "Invoiced",      activeClass: "bg-teal-100 text-teal-800 border-teal-300"       },
+  { value: "cancelled",     label: "Cancelled",     activeClass: "bg-red-100 text-red-800 border-red-300"          },
 ];
 
-//  Sort helpers 
+//  Sort helpers
 
 function sortJobs(jobs: ServiceJobRow[], key: SortKey, dir: SortDir): ServiceJobRow[] {
   return [...jobs].sort((a, b) => {
@@ -76,7 +84,7 @@ function sortJobs(jobs: ServiceJobRow[], key: SortKey, dir: SortDir): ServiceJob
   });
 }
 
-//  Table row 
+//  Table row (desktop)
 
 function JobRow({ job, onClick }: { job: ServiceJobRow; onClick: () => void }) {
   const PriorityIcon = PRIORITY_ICONS[job.priority] ?? Minus;
@@ -89,7 +97,7 @@ function JobRow({ job, onClick }: { job: ServiceJobRow; onClick: () => void }) {
       <td className="px-3 py-2 font-mono text-xs text-primary font-semibold whitespace-nowrap">
         {job.job_number ?? ""}
       </td>
-      <td className="px-3 py-2">
+      <td className="px-3 py-2 whitespace-nowrap">
         <span className={cn(
           "px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap",
           SERVICE_STATE_COLORS[job.state]
@@ -97,19 +105,22 @@ function JobRow({ job, onClick }: { job: ServiceJobRow; onClick: () => void }) {
           {SERVICE_STATE_LABELS[job.state]}
         </span>
       </td>
-      <td className="px-3 py-2 text-sm text-gray-800 max-w-[220px]">
+      <td className="px-3 py-2 text-sm text-gray-800 max-w-[200px]">
         <span className="line-clamp-1">{job.job_description}</span>
       </td>
-      <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">
-        {job.customer_name ?? <span className="text-muted-foreground italic text-xs">No customer</span>}
+      <td className="px-3 py-2 text-sm text-gray-700 max-w-[140px]">
+        <span className="block truncate">
+          {job.customer_name ?? <span className="text-muted-foreground italic text-xs">No customer</span>}
+        </span>
       </td>
       <td className="px-3 py-2 font-mono text-xs text-gray-700 whitespace-nowrap">
         {job.plate_number ?? ""}
       </td>
-      <td className="px-3 py-2 text-xs text-gray-700 whitespace-nowrap">
+      {/* Mechanic hidden on smaller screens to prevent column bleed */}
+      <td className="px-3 py-2 text-xs text-gray-700 whitespace-nowrap hidden md:table-cell">
         {job.mechanic_name ?? <span className="text-muted-foreground">Unassigned</span>}
       </td>
-      <td className="px-3 py-2 text-center">
+      <td className="px-3 py-2 text-center whitespace-nowrap">
         <span className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium", PRIORITY_COLORS[job.priority])}>
           <PriorityIcon className="h-2.5 w-2.5" />
           {job.priority}
@@ -128,7 +139,42 @@ function JobRow({ job, onClick }: { job: ServiceJobRow; onClick: () => void }) {
   );
 }
 
-//  Group section header 
+//  Mobile card (stacked) view
+
+function MobileJobCard({ job, onClick }: { job: ServiceJobRow; onClick: () => void }) {
+  const PriorityIcon = PRIORITY_ICONS[job.priority] ?? Minus;
+  return (
+    <div onClick={onClick} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm cursor-pointer transition hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-mono text-xs text-primary">{job.job_number ?? ""}</span>
+            <span className={cn("text-xs px-2 py-0.5 rounded-full font-semibold", SERVICE_STATE_COLORS[job.state])}>
+              {SERVICE_STATE_LABELS[job.state]}
+            </span>
+          </div>
+          <div className="text-sm font-medium text-gray-800 line-clamp-2">{job.job_description}</div>
+          <div className="mt-2 text-xs text-muted-foreground flex flex-wrap gap-3">
+            <div>{job.customer_name}</div>
+            <div className="font-mono">{job.plate_number}</div>
+            <div>{job.mechanic_name ?? "Unassigned"}</div>
+          </div>
+        </div>
+        <div className="flex-shrink-0 text-right">
+          <div className={cn("inline-flex items-center gap-1 px-2 py-1 rounded text-[12px] font-semibold", PRIORITY_COLORS[job.priority])}>
+            <PriorityIcon className="h-3 w-3" />
+            <span className="uppercase text-[11px]">{job.priority}</span>
+          </div>
+          <div className="text-sm font-semibold text-gray-800 mt-3">
+            {job.total_amount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+//  Group section header
 
 function GroupHeader({
   label, count, expanded, onToggle,
@@ -151,7 +197,7 @@ function GroupHeader({
   );
 }
 
-//  Sortable column header 
+//  Sortable column header
 
 function SortableHeader({
   label, field, sortKey, sortDir, onSort,
@@ -172,7 +218,7 @@ function SortableHeader({
   );
 }
 
-//  Main Page 
+//  Main Page
 
 export default function ServicesListPage() {
   const router         = useRouter();
@@ -275,7 +321,7 @@ export default function ServicesListPage() {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/*  Header  */}
-      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between gap-3 shrink-0">
+      <header className="bg-white border-b border-gray-200 px-6 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-3">
           <Wrench className="h-5 w-5 text-primary" />
           <div>
@@ -284,49 +330,53 @@ export default function ServicesListPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-1 max-w-sm">
-          <div className="relative flex-1">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="relative flex-1 min-w-0">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Search job number, customer, plate"
-              className="pl-8 h-8 text-sm"
+              className="pl-8 h-8 text-sm w-full"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           {/* Group by */}
-          <Select value={groupBy} onValueChange={(v: GroupBy) => setGroupBy(v)}>
-            <SelectTrigger className="h-8 w-40 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No Grouping</SelectItem>
-              <SelectItem value="state">Group by Status</SelectItem>
-              <SelectItem value="priority">Group by Priority</SelectItem>
-              <SelectItem value="mechanic">Group by Mechanic</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="w-full sm:w-auto">
+            <Select value={groupBy} onValueChange={(v: GroupBy) => setGroupBy(v)}>
+              <SelectTrigger className="h-8 w-full sm:w-40 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No Grouping</SelectItem>
+                <SelectItem value="state">Group by Status</SelectItem>
+                <SelectItem value="priority">Group by Priority</SelectItem>
+                <SelectItem value="mechanic">Group by Mechanic</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-          <Button variant="outline" className="h-8 gap-1.5 text-sm"
-            onClick={() => router.push("/services")}>
+          <Button variant="outline" className="h-8 gap-1.5 text-sm" onClick={() => router.push("/services")}>
             <Columns className="h-4 w-4" />
-            Kanban
+            <span className="hidden sm:inline">Kanban</span>
           </Button>
           <Button variant="outline" size="icon" className="h-8 w-8" onClick={fetchJobs}>
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
           <Button size="sm" className="gap-1.5" onClick={() => setNewOpen(true)}>
             <PlusCircle className="h-4 w-4" />
-            New Job
+            <span className="hidden sm:inline">New Job</span>
           </Button>
         </div>
       </header>
 
-      {/* Service-specific state filter badge chips */}
-      <div className="bg-white border-b border-gray-100 px-6 py-2 flex items-center gap-1.5 shrink-0 flex-wrap">
+      {/*
+        State filter chips — overflow-x-auto + scrollbar-none lets chips scroll
+        horizontally on narrow screens without wrapping or overflowing the layout.
+      */}
+      <div className="bg-white border-b border-gray-100 px-6 py-2 flex items-center gap-1.5 shrink-0 overflow-x-auto scrollbar-none">
         {STATE_FILTERS.map(({ value, label, activeClass }) => {
           const count = value === "all" ? jobs.length : jobs.filter(j => j.state === value).length;
           const isActive = stateFilter === value;
@@ -335,7 +385,7 @@ export default function ServicesListPage() {
               key={value}
               onClick={() => setStateFilter(value)}
               className={cn(
-                "px-3 py-1 rounded-full text-xs font-medium border transition-all",
+                "px-3 py-1 rounded-full text-xs font-medium border transition-all whitespace-nowrap flex-shrink-0",
                 isActive
                   ? activeClass
                   : "bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700"
@@ -361,7 +411,7 @@ export default function ServicesListPage() {
         </div>
       )}
 
-      {/*  Table  */}
+      {/*  Content */}
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="h-7 w-7 animate-spin text-primary" />
@@ -369,54 +419,97 @@ export default function ServicesListPage() {
       ) : (
         <div className="flex-1 overflow-auto p-6">
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <table className="w-full text-sm table-fixed">
-              <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
-                <tr>
-                  <SortableHeader label="Job #"       field="job_number"    sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                  <th className="text-left px-3 py-2 font-semibold text-xs text-gray-600 w-28">Status</th>
-                  <th className="text-left px-3 py-2 font-semibold text-xs text-gray-600 w-48">Description</th>
-                  <SortableHeader label="Customer"    field="customer_name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                  <th className="text-left px-3 py-2 font-semibold text-xs text-gray-600 w-24">Plate</th>
-                  <th className="text-left px-3 py-2 font-semibold text-xs text-gray-600 w-28">Mechanic</th>
-                  <SortableHeader label="Priority"    field="priority"      sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                  <SortableHeader label="Date"        field="job_date"      sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                  <SortableHeader label="Total"       field="total_amount"  sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                  <th className="w-8" />
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
+            {/*
+              Desktop/table view (sm+).
+              overflow-x-auto here ensures the table scrolls horizontally
+              instead of columns bleeding into each other.
+            */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
                   <tr>
-                    <td colSpan={10} className="text-center py-12 text-muted-foreground text-sm">
-                      No service jobs found.
-                    </td>
+                    <SortableHeader label="Job #"      field="job_number"    sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <th className="text-left px-3 py-2 font-semibold text-xs text-gray-600 w-24 whitespace-nowrap">Status</th>
+                    <th className="text-left px-3 py-2 font-semibold text-xs text-gray-600 min-w-[160px]">Description</th>
+                    <SortableHeader label="Customer"   field="customer_name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <th className="text-left px-3 py-2 font-semibold text-xs text-gray-600 w-20 whitespace-nowrap">Plate</th>
+                    {/* Mechanic column hidden below md to reduce crowding */}
+                    <th className="text-left px-3 py-2 font-semibold text-xs text-gray-600 w-28 whitespace-nowrap hidden md:table-cell">Mechanic</th>
+                    <SortableHeader label="Priority"   field="priority"      sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortableHeader label="Date"       field="job_date"      sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortableHeader label="Total"      field="total_amount"  sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <th className="w-8" />
                   </tr>
-                ) : groupBy === "none" ? (
-                  filtered.map(j => (
-                    <JobRow key={j.job_id} job={j} onClick={() => router.push(`/services/${j.job_id}`)} />
-                  ))
-                ) : (
-                  grouped.map(group => (
-                    <Fragment key={group.key}>
-                      <GroupHeader
-                        key={`gh-${group.key}`}
-                        label={group.label}
-                        count={group.jobs.length}
-                        expanded={!collapsed.has(group.key)}
-                        onToggle={() => toggleGroup(group.key)}
-                      />
-                      {!collapsed.has(group.key) && group.jobs.map(j => (
-                        <JobRow key={j.job_id} job={j} onClick={() => router.push(`/services/${j.job_id}`)} />
-                      ))}
-                    </Fragment>
-                  ))
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="text-center py-12 text-muted-foreground text-sm">
+                        No service jobs found.
+                      </td>
+                    </tr>
+                  ) : groupBy === "none" ? (
+                    filtered.map(j => (
+                      <JobRow key={j.job_id} job={j} onClick={() => router.push(`/services/${j.job_id}`)} />
+                    ))
+                  ) : (
+                    grouped.map(group => (
+                      <Fragment key={group.key}>
+                        <GroupHeader
+                          key={`gh-${group.key}`}
+                          label={group.label}
+                          count={group.jobs.length}
+                          expanded={!collapsed.has(group.key)}
+                          onToggle={() => toggleGroup(group.key)}
+                        />
+                        {!collapsed.has(group.key) && group.jobs.map(j => (
+                          <JobRow key={j.job_id} job={j} onClick={() => router.push(`/services/${j.job_id}`)} />
+                        ))}
+                      </Fragment>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile stacked cards (xs) */}
+            <div className="sm:hidden p-3 space-y-3">
+              {filtered.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">No service jobs found.</div>
+              ) : groupBy === "none" ? (
+                filtered.map(j => (
+                  <MobileJobCard key={j.job_id} job={j} onClick={() => router.push(`/services/${j.job_id}`)} />
+                ))
+              ) : (
+                grouped.map(group => (
+                  <div key={`mg-${group.key}`} className="space-y-2">
+                    <button
+                      onClick={() => toggleGroup(group.key)}
+                      className="w-full flex items-center justify-between bg-gray-100 px-3 py-2 rounded-md"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold">{group.label}</span>
+                        <span className="text-xs text-muted-foreground bg-white px-1.5 py-0.5 rounded-full border border-gray-200">
+                          {group.jobs.length}
+                        </span>
+                      </div>
+                      <span>{collapsed.has(group.key) ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</span>
+                    </button>
+                    {!collapsed.has(group.key) && (
+                      <div className="space-y-2">
+                        {group.jobs.map(j => (
+                          <MobileJobCard key={j.job_id} job={j} onClick={() => router.push(`/services/${j.job_id}`)} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
 
           {/* Footer summary */}
-          <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+          <div className="mt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs text-muted-foreground gap-2">
             <span>Showing <strong>{totalShown}</strong> jobs</span>
             <span>
               Total value: <strong>

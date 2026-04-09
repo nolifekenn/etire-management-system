@@ -2,16 +2,13 @@
 /**
  * src/app/services/components/NewJobDialog.tsx
  *
- * Redesigned "New Service Job" dialog.
+ * Redesigned "New Service Job" dialog (responsive).
  *
- * Key design changes:
- *  - Job description is AUTO-GENERATED from the selected service/catalog lines.
- *  - User picks one or more services/parts from the catalog (pre-set prices).
- *  - Multiple services per job in one transaction.
- *  - Optional freeform "Notes" field.
- *
- * Radix UI Note: SelectItem does not allow empty-string values.
- * Optional selects use sentinel "__none__" and convert back on update.
+ * Key responsive changes:
+ *  - Dialog is full-width on small screens and constrained on larger screens.
+ *  - Assignment grid stacks to one column on small devices.
+ *  - Service lines render as a scrollable table on >=sm and stacked cards on mobile.
+ *  - Footer and controls adapt to small screens (stacked buttons, full-width inputs).
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -362,7 +359,7 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
 
   return (
     <Dialog open={open} onOpenChange={v => !v && handleClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full h-full sm:h-auto sm:max-w-2xl lg:max-w-3xl overflow-y-auto mx-0 sm:mx-auto sm:rounded-xl sm:my-8">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Wrench className="h-5 w-5 text-primary" />
@@ -386,14 +383,14 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
               Vehicle &amp; Assignment
             </p>
-            {/* Added items-end to the grid to keep all input baselines level */}
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3 items-end">
+            {/* Responsive: single column on mobile, two cols on sm+ */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 items-end">
 
               {/* Customer */}
               <div className="space-y-1">
                 <Label className="text-xs flex items-center gap-1 h-4"><User className="h-3 w-3" />Customer</Label>
                 <Select value={toSel(customerId)} onValueChange={v => setCustomerId(toVal(v))}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Walk-in" /></SelectTrigger>
+                  <SelectTrigger className="w-full h-8 text-sm"><SelectValue placeholder="Walk-in" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NONE}>-- Walk-in --</SelectItem>
                     {customers.map(c => (
@@ -409,7 +406,7 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
               <div className="space-y-1">
                 <Label className="text-xs flex items-center gap-1 h-4"><Car className="h-3 w-3" />Vehicle</Label>
                 <Select value={toSel(vehicleId)} onValueChange={v => setVehicleId(toVal(v))} disabled={!customerId}>
-                  <SelectTrigger className="h-8 text-sm">
+                  <SelectTrigger className="w-full h-8 text-sm">
                     <SelectValue placeholder={customerId ? "Select" : "Select customer first"} />
                   </SelectTrigger>
                   <SelectContent>
@@ -431,7 +428,7 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
                   {vehicleId && <span className="ml-1 text-[10px] text-muted-foreground font-normal">(auto-set)</span>}
                 </Label>
                 <Select value={toSel(vehicleTypeId)} onValueChange={v => setVehicleTypeId(toVal(v))} disabled={!!vehicleId}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select type" /></SelectTrigger>
+                  <SelectTrigger className="w-full h-8 text-sm"><SelectValue placeholder="Select type" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NONE}>-- None --</SelectItem>
                     {vehTypes.map(vt => (
@@ -445,7 +442,7 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
               <div className="space-y-1">
                 <Label className="text-xs flex items-center gap-1 h-4"><Wrench className="h-3 w-3" />Mechanic</Label>
                 <Select value={toSel(mechanicId)} onValueChange={v => setMechanicId(toVal(v))}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                  <SelectTrigger className="w-full h-8 text-sm"><SelectValue placeholder="Unassigned" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NONE}>-- Unassigned --</SelectItem>
                     {mechanics.map(m => (
@@ -459,7 +456,7 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
               <div className="space-y-1">
                 <Label className="text-xs flex items-center h-4">Priority</Label>
                 <Select value={priority} onValueChange={(v: "low"|"normal"|"high"|"urgent") => setPriority(v)}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full h-8 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="low">Low</SelectItem>
                     <SelectItem value="normal">Normal</SelectItem>
@@ -472,12 +469,11 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
               {/* Est. Completion */}
               <div className="space-y-1">
                 <Label className="text-xs flex items-center gap-1 h-4"><Clock className="h-3 w-3" />Est. Completion</Label>
-                {/* Removed mt-1 here */}
                 <Input 
-                  type="datetime-local" 
-                  className="h-8 text-sm" 
-                  value={estCompletion} 
-                  onChange={e => setEstCompletion(e.target.value)} 
+                  type="datetime-local"
+                  className="w-full h-8 text-sm"
+                  value={estCompletion}
+                  onChange={e => setEstCompletion(e.target.value)}
                 />
               </div>
 
@@ -497,82 +493,143 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
                   <p className="text-xs text-muted-foreground mt-0.5">Click &ldquo;Add Service&rdquo; to select from the catalog.</p>
                 </div>
               ) : (
-                <div className="border border-gray-200 rounded-lg overflow-hidden mb-2">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th className="text-left px-3 py-1.5 text-xs font-medium text-gray-600">Service / Part</th>
-                        <th className="text-right px-3 py-1.5 text-xs font-medium text-gray-600 w-14">Qty</th>
-                        <th className="text-right px-3 py-1.5 text-xs font-medium text-gray-600 w-28">Unit Price</th>
-                        <th className="text-right px-3 py-1.5 text-xs font-medium text-gray-600 w-28">Subtotal</th>
-                          <th className="w-16" />
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {lines.map(line => (
-                        <tr key={line.id} className="hover:bg-gray-50">
-                          <td className="px-3 py-1.5">
-                            <div className="flex items-center gap-2">
+                <>
+                  {/* Table for sm+ screens */}
+                  <div className="hidden sm:block border border-gray-200 rounded-lg overflow-hidden mb-2">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="text-left px-3 py-1.5 text-xs font-medium text-gray-600">Service / Part</th>
+                            <th className="text-right px-3 py-1.5 text-xs font-medium text-gray-600 w-14">Qty</th>
+                            <th className="text-right px-3 py-1.5 text-xs font-medium text-gray-600 w-28">Unit Price</th>
+                            <th className="text-right px-3 py-1.5 text-xs font-medium text-gray-600 w-28">Subtotal</th>
+                              <th className="w-16" />
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {lines.map(line => (
+                            <tr key={line.id} className="hover:bg-gray-50">
+                              <td className="px-3 py-1.5">
+                                <div className="flex items-center gap-2">
+                                  <span className={cn(
+                                    "shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold capitalize",
+                                    CATEGORY_BADGE[line.category] ?? "bg-gray-100 text-gray-600"
+                                  )}>
+                                    {line.category}
+                                  </span>
+                                  <span className="text-sm font-medium text-gray-900">{line.name}</span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-1.5 text-right">
+                                <Input
+                                  type="number" min={1}
+                                  value={line.qty}
+                                  onChange={e => updateLine(line.id, "qty", Math.max(1, Number(e.target.value)))}
+                                  className="h-6 w-14 text-xs text-right border-0 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-b focus-visible:border-primary rounded-none"
+                                />
+                              </td>
+                              <td className="px-3 py-1.5 text-right">
+                                <Input
+                                  type="number" min={0} step={0.01}
+                                  value={line.unit_price}
+                                  onChange={e => updateLine(line.id, "unit_price", parseFloat(e.target.value) || 0)}
+                                  className="h-6 w-24 text-xs text-right border-0 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-b focus-visible:border-primary rounded-none"
+                                />
+                              </td>
+                              <td className="px-3 py-1.5 text-right text-xs font-semibold text-gray-800">
+                                P{(line.qty * line.unit_price).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="px-2 py-1.5 text-center">
+                                <div className="flex items-center gap-0.5 justify-center">
+                                  <Button type="button" variant="ghost" size="icon"
+                                    className="h-6 w-6 text-blue-400 hover:text-blue-600 hover:bg-blue-50"
+                                    onClick={() => updateLine(line.id, "qty", line.qty + 1)}>
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
+                                
+                                  <Button type="button" variant="ghost" size="icon"
+                                    className="h-6 w-6 text-amber-500 hover:text-amber-700 hover:bg-amber-50"
+                                    onClick={() => updateLine(line.id, "qty", Math.max(1, line.qty - 1))}>
+                                    <Minus className="h-3 w-3" />
+                                  </Button>
+                                
+                                  <Button type="button" variant="ghost" size="icon"
+                                    className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50"
+                                    onClick={() => removeLine(line.id)}>
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Stacked cards for mobile */}
+                  <div className="sm:hidden space-y-2 mb-2">
+                    {lines.map(line => (
+                      <div key={line.id} className="border rounded-lg p-3">
+                        <div className="flex justify-between items-start gap-3">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
                               <span className={cn(
                                 "shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold capitalize",
                                 CATEGORY_BADGE[line.category] ?? "bg-gray-100 text-gray-600"
                               )}>
                                 {line.category}
                               </span>
-                              <span className="text-sm font-medium text-gray-900">{line.name}</span>
+                              <div className="text-sm font-medium text-gray-900">{line.name}</div>
                             </div>
-                          </td>
-                          <td className="px-3 py-1.5 text-right">
-                            <Input
-                              type="number" min={1}
-                              value={line.qty}
-                              onChange={e => updateLine(line.id, "qty", Math.max(1, Number(e.target.value)))}
-                              className="h-6 w-14 text-xs text-right border-0 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-b focus-visible:border-primary rounded-none"
-                            />
-                          </td>
-                          <td className="px-3 py-1.5 text-right">
-                            <Input
-                              type="number" min={0} step={0.01}
-                              value={line.unit_price}
-                              onChange={e => updateLine(line.id, "unit_price", parseFloat(e.target.value) || 0)}
-                              className="h-6 w-24 text-xs text-right border-0 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-b focus-visible:border-primary rounded-none"
-                            />
-                          </td>
-                          <td className="px-3 py-1.5 text-right text-xs font-semibold text-gray-800">
-                            P{(line.qty * line.unit_price).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="px-2 py-1.5 text-center">
-                            <div className="flex items-center gap-0.5 justify-center">
+                            <div className="text-xs text-gray-700">Unit: P{line.unit_price.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
+                            <div className="text-xs text-gray-800 font-semibold mt-1">Subtotal: P{(line.qty * line.unit_price).toLocaleString("en-PH", { minimumFractionDigits: 2 })}</div>
+                          </div>
+
+                          <div className="flex flex-col items-end gap-2">
+                            <div className="flex items-center gap-1">
                               <Button type="button" variant="ghost" size="icon"
-                                className="h-6 w-6 text-blue-400 hover:text-blue-600 hover:bg-blue-50"
+                                className="h-8 w-8 text-blue-400 hover:text-blue-600 hover:bg-blue-50"
                                 onClick={() => updateLine(line.id, "qty", line.qty + 1)}>
                                 <Plus className="h-3 w-3" />
                               </Button>
-                            
+                              <div className="flex items-center border rounded px-2 h-8">
+                                <Input
+                                  type="number" min={1}
+                                  value={line.qty}
+                                  onChange={e => updateLine(line.id, "qty", Math.max(1, Number(e.target.value)))}
+                                  className="h-6 w-14 text-xs text-right border-0 bg-transparent px-0 focus-visible:ring-0"
+                                />
+                              </div>
                               <Button type="button" variant="ghost" size="icon"
-                                className="h-6 w-6 text-amber-500 hover:text-amber-700 hover:bg-amber-50"
+                                className="h-8 w-8 text-amber-500 hover:text-amber-700 hover:bg-amber-50"
                                 onClick={() => updateLine(line.id, "qty", Math.max(1, line.qty - 1))}>
                                 <Minus className="h-3 w-3" />
                               </Button>
-                            
+                            </div>
+
+                            <div className="flex gap-1">
                               <Button type="button" variant="ghost" size="icon"
-                                className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50"
+                                className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50"
                                 onClick={() => removeLine(line.id)}>
                                 <Trash2 className="h-3 w-3" />
                               </Button>
                             </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
-
-              <div className="flex items-center justify-between mt-2">
-                <ServicePickerPopover onSelect={line => addLine({ item_id: null, name: line.name, category: line.category, unit_price: line.unit_price })} />
+              
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-2 gap-2">
+                <div className="w-full sm:w-auto">
+                  <ServicePickerPopover onSelect={line => addLine({ item_id: null, name: line.name, category: line.category, unit_price: line.unit_price })} />
+                </div>
                 {lines.length > 0 && (
-                  <div className="text-sm font-semibold text-gray-800">
+                  <div className="text-sm font-semibold text-gray-800 ml-auto">
                     Total: P{subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                   </div>
                 )}
@@ -609,11 +666,13 @@ export function NewJobDialog({ open, onClose, onCreated, branchId, userId }: New
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={saving}>Cancel</Button>
-          <Button onClick={handleCreate} disabled={saving || loadingOpts || lines.length === 0}>
-            {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Create Job{lines.length > 0 ? ` (${lines.length} service${lines.length > 1 ? "s" : ""})` : ""}
-          </Button>
+          <div className="w-full flex flex-col sm:flex-row sm:justify-end gap-2">
+            <Button variant="outline" onClick={handleClose} disabled={saving} className="w-full sm:w-auto">Cancel</Button>
+            <Button onClick={handleCreate} disabled={saving || loadingOpts || lines.length === 0} className="w-full sm:w-auto">
+              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Create Job{lines.length > 0 ? ` (${lines.length} service${lines.length > 1 ? "s" : ""})` : ""}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

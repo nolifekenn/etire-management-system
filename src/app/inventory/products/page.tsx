@@ -271,7 +271,7 @@ export default function ProductListPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4 p-6">
+    <div className="flex flex-col gap-4 p-4 sm:p-6">
       {/* Header bar */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
@@ -282,19 +282,19 @@ export default function ProductListPage() {
           </nav>
           <h1 className="text-xl font-bold text-foreground">Products</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Button
             onClick={handleExportPDF}
             variant="outline"
             size="sm"
-            className="border-[#714B67] text-[#714B67] hover:bg-[#714B67] hover:text-white"
+            className="border-[#714B67] text-[#714B67] hover:bg-[#714B67] hover:text-white w-full sm:w-auto"
           >
             <FileText className="h-4 w-4 mr-1" />
             Export PDF
           </Button>
           <Button
             onClick={() => setShowCreate(true)}
-            className="bg-[#714B67] hover:bg-[#5a3c53] text-white"
+            className="bg-[#714B67] hover:bg-[#5a3c53] text-white w-full sm:w-auto"
             size="sm"
           >
             <Plus className="h-4 w-4 mr-1" />
@@ -311,7 +311,7 @@ export default function ProductListPage() {
 
       {/* Toolbar: search + filters */}
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search products…"
@@ -353,9 +353,9 @@ export default function ProductListPage() {
           </SelectContent>
         </Select>
 
-        <div className="ml-auto shrink-0">
+        <div className="w-full sm:w-auto sm:ml-auto shrink-0">
           <Select value={String(rowsPerPage)} onValueChange={(value) => setRowsPerPage(Number(value))}>
-            <SelectTrigger className="h-9 w-[130px]">
+            <SelectTrigger className="h-9 w-full sm:w-[130px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -369,7 +369,7 @@ export default function ProductListPage() {
 
       {/* Active filter badges */}
       {(filter !== "all" || category !== "all") && (
-        <div className="flex items-center gap-2 -mt-2">
+        <div className="flex items-center gap-2 -mt-2 flex-wrap">
           <span className="text-xs text-muted-foreground">Active filters:</span>
           {filter === "low_stock" && (
             <Badge className="bg-amber-100 text-amber-800 gap-1 cursor-pointer" onClick={() => setFilter("all")}>
@@ -393,8 +393,9 @@ export default function ProductListPage() {
       )}
 
       {/* Table */}
-      <div className="overflow-x-auto overflow-y-visible rounded-lg border border-border bg-white">
-        <table className="w-full text-sm">
+      <div className="rounded-lg border border-border bg-white overflow-hidden">
+        <div className="hidden sm:block overflow-x-auto overflow-y-visible">
+        <table className="w-full text-sm min-w-[920px]">
           <thead className="bg-muted/50 sticky top-0 z-10 border-b border-border">
             <tr>
               <th className="px-4 py-3 text-left text-xs uppercase tracking-wide font-semibold text-muted-foreground w-1/3">Product</th>
@@ -611,10 +612,67 @@ export default function ProductListPage() {
             )}
           </tbody>
         </table>
+        </div>
+
+        <div className="sm:hidden p-3 space-y-3">
+          {loading ? (
+            <div className="py-10 text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+            </div>
+          ) : items.length === 0 ? (
+            <p className="py-8 text-center text-muted-foreground text-sm">No products found</p>
+          ) : (
+            items.map(item => {
+              const itemId = String(item.item_id);
+              const brandName = (item.tire_brand as AnyRecord)?.name as string | undefined;
+              const sizeName = (item.tire_size as AnyRecord)?.label as string | undefined;
+              const subtitle = [brandName, sizeName].filter(Boolean).join(" · ");
+              const isExpanded = expandedId === itemId;
+              return (
+                <div key={itemId} className="rounded-lg border border-border p-3 bg-card">
+                  <button
+                    className="w-full text-left"
+                    onClick={() => setExpandedId(prev => prev === itemId ? null : itemId)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground break-words">{String(item.name)}</p>
+                        {subtitle && <p className="text-xs text-muted-foreground mt-0.5 break-words">{subtitle}</p>}
+                      </div>
+                      <Badge className={`text-xs ${CATEGORY_COLORS[String(item.category)] ?? "bg-gray-100 text-gray-800"}`}>
+                        {String(item.category)}
+                      </Badge>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                      <div><p className="text-muted-foreground">Vehicle</p><p className="font-medium">{item.vehicle_type ? VEHICLE_LABELS[String(item.vehicle_type)] ?? String(item.vehicle_type) : "—"}</p></div>
+                      <div className="text-right"><p className="text-muted-foreground">On Hand</p><div className="inline-block mt-0.5">{stockBadge(item)}</div></div>
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="mt-3 border-t border-border pt-3 text-xs space-y-2">
+                      <div className="flex justify-between"><span className="text-muted-foreground">Sale Price</span><span className="font-medium">{fmt(item.sale_price)}</span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Cost</span><span>{fmt(item.cost_price)}</span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Reorder</span><span>{String(item.reorder_level ?? 5)}</span></div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full mt-1"
+                        onClick={() => router.push(`/inventory/products/${itemId}`)}
+                      >
+                        Open Edit / Archive
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between text-sm text-muted-foreground border-t border-border pt-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-muted-foreground border-t border-border pt-3">
         <span>
           {loading ? 'Loading...' : `Showing ${total === 0 ? 0 : (page - 1) * rowsPerPage + 1}-${(page - 1) * rowsPerPage + items.length} of ${total}`}
         </span>

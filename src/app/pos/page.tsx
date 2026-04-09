@@ -438,14 +438,14 @@ const SalesHistoryDrawer: React.FC<{
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <DialogContent className="flex h-[88vh] w-[min(96vw,1200px)] max-w-none flex-col p-0">
-        <DialogHeader className="border-b px-5 py-4">
+        <DialogHeader className="border-b px-4 sm:px-5 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <History className="h-5 w-5 text-foreground" />
               <DialogTitle className="text-lg font-semibold text-foreground">Sales History</DialogTitle>
             </div>
           </div>
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex flex-wrap items-center gap-2 mt-2">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
               <input
@@ -475,7 +475,9 @@ const SalesHistoryDrawer: React.FC<{
               <p className="text-sm text-gray-400">No sales found</p>
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <>
+            <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm">
               <thead className="sticky top-0 bg-white">
                 <tr>
                   <th className="px-4 py-2.5 text-left font-medium text-gray-500 text-xs">Sale #</th>
@@ -552,6 +554,70 @@ const SalesHistoryDrawer: React.FC<{
                 ))}
               </tbody>
             </table>
+            </div>
+
+            <div className="space-y-2 p-3 sm:hidden">
+              {filtered.map((sale) => (
+                <div
+                  key={sale.sale_id}
+                  className="rounded-lg border border-gray-200 bg-white p-3"
+                  onClick={() => setExpanded(prev => prev === sale.sale_id ? null : sale.sale_id)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{sale.sale_number ?? '—'}</p>
+                      <p className="text-xs text-gray-600 truncate">{sale.customer?.name ?? 'Walk-in'}</p>
+                      <p className="text-[11px] text-gray-500 mt-1">
+                        {new Date(sale.sale_date).toLocaleString('en-PH', {
+                          month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+                        })}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${payBadge(sale.payment_method)}`}>
+                        {sale.payment_method}
+                      </span>
+                      <p className="text-sm font-semibold text-gray-800 mt-2">{formatCurrency(sale.total_amount)}</p>
+                    </div>
+                  </div>
+
+                  {expanded === sale.sale_id && (
+                    <div className="mt-3 border-t border-gray-200 pt-2">
+                      <div className="mb-1.5 text-xs font-medium text-gray-500">Items</div>
+                      <div className="space-y-1">
+                        {(sale.sale_item ?? []).map((si, idx) => (
+                          <div key={idx} className="flex justify-between text-xs text-gray-700 gap-2">
+                            <span className="truncate">{si.item?.name ?? 'Item'} × {si.quantity}</span>
+                            <span className="shrink-0">{formatCurrency(si.price_at_sale * si.quantity)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {(sale.discount_amount > 0 || sale.tax_amount > 0) && (
+                        <div className="mt-2 space-y-0.5 border-t border-gray-200 pt-2">
+                          {sale.discount_amount > 0 && (
+                            <div className="flex justify-between text-xs text-red-500">
+                              <span>Discount</span>
+                              <span>-{formatCurrency(sale.discount_amount)}</span>
+                            </div>
+                          )}
+                          {sale.tax_amount > 0 && (
+                            <div className="flex justify-between text-xs text-gray-500">
+                              <span>VAT</span>
+                              <span>{formatCurrency(sale.tax_amount)}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <div className="mt-1.5 flex justify-between border-t border-gray-200 pt-1.5 text-xs font-bold text-foreground">
+                        <span>Total</span>
+                        <span>{formatCurrency(sale.total_amount)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            </>
           )}
         </div>
       </DialogContent>
@@ -851,8 +917,8 @@ export default function POSPage() {
       )}>
 
         {/* Search bar */}
-        <div className="flex flex-wrap items-center gap-3 border-b bg-white px-4 py-2">
-          <div className="relative min-w-[220px] flex-1 md:max-w-sm">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 border-b bg-white px-3 sm:px-4 py-2">
+          <div className="relative min-w-0 w-full sm:flex-1 sm:min-w-[220px] md:max-w-sm">
             <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <Input
               placeholder="Search products…"
@@ -862,7 +928,7 @@ export default function POSPage() {
             />
           </div>
           <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className="h-8 w-[160px] text-sm">
+            <SelectTrigger className="h-8 w-full sm:w-[160px] text-sm">
               <SelectValue placeholder="Type of item" />
             </SelectTrigger>
             <SelectContent>
@@ -873,7 +939,7 @@ export default function POSPage() {
             </SelectContent>
           </Select>
           <Select value={vehicleType} onValueChange={setVehicleType}>
-            <SelectTrigger className="h-8 w-[170px] text-sm">
+            <SelectTrigger className="h-8 w-full sm:w-[170px] text-sm">
               <SelectValue placeholder="Type of vehicle" />
             </SelectTrigger>
             <SelectContent>
@@ -885,20 +951,20 @@ export default function POSPage() {
           </Select>
           <button
             onClick={loadData}
-            className="rounded p-1.5 text-gray-500 hover:bg-gray-100"
+            className="rounded p-1.5 text-gray-500 hover:bg-gray-100 shrink-0"
             title="Refresh"
           >
             <RefreshCw className="h-4 w-4" />
           </button>
           <button
             onClick={() => setShowHistory(true)}
-            className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm font-medium text-[#714B67] border border-[#714B67]/30 hover:bg-[#714B67]/10 transition-colors"
+            className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm font-medium text-[#714B67] border border-[#714B67]/30 hover:bg-[#714B67]/10 transition-colors shrink-0"
             title="Sales History"
           >
             <History className="h-4 w-4" />
             <span className="hidden sm:inline">History</span>
           </button>
-          <p className="text-xs text-gray-400 hidden sm:block">
+          <p className="text-xs text-gray-400 hidden lg:block">
             {filteredProducts.length} items
           </p>
         </div>
@@ -1055,7 +1121,7 @@ export default function POSPage() {
               <span className="font-medium text-gray-700">Tax</span>
               {activeTaxRate > 0 && <span>{formatCurrency(taxAmt)}</span>}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 size="sm"
@@ -1098,7 +1164,7 @@ export default function POSPage() {
                   setTaxPreset('custom');
                   setTaxRate(event.target.value);
                 }}
-                className="ml-auto h-7 w-20 text-right text-xs"
+                className="h-7 w-20 text-right text-xs sm:ml-auto"
                 aria-label="Custom tax percentage"
               />
               <span className="text-xs">%</span>

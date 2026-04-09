@@ -129,34 +129,34 @@ export default function PurchasingPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
-      <div className="border-b border-border bg-white px-6 py-3 flex items-center gap-3 sticky top-0 z-10">
+      <div className="border-b border-border bg-white px-4 sm:px-6 py-3 flex flex-wrap items-center gap-2 sm:gap-3 sticky top-0 z-10">
         <Package className="h-5 w-5 text-purple-600 shrink-0" />
         <h1 className="text-base font-semibold text-foreground">Purchase Orders</h1>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Button
             size="sm"
-            className="gap-1.5 bg-purple-600 hover:bg-purple-700 text-white"
+            className="gap-1.5 bg-purple-600 hover:bg-purple-700 text-white w-full sm:w-auto"
             onClick={handleOpenCreate}
           >
             <PlusCircle className="h-4 w-4" />
             New
           </Button>
           {(user?.role === "super_admin" || user?.role === "branch_manager") && (
-            <Button variant="outline" size="sm" className="gap-1.5 text-[#714B67] border-[#714B67] hover:bg-purple-50" asChild>
+            <Button variant="outline" size="sm" className="gap-1.5 text-[#714B67] border-[#714B67] hover:bg-purple-50 w-full sm:w-auto" asChild>
               <Link href="/purchasing/vendors">
                 <Building2 className="h-4 w-4" />
                 Vendors
               </Link>
             </Button>
           )}
-          <Button variant="ghost" size="icon" onClick={fetchOrders} title="Refresh">
+          <Button variant="ghost" size="icon" onClick={fetchOrders} title="Refresh" className="ml-auto sm:ml-0">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-6 space-y-5">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-5">
 
         {/* Stat strip */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -178,7 +178,7 @@ export default function PurchasingPage() {
 
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <div className="relative w-full sm:flex-1 sm:min-w-[200px] sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="Search PO number..."
@@ -194,7 +194,7 @@ export default function PurchasingPage() {
           </div>
 
           <Select value={stateFilter} onValueChange={setStateFilter}>
-            <SelectTrigger className="h-8 text-sm w-44">
+            <SelectTrigger className="h-8 text-sm w-full sm:w-44">
               <SlidersHorizontal className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
@@ -205,12 +205,13 @@ export default function PurchasingPage() {
             </SelectContent>
           </Select>
 
-          <p className="ml-auto text-xs text-muted-foreground">{count} record{count !== 1 ? "s" : ""}</p>
+          <p className="text-xs text-muted-foreground w-full sm:w-auto sm:ml-auto">{count} record{count !== 1 ? "s" : ""}</p>
         </div>
 
-        {/* Table */}
-        <div className="rounded-lg border border-border bg-white overflow-x-auto">
-          <table className="w-full text-sm">
+        {/* Table / Mobile cards */}
+        <div className="rounded-lg border border-border bg-white overflow-hidden">
+          <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full text-sm min-w-[760px]">
             <thead>
               <tr className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
                 <th className="text-left px-4 py-2.5 font-medium">Reference</th>
@@ -285,11 +286,64 @@ export default function PurchasingPage() {
               )}
             </tbody>
           </table>
+          </div>
+
+          <div className="sm:hidden p-3 space-y-3">
+            {loading ? (
+              <div className="py-10 text-center text-muted-foreground">
+                <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2" />
+                Loading...
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="py-10 text-center">
+                <Package className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-40" />
+                <p className="text-sm text-muted-foreground">No purchase orders found.</p>
+                {canCreatePO && (
+                  <Button variant="outline" size="sm" className="mt-3" onClick={handleOpenCreate}>
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    Create your first RFQ
+                  </Button>
+                )}
+              </div>
+            ) : (
+              orders.map((po) => {
+                const supplier = po.supplier as { name?: string } | null;
+                const branch = po.branch as { name?: string } | null;
+                const stateVal = String(po.state ?? po.status ?? "draft");
+                return (
+                  <button
+                    key={String(po.po_id)}
+                    className="w-full text-left rounded-lg border border-border p-3 hover:bg-accent/30 transition-colors"
+                    onClick={() => router.push(`/purchasing/${po.po_id}`)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-mono font-medium text-purple-700 text-xs truncate">{String(po.po_number ?? "")}</p>
+                        <p className="text-sm font-medium text-foreground mt-1 truncate">{supplier?.name ?? ""}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{branch?.name ?? ""}</p>
+                      </div>
+                      <StateBadge state={stateVal} />
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <p className="text-muted-foreground">Order Date</p>
+                        <p className="font-medium text-foreground">{fmtDate(po.order_date) || "-"}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-muted-foreground">Total</p>
+                        <p className="font-semibold text-foreground">{fmt(po.total_amount as number)}</p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
 
         {/* Pagination */}
         {count > 0 && (
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm">
             <p className="text-muted-foreground">
               Showing {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, count)} of {count}
             </p>

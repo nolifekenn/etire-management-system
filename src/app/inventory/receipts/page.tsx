@@ -105,9 +105,9 @@ export default function InventoryReceiptsPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="flex flex-col gap-4 p-6">
+    <div className="flex flex-col gap-4 p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button
           variant="ghost"
           size="sm"
@@ -125,8 +125,8 @@ export default function InventoryReceiptsPage() {
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-background p-4">
-        <div className="relative flex-1 min-w-48">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-background p-3 sm:p-4">
+        <div className="relative w-full sm:flex-1 sm:min-w-48">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search receipt / sale number…"
@@ -137,7 +137,7 @@ export default function InventoryReceiptsPage() {
         </div>
 
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-[160px] h-9">
+          <SelectTrigger className="w-full sm:w-[160px] h-9">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
@@ -153,7 +153,7 @@ export default function InventoryReceiptsPage() {
           variant="outline"
           size="sm"
           onClick={() => load()}
-          className="h-9 gap-1.5"
+          className="h-9 gap-1.5 w-full sm:w-auto"
           disabled={loading}
         >
           {loading
@@ -165,7 +165,8 @@ export default function InventoryReceiptsPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="rounded-lg border border-border overflow-hidden bg-white">
+        <div className="hidden sm:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
@@ -242,11 +243,57 @@ export default function InventoryReceiptsPage() {
             )}
           </TableBody>
         </Table>
+        </div>
+
+        <div className="sm:hidden p-3 space-y-2">
+          {loading ? (
+            <div className="py-10 text-center">
+              <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
+            </div>
+          ) : sales.length === 0 ? (
+            <p className="py-8 text-center text-muted-foreground text-sm">No receipts found</p>
+          ) : (
+            sales.map((sale) => {
+              const customer = sale.customer as AnyRecord | null;
+              const state = str(sale.state);
+              return (
+                <div key={str(sale.sale_id)} className="rounded-lg border border-border p-3 bg-card">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-mono text-sm font-medium text-[#714B67] truncate">{str(sale.sale_number) || '—'}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{fmtDate(sale.sale_date ?? sale.created_at)}</p>
+                    </div>
+                    <Badge variant="outline" className={`text-[10px] ${STATE_COLORS[state] ?? STATE_COLORS.draft}`}>
+                      {STATE_LABELS[state] ?? state}
+                    </Badge>
+                  </div>
+                  <p className="text-sm mt-2">{customer ? str(customer.name) : <span className="text-muted-foreground">Walk-in</span>}</p>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground capitalize">{str(sale.payment_method).replace('_', ' ') || '—'}</span>
+                    <span className="font-semibold text-sm">{fmtCurrency(sale.total_amount)}</span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <button
+                      className="text-xs text-[#714B67]"
+                      onClick={() => router.push(`/sales/${str(sale.sale_id)}`)}
+                    >
+                      Open Sale
+                    </button>
+                    <Link href={`/receipt/${str(sale.sale_id)}`} className="inline-flex items-center gap-1.5 text-xs text-[#714B67]">
+                      <ReceiptText className="h-3.5 w-3.5" />
+                      Receipt
+                    </Link>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-muted-foreground">
           <span>{total} receipt{total !== 1 ? 's' : ''} total</span>
           <div className="flex items-center gap-2">
             <Button

@@ -194,7 +194,7 @@ export default function POFormPage({ params }: { params: Promise<{ id: string }>
   return (
     <div className="flex flex-col h-full">
       {/* ── Breadcrumb / top header ──────────────────────────────────────── */}
-      <div className="border-b border-border bg-white px-6 py-3 flex items-center gap-3 sticky top-0 z-10 shrink-0">
+      <div className="border-b border-border bg-white px-4 sm:px-6 py-3 flex flex-wrap items-center gap-3 sticky top-0 z-10 shrink-0">
         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => router.push("/purchasing")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
@@ -208,7 +208,7 @@ export default function POFormPage({ params }: { params: Promise<{ id: string }>
           </span>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 w-full sm:w-auto justify-end">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={loadPO} title="Refresh">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
@@ -217,7 +217,7 @@ export default function POFormPage({ params }: { params: Promise<{ id: string }>
 
       {/* ── Content scroll area ──────────────────────────────────────────── */}
       <div className="flex-1 overflow-auto">
-        <div className="max-w-6xl mx-auto p-6 space-y-6">
+        <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
 
           {/* ── Status bar ─────────────────────────────────────────────── */}
           <div className="bg-white rounded-lg border border-border p-4 space-y-3">
@@ -249,7 +249,7 @@ export default function POFormPage({ params }: { params: Promise<{ id: string }>
             </div>
 
             {/* PO headline */}
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div>
                 <h1 className="text-xl font-bold text-foreground">
                   {String(po.po_number ?? "Draft")}
@@ -258,7 +258,7 @@ export default function POFormPage({ params }: { params: Promise<{ id: string }>
                   {supplier?.name ?? "No vendor"} · {branch?.name ?? "No branch"}
                 </p>
               </div>
-              <div className="text-right">
+              <div className="text-left sm:text-right">
                 <p className="text-2xl font-bold text-foreground">
                   ₱{Number(po.total_amount ?? 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                 </p>
@@ -301,7 +301,7 @@ export default function POFormPage({ params }: { params: Promise<{ id: string }>
             {/* Main tabs */}
             <div className="lg:col-span-2">
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="h-9">
+                <TabsList className="h-9 w-full justify-start overflow-x-auto">
                   <TabsTrigger value="lines"      className="text-xs px-4">Products</TabsTrigger>
                   <TabsTrigger value="other-info" className="text-xs px-4">Other Info</TabsTrigger>
                 </TabsList>

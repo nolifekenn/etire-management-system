@@ -109,7 +109,7 @@ export default function ForecastPage() {
   const pagedDisplayed = displayed.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6 p-4 sm:p-6">
 
       {/* Header */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -129,7 +129,7 @@ export default function ForecastPage() {
             Demand-based criticality, days remaining, and suggested reorder levels.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+        <Button variant="outline" size="sm" onClick={load} disabled={loading} className="w-full sm:w-auto">
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </Button>
@@ -169,7 +169,7 @@ export default function ForecastPage() {
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
           <Filter className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Filter by product name…"
@@ -179,7 +179,7 @@ export default function ForecastPage() {
           />
         </div>
         <Select value={crit} onValueChange={setCrit}>
-          <SelectTrigger className="h-9 w-[175px]">
+          <SelectTrigger className="h-9 w-full sm:w-[175px]">
             <SelectValue placeholder="Criticality" />
           </SelectTrigger>
           <SelectContent>
@@ -190,9 +190,9 @@ export default function ForecastPage() {
             ))}
           </SelectContent>
         </Select>
-        <div className="ml-auto shrink-0">
+        <div className="w-full sm:w-auto sm:ml-auto shrink-0">
           <Select value={String(rowsPerPage)} onValueChange={(value) => setRowsPerPage(Number(value))}>
-            <SelectTrigger className="h-9 w-[130px]">
+            <SelectTrigger className="h-9 w-full sm:w-[130px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -206,8 +206,9 @@ export default function ForecastPage() {
       </div>
 
       {/* Table */}
-      <div className="overflow-auto rounded-lg border border-border bg-white">
-        <table className="w-full text-sm">
+      <div className="rounded-lg border border-border bg-white overflow-hidden">
+        <div className="hidden sm:block overflow-auto">
+        <table className="w-full text-sm min-w-[980px]">
           <thead className="bg-muted/50 sticky top-0 z-10 border-b border-border">
             <tr>
               <th className="px-4 py-3 text-left text-xs uppercase tracking-wide font-semibold text-muted-foreground w-1/3">Product</th>
@@ -310,9 +311,54 @@ export default function ForecastPage() {
             })}
           </tbody>
         </table>
+        </div>
+
+        <div className="sm:hidden p-3 space-y-3">
+          {loading ? (
+            <div className="py-12 text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+            </div>
+          ) : displayed.length === 0 ? (
+            <p className="py-8 text-center text-muted-foreground text-sm">
+              {rows.length === 0
+                ? "No forecast data available."
+                : "No items match the current filter."}
+            </p>
+          ) : (
+            pagedDisplayed.map(row => {
+              const cfg = CRIT_CONFIG[row.criticality] ?? CRIT_CONFIG.HEALTHY;
+              const Icon = cfg.icon;
+              const reorderFlag = row.reorder_level_needs_update && row.suggested_reorder_level > row.current_reorder_level;
+              return (
+                <button
+                  key={row.item_id}
+                  onClick={() => router.push(`/inventory/products/${row.item_id}`)}
+                  className="w-full text-left rounded-lg border border-border p-3 hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground break-words">{row.name}</p>
+                      <Badge className={`mt-1 text-xs ${CATEGORY_COLORS[row.category] ?? "bg-gray-100 text-gray-800"}`}>{row.category}</Badge>
+                    </div>
+                    <Badge variant="outline" className={`${cfg.bg} ${cfg.color} ${cfg.border} gap-1 text-xs`}>
+                      <Icon className="h-3 w-3" />
+                      {cfg.label}
+                    </Badge>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <div><p className="text-muted-foreground">On Hand</p><p className="font-medium">{row.stock_quantity}</p></div>
+                    <div className="text-right"><p className="text-muted-foreground">Days Left</p><p className="font-semibold">{fmtDays(row.days_of_stock_remaining)}</p></div>
+                    <div><p className="text-muted-foreground">Daily Demand</p><p className="font-medium">{fmtQty(row.blended_daily_demand)}</p></div>
+                    <div className="text-right"><p className="text-muted-foreground">Suggested</p><p className={`font-medium ${reorderFlag ? "text-amber-600" : "text-foreground"}`}>{row.suggested_reorder_level}</p></div>
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
       </div>
 
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-muted-foreground">
         <span>
           Showing {displayed.length === 0 ? 0 : (page - 1) * rowsPerPage + 1}-{Math.min(page * rowsPerPage, displayed.length)} of {displayed.length}
         </span>
