@@ -222,7 +222,7 @@ function SortableHeader({
 
 export default function ServicesListPage() {
   const router         = useRouter();
-  const { user }       = useAuth();
+  const { user, activeBranchId } = useAuth();
   const { toast }      = useToast();
 
   const [jobs,    setJobs]   = useState<ServiceJobRow[]>([]);
@@ -236,7 +236,7 @@ export default function ServicesListPage() {
   const [error, setError]    = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
 
-  const branchId = user?.branch_id ?? "";
+  const branchId = activeBranchId ?? "";
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);

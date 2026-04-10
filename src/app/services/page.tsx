@@ -177,7 +177,7 @@ function KanbanColumn({
 
 export default function ServicesKanbanPage() {
   const router               = useRouter();
-  const { user }             = useAuth();
+  const { user, activeBranchId } = useAuth();
   const { toast }            = useToast();
   const [jobs,     setJobs]  = useState<ServiceJobRow[]>([]);
   const [loading,  setLoading]  = useState(true);
@@ -185,7 +185,7 @@ export default function ServicesKanbanPage() {
   const [newOpen,  setNewOpen]  = useState(false);
   const [error,    setError]    = useState<string | null>(null);
 
-  const branchId = user?.branch_id ?? "";
+  const branchId = activeBranchId ?? "";
   const userId   = user?.user_id   ?? "";
 
   //  Fetch all active jobs 

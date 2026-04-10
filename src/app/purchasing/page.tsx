@@ -67,7 +67,7 @@ const STATE_FILTERS = [
 
 export default function PurchasingPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, activeBranchId } = useAuth();
   const { toast } = useToast();
   const [, startTransition] = useTransition();
 
@@ -98,7 +98,7 @@ export default function PurchasingPage() {
     setLoading(true);
     try {
       const result = await listPOs({
-        branchId: user?.role !== "super_admin" ? user?.branch_id ?? undefined : undefined,
+        branchId: activeBranchId ?? undefined,
         state:    stateFilter !== "all" ? (stateFilter as POState) : undefined,
         search:   search.trim() || undefined,
         page,
@@ -111,7 +111,7 @@ export default function PurchasingPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, stateFilter, search, page, toast]);
+  }, [activeBranchId, stateFilter, search, page, toast]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
   useEffect(() => { setPage(1); }, [stateFilter, search]);
