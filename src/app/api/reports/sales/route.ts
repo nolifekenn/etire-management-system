@@ -43,8 +43,9 @@ export async function POST(request: Request) {
       const end = `${filters.date_to}T23:59:59Z`;
       query = query.gte("created_at", start).lte("created_at", end);
     }
-    if (filters.branchId) {
-      query = query.eq("branch_id", filters.branchId);
+    const branchFilter = filters.branch_id ?? filters.branchId;
+    if (branchFilter) {
+      query = query.eq("branch_id", branchFilter);
     }
     if (filters.startDate && filters.endDate) {
       query = query.gte("created_at", filters.startDate).lte("created_at", filters.endDate);

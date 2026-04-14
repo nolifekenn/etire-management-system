@@ -15,11 +15,17 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, AlertTriangle, Settings as SettingsIcon, Shield, History, Bell, RefreshCw, CheckCircle, XCircle, Info, Eye, EyeOff, AlertCircle, Users, ExternalLink, UserCheck, UserX } from 'lucide-react';
+import { Loader2, AlertTriangle, Settings as SettingsIcon, Shield, History, Bell, RefreshCw, CheckCircle, XCircle, Info, Eye, EyeOff, AlertCircle, Users, ExternalLink, UserCheck, UserX, Plus, PencilLine, Trash2, RotateCcw } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { SystemSetting, AuditLog, Notification } from '@/lib/types';
 import Link from 'next/link';
-import { validateShortText, type FieldError } from '@/lib/validation';
+import { validateShortText, validateNumber, type FieldError } from '@/lib/validation';
+import {
+  listServiceCatalogForSettings,
+  upsertServiceCatalogItem,
+  archiveServiceCatalogItem,
+  type ServiceFormCatalogItem,
+} from '@/lib/actions/services';
 
 // Design system from POS page (keeping the button styles and animations)
 const buttonStyles = {
@@ -166,6 +172,17 @@ export default function SettingsPage() {
   const [isUsersLoading,         setIsUsersLoading]         = useState(false);
   const [usersError,             setUsersError]             = useState<string | null>(null);
 
+  // Service catalog state (admins/managers)
+  const [serviceCatalog, setServiceCatalog] = useState<ServiceFormCatalogItem[]>([]);
+  const [isCatalogLoading, setIsCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [catalogId, setCatalogId] = useState<string | null>(null);
+  const [catalogName, setCatalogName] = useState('');
+  const [catalogSku, setCatalogSku] = useState('');
+  const [catalogPrice, setCatalogPrice] = useState('');
+  const [catalogNameError, setCatalogNameError] = useState<FieldError>(null);
+  const [catalogPriceError, setCatalogPriceError] = useState<FieldError>(null);
+
   // System settings validation errors
 
 
@@ -259,14 +276,91 @@ export default function SettingsPage() {
     }
   }, []);
 
+  const fetchServiceCatalog = useCallback(async () => {
+    setIsCatalogLoading(true);
+    const result = await listServiceCatalogForSettings();
+
+    if (!result.success) {
+      setCatalogError(`Could not fetch service catalog: ${result.error ?? 'Unknown error'}`);
+      setServiceCatalog([]);
+    } else {
+      setServiceCatalog(result.items);
+      setCatalogError(null);
+    }
+    setIsCatalogLoading(false);
+  }, []);
+
+  const resetCatalogForm = () => {
+    setCatalogId(null);
+    setCatalogName('');
+    setCatalogSku('');
+    setCatalogPrice('');
+    setCatalogNameError(null);
+    setCatalogPriceError(null);
+  };
+
+  const startEditCatalogItem = (item: ServiceFormCatalogItem) => {
+    setCatalogId(String(item.item_id));
+    setCatalogName(String(item.name));
+    setCatalogSku(String(item.sku ?? ''));
+    setCatalogPrice(String(item.sale_price ?? 0));
+    setCatalogNameError(null);
+    setCatalogPriceError(null);
+    setActiveTab('services');
+  };
+
+  const handleCatalogSave = async () => {
+    if (!user) return;
+
+    const nameErr = validateShortText(catalogName, { label: 'Service name', required: true, minLength: 2, maxLength: 100 });
+    const priceErr = validateNumber(catalogPrice, { label: 'Sale price', required: true, min: 0 });
+    setCatalogNameError(nameErr);
+    setCatalogPriceError(priceErr);
+    if (nameErr || priceErr) return;
+
+    setIsCatalogLoading(true);
+    const result = await upsertServiceCatalogItem({
+      item_id: catalogId ?? undefined,
+      name: catalogName,
+      sku: catalogSku,
+      sale_price: Number(catalogPrice),
+    });
+
+    if (!result.success) {
+      toast({ title: 'Save Error', description: result.error ?? 'Save failed', variant: 'destructive' });
+      setIsCatalogLoading(false);
+      return;
+    }
+
+    toast({ title: catalogId ? 'Service updated' : 'Service added' });
+    resetCatalogForm();
+    await fetchServiceCatalog();
+  };
+
+  const handleCatalogArchive = async (itemId: string) => {
+    if (!user) return;
+    const result = await archiveServiceCatalogItem(itemId);
+
+    if (!result.success) {
+      toast({ title: 'Error', description: result.error ?? 'Archive failed', variant: 'destructive' });
+      return;
+    }
+
+    if (catalogId === itemId) {
+      resetCatalogForm();
+    }
+    await fetchServiceCatalog();
+  };
+
   useEffect(() => {
     fetchSystemSettings();
     fetchNotifications();
     if (user?.role === 'super_admin' || user?.role === 'branch_manager') { // Only admins and managers can see audit logs
       fetchAuditLogs();
       fetchSettingsUsers();
+      fetchServiceCatalog();
     }
-  }, [fetchSystemSettings, fetchAuditLogs, fetchNotifications, fetchSettingsUsers, user]);
+  }, [fetchSystemSettings, fetchAuditLogs, fetchNotifications, fetchSettingsUsers, fetchServiceCatalog, user]);
 
   const handleSaveChanges = async () => {
     if (!user || !supabase) {
@@ -476,6 +570,7 @@ export default function SettingsPage() {
     if (user?.role === 'super_admin' || user?.role === 'branch_manager') {
       fetchAuditLogs();
       fetchSettingsUsers();
+      fetchServiceCatalog();
     }
   };
 
@@ -488,7 +583,7 @@ export default function SettingsPage() {
   };
 
   const isAdmin = user?.role === 'super_admin' || user?.role === 'branch_manager';
-  const tabCount = isAdmin ? 3 : 2;
+  const tabCount = isAdmin ? 4 : 2;
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   // Initials derived from user name (e.g. "John Doe" → "JD")
@@ -553,6 +648,12 @@ export default function SettingsPage() {
                 </span>
               )}
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="services" className="rounded-md data-[state=active]:bg-[#714B67] data-[state=active]:text-white">
+                <Plus className="h-4 w-4 mr-2" />
+                Services
+              </TabsTrigger>
+            )}
             {isAdmin && (
               <TabsTrigger value="users" className="rounded-md data-[state=active]:bg-[#714B67] data-[state=active]:text-white">
                 <Users className="h-4 w-4 mr-2" />
@@ -885,6 +986,183 @@ export default function SettingsPage() {
               </Card>
             )}
           </TabsContent>
+
+          {/* ══════════════ SERVICES TAB ══════════════ */}
+          {isAdmin && (
+            <TabsContent value="services" className="space-y-6">
+              <div className="grid gap-6 lg:grid-cols-[360px_1fr] items-start">
+                <Card className="border border-border">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Plus className="h-4 w-4 text-indigo-600" />
+                      {catalogId ? 'Edit Service' : 'Add Service'}
+                    </CardTitle>
+                    <CardDescription>
+                      Manage the service catalog used by the New Service Job dialog.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 font-medium">Service Name <span className="text-red-500">*</span></Label>
+                      <Input
+                        value={catalogName}
+                        onChange={(e) => {
+                          setCatalogName(e.target.value);
+                          setCatalogNameError(validateShortText(e.target.value, { label: 'Service name', required: true, minLength: 2, maxLength: 100 }));
+                        }}
+                        maxLength={100}
+                        placeholder="Tire Rotation"
+                        aria-invalid={!!catalogNameError}
+                        className={catalogNameError ? 'border-red-400 focus:border-red-400' : ''}
+                      />
+                      {catalogNameError && <p className="text-xs text-red-500">⚠ {catalogNameError}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 font-medium">SKU / Code</Label>
+                      <Input
+                        value={catalogSku}
+                        onChange={(e) => setCatalogSku(e.target.value)}
+                        maxLength={64}
+                        placeholder="TIRE_ROTATION"
+                      />
+                      <p className="text-[11px] text-muted-foreground">Optional internal code for quick identification.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 font-medium">Sale Price <span className="text-red-500">*</span></Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={catalogPrice}
+                        onChange={(e) => {
+                          setCatalogPrice(e.target.value);
+                          setCatalogPriceError(validateNumber(e.target.value, { label: 'Sale price', required: true, min: 0 }));
+                        }}
+                        placeholder="150"
+                        aria-invalid={!!catalogPriceError}
+                        className={catalogPriceError ? 'border-red-400 focus:border-red-400' : ''}
+                      />
+                      {catalogPriceError && <p className="text-xs text-red-500">⚠ {catalogPriceError}</p>}
+                    </div>
+
+                    <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600">
+                      Category is fixed to <span className="font-semibold text-slate-700">service</span> for this catalog.
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                      <Button
+                        onClick={handleCatalogSave}
+                        disabled={isCatalogLoading}
+                        className="bg-[#714B67] hover:bg-[#5a3c53] text-white flex-1"
+                      >
+                        {isCatalogLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {catalogId ? 'Update Service' : 'Save Service'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={resetCatalogForm}
+                        disabled={isCatalogLoading && !catalogId}
+                        className="flex-1"
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-border">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <PencilLine className="h-4 w-4 text-indigo-600" />
+                          Service Catalog
+                        </CardTitle>
+                        <CardDescription>Items shown in the New Service Job service picker.</CardDescription>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={fetchServiceCatalog} className="gap-1.5">
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Reload
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {catalogError && (
+                      <Alert variant="destructive" className="mb-4">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>{catalogError}</AlertDescription>
+                      </Alert>
+                    )}
+                    {isCatalogLoading && serviceCatalog.length === 0 ? (
+                      <div className="flex items-center gap-2 py-8 text-muted-foreground justify-center text-sm">
+                        <Loader2 className="h-5 w-5 animate-spin" /> Loading services…
+                      </div>
+                    ) : serviceCatalog.length === 0 ? (
+                      <div className="text-center py-10">
+                        <PencilLine className="h-12 w-12 text-slate-200 mx-auto mb-3" />
+                        <p className="text-slate-500 font-medium">No services found</p>
+                        <p className="text-xs text-muted-foreground mt-1">Add the first service using the form on the left.</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-lg border border-slate-200">
+                        <table className="w-full text-sm">
+                          <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-slate-600">Service</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-slate-600">SKU</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-slate-600">Price</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-slate-600">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {serviceCatalog.map((item) => {
+                              const itemId = String(item.item_id);
+                              const itemName = String(item.name);
+                              const itemSku = String(item.sku ?? '');
+                              const itemPrice = Number(item.sale_price ?? 0);
+                              return (
+                                <tr key={itemId} className="hover:bg-slate-50">
+                                  <td className="px-3 py-2 font-medium text-slate-800">{itemName}</td>
+                                  <td className="px-3 py-2 font-mono text-xs text-slate-600">{itemSku || '—'}</td>
+                                  <td className="px-3 py-2 text-slate-700">P{itemPrice.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
+                                  <td className="px-3 py-2">
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                                        title="Edit"
+                                        onClick={() => startEditCatalogItem(item)}
+                                      >
+                                        <PencilLine className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                        title="Archive"
+                                        onClick={() => handleCatalogArchive(itemId)}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          )}
 
           {/* ══════════════ USERS TAB ══════════════ */}
           {isAdmin && (

@@ -86,6 +86,7 @@ export default function AdjustmentsPage() {
     setLoadingItems(true);
     try {
       const res = await listProducts({
+        branch_id: activeBranchId ?? undefined,
         search:    search || undefined,
         category:  category !== "all" ? category : undefined,
         page:      1,
@@ -97,7 +98,7 @@ export default function AdjustmentsPage() {
     } finally {
       setLoadingItems(false);
     }
-  }, [search, category, toast]);
+  }, [activeBranchId, search, category, toast]);
 
   const loadHistory = useCallback(async () => {
     setLoadingHist(true);

@@ -40,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { listProducts } from "@/lib/actions/inventory";
 import { CreateProductDialog } from "@/app/inventory/components/CreateProductDialog";
@@ -72,6 +73,7 @@ export default function ProductListPage() {
   const router      = useRouter();
   const params      = useSearchParams();
   const { toast }   = useToast();
+  const { activeBranchId } = useAuth();
 
   const [items, setItems]           = useState<AnyRecord[]>([]);
   const [total, setTotal]           = useState(0);
@@ -90,6 +92,7 @@ export default function ProductListPage() {
     setLoading(true);
     try {
       const res = await listProducts({
+        branch_id:    activeBranchId ?? undefined,
         search:       search || undefined,
         category:     category !== "all" ? category : undefined,
         low_stock:    filter === "low_stock",
@@ -107,7 +110,7 @@ export default function ProductListPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, category, filter, rowsPerPage, toast]);
+  }, [activeBranchId, search, category, filter, rowsPerPage, toast]);
 
   useEffect(() => { setPage(1); load(1); }, [search, category, filter, rowsPerPage, load]);
   useEffect(() => { load(page); }, [page, load]);
@@ -141,6 +144,7 @@ export default function ProductListPage() {
     let allItems: AnyRecord[] = [];
     try {
       const res = await listProducts({
+        branch_id:    activeBranchId ?? undefined,
         search:       search || undefined,
         category:     category !== 'all' ? category : undefined,
         low_stock:    filter === 'low_stock',

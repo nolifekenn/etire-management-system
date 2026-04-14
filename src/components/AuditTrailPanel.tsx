@@ -419,6 +419,7 @@ export function AuditTrailPanel({ relatedTable, relatedRecordId, className }: Au
 
   const noteCount    = timeline.filter(e => e.kind === "chatter" && e.message_type === "comment").length;
   const historyCount = timeline.filter(e => e.kind === "audit" || (e.kind === "chatter" && e.message_type !== "comment")).length;
+  const shouldScrollTimeline = filtered.length >= 3;
 
   return (
     <div className={cn("flex flex-col gap-4", className)}>
@@ -501,7 +502,12 @@ export function AuditTrailPanel({ relatedTable, relatedRecordId, className }: Au
       ) : filtered.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">No entries yet.</p>
       ) : (
-        <div className="space-y-2">
+        <div
+          className={cn(
+            "space-y-2",
+            shouldScrollTimeline && "max-h-[18rem] overflow-y-auto pr-1"
+          )}
+        >
           {filtered.map((entry) =>
             entry.kind === "audit"
               ? <AuditEntryCard   key={`audit-${entry.id}`}   entry={entry} />

@@ -25,6 +25,7 @@ import {
   exportSalesReportPDF,
   exportSalesReportCSV,
 } from "@/lib/salesReportService";
+import { useAuth } from "@/hooks/useAuth";
 import { formatSalesReportData } from "@/lib/salesReportFormatter";
 import { useToast } from "@/hooks/use-toast";
 import { StatCard } from "@/components/StatCard";
@@ -89,12 +90,14 @@ interface SalesReportRow {
 
 export default function SalesReportCard() {
   const { toast } = useToast();
+  const { user, activeBranchId } = useAuth();
+  const isSuperAdmin = user?.role === "super_admin";
 
   // --- STATE MANAGEMENT ---
   const [filters, setFilters] = useState<SalesFilters>({
     date_from: "",
     date_to: "",
-    branch_id: "all",
+    branch_id: activeBranchId ?? "all",
     vehicle_type_id: "all",
   });
 
@@ -110,7 +113,21 @@ export default function SalesReportCard() {
   const [totalPages, setTotalPages] = useState(1);
 
   // Filter state
-  const [localFilters, setLocalFilters] = useState<SalesFilters>(filters);
+  const [localFilters, setLocalFilters] = useState<SalesFilters>({
+    date_from: "",
+    date_to: "",
+    branch_id: activeBranchId ?? "all",
+    vehicle_type_id: "all",
+  });
+
+  useEffect(() => {
+    const branchValue = activeBranchId ?? "all";
+
+    if (!isSuperAdmin) {
+      setFilters((prev) => ({ ...prev, branch_id: branchValue }));
+      setLocalFilters((prev) => ({ ...prev, branch_id: branchValue }));
+    }
+  }, [activeBranchId, isSuperAdmin]);
 
   // Modal State
   const [modalState, setModalState] = useState<{
@@ -178,9 +195,13 @@ export default function SalesReportCard() {
       setLoading(true);
       setCurrentPage(1);
 
+      const resolvedBranchId = isSuperAdmin
+        ? (localFilters.branch_id === "all" ? (activeBranchId ?? "") : localFilters.branch_id)
+        : (activeBranchId ?? "");
+
       const apiFilters: SalesFilters = {
         ...localFilters,
-        branch_id: localFilters.branch_id === "all" ? "" : localFilters.branch_id,
+        branch_id: resolvedBranchId,
         vehicle_type_id: localFilters.vehicle_type_id === "all" ? "" : localFilters.vehicle_type_id,
       };
 
@@ -252,7 +273,7 @@ export default function SalesReportCard() {
     setLocalFilters({
       date_from: "",
       date_to: "",
-      branch_id: "all",
+      branch_id: isSuperAdmin ? "all" : (activeBranchId ?? "all"),
       vehicle_type_id: "all",
     });
     toast({
@@ -368,13 +389,14 @@ export default function SalesReportCard() {
                 <Select
                   value={localFilters.branch_id}
                   onValueChange={(value) => setLocalFilters({ ...localFilters, branch_id: value })}
+                  disabled={!isSuperAdmin}
                 >
                   <SelectTrigger className="border-slate-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 h-10">
                     <Building className="h-4 w-4 mr-2 text-slate-400" />
                     <SelectValue placeholder="All Branches" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Branches</SelectItem>
+                    {isSuperAdmin && <SelectItem value="all">All Branches</SelectItem>}
                     {branches.map((b) => (
                       <SelectItem key={b.branch_id} value={b.branch_id}>
                         {b.name}
