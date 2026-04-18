@@ -71,6 +71,7 @@ export function useDashboardAnalytics() {
           )
         `)
                 .eq('sale.branch_id', activeBranchId)
+            .eq('sale.state', 'done')
                 .is('sale.deleted_at', null);
 
             if (revenueError) throw revenueError;
@@ -99,6 +100,7 @@ export function useDashboardAnalytics() {
                 .from('sale')
                 .select('total_amount')
                 .eq('branch_id', activeBranchId)
+                .eq('state', 'done')
                 .is('deleted_at', null)
                 .gte('created_at', currentMonthStart)
                 .lte('created_at', currentMonthEnd);
@@ -114,6 +116,7 @@ export function useDashboardAnalytics() {
                 .from('sale')
                 .select('total_amount')
                 .eq('branch_id', activeBranchId)
+                .eq('state', 'done')
                 .is('deleted_at', null)
                 .gte('created_at', lastMonthStart)
                 .lte('created_at', lastMonthEnd);
@@ -147,6 +150,7 @@ export function useDashboardAnalytics() {
           )
         `)
                 .eq('sale.branch_id', activeBranchId)
+            .eq('sale.state', 'done')
                 .is('sale.deleted_at', null);
 
             if (topItemsError) throw topItemsError;

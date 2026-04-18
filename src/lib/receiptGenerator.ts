@@ -23,6 +23,17 @@ export interface BusinessInfo {
   phone: string;
   taxInfo: string;
   footerMessage: string;
+  registeredBusinessName?: string;
+  mainBranchAddress?: string;
+  tin?: string;
+  vatLabel?: string;
+  atpNumber?: string;
+  printerName?: string;
+  printerAddress?: string;
+  printerTin?: string;
+  serialRange?: string;
+  receiptTypeLabel?: string;
+  vatInclusiveNote?: string;
 }
 
 /**
@@ -31,6 +42,8 @@ export interface BusinessInfo {
 export interface ReceiptCustomer {
   name: string;
   phone?: string;
+  address?: string;
+  tin?: string;
 }
 
 /**
@@ -82,16 +95,16 @@ const getReceiptCss = (): string => `
   body {
     font-family: 'Courier New', Courier, monospace;
     margin: 0;
-    padding: 20px;
-    background: #f4f4f4;
+    padding: 12px;
+    background: #ffffff;
   }
   .receipt-container {
-    width: 320px; /* Standard thermal printer width */
+    width: 360px;
     margin: auto;
     background: #fff;
-    border: 1px dashed #ccc;
-    padding: 20px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    border: 1px solid #111;
+    padding: 14px;
+    box-shadow: none;
   }
   .header {
     text-align: center;
@@ -105,6 +118,19 @@ const getReceiptCss = (): string => `
   .header p {
     margin: 2px 0;
     font-size: 12px;
+  }
+  .document-label {
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 0.8px;
+  }
+  .section-title {
+    margin: 0 0 4px 0;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
   }
   .details, .customer {
     padding: 10px 0;
@@ -194,7 +220,26 @@ export const generateHtmlReceipt = (data: ReceiptData): string => {
   const { sale, items, cashier, businessInfo, customer, branch } = data;
 
   // Calculate subtotal from sale object
-  const subtotal = (sale.total_amount || 0) - (sale.tax_amount || 0) + (sale.discount_amount || 0);
+  const totalAmount = Number(sale.total_amount || 0);
+  const taxAmount = Number(sale.tax_amount || 0);
+  const discountAmount = Number(sale.discount_amount || 0);
+  const subtotal = totalAmount - taxAmount + discountAmount;
+  const receiptSerial = sale.sale_number ?? sale.sale_id.split('-')[0]!;
+  const registeredBusinessName = businessInfo.registeredBusinessName || businessInfo.storeName;
+  const mainBranchAddress = businessInfo.mainBranchAddress || businessInfo.address || 'N/A';
+  const businessTin = businessInfo.tin || businessInfo.taxInfo || 'N/A';
+  const vatLabel = businessInfo.vatLabel || 'VAT Registered';
+  const receiptTypeLabel = businessInfo.receiptTypeLabel || 'SALES INVOICE';
+  const atpNumber = businessInfo.atpNumber || 'ATP-000000000000';
+  const printerName = businessInfo.printerName || 'TUP-M BSIS-4A 25-26 Team';
+  const printerAddress = businessInfo.printerAddress || 'Printer Address Placeholder';
+  const printerTin = businessInfo.printerTin || '000-000-000-000';
+  const serialRange = businessInfo.serialRange || '000001-000500';
+  const isVatRegistered = !/non-vat/i.test(vatLabel);
+  const vatTreatmentNote = businessInfo.vatInclusiveNote || (isVatRegistered
+    ? 'Prices shown are VAT-inclusive.'
+    : 'Non-VAT sale (no VAT breakdown).');
+  const vatableSales = Math.max(0, totalAmount - taxAmount);
 
   // Generate rows for the items table
   const itemRows = items
@@ -213,7 +258,7 @@ export const generateHtmlReceipt = (data: ReceiptData): string => {
   return `
     <html>
       <head>
-        <title>Receipt ${sale.sale_id.split('-')[0]}</title>
+        <title>${receiptTypeLabel} ${receiptSerial}</title>
         <style>
           ${getReceiptCss()}
         </style>
@@ -222,22 +267,38 @@ export const generateHtmlReceipt = (data: ReceiptData): string => {
         <div class="receipt-container">
           
           <div class="header">
-            <h1>${businessInfo.storeName}</h1>
-            <p>${businessInfo.address}</p>
+            <h1>${registeredBusinessName}</h1>
+            <p>${mainBranchAddress}</p>
             <p>Phone: ${businessInfo.phone || 'N/A'}</p>
-            <p>TIN: ${businessInfo.taxInfo || 'N/A'}</p>
+            <p>TIN: ${businessTin}</p>
+            <p>${vatLabel}</p>
+            <p class="document-label">${receiptTypeLabel}</p>
           </div>
 
           <div class="details">
-            <p>Sale ID: ${sale.sale_id.split('-')[0]!}</p>
-            <p>Date: ${formatDate(sale.sale_date ?? new Date().toISOString())}</p>
+            <p class="section-title">Receipt Details</p>
+            <p>Serial No: ${receiptSerial}</p>
+            <p>Transaction Date: ${formatDate(sale.sale_date ?? new Date().toISOString())}</p>
+            <p>Printed Date: ${formatDate(new Date().toISOString())}</p>
             <p>Cashier: ${cashier.name}</p>
             ${branch ? `<p>Branch: ${branch.name}</p>` : ''}
           </div>
 
+          <div class="details">
+            <p class="section-title">Permit to Print</p>
+            <p>ATP No: ${atpNumber}</p>
+            <p>Accredited Printer: ${printerName}</p>
+            <p>Printer Address: ${printerAddress}</p>
+            <p>Printer TIN: ${printerTin}</p>
+            <p>Serial Range: ${serialRange}</p>
+          </div>
+
           <div class="customer">
+            <p class="section-title">Customer Details</p>
             <p>Customer: ${customer ? customer.name : 'Walk-in Customer'}</p>
             ${customer && customer.phone ? `<p>Phone: ${customer.phone}</p>` : ''}
+            ${customer && customer.address ? `<p>Address: ${customer.address}</p>` : ''}
+            ${customer && customer.tin ? `<p>TIN: ${customer.tin}</p>` : ''}
           </div>
 
           <table class="items-table">
@@ -262,21 +323,32 @@ export const generateHtmlReceipt = (data: ReceiptData): string => {
               </tr>
               <tr>
                 <td class="label">Discount</td>
-                <td class="value">-${formatCurrency(sale.discount_amount || 0)}</td>
+                <td class="value">-${formatCurrency(discountAmount)}</td>
               </tr>
               <tr>
-                <td class="label">Tax</td>
-                <td class="value">${formatCurrency(sale.tax_amount || 0)}</td>
+                <td class="label">VATable Sales</td>
+                <td class="value">${isVatRegistered ? formatCurrency(vatableSales) : 'Non-VAT'}</td>
+              </tr>
+              <tr>
+                <td class="label">VAT Amount</td>
+                <td class="value">${isVatRegistered ? formatCurrency(taxAmount) : 'Non-VAT'}</td>
+              </tr>
+              <tr>
+                <td class="label">Tax Note</td>
+                <td class="value">${vatTreatmentNote}</td>
               </tr>
               <tr class="total-row">
-                <td class="label">TOTAL</td>
-                <td class="value">${formatCurrency(sale.total_amount || 0)}</td>
+                <td class="label">TOTAL AMOUNT DUE</td>
+                <td class="value">${formatCurrency(totalAmount)}</td>
               </tr>
             </tbody>
           </table>
 
           <div class="footer">
-            <p>Payment Method: ${sale.payment_method}</p>
+            <p>Mode of Payment: ${sale.payment_method ? String(sale.payment_method).toUpperCase() : 'N/A'}</p>
+            <p>Cashier: ${cashier.name}</p>
+            <p>Cashier Signature: ____________________</p>
+            <p><strong>This serves as your official receipt.</strong></p>
             <p class="thanks">${businessInfo.footerMessage}</p>
           </div>
 

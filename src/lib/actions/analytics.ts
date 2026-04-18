@@ -177,7 +177,7 @@ export async function getRevenueCOGSChart(
     // Revenue per day
     let revQ = supabase
       .from('sale')
-      .select('total_amount, sale_date')
+      .select('sale_id, total_amount, sale_date')
       .is('deleted_at', null)
       .in('state', ['confirmed', 'done'])
       .gte('sale_date', dateFrom.toISOString());
@@ -186,17 +186,26 @@ export async function getRevenueCOGSChart(
     const { data: revData, error: revErr } = await revQ;
     if (revErr) throw revErr;
 
-    // COGS per day from inventory_moves ledger
-    let cogsQ = supabase
-      .from('inventory_moves')
-      .select('quantity_moved, unit_cost, created_at, branch_id')
-      .eq('source_document_type', 'sale')
-      .lt('quantity_moved', 0)   // only outbound moves
-      .gte('created_at', dateFrom.toISOString());
-    if (branch_id) cogsQ = cogsQ.eq('branch_id', branch_id);
+    const activeSaleIds = ((revData as AnyRecord[]) ?? [])
+      .map(row => row.sale_id as string)
+      .filter(Boolean);
 
-    const { data: cogsData, error: cogsErr } = await cogsQ;
-    if (cogsErr) throw cogsErr;
+    // COGS per day from inventory_moves ledger
+    let cogsData: AnyRecord[] = [];
+    if (activeSaleIds.length > 0) {
+      let cogsQ = supabase
+        .from('inventory_moves')
+        .select('quantity_moved, unit_cost, created_at, branch_id, source_document_id')
+        .eq('source_document_type', 'sale')
+        .lt('quantity_moved', 0)   // only outbound moves
+        .gte('created_at', dateFrom.toISOString())
+        .in('source_document_id', activeSaleIds);
+      if (branch_id) cogsQ = cogsQ.eq('branch_id', branch_id);
+
+      const { data, error: cogsErr } = await cogsQ;
+      if (cogsErr) throw cogsErr;
+      cogsData = (data ?? []) as AnyRecord[];
+    }
 
     // Build day → amounts map
     const revenueByDay = new Map<string, number>();
@@ -215,7 +224,7 @@ export async function getRevenueCOGSChart(
       }
     }
 
-    for (const row of (cogsData as AnyRecord[]) ?? []) {
+    for (const row of cogsData) {
       const d = format(new Date(row.created_at as string), 'MMM dd');
       if (cogsByDay.has(d)) {
         const cost = Math.abs(Number(row.quantity_moved ?? 0) * Number(row.unit_cost ?? 0));
@@ -421,6 +430,7 @@ export async function getSalesReport(filter: SalesReportFilter = {}) {
       sale_item ( sale_item_id )
     `, { count: 'exact' })
     .is('deleted_at', null)
+    .in('state', ['confirmed', 'done'])
     .order('sale_date', { ascending: false })
     .range(offset, offset + page_size - 1);
 

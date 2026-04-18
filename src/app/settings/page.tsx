@@ -150,6 +150,9 @@ export default function SettingsPage() {
   const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [managerPin, setManagerPin] = useState('');
+  const [confirmManagerPin, setConfirmManagerPin] = useState('');
+  const [isUpdatingManagerPin, setIsUpdatingManagerPin] = useState(false);
 
 
   // System settings state
@@ -500,6 +503,48 @@ export default function SettingsPage() {
     }
   };
 
+  const handleManagerPinChange = async () => {
+    if (user?.role !== 'branch_manager') {
+      return;
+    }
+
+    const normalizedPin = managerPin.replace(/\D/g, '');
+    const normalizedConfirmPin = confirmManagerPin.replace(/\D/g, '');
+
+    if (!/^\d{6}$/.test(normalizedPin)) {
+      toast({ title: 'Validation Error', description: 'PIN must be exactly 6 digits.', variant: 'destructive' });
+      return;
+    }
+
+    if (normalizedPin !== normalizedConfirmPin) {
+      toast({ title: 'Validation Error', description: 'PIN values do not match.', variant: 'destructive' });
+      return;
+    }
+
+    setIsUpdatingManagerPin(true);
+    try {
+      const response = await fetch('/api/auth/change-manager-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: normalizedPin }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        toast({ title: 'Update Error', description: result?.error || 'Failed to update PIN.', variant: 'destructive' });
+        return;
+      }
+
+      toast({ title: 'Success', description: 'Manager PIN updated successfully.' });
+      setManagerPin('');
+      setConfirmManagerPin('');
+    } catch (error: any) {
+      toast({ title: 'Update Error', description: error?.message || 'An unexpected error occurred.', variant: 'destructive' });
+    } finally {
+      setIsUpdatingManagerPin(false);
+    }
+  };
+
   const markAsRead = async (notificationId: string) => {
     if (!supabase) return;
     const { error } = await (supabase
@@ -831,6 +876,60 @@ export default function SettingsPage() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {user?.role === 'branch_manager' && (
+                  <Card className="border border-border">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Shield className="h-4 w-4 text-indigo-600" />
+                        Change Manager PIN
+                      </CardTitle>
+                      <CardDescription>Use a 6-digit PIN for branch manager authorization prompts.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="new-manager-pin" className="text-slate-700 font-medium">New Manager PIN</Label>
+                          <Input
+                            id="new-manager-pin"
+                            type="password"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={6}
+                            value={managerPin}
+                            onChange={(e) => setManagerPin(e.target.value.replace(/\D/g, ''))}
+                            placeholder="6-digit PIN"
+                            className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="confirm-manager-pin" className="text-slate-700 font-medium">Confirm Manager PIN</Label>
+                          <Input
+                            id="confirm-manager-pin"
+                            type="password"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={6}
+                            value={confirmManagerPin}
+                            onChange={(e) => setConfirmManagerPin(e.target.value.replace(/\D/g, ''))}
+                            placeholder="Repeat PIN"
+                            className="border-slate-300 focus:border-indigo-400 transition-all duration-300"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end pt-2">
+                        <Button
+                          onClick={handleManagerPinChange}
+                          disabled={isUpdatingManagerPin || managerPin.length !== 6 || confirmManagerPin.length !== 6}
+                          className="bg-[#714B67] hover:bg-[#5a3c53] text-white px-6"
+                        >
+                          {isUpdatingManagerPin ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                          Update PIN
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </div>
           </TabsContent>

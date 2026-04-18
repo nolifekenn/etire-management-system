@@ -24,6 +24,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabaseUntyped as supabase } from '@/lib/supabaseClient';
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -43,6 +44,34 @@ const buttonStyles = {
   actionEdit: "h-8 w-8 p-0 rounded-lg bg-gray-100 text-gray-600 hover:bg-indigo-100 hover:text-indigo-700 border-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-indigo-900/50 dark:hover:text-indigo-400",
   actionDelete: "h-8 w-8 p-0 rounded-lg bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-700 border-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-red-900/50 dark:hover:text-red-400",
   actionRole: "h-8 w-8 p-0 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-900/50",
+};
+
+const DEFAULT_MANAGER_PIN = '112233';
+
+type BusinessInfoForm = {
+  business_name: string;
+  business_tin: string;
+  vat_label: string;
+  atp_number: string;
+  printer_name: string;
+  printer_address: string;
+  printer_tin: string;
+  serial_range: string;
+  receipt_type_label: string;
+  vat_inclusive_note: string;
+};
+
+const DEFAULT_BUSINESS_INFO: BusinessInfoForm = {
+  business_name: 'Queen.R Tire Supply & Vulcanizing Shop',
+  business_tin: '193-953-192-000',
+  vat_label: 'VAT Registered',
+  atp_number: 'ATP-000000000000',
+  printer_name: 'TUP-M BSIS-4A 25-26 Team',
+  printer_address: 'Ayala Blvd., corner San Marcelino St., Ermita, Manila 1000, Metro Manila, Philippines',
+  printer_tin: '000-000-000-000',
+  serial_range: '000001-000500',
+  receipt_type_label: 'SALES INVOICE',
+  vat_inclusive_note: 'Prices shown are VAT-inclusive.',
 };
 
 export default function AdminPage() {
@@ -77,6 +106,11 @@ export default function AdminPage() {
   const [role, setRole] = useState<UserRole>('staff');
   const [branchId, setBranchId] = useState<string>('unassigned_dummy_val');
   const [showPassword, setShowPassword] = useState(false);
+  const [activeTab, setActiveTab] = useState('users');
+
+  const [businessInfo, setBusinessInfo] = useState<BusinessInfoForm>(DEFAULT_BUSINESS_INFO);
+  const [isBusinessLoading, setIsBusinessLoading] = useState(false);
+  const [isBusinessSaving, setIsBusinessSaving] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -119,12 +153,59 @@ export default function AdminPage() {
     }
   }, []);
 
+  const fetchBusinessInfo = useCallback(async () => {
+    setIsBusinessLoading(true);
+    try {
+      const response = await fetch('/api/admin/business-info');
+      const result = await response.json();
+
+      if (!response.ok) {
+        toast({ title: 'Load Error', description: result.error || 'Could not fetch business information.', variant: 'destructive' });
+        setBusinessInfo(DEFAULT_BUSINESS_INFO);
+      } else {
+        setBusinessInfo({ ...DEFAULT_BUSINESS_INFO, ...(result.data ?? {}) });
+      }
+    } catch (err: any) {
+      toast({ title: 'Load Error', description: err.message || 'Could not fetch business information.', variant: 'destructive' });
+      setBusinessInfo(DEFAULT_BUSINESS_INFO);
+    }
+    setIsBusinessLoading(false);
+  }, [toast]);
+
+  const handleBusinessFieldChange = (key: keyof BusinessInfoForm, value: string) => {
+    setBusinessInfo(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSaveBusinessInfo = async () => {
+    setIsBusinessSaving(true);
+    try {
+      const response = await fetch('/api/admin/business-info', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(businessInfo),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        toast({ title: 'Save Error', description: result.error || 'Could not save business information.', variant: 'destructive' });
+      } else {
+        toast({ title: 'Success', description: 'Business information updated successfully.' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Save Error', description: err.message || 'Could not save business information.', variant: 'destructive' });
+    }
+    setIsBusinessSaving(false);
+  };
+
   useEffect(() => {
     if (user?.role === 'super_admin' || user?.role === 'branch_manager') {
       fetchUsers();
       fetchBranches();
+      if (user.role === 'super_admin') {
+        fetchBusinessInfo();
+      }
     }
-  }, [fetchUsers, fetchBranches, user]);
+  }, [fetchUsers, fetchBranches, fetchBusinessInfo, user]);
 
   const resetForm = () => {
     setName('');
@@ -224,6 +305,7 @@ export default function AdminPage() {
 
   const handleSubmit = async () => {
     const effectiveRole: UserRole = editingUser ? editingUser.role : role;
+    const normalizedPin = pin.trim();
 
     if (!name || !username) {
       toast({ title: "Validation Error", description: "Name and Username are required.", variant: "destructive" });
@@ -233,11 +315,19 @@ export default function AdminPage() {
       toast({ title: "Validation Error", description: "Password is required for new users.", variant: "destructive" });
       return;
     }
-    if (pin && !/^\d{6}$/.test(pin)) {
+    if (effectiveRole === 'branch_manager' && !editingUser && !normalizedPin) {
+      setPin(DEFAULT_MANAGER_PIN);
+    }
+
+    const resolvedCreatePin = !editingUser && effectiveRole === 'branch_manager'
+      ? (normalizedPin || DEFAULT_MANAGER_PIN)
+      : normalizedPin;
+
+    if (resolvedCreatePin && !/^\d{6}$/.test(resolvedCreatePin)) {
       toast({ title: "Validation Error", description: "PIN must be exactly 6 digits.", variant: "destructive" });
       return;
     }
-    if (effectiveRole !== 'branch_manager' && pin) {
+    if (effectiveRole !== 'branch_manager' && normalizedPin) {
       toast({ title: "Validation Error", description: "PIN can only be assigned to branch managers.", variant: "destructive" });
       return;
     }
@@ -255,8 +345,8 @@ export default function AdminPage() {
           updatePayload.password = password;
           hasChanges = true;
         }
-        if (editingUser.role === 'branch_manager' && pin) {
-          updatePayload.pin = pin;
+        if (editingUser.role === 'branch_manager' && normalizedPin) {
+          updatePayload.pin = normalizedPin;
           hasChanges = true;
         }
 
@@ -300,7 +390,7 @@ export default function AdminPage() {
             name,
             username,
             password,
-            pin: role === 'branch_manager' ? (pin || null) : null,
+            pin: role === 'branch_manager' ? (normalizedPin || DEFAULT_MANAGER_PIN) : null,
             role,
             branch_id: finalBranchId
           }),
@@ -411,106 +501,188 @@ export default function AdminPage() {
               Admin Panel
             </h1>
           </div>
-          <Button onClick={fetchUsers} disabled={isLoading} variant="outline" size="sm">
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          <Button
+            onClick={activeTab === 'users' ? fetchUsers : fetchBusinessInfo}
+            disabled={activeTab === 'users' ? isLoading : isBusinessLoading}
+            variant="outline"
+            size="sm"
+          >
+            <RefreshCw className={`h-4 w-4 ${(activeTab === 'users' ? isLoading : isBusinessLoading) ? 'animate-spin' : ''}`} />
           </Button>
         </div>
 
-        {/* Stats Cards */}
-        <div className={`grid grid-cols-1 md:grid-cols-5 gap-4 mb-8 transition-all duration-500 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
-            <div className="flex items-center justify-between">
-              <div><p className="text-sm text-slate-500 dark:text-slate-400">Total Users</p><p className="text-2xl font-bold text-slate-800 dark:text-white">{userStats.total}</p></div>
-              <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center"><Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" /></div>
-            </div>
-          </div>
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
-            <div className="flex items-center justify-between">
-              <div><p className="text-sm text-slate-500 dark:text-slate-400">Admins</p><p className="text-2xl font-bold text-red-600 dark:text-red-400">{userStats.admins}</p></div>
-              <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center"><Shield className="h-5 w-5 text-red-600 dark:text-red-400" /></div>
-            </div>
-          </div>
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
-            <div className="flex items-center justify-between">
-              <div><p className="text-sm text-slate-500 dark:text-slate-400">Managers</p><p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{userStats.managers}</p></div>
-              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center"><Users className="h-5 w-5 text-purple-600 dark:text-purple-400" /></div>
-            </div>
-          </div>
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
-            <div className="flex items-center justify-between">
-              <div><p className="text-sm text-slate-500 dark:text-slate-400">Staff</p><p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{userStats.staff}</p></div>
-              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center"><Users className="h-5 w-5 text-blue-600 dark:text-blue-400" /></div>
-            </div>
-          </div>
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
-            <div className="flex items-center justify-between">
-              <div><p className="text-sm text-slate-500 dark:text-slate-400">Mechanics</p><p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{userStats.mechanics}</p></div>
-              <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center"><Users className="h-5 w-5 text-orange-600 dark:text-orange-400" /></div>
-            </div>
-          </div>
-        </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full bg-muted border border-border rounded-lg p-1 mb-4" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+            <TabsTrigger value="users" className="rounded-md data-[state=active]:bg-[#714B67] data-[state=active]:text-white">
+              <Users className="h-4 w-4 mr-2" />
+              User Management
+            </TabsTrigger>
+            <TabsTrigger value="business" className="rounded-md data-[state=active]:bg-[#714B67] data-[state=active]:text-white">
+              <Shield className="h-4 w-4 mr-2" />
+              Business Information
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Table */}
-        <div className={`transition-all duration-500 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-          <div className="rounded-lg overflow-hidden border border-border">
-            <div className="w-full bg-muted/50 border-b border-border p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <Users className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <div className="text-sm font-semibold text-foreground">User Management</div>
-                  <div className="text-xs text-muted-foreground">View and manage system access</div>
+          <TabsContent value="users" className="space-y-4">
+            <div className={`grid grid-cols-1 md:grid-cols-5 gap-4 mb-4 transition-all duration-500 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="flex items-center justify-between">
+                  <div><p className="text-sm text-slate-500 dark:text-slate-400">Total Users</p><p className="text-2xl font-bold text-slate-800 dark:text-white">{userStats.total}</p></div>
+                  <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center"><Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" /></div>
                 </div>
               </div>
-              <Button onClick={handleOpenAddDialog} className="bg-[#714B67] hover:bg-[#5a3c53] text-white" size="sm">
-                <UserPlus className="h-4 w-4 mr-2" /> Add New User
-              </Button>
-            </div>
-
-            {/* Filters */}
-            <div className="p-4 bg-background border-b border-border flex flex-col sm:flex-row gap-4 items-end">
-              <div className="flex-1 w-full">
-                <Label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 block">Search Users</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                  <Input
-                    placeholder="Search by name or username..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus:bg-white dark:focus:bg-slate-900"
-                  />
-                  {searchQuery && (
-                    <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"><X className="h-3 w-3" /></button>
-                  )}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="flex items-center justify-between">
+                  <div><p className="text-sm text-slate-500 dark:text-slate-400">Admins</p><p className="text-2xl font-bold text-red-600 dark:text-red-400">{userStats.admins}</p></div>
+                  <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center"><Shield className="h-5 w-5 text-red-600 dark:text-red-400" /></div>
                 </div>
               </div>
-              <div className="w-full sm:w-48">
-                <Label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 block">Role Filter</Label>
-                <Select value={roleFilter} onValueChange={setRoleFilter}>
-                  <SelectTrigger className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800">
-                    <div className="flex items-center gap-2"><Filter className="h-3.5 w-3.5 text-slate-500" /><SelectValue placeholder="Filter by role" /></div>
-                  </SelectTrigger>
-                  <SelectContent className="dark:bg-slate-950 dark:border-slate-800">
-                    <SelectItem value="all">All Roles</SelectItem>
-                    <SelectItem value="super_admin">Super Admin</SelectItem>
-                    <SelectItem value="branch_manager">Branch Manager</SelectItem>
-                    <SelectItem value="staff">Staff</SelectItem>
-                    <SelectItem value="cashier">Cashier</SelectItem>
-                    <SelectItem value="mechanic">Mechanic</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="flex items-center justify-between">
+                  <div><p className="text-sm text-slate-500 dark:text-slate-400">Managers</p><p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{userStats.managers}</p></div>
+                  <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center"><Users className="h-5 w-5 text-purple-600 dark:text-purple-400" /></div>
+                </div>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 w-full sm:w-auto sm:ml-auto">
-                {filteredUsers.length} user{filteredUsers.length === 1 ? '' : 's'} shown
-              </p>
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="flex items-center justify-between">
+                  <div><p className="text-sm text-slate-500 dark:text-slate-400">Staff</p><p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{userStats.staff}</p></div>
+                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center"><Users className="h-5 w-5 text-blue-600 dark:text-blue-400" /></div>
+                </div>
+              </div>
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="flex items-center justify-between">
+                  <div><p className="text-sm text-slate-500 dark:text-slate-400">Mechanics</p><p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{userStats.mechanics}</p></div>
+                  <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center"><Users className="h-5 w-5 text-orange-600 dark:text-orange-400" /></div>
+                </div>
+              </div>
             </div>
 
-            <DataTableWrapper
-              columns={columns}
-              data={filteredUsers.map(u => ({ ...u, id: u.user_id }))}
-              showHeader={false}
-            />
-          </div>
-        </div>
+            <div className={`transition-all duration-500 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+              <div className="rounded-lg overflow-hidden border border-border">
+                <div className="w-full bg-muted/50 border-b border-border p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <Users className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">User Management</div>
+                      <div className="text-xs text-muted-foreground">View and manage system access</div>
+                    </div>
+                  </div>
+                  <Button onClick={handleOpenAddDialog} className="bg-[#714B67] hover:bg-[#5a3c53] text-white" size="sm">
+                    <UserPlus className="h-4 w-4 mr-2" /> Add New User
+                  </Button>
+                </div>
+
+                <div className="p-4 bg-background border-b border-border flex flex-col sm:flex-row gap-4 items-end">
+                  <div className="flex-1 w-full">
+                    <Label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 block">Search Users</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+                      <Input
+                        placeholder="Search by name or username..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus:bg-white dark:focus:bg-slate-900"
+                      />
+                      {searchQuery && (
+                        <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"><X className="h-3 w-3" /></button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="w-full sm:w-48">
+                    <Label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 block">Role Filter</Label>
+                    <Select value={roleFilter} onValueChange={setRoleFilter}>
+                      <SelectTrigger className="bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800">
+                        <div className="flex items-center gap-2"><Filter className="h-3.5 w-3.5 text-slate-500" /><SelectValue placeholder="Filter by role" /></div>
+                      </SelectTrigger>
+                      <SelectContent className="dark:bg-slate-950 dark:border-slate-800">
+                        <SelectItem value="all">All Roles</SelectItem>
+                        <SelectItem value="super_admin">Super Admin</SelectItem>
+                        <SelectItem value="branch_manager">Branch Manager</SelectItem>
+                        <SelectItem value="staff">Staff</SelectItem>
+                        <SelectItem value="cashier">Cashier</SelectItem>
+                        <SelectItem value="mechanic">Mechanic</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 w-full sm:w-auto sm:ml-auto">
+                    {filteredUsers.length} user{filteredUsers.length === 1 ? '' : 's'} shown
+                  </p>
+                </div>
+
+                <DataTableWrapper
+                  columns={columns}
+                  data={filteredUsers.map(u => ({ ...u, id: u.user_id }))}
+                  showHeader={false}
+                />
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="business" className="space-y-4">
+            <div className="rounded-lg overflow-hidden border border-border bg-background">
+              <div className="w-full bg-muted/50 border-b border-border p-4">
+                <div className="text-sm font-semibold text-foreground">Business Information</div>
+                <div className="text-xs text-muted-foreground">Edit legal and receipt-printing details used by POS receipts.</div>
+              </div>
+
+              {isBusinessLoading ? (
+                <div className="p-8 flex items-center justify-center text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading business information...
+                </div>
+              ) : (
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Business Name</Label>
+                    <Input value={businessInfo.business_name} onChange={(e) => handleBusinessFieldChange('business_name', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Business TIN</Label>
+                    <Input value={businessInfo.business_tin} onChange={(e) => handleBusinessFieldChange('business_tin', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>VAT Label</Label>
+                    <Input value={businessInfo.vat_label} onChange={(e) => handleBusinessFieldChange('vat_label', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>ATP Number</Label>
+                    <Input value={businessInfo.atp_number} onChange={(e) => handleBusinessFieldChange('atp_number', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Printer Name</Label>
+                    <Input value={businessInfo.printer_name} onChange={(e) => handleBusinessFieldChange('printer_name', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Printer TIN</Label>
+                    <Input value={businessInfo.printer_tin} onChange={(e) => handleBusinessFieldChange('printer_tin', e.target.value)} />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Printer Address</Label>
+                    <Input value={businessInfo.printer_address} onChange={(e) => handleBusinessFieldChange('printer_address', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Serial Range</Label>
+                    <Input value={businessInfo.serial_range} onChange={(e) => handleBusinessFieldChange('serial_range', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Receipt Type Label</Label>
+                    <Input value={businessInfo.receipt_type_label} onChange={(e) => handleBusinessFieldChange('receipt_type_label', e.target.value)} />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>VAT Inclusive Note</Label>
+                    <Input value={businessInfo.vat_inclusive_note} onChange={(e) => handleBusinessFieldChange('vat_inclusive_note', e.target.value)} />
+                  </div>
+
+                  <div className="md:col-span-2 flex justify-end pt-2">
+                    <Button onClick={handleSaveBusinessInfo} disabled={isBusinessSaving} className="bg-[#714B67] hover:bg-[#5a3c53] text-white">
+                      {isBusinessSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Save Business Information
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
 
         {/* 1. Add/Edit Dialog */}
         <Dialog open={isAddUserDialogOpen || isEditUserDialogOpen} onOpenChange={isOpen => { if (!isOpen) { setIsAddUserDialogOpen(false); setIsEditUserDialogOpen(false); } }}>
@@ -534,7 +706,19 @@ export default function AdminPage() {
               {!editingUser && (
                 <div className="space-y-2">
                   <Label className="dark:text-slate-300">Initial Role</Label>
-                  <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
+                  <Select
+                    value={role}
+                    onValueChange={(v) => {
+                      const nextRole = v as UserRole;
+                      setRole(nextRole);
+                      if (nextRole === 'branch_manager' && !pin) {
+                        setPin(DEFAULT_MANAGER_PIN);
+                      }
+                      if (nextRole !== 'branch_manager') {
+                        setPin('');
+                      }
+                    }}
+                  >
                     <SelectTrigger className="dark:bg-slate-950 dark:border-slate-700"><SelectValue /></SelectTrigger>
                     <SelectContent className="dark:bg-slate-900 dark:border-slate-700">
                       <SelectItem value="cashier">Cashier</SelectItem>
@@ -579,24 +763,31 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {((editingUser && editingUser.role === 'branch_manager') || (!editingUser && role === 'branch_manager')) ? (
-                <div className="space-y-2">
-                  <Label className="dark:text-slate-300">{editingUser ? 'Manager PIN (Optional)' : 'Initial Manager PIN'}</Label>
-                  <Input
-                    type="password"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={6}
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                    placeholder="Exactly 6 digits"
-                    className="dark:bg-slate-950 dark:border-slate-700"
-                  />
-                  <p className="text-xs text-muted-foreground">Used for branch manager authorization prompts (archive/edit approvals).</p>
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">PIN is only available for branch manager accounts.</p>
-              )}
+              <div className="min-h-[108px]">
+                {((editingUser && editingUser.role === 'branch_manager') || (!editingUser && role === 'branch_manager')) ? (
+                  <div className="space-y-2">
+                    <Label className="dark:text-slate-300">{editingUser ? 'Manager PIN (Optional)' : 'Initial Manager PIN (Required)'}</Label>
+                    <Input
+                      type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      value={pin}
+                      onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                      placeholder={editingUser ? 'Exactly 6 digits' : DEFAULT_MANAGER_PIN}
+                      required={!editingUser}
+                      className="dark:bg-slate-950 dark:border-slate-700"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Used for branch manager authorization prompts (archive/edit approvals). Default: {DEFAULT_MANAGER_PIN}.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="h-full rounded-md border border-dashed border-slate-300 dark:border-slate-700 px-3 py-2 flex items-center">
+                    <p className="text-xs text-muted-foreground">PIN is only available for branch manager accounts.</p>
+                  </div>
+                )}
+              </div>
             </div>
             <DialogFooter>
               <Button onClick={handleSubmit} disabled={isLoading} className={buttonStyles.primary}>
