@@ -21,6 +21,11 @@ interface AdminProfile {
   role: string;
 }
 
+interface SystemSettingRow {
+  key: string;
+  value: string | null;
+}
+
 const DEFAULT_SETTINGS: BusinessSettingsPayload = {
   business_name: "Queen.R Tire Supply & Vulcanizing Shop",
   business_tin: "193-953-192-000",
@@ -74,7 +79,8 @@ export async function GET(_request: NextRequest) {
   const { data, error } = await adminClient
     .from("system_settings")
     .select("key, value")
-    .in("key", [...BUSINESS_SETTING_KEYS]);
+    .in("key", [...BUSINESS_SETTING_KEYS])
+    .returns<SystemSettingRow[]>();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
