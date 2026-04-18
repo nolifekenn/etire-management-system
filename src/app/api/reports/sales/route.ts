@@ -37,6 +37,10 @@ export async function POST(request: Request) {
         )
       `);
 
+      query = query
+        .is('deleted_at', null)
+        .in('state', ['confirmed', 'done']);
+
     // 2️⃣ Apply filters if provided
     if (filters.date_from && filters.date_to) {
       const start = `${filters.date_from}T00:00:00Z`;

@@ -57,12 +57,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Could not verify current user." }, { status: 401 });
     }
 
-    // Non-manager roles can only request authorization for their own branch.
-    if (
-      requester.role !== "super_admin" &&
-      requester.role !== "branch_manager" &&
-      requester.branch_id !== normalizedBranchId
-    ) {
+    // All non-super-admin users can only request authorization for their own branch.
+    if (requester.role !== "super_admin" && requester.branch_id !== normalizedBranchId) {
       return NextResponse.json(
         { success: false, error: "You can only request manager authorization for your branch." },
         { status: 403 }
@@ -76,6 +72,7 @@ export async function POST(request: NextRequest) {
       .eq("branch_id", normalizedBranchId)
       .eq("pin", normalizedPin)
       .is("deleted_at", null)
+      .limit(1)
       .maybeSingle<ManagerRecord>();
 
     if (managerError) {

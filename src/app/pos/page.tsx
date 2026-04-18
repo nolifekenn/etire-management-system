@@ -18,7 +18,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase as _supabase } from '@/lib/supabaseClient';
-import { createPOSSale, type CreatePOSSaleInput } from '@/lib/actions/sales';
+import { createPOSSale, voidLatestPOSSaleForBranch, type CreatePOSSaleInput } from '@/lib/actions/sales';
 import {
   generateHtmlReceipt, printReceipt,
   type BusinessInfo, type ReceiptItem, type ReceiptData,
@@ -46,6 +46,7 @@ import {
 import { toast } from '@/hooks/use-toast';
 import type { InventoryItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { SecureVoidModal } from '@/components/SecureVoidModal';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Types
@@ -64,6 +65,8 @@ interface Customer {
   customer_id: string;
   name:        string;
   phone?:      string;
+  address?:    string;
+  vat?:        string;
 }
 
 interface BranchInfo {
@@ -71,6 +74,19 @@ interface BranchInfo {
   name:      string;
   address?:  string;
   phone?:    string;
+}
+
+interface ReceiptBusinessSettings {
+  business_name?: string;
+  business_tin?: string;
+  vat_label?: string;
+  atp_number?: string;
+  printer_name?: string;
+  printer_address?: string;
+  printer_tin?: string;
+  serial_range?: string;
+  receipt_type_label?: string;
+  vat_inclusive_note?: string;
 }
 
 type TaxPreset = 'none' | 'vat' | 'custom';
@@ -369,6 +385,7 @@ interface SaleRecord {
   total_amount:    number;
   payment_method:  string;
   sale_date:       string;
+  state:           string;
   discount_amount: number;
   tax_amount:      number;
   customer?: { name: string } | null;
@@ -386,9 +403,12 @@ const SalesHistoryDrawer: React.FC<{
   const [loading, setLoading] = useState(false);
   const [search,  setSearch]  = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [isVoidModalOpen, setIsVoidModalOpen] = useState(false);
+  const [isVoidingLatest, setIsVoidingLatest] = useState(false);
 
-  useEffect(() => {
+  const loadSalesHistory = useCallback(() => {
     if (!open || !branchId) return;
+
     setLoading(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any)
@@ -399,6 +419,7 @@ const SalesHistoryDrawer: React.FC<{
         total_amount,
         payment_method,
         sale_date,
+        state,
         discount_amount,
         tax_amount,
         customer:customer_id ( name ),
@@ -410,14 +431,59 @@ const SalesHistoryDrawer: React.FC<{
         )
       `)
       .eq('branch_id', branchId)
-      .eq('state', 'done')
+      .in('state', ['done', 'cancelled'])
+      .is('deleted_at', null)
       .order('sale_date', { ascending: false })
       .limit(100)
       .then(({ data, error }: { data: SaleRecord[] | null; error: unknown }) => {
         if (!error && data) setSales(data);
         setLoading(false);
       });
-  }, [open, branchId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, branchId, supabase]);
+
+  useEffect(() => {
+    loadSalesHistory();
+  }, [loadSalesHistory]);
+
+  const handleVoidLatestSale = async () => {
+    if (!branchId) {
+      toast({ title: 'Missing branch', description: 'Branch context is required.', variant: 'destructive' });
+      return;
+    }
+
+    setIsVoidingLatest(true);
+    try {
+      const result = await voidLatestPOSSaleForBranch(branchId, 'Voided from POS History');
+
+      if (!result.success) {
+        toast({ title: 'Void failed', description: result.error || 'Could not void latest sale.', variant: 'destructive' });
+        return;
+      }
+
+      const restoredItems = (result.restoredItems ?? []) as Array<{ name?: string; quantity?: number }>;
+      const restoredPreview = restoredItems
+        .slice(0, 3)
+        .map(item => `${item.name ?? 'Item'} (+${item.quantity ?? 0})`)
+        .join(', ');
+      const hasMore = restoredItems.length > 3;
+
+      toast({
+        title: 'Latest sale voided',
+        description: restoredItems.length > 0
+          ? `Sale ${result.saleNumber ?? 'transaction'} voided. Returned ${result.restoredUnits ?? 0} unit(s): ${restoredPreview}${hasMore ? ', ...' : ''}`
+          : `Sale ${result.saleNumber ?? 'transaction'} has been voided.`,
+      });
+      loadSalesHistory();
+    } catch (error: unknown) {
+      toast({
+        title: 'Void failed',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsVoidingLatest(false);
+    }
+  };
 
   const filtered = sales.filter(s =>
     !search ||
@@ -437,7 +503,7 @@ const SalesHistoryDrawer: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="flex h-[88vh] w-[min(96vw,1200px)] max-w-none flex-col p-0">
+      <DialogContent className="flex h-[90vh] w-[calc(100vw-12px)] max-w-[calc(100vw-12px)] flex-col p-0">
         <DialogHeader className="border-b px-4 sm:px-5 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -460,7 +526,20 @@ const SalesHistoryDrawer: React.FC<{
                 </button>
               )}
             </div>
-            <span className="whitespace-nowrap text-xs text-gray-400">{filtered.length} records</span>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="whitespace-nowrap text-xs text-gray-400">{filtered.length} records</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={isVoidingLatest || loading || !branchId || filtered.length === 0}
+                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                onClick={() => setIsVoidModalOpen(true)}
+              >
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                Void Latest
+              </Button>
+            </div>
           </div>
         </DialogHeader>
 
@@ -476,8 +555,8 @@ const SalesHistoryDrawer: React.FC<{
             </div>
           ) : (
             <>
-            <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full min-w-[760px] text-sm">
+            <div className="hidden sm:block">
+            <table className="w-full text-sm">
               <thead className="sticky top-0 bg-white">
                 <tr>
                   <th className="px-4 py-2.5 text-left font-medium text-gray-500 text-xs">Sale #</th>
@@ -485,13 +564,17 @@ const SalesHistoryDrawer: React.FC<{
                   <th className="px-4 py-2.5 text-left font-medium text-gray-500 text-xs">Payment</th>
                   <th className="px-4 py-2.5 text-right font-medium text-gray-500 text-xs">Total</th>
                   <th className="px-4 py-2.5 text-right font-medium text-gray-500 text-xs">Date</th>
+                  <th className="px-4 py-2.5 text-right font-medium text-gray-500 text-xs">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(sale => (
                   <React.Fragment key={sale.sale_id}>
                     <tr
-                      className="cursor-pointer border-t border-gray-100 transition-colors hover:bg-gray-50"
+                      className={cn(
+                        'cursor-pointer border-t border-gray-100 transition-colors hover:bg-gray-50',
+                        sale.state === 'cancelled' && 'bg-red-50/50 hover:bg-red-50'
+                      )}
                       onClick={() => setExpanded(prev => prev === sale.sale_id ? null : sale.sale_id)}
                     >
                       <td className="px-4 py-2.5 font-semibold text-foreground">
@@ -514,10 +597,17 @@ const SalesHistoryDrawer: React.FC<{
                           hour: 'numeric', minute: '2-digit',
                         })}
                       </td>
+                      <td className="px-4 py-2.5 text-right">
+                        {sale.state === 'cancelled' ? (
+                          <Badge className="bg-red-600 text-white hover:bg-red-600">VOIDED</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-50">DONE</Badge>
+                        )}
+                      </td>
                     </tr>
                     {expanded === sale.sale_id && (
                       <tr className="bg-gray-50">
-                        <td colSpan={5} className="px-6 pb-3 pt-1">
+                        <td colSpan={6} className="px-6 pb-3 pt-1">
                           <div className="mb-1.5 mt-1 text-xs font-medium text-gray-500">Items</div>
                           <div className="space-y-1">
                             {(sale.sale_item ?? []).map((si, idx) => (
@@ -560,12 +650,20 @@ const SalesHistoryDrawer: React.FC<{
               {filtered.map((sale) => (
                 <div
                   key={sale.sale_id}
-                  className="rounded-lg border border-gray-200 bg-white p-3"
+                  className={cn(
+                    'rounded-lg border border-gray-200 bg-white p-3',
+                    sale.state === 'cancelled' && 'border-red-200 bg-red-50/60'
+                  )}
                   onClick={() => setExpanded(prev => prev === sale.sale_id ? null : sale.sale_id)}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground truncate">{sale.sale_number ?? '—'}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground truncate">{sale.sale_number ?? '—'}</p>
+                        {sale.state === 'cancelled' && (
+                          <Badge className="bg-red-600 text-white hover:bg-red-600">VOIDED</Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-600 truncate">{sale.customer?.name ?? 'Walk-in'}</p>
                       <p className="text-[11px] text-gray-500 mt-1">
                         {new Date(sale.sale_date).toLocaleString('en-PH', {
@@ -578,6 +676,13 @@ const SalesHistoryDrawer: React.FC<{
                         {sale.payment_method}
                       </span>
                       <p className="text-sm font-semibold text-gray-800 mt-2">{formatCurrency(sale.total_amount)}</p>
+                      <div className="mt-1 flex justify-end">
+                        {sale.state === 'cancelled' ? (
+                          <Badge className="bg-red-600 text-white hover:bg-red-600">VOIDED</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-50">DONE</Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -621,6 +726,14 @@ const SalesHistoryDrawer: React.FC<{
           )}
         </div>
       </DialogContent>
+
+      <SecureVoidModal
+        isOpen={isVoidModalOpen}
+        onClose={() => setIsVoidModalOpen(false)}
+        onAuthorized={() => { void handleVoidLatestSale(); }}
+        requiredBranchId={branchId}
+        actionDescription="Only branch managers from the same branch can void the latest sales transaction."
+      />
     </Dialog>
   );
 };
@@ -683,7 +796,7 @@ export default function POSPage() {
       productQuery,
       supabase
         .from('customer')
-        .select('customer_id, name, phone')
+        .select('customer_id, name, phone, address, vat')
         .is('deleted_at', null)
         .order('name'),
     ]);
@@ -817,12 +930,34 @@ export default function POSPage() {
 
       // Build and print receipt
       const customerObj  = customers.find(c => c.customer_id === customerId);
+      let businessSettings: ReceiptBusinessSettings = {};
+      try {
+        const settingsRes = await fetch('/api/business-info', { method: 'GET', cache: 'no-store' });
+        if (settingsRes.ok) {
+          const payload = await settingsRes.json();
+          businessSettings = (payload?.data ?? {}) as ReceiptBusinessSettings;
+        }
+      } catch {
+        businessSettings = {};
+      }
+
       const biz: BusinessInfo = {
-        storeName:     branch?.name    ?? 'eTire POS',
-        address:       branch?.address ?? '',
-        phone:         branch?.phone   ?? '',
-        taxInfo:       '',
-        footerMessage: 'Thank you for your business!',
+        storeName:              businessSettings.business_name || branch?.name || 'Business Name',
+        address:                branch?.address ?? '',
+        phone:                  branch?.phone ?? '',
+        taxInfo:                businessSettings.business_tin || '',
+        footerMessage:          'Thank you for your business!',
+        registeredBusinessName: businessSettings.business_name || branch?.name || 'Business Name',
+        mainBranchAddress:      branch?.address ?? 'Main Branch Address Placeholder',
+        tin:                    businessSettings.business_tin || '',
+        vatLabel:               businessSettings.vat_label || 'VAT Registered',
+        atpNumber:              businessSettings.atp_number || '',
+        printerName:            businessSettings.printer_name || '',
+        printerAddress:         businessSettings.printer_address || '',
+        printerTin:             businessSettings.printer_tin || '',
+        serialRange:            businessSettings.serial_range || '',
+        receiptTypeLabel:       businessSettings.receipt_type_label || 'SALES INVOICE',
+        vatInclusiveNote:       businessSettings.vat_inclusive_note || 'Prices shown are VAT-inclusive.',
       };
       const receiptItems: ReceiptItem[] = cart.map(l => ({
         name:     l.item.name,
@@ -850,7 +985,12 @@ export default function POSPage() {
         role:     String(user.role ?? 'staff'),
       } as unknown as User;
       const receiptCustomer: ReceiptCustomer | undefined = customerObj
-        ? { name: customerObj.name, phone: customerObj.phone }
+        ? {
+            name: customerObj.name,
+            phone: customerObj.phone,
+            address: customerObj.address,
+            tin: customerObj.vat,
+          }
         : undefined;
       const branchRecord = branch?.branch_id
         ? {

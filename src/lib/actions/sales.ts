@@ -575,6 +575,183 @@ export async function voidSale(saleId: string, userId: string, reason: string) {
   return { success: true };
 }
 
+export async function voidLatestPOSSaleForBranch(branchId: string, reason: string = 'Voided from POS History') {
+  const supabase: AnyClient = await createClient();
+  const admin: AnyClient = createAdminClient();
+
+  if (!branchId) {
+    return { success: false, error: 'Branch is required.' };
+  }
+
+  const {
+    data: { user: authUser },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !authUser) {
+    return { success: false, error: 'Unauthorized.' };
+  }
+
+  const { data: actor, error: actorError } = await admin
+    .from('user')
+    .select('user_id, role, branch_id')
+    .eq('auth_id', authUser.id)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (actorError || !actor) {
+    return { success: false, error: 'Could not verify current user.' };
+  }
+
+  if (actor.role !== 'super_admin' && actor.role !== 'branch_manager') {
+    return { success: false, error: 'Insufficient permissions to void sales.' };
+  }
+
+  if (actor.role !== 'super_admin' && actor.branch_id !== branchId) {
+    return { success: false, error: 'You can only void sales from your own branch.' };
+  }
+
+  const { data: latestSale, error: latestSaleError } = await admin
+    .from('sale')
+    .select('sale_id, sale_number, note')
+    .eq('branch_id', branchId)
+    .eq('state', 'done')
+    .is('deleted_at', null)
+    .order('sale_date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestSaleError) {
+    return { success: false, error: latestSaleError.message };
+  }
+
+  if (!latestSale) {
+    return { success: false, error: 'No completed sales were found to void.' };
+  }
+
+  const oldNote = String((latestSale as AnyRecord).note ?? '').trim();
+  const voidNote = oldNote
+    ? `${oldNote}\n[VOID] ${reason}`
+    : `[VOID] ${reason}`;
+
+  const { data: claimedSale, error: claimSaleError } = await admin
+    .from('sale')
+    .update({
+      state: 'cancelled',
+      note: voidNote,
+    })
+    .eq('sale_id', latestSale.sale_id)
+    .eq('state', 'done')
+    .select('sale_id')
+    .maybeSingle();
+
+  if (claimSaleError) {
+    return { success: false, error: claimSaleError.message };
+  }
+
+  if (!claimedSale) {
+    return { success: false, error: 'Latest sale is no longer eligible for voiding.' };
+  }
+
+  const { data: saleItems, error: itemsError } = await admin
+    .from('sale_item')
+    .select('item_id, quantity, price_at_sale')
+    .eq('sale_id', latestSale.sale_id);
+
+  if (itemsError) {
+    return { success: false, error: itemsError.message };
+  }
+
+  const qtyByItem = new Map<string, number>();
+  for (const row of (saleItems as AnyRecord[]) ?? []) {
+    const itemId = row.item_id as string | null;
+    if (!itemId) continue;
+    const qty = Number(row.quantity ?? 0);
+    qtyByItem.set(itemId, (qtyByItem.get(itemId) ?? 0) + qty);
+  }
+
+  const restoredItems: { item_id: string; name: string; quantity: number }[] = [];
+  let restoredUnits = 0;
+
+  for (const [itemId, qty] of qtyByItem.entries()) {
+    const { data: itemRow, error: itemFetchError } = await admin
+      .from('inventory_item')
+      .select('name, stock_quantity, cost_price')
+      .eq('item_id', itemId)
+      .single();
+
+    if (itemFetchError) {
+      return { success: false, error: itemFetchError.message };
+    }
+
+    const currentQty = Number((itemRow as AnyRecord).stock_quantity ?? 0);
+    const costPrice = Number((itemRow as AnyRecord).cost_price ?? 0);
+
+    const { error: itemUpdateError } = await admin
+      .from('inventory_item')
+      .update({ stock_quantity: currentQty + qty })
+      .eq('item_id', itemId);
+
+    if (itemUpdateError) {
+      return { success: false, error: itemUpdateError.message };
+    }
+
+    const { error: moveError } = await admin
+      .from('inventory_moves')
+      .insert({
+        item_id: itemId,
+        branch_id: branchId,
+        source_document_type: 'adjustment',
+        source_document_id: latestSale.sale_id,
+        quantity_moved: qty,
+        unit_cost: costPrice,
+        created_by: actor.user_id,
+        notes: `Stock returned after voiding sale ${latestSale.sale_number ?? latestSale.sale_id}`,
+      });
+
+    if (moveError) {
+      return { success: false, error: moveError.message };
+    }
+
+    restoredUnits += qty;
+    restoredItems.push({
+      item_id: itemId,
+      name: String((itemRow as AnyRecord).name ?? itemId),
+      quantity: qty,
+    });
+  }
+
+  await admin.from('audit_log').insert({
+    user_id: actor.user_id,
+    action: 'VOID',
+    table_name: 'sale',
+    record_id: latestSale.sale_id,
+    record_number: latestSale.sale_number ?? undefined,
+    old_values: { state: 'done' },
+    new_values: {
+      state: 'cancelled',
+      reason,
+      source: 'pos_history_void_latest',
+      restored_units: restoredUnits,
+      restored_items: restoredItems,
+    },
+  });
+
+  revalidatePath('/pos');
+  revalidatePath('/sales');
+  revalidatePath('/reports');
+  revalidatePath('/dashboard');
+
+  return {
+    success: true,
+    saleId: latestSale.sale_id as string,
+    saleNumber: (latestSale.sale_number as string | null) ?? null,
+    restoredUnits,
+    restoredItems,
+  };
+}
+
 // ── 8. upsertSaleLines (for editing a draft quotation) ────────────────────
 
 export async function upsertSaleLines(

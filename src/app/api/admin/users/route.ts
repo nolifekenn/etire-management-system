@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient, createClient } from "@/lib/supabaseServer";
 
 const PIN_REGEX = /^\d{6}$/;
+const DEFAULT_MANAGER_PIN = '112233';
 
 // Verify the request comes from an authenticated super admin.
 // Uses getUser() which always re-validates against the Supabase Auth server,
@@ -68,16 +69,19 @@ export async function POST(request: NextRequest) {
         const normalizedRole = String(role || 'staff');
         const pinInput = pin == null ? '' : String(pin).trim();
         const normalizedPin = pinInput === '' ? null : pinInput;
+        const resolvedManagerPin = normalizedRole === 'branch_manager'
+            ? (normalizedPin ?? DEFAULT_MANAGER_PIN)
+            : null;
 
         if (!name || !username || !password) {
             return NextResponse.json({ error: "Name, username, and password are required" }, { status: 400 });
         }
 
-        if (normalizedPin && !PIN_REGEX.test(normalizedPin)) {
-            return NextResponse.json({ error: "PIN must be exactly 6 digits" }, { status: 400 });
-        }
-
-        if (normalizedRole !== 'branch_manager' && normalizedPin) {
+        if (normalizedRole === 'branch_manager') {
+            if (!resolvedManagerPin || !PIN_REGEX.test(resolvedManagerPin)) {
+                return NextResponse.json({ error: "Branch manager PIN must be exactly 6 digits" }, { status: 400 });
+            }
+        } else if (normalizedPin) {
             return NextResponse.json({ error: "PIN can only be set for branch managers" }, { status: 400 });
         }
 
@@ -107,7 +111,7 @@ export async function POST(request: NextRequest) {
                 role: normalizedRole,
                 auth_id: authData.user.id, // Using auth_id
                 branch_id: branch_id || null,
-                pin: normalizedRole === 'branch_manager' ? normalizedPin : null
+                pin: resolvedManagerPin
             })
             .select()
             .single();
@@ -173,7 +177,9 @@ export async function PUT(request: NextRequest) {
 
         if (targetRole === 'branch_manager') {
             if (pinWasProvided) {
-                updateData.pin = normalizedInputPin;
+                updateData.pin = normalizedInputPin || DEFAULT_MANAGER_PIN;
+            } else if (existingUser.pin === null) {
+                updateData.pin = DEFAULT_MANAGER_PIN;
             }
         } else {
             if (pinWasProvided && normalizedInputPin) {
