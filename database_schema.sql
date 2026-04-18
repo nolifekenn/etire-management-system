@@ -474,6 +474,16 @@ CREATE TABLE public.supplier (
   notes text,
   CONSTRAINT supplier_pkey PRIMARY KEY (supplier_id)
 );
+CREATE TABLE public.system_settings (
+  setting_id uuid NOT NULL DEFAULT gen_random_uuid(),
+  key text NOT NULL UNIQUE,
+  value text,
+  description text,
+  updated_by uuid,
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT system_settings_pkey PRIMARY KEY (setting_id),
+  CONSTRAINT system_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.user(user_id)
+);
 CREATE TABLE public.tire_brand (
   brand_id uuid NOT NULL DEFAULT gen_random_uuid(),
   name text NOT NULL UNIQUE,
@@ -495,10 +505,9 @@ CREATE TABLE public.user (
   deleted_at timestamp with time zone,
   updated_at timestamp with time zone DEFAULT now(),
   password text NOT NULL DEFAULT ''::text,
-  pin text,
   current_session_nonce text,
+  pin text CHECK (pin IS NULL OR pin ~ '^[0-9]{6}$'::text),
   CONSTRAINT user_pkey PRIMARY KEY (user_id),
-  CONSTRAINT user_pin_role_check CHECK (((pin IS NULL) OR (pin ~ '^[0-9]{6}$'::text)) AND ((pin IS NULL) OR (role::text = 'branch_manager'::text))),
   CONSTRAINT user_auth_id_fkey FOREIGN KEY (auth_id) REFERENCES auth.users(id),
   CONSTRAINT user_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branch(branch_id)
 );
