@@ -16,6 +16,11 @@ const BUSINESS_SETTING_KEYS = [
 
 type BusinessSettingsPayload = Record<(typeof BUSINESS_SETTING_KEYS)[number], string>;
 
+interface SystemSettingRow {
+  key: string;
+  value: string | null;
+}
+
 const DEFAULT_SETTINGS: BusinessSettingsPayload = {
   business_name: "",
   business_tin: "",
@@ -44,7 +49,8 @@ export async function GET(_request: NextRequest) {
   const { data, error } = await adminClient
     .from("system_settings")
     .select("key, value")
-    .in("key", [...BUSINESS_SETTING_KEYS]);
+    .in("key", [...BUSINESS_SETTING_KEYS])
+    .returns<SystemSettingRow[]>();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
