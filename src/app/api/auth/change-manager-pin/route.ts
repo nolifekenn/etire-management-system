@@ -54,8 +54,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { error: updateError } = await adminClient
-      .from("user")
+    const { error: updateError } = await (adminClient
+      .from("user") as any)
       .update({ pin: normalizedPin })
       .eq("user_id", requester.user_id)
       .eq("role", "branch_manager")
