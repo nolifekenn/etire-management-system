@@ -16,6 +16,11 @@ const BUSINESS_SETTING_KEYS = [
 
 type BusinessSettingsPayload = Record<(typeof BUSINESS_SETTING_KEYS)[number], string>;
 
+interface AdminProfile {
+  user_id: string;
+  role: string;
+}
+
 const DEFAULT_SETTINGS: BusinessSettingsPayload = {
   business_name: "Queen.R Tire Supply & Vulcanizing Shop",
   business_tin: "193-953-192-000",
@@ -46,7 +51,7 @@ async function verifySuperAdmin() {
     .select("user_id, role")
     .eq("auth_id", user.id)
     .is("deleted_at", null)
-    .maybeSingle();
+    .maybeSingle<AdminProfile>();
 
   if (profileError || !profile) {
     return { ok: false as const, error: "Could not verify current user", status: 401 };
