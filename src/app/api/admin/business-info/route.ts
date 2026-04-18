@@ -112,8 +112,8 @@ export async function PUT(request: NextRequest) {
   }));
 
   const adminClient = createAdminClient();
-  const { error } = await adminClient
-    .from("system_settings")
+  const { error } = await (adminClient
+    .from("system_settings") as any)
     .upsert(upsertRows, { onConflict: "key" });
 
   if (error) {
