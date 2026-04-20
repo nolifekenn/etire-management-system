@@ -10,6 +10,7 @@ import type { User, Customer, Branch, Sale } from '@/lib/types'; // Import from 
  */
 export interface ReceiptItem {
   name: string;
+  description?: string;
   quantity: number;
   price: number; // Price per unit at time of sale
 }
@@ -154,6 +155,17 @@ const getReceiptCss = (): string => `
   .items-table tbody td {
     padding: 4px 0;
   }
+  .item-name {
+    display: block;
+  }
+  .item-description {
+    display: block;
+    margin-top: 1px;
+    font-size: 10px;
+    font-style: italic;
+    color: #666;
+    line-height: 1.2;
+  }
   .items-table .qty, .items-table .price {
     text-align: center;
   }
@@ -246,7 +258,10 @@ export const generateHtmlReceipt = (data: ReceiptData): string => {
     .map(
       (item) => `
     <tr>
-      <td>${item.name}</td>
+      <td>
+        <span class="item-name">${item.name}</span>
+        ${item.description ? `<span class="item-description">${item.description}</span>` : ''}
+      </td>
       <td class="qty">${item.quantity}</td>
       <td class="price">${formatCurrency(item.price)}</td>
       <td class="total">${formatCurrency(item.quantity * item.price)}</td>

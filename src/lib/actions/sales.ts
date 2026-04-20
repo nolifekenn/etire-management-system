@@ -481,6 +481,7 @@ export async function getSaleWithDetails(saleId: string) {
     `)
     .eq('sale_id', saleId)
     .is('deleted_at', null)
+    .is('sale_item.deleted_at', null)
     .single();
 
   if (error) return { success: false, error: error.message, sale: null };
@@ -521,7 +522,8 @@ export async function getSaleSmartButtons(saleId: string) {
   const { data: items } = await supabase
     .from('sale_item')
     .select('sale_item_id, quantity')
-    .eq('sale_id', saleId);
+    .eq('sale_id', saleId)
+    .is('deleted_at', null);
 
   const totalUnits = ((items ?? []) as AnyRecord[])
     .reduce((s, i) => s + Number(i.quantity), 0);
@@ -657,7 +659,8 @@ export async function voidLatestPOSSaleForBranch(branchId: string, reason: strin
   const { data: saleItems, error: itemsError } = await admin
     .from('sale_item')
     .select('item_id, quantity, price_at_sale')
-    .eq('sale_id', latestSale.sale_id);
+    .eq('sale_id', latestSale.sale_id)
+    .is('deleted_at', null);
 
   if (itemsError) {
     return { success: false, error: itemsError.message };
@@ -760,8 +763,12 @@ export async function upsertSaleLines(
 ) {
   const supabase: AnyClient = await createClient();
 
-  // Delete old lines
-  await supabase.from('sale_item').delete().eq('sale_id', saleId);
+  // Soft-delete old lines
+  await supabase
+    .from('sale_item')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('sale_id', saleId)
+    .is('deleted_at', null);
 
   const subtotal = lines.reduce(
     (s, l) => s + l.price_at_sale * l.quantity + (l.installation_fee ?? 0),

@@ -219,7 +219,8 @@ export async function getServiceJobSmartButtons(
     supabase
       .from('service_job_item')
       .select('service_job_item_id, quantity, price_at_service')
-      .eq('job_id', jobId),
+      .eq('job_id', jobId)
+      .is('deleted_at', null),
 
     supabase
       .from('sale')

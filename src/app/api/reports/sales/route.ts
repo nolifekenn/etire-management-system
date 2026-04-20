@@ -39,6 +39,7 @@ export async function POST(request: Request) {
 
       query = query
         .is('deleted_at', null)
+        .is('sale_item.deleted_at', null)
         .in('state', ['confirmed', 'done']);
 
     // 2️⃣ Apply filters if provided

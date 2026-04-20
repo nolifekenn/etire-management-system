@@ -132,8 +132,12 @@ export async function createRFQ(input: CreateRFQInput) {
       .insert(lineRows);
 
     if (lineErr) {
-      // Roll back the PO
-      await supabase.from('purchase_order').delete().eq('po_id', po.po_id);
+      // Roll back the PO via soft-delete
+      await supabase
+        .from('purchase_order')
+        .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('po_id', po.po_id)
+        .is('deleted_at', null);
       return { success: false, error: lineErr.message };
     }
   }

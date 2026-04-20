@@ -202,6 +202,7 @@ export async function getProductWithDetails(itemId: string) {
       )
     `)
     .eq('item_id', itemId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(20);
 
@@ -465,7 +466,8 @@ export async function getInventorySmartButtons(itemId: string) {
     supabase
       .from('sale_item')
       .select('sale_item_id, quantity')
-      .eq('item_id', itemId),
+      .eq('item_id', itemId)
+      .is('deleted_at', null),
     supabase
       .from('inventory_adjustment_line')
       .select('adj_line_id')

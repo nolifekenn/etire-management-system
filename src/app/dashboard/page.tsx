@@ -302,7 +302,15 @@ export default function DashboardPage() {
       )}
 
       {/* ── KPI Row ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <KpiCard
+          title="Total Business Income"
+          value={loadingKPIs ? '…' : fmtCompact(summary?.total_business_income ?? 0)}
+          subtitle={loadingKPIs ? undefined : `Sales ${fmtCompact(summary?.total_sales_revenue ?? 0)} + Services ${fmtCompact(summary?.total_service_revenue ?? 0)}`}
+          icon={<DollarSign className="h-4 w-4" />}
+          loading={loadingKPIs}
+          color="ring-emerald-500/20"
+        />
         <KpiCard
           title="Total Sales Revenue"
           value={loadingKPIs ? '…' : fmtCompact(summary?.total_sales_revenue ?? 0)}
