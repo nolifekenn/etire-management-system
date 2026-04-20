@@ -110,6 +110,7 @@ export interface ServiceJobRow {
   updated_at:            string;
   // Joined
   customer_name:         string | null;
+  customer_phone:        string | null;
   plate_number:          string | null;
   vehicle_make:          string | null;
   vehicle_model:         string | null;
@@ -249,6 +250,7 @@ export async function listServiceJobs(input: ListServiceJobsInput = {}) {
       created_at:           row.created_at as string,
       updated_at:           (row.updated_at as string) ?? row.created_at as string,
       customer_name:        (customer?.name as string)           ?? null,
+      customer_phone:       (customer?.phone as string)          ?? null,
       plate_number:         (vehicle?.plate_number as string)    ?? null,
       vehicle_make:         (vehicle?.make as string)            ?? null,
       vehicle_model:        (vehicle?.model as string)           ?? null,
@@ -350,6 +352,7 @@ export async function getServiceJobDetail(
     created_at:           row.created_at,
     updated_at:           row.updated_at ?? row.created_at,
     customer_name:        (customer?.name as string)           ?? null,
+    customer_phone:       (customer?.phone as string)          ?? null,
     plate_number:         (vehicle?.plate_number as string)    ?? null,
     vehicle_make:         (vehicle?.make as string)            ?? null,
     vehicle_model:        (vehicle?.model as string)           ?? null,
