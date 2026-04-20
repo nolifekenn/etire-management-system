@@ -458,6 +458,7 @@ export async function getSalesReport(filter: SalesReportFilter = {}) {
       sale_item ( sale_item_id )
     `, { count: 'exact' })
     .is('deleted_at', null)
+    .is('sale_item.deleted_at', null)
     .in('state', ['confirmed', 'done'])
     .order('sale_date', { ascending: false })
     .range(offset, offset + page_size - 1);
@@ -629,6 +630,7 @@ export async function getServiceReport(filter: ServiceReportFilter = {}) {
       )
     `)
     .is('deleted_at', null)
+    .is('service_job_item.deleted_at', null)
     .order('job_date', { ascending: false });
 
   if (branch_id)   q = q.eq('branch_id', branch_id);

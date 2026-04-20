@@ -53,9 +53,23 @@ import {
 import { type ServiceState, SERVICE_STATE_LABELS, getNextServiceStates } from "@/lib/serviceUtils";
 import { cn } from "@/lib/utils";
 import {
-  generateServiceReceiptHtml, printReceipt,
-  type ServiceReceiptData, type ServiceReceiptLine,
+  generateHtmlReceipt, printReceipt,
+  type BusinessInfo, type ReceiptItem, type ReceiptData, type ReceiptCustomer,
 } from "@/lib/receiptGenerator";
+import type { Branch, Sale, User as AppUser } from "@/lib/types";
+
+interface ReceiptBusinessSettings {
+  business_name?: string;
+  business_tin?: string;
+  vat_label?: string;
+  atp_number?: string;
+  printer_name?: string;
+  printer_address?: string;
+  printer_tin?: string;
+  serial_range?: string;
+  receipt_type_label?: string;
+  vat_inclusive_note?: string;
+}
 
 const STATE_ORDER: ServiceState[] = [
   "quotation", "confirmed", "in_progress", "quality_check", "completed", "invoiced",
@@ -685,28 +699,93 @@ export default function ServiceFormPage() {
     }
   };
 
-  const handlePrintInvoice = () => {
+  const handlePrintInvoice = async () => {
     if (!job) return;
-    const receiptLines: ServiceReceiptLine[] = items.map(it => ({
-      name:       it.item_name ?? "Service",
-      quantity:   it.quantity,
-      unit_price: it.price_at_service,
-    }));
-    const receiptData: ServiceReceiptData = {
-      job_number:     job.job_number ?? job.job_id.slice(0, 8).toUpperCase(),
-      job_date:       job.job_date,
-      branch_name:    job.branch_name ?? "eTire Workshop",
-      customer_name:  job.customer_name ?? undefined,
-      plate_number:   job.plate_number ?? undefined,
-      vehicle_make:   job.vehicle_make ?? undefined,
-      vehicle_model:  job.vehicle_model ?? undefined,
-      vehicle_year:   job.vehicle_year ?? undefined,
-      mechanic_name:  job.mechanic_name ?? undefined,
-      lines:          receiptLines.length > 0 ? receiptLines : [{ name: job.job_description, quantity: 1, unit_price: job.total_amount }],
-      total_amount:   job.total_amount,
-      notes:          job.notes ?? undefined,
+    let businessSettings: ReceiptBusinessSettings = {};
+    try {
+      const settingsRes = await fetch('/api/business-info', { method: 'GET', cache: 'no-store' });
+      if (settingsRes.ok) {
+        const payload = await settingsRes.json();
+        businessSettings = (payload?.data ?? {}) as ReceiptBusinessSettings;
+      }
+    } catch {
+      businessSettings = {};
+    }
+
+    const biz: BusinessInfo = {
+      storeName:              businessSettings.business_name || job.branch_name || 'Business Name',
+      address:                job.branch_address || '',
+      phone:                  job.branch_phone || '',
+      taxInfo:                businessSettings.business_tin || '',
+      footerMessage:          'Thank you for your business!',
+      registeredBusinessName: businessSettings.business_name || job.branch_name || 'Business Name',
+      mainBranchAddress:      job.branch_address || 'Main Branch Address Placeholder',
+      tin:                    businessSettings.business_tin || '',
+      vatLabel:               businessSettings.vat_label || 'VAT Registered',
+      atpNumber:              businessSettings.atp_number || '',
+      printerName:            businessSettings.printer_name || '',
+      printerAddress:         businessSettings.printer_address || '',
+      printerTin:             businessSettings.printer_tin || '',
+      serialRange:            businessSettings.serial_range || '',
+      receiptTypeLabel:       businessSettings.receipt_type_label || 'SALES INVOICE',
+      vatInclusiveNote:       businessSettings.vat_inclusive_note || 'Prices shown are VAT-inclusive.',
     };
-    const html = generateServiceReceiptHtml(receiptData);
+
+    const receiptItems: ReceiptItem[] = items.map(it => ({
+      name:     (it.item_category && it.item_category !== 'service') ? 'Part' : 'Service',
+      description: it.item_name || job.job_description,
+      quantity: it.quantity,
+      price:    it.price_at_service,
+    }));
+
+    const saleRecord: Sale = {
+      sale_id:         job.job_id,
+      branch_id:       job.branch_id,
+      user_id:         undefined,
+      customer_id:     job.customer_id ?? undefined,
+      service_job_id:  job.job_id,
+      total_amount:    job.total_amount,
+      sale_number:     job.job_number ?? undefined,
+      status:          'done',
+      sale_date:       job.job_date,
+      discount_amount: 0,
+      tax_amount:      0,
+      payment_method:  'cash',
+    };
+
+    const cashierUser = {
+      user_id:  'service-print',
+      name:     job.mechanic_name || 'Service Advisor',
+      username: '',
+      password: '',
+      role:     'staff',
+    } as unknown as AppUser;
+
+    const receiptCustomer: ReceiptCustomer | undefined = job.customer_name
+      ? {
+          name: job.customer_name,
+          phone: job.customer_phone ?? undefined,
+        }
+      : undefined;
+
+    const branchRecord: Branch = {
+      branch_id: job.branch_id,
+      name:      job.branch_name || 'Branch',
+      address:   job.branch_address || biz.mainBranchAddress || '',
+      phone:     job.branch_phone || biz.phone || '',
+      is_active: true,
+    };
+
+    const receiptPayload: ReceiptData = {
+      sale:         saleRecord,
+      items:        receiptItems.length > 0 ? receiptItems : [{ name: 'Service', description: job.job_description, quantity: 1, price: job.total_amount }],
+      cashier:      cashierUser,
+      businessInfo: biz,
+      customer:     receiptCustomer,
+      branch:       branchRecord,
+    };
+
+    const html = generateHtmlReceipt(receiptPayload);
     printReceipt(html);
   };
 

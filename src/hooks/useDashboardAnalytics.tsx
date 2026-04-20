@@ -72,6 +72,7 @@ export function useDashboardAnalytics() {
         `)
                 .eq('sale.branch_id', activeBranchId)
             .eq('sale.state', 'done')
+                .is('deleted_at', null)
                 .is('sale.deleted_at', null);
 
             if (revenueError) throw revenueError;
@@ -151,6 +152,7 @@ export function useDashboardAnalytics() {
         `)
                 .eq('sale.branch_id', activeBranchId)
             .eq('sale.state', 'done')
+                .is('deleted_at', null)
                 .is('sale.deleted_at', null);
 
             if (topItemsError) throw topItemsError;

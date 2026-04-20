@@ -433,6 +433,7 @@ const SalesHistoryDrawer: React.FC<{
       .eq('branch_id', branchId)
       .in('state', ['done', 'cancelled'])
       .is('deleted_at', null)
+      .is('sale_item.deleted_at', null)
       .order('sale_date', { ascending: false })
       .limit(100)
       .then(({ data, error }: { data: SaleRecord[] | null; error: unknown }) => {

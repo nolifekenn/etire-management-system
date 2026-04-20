@@ -116,6 +116,8 @@ export interface ServiceJobRow {
   vehicle_year:          number | null;
   mechanic_name:         string | null;
   branch_name:           string | null;
+  branch_address:        string | null;
+  branch_phone:          string | null;
   // Computed
   items_count:           number;
   total_amount:          number;
@@ -181,10 +183,11 @@ export async function listServiceJobs(input: ListServiceJobsInput = {}) {
       customer:customer_id ( name, phone ),
       vehicle:vehicle_id   ( plate_number, make, model, year ),
       mechanic:mechanic_id ( name ),
-      branch:branch_id     ( name ),
+      branch:branch_id     ( name, address, phone ),
       service_job_item ( service_job_item_id, price_at_service, quantity )
     `, { count: 'exact' })
     .is('deleted_at', null)
+    .is('service_job_item.deleted_at', null)
     .order('job_date', { ascending: false })
     .range(offset, offset + page_size - 1);
 
@@ -252,6 +255,8 @@ export async function listServiceJobs(input: ListServiceJobsInput = {}) {
       vehicle_year:         (vehicle?.year as number)            ?? null,
       mechanic_name:        (mechanic?.name as string)           ?? null,
       branch_name:          (branch?.name as string)             ?? null,
+      branch_address:       (branch?.address as string)          ?? null,
+      branch_phone:         (branch?.phone as string)            ?? null,
       items_count:          items.length,
       total_amount:         totalAmount,
     };
@@ -275,7 +280,7 @@ export async function getServiceJobDetail(
       vehicle:vehicle_id   ( vehicle_id, plate_number, make, model, year, vehicle_type_id ),
       mechanic:mechanic_id ( user_id, name ),
       assigned_user:user_id ( user_id, name ),
-      branch:branch_id     ( branch_id, name ),
+      branch:branch_id     ( branch_id, name, address, phone ),
       vehicle_type:vehicle_type_id ( vehicle_type_id, name ),
       service_job_item (
         service_job_item_id,
@@ -291,6 +296,7 @@ export async function getServiceJobDetail(
     `)
     .eq('job_id', jobId)
     .is('deleted_at', null)
+    .is('service_job_item.deleted_at', null)
     .single();
 
   if (error || !row) {
@@ -350,6 +356,8 @@ export async function getServiceJobDetail(
     vehicle_year:         (vehicle?.year as number)            ?? null,
     mechanic_name:        (mechanic?.name as string)           ?? null,
     branch_name:          (branch?.name as string)             ?? null,
+    branch_address:       (branch?.address as string)          ?? null,
+    branch_phone:         (branch?.phone as string)            ?? null,
     items_count:          items.length,
     total_amount:         totalAmount,
   };
@@ -415,8 +423,12 @@ export async function createServiceJob(input: CreateServiceJobInput) {
       .insert(itemRows);
 
     if (itemErr) {
-      // Rollback job
-      await supabase.from('service_job').delete().eq('job_id', job.job_id);
+      // Rollback job via soft-delete
+      await supabase
+        .from('service_job')
+        .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('job_id', job.job_id)
+        .is('deleted_at', null);
       return { success: false, error: `Item insert failed: ${itemErr.message}`, job_id: null };
     }
   }
@@ -496,11 +508,12 @@ export async function upsertServiceJobItems(
 ) {
   const supabase: AnyClient = await createClient();
 
-  // Delete all old items
+  // Soft-delete all old items
   const { error: delErr } = await supabase
     .from('service_job_item')
-    .delete()
-    .eq('job_id', jobId);
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('job_id', jobId)
+    .is('deleted_at', null);
 
   if (delErr) return { success: false, error: delErr.message };
 
@@ -542,8 +555,9 @@ export async function deleteServiceJobItem(serviceJobItemId: string, jobId: stri
 
   const { error } = await supabase
     .from('service_job_item')
-    .delete()
-    .eq('service_job_item_id', serviceJobItemId);
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('service_job_item_id', serviceJobItemId)
+    .is('deleted_at', null);
 
   if (error) return { success: false, error: error.message };
 
@@ -597,6 +611,7 @@ export async function transitionServiceJob(
     `)
     .eq('job_id', jobId)
     .is('deleted_at', null)
+    .is('service_job_item.deleted_at', null)
     .single();
 
   if (fetchErr || !job) {
@@ -816,7 +831,8 @@ export async function getServiceSmartButtons(
   const { count: itemCount } = await supabase
     .from('service_job_item')
     .select('*', { count: 'exact', head: true })
-    .eq('job_id', jobId);
+    .eq('job_id', jobId)
+    .is('deleted_at', null);
 
   buttons.push({
     label: 'Parts / Labor',

@@ -50,6 +50,7 @@ export async function POST(request: Request) {
           )
         `)
         .eq('inventory_item.category', 'service')
+        .is('deleted_at', null)
         .is('sale.deleted_at', null)
         .in('sale.service_job_id', jobIds);
 
