@@ -36,6 +36,8 @@ export interface DateRangeFilter {
 // ── 1. getExecutiveSummary ────────────────────────────────────────────────────
 
 export interface ExecutiveSummary {
+  total_business_income: number;
+  total_service_revenue: number;
   total_sales_revenue:  number;
   total_sales_count:    number;
   inventory_value:      number;
@@ -108,6 +110,30 @@ export async function getExecutiveSummary(
       (acc, i) => acc + Number(i.stock_quantity ?? 0) * Number(i.cost_price ?? 0), 0
     );
 
+    // ── Service revenue: sum service_job_item line totals from billed/done jobs ─
+    let serviceQ = supabase
+      .from('service_job')
+      .select('job_id, service_job_item(quantity, price_at_service)')
+      .in('state', ['completed', 'invoiced'])
+      .is('deleted_at', null);
+    if (branch_id) serviceQ = serviceQ.eq('branch_id', branch_id);
+    if (date_from) serviceQ = serviceQ.gte('job_date', date_from);
+    if (date_to)   serviceQ = serviceQ.lte('job_date', date_to + 'T23:59:59');
+
+    const { data: serviceData, error: serviceErr } = await serviceQ;
+    if (serviceErr) throw serviceErr;
+
+    const totalServiceRevenue = ((serviceData as AnyRecord[]) ?? []).reduce((jobAcc, job) => {
+      const lines = (job.service_job_item as AnyRecord[]) ?? [];
+      const jobTotal = lines.reduce(
+        (lineAcc, line) => lineAcc + Number(line.price_at_service ?? 0) * Number(line.quantity ?? 0),
+        0,
+      );
+      return jobAcc + jobTotal;
+    }, 0);
+
+    const totalBusinessIncome = totalRevenue + totalServiceRevenue;
+
     // ── Open POs: treat both legacy status and current state values as open ──
     let poQ = supabase
       .from('purchase_order')
@@ -136,6 +162,8 @@ export async function getExecutiveSummary(
       success: true,
       error:   null,
       data: {
+        total_business_income: totalBusinessIncome,
+        total_service_revenue: totalServiceRevenue,
         total_sales_revenue:  totalRevenue,
         total_sales_count:    salesCount,
         inventory_value:      inventoryValue,
