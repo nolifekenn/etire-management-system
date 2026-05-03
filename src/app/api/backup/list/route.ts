@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient, createClient } from '@/lib/supabaseServer';
+import { createAdminClient, createClient, getUserSafe } from '@/lib/supabaseServer';
 
 export async function GET() {
   const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { user, error: authError } = await getUserSafe(supabase);
 
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

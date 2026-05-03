@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient, createClient } from "@/lib/supabaseServer";
+import { createAdminClient, createClient, getUserSafe } from "@/lib/supabaseServer";
 
 const PIN_REGEX = /^\d{6}$/;
 const DEFAULT_MANAGER_PIN = '112233';
@@ -10,7 +10,7 @@ const DEFAULT_MANAGER_PIN = '112233';
 // unlike getSession() which can return a stale/revoked cached token.
 async function verifyAdminAccessImproved(_request: NextRequest) {
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { user, error: authError } = await getUserSafe(supabase);
 
     if (authError || !user) {
         return { error: "Unauthorized", status: 401 };

@@ -42,6 +42,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const clearLocalSessionState = () => {
+    sessionStorage.removeItem('etire_session_nonce');
+    sessionStorage.removeItem('etire_intended_path');
+    localStorage.removeItem('etire_session_user_id');
+    localStorage.removeItem('etire_session_started_at');
+    localStorage.removeItem('etire_last_activity');
+    localStorage.removeItem('etire_active_branch');
+    setUser(null);
+    setActiveBranchIdState(null);
+  };
+
+  const isInvalidRefreshError = (error: unknown) => {
+    const code = (error as { code?: string }).code;
+    return code === 'refresh_token_not_found'
+      || code === 'refresh_token_already_used'
+      || code === 'invalid_refresh_token';
+  };
+
   const setActiveBranchId = (id: string | null) => {
     setActiveBranchIdState(id);
     if (user?.role === 'super_admin') {
@@ -163,6 +181,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
 
         if (userError) {
+          if (isInvalidRefreshError(userError)) {
+            clearLocalSessionState();
+            await supabase.auth.signOut({ scope: 'local' });
+            router.push("/login?error=invalid_session");
+            setIsLoading(false);
+            hasInitialized = true;
+            if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
+            return;
+          }
           // auth_session_missing is expected when no user is logged in — not a real error
           const code = (userError as { code?: string }).code;
           if (code !== 'auth_session_missing') {
@@ -348,7 +375,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshUser = async (): Promise<void> => {
     if (!supabase) return;
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
+      if (userError && isInvalidRefreshError(userError)) {
+        clearLocalSessionState();
+        await supabase.auth.signOut({ scope: 'local' });
+        router.push('/login?error=invalid_session');
+        return;
+      }
       if (!authUser) return;
 
       let result = await supabase
@@ -383,13 +416,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     // Clear client state immediately so the UI reflects logged-out state.
-    sessionStorage.removeItem('etire_session_nonce');
-    localStorage.removeItem('etire_session_user_id');
-    localStorage.removeItem('etire_session_started_at');
-    localStorage.removeItem('etire_last_activity');
-    setUser(null);
-    setActiveBranchIdState(null);
-    localStorage.removeItem('etire_active_branch');
+    clearLocalSessionState();
     router.push('/login');
 
     if (!supabase) return;
@@ -403,14 +430,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const resetSession = async () => {
-    sessionStorage.removeItem('etire_session_nonce');
-    sessionStorage.removeItem('etire_intended_path');
-    localStorage.removeItem('etire_session_user_id');
-    localStorage.removeItem('etire_session_started_at');
-    localStorage.removeItem('etire_last_activity');
-    setUser(null);
-    setActiveBranchIdState(null);
-    localStorage.removeItem('etire_active_branch');
+    clearLocalSessionState();
 
     if (supabase) {
       try {

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient, createClient } from '@/lib/supabaseServer';
+import { createAdminClient, createClient, getUserSafe } from '@/lib/supabaseServer';
 
 async function getAuthenticatedUser() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getUserSafe(supabase);
   return user;
 }
 

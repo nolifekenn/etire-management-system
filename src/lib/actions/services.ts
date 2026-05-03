@@ -16,7 +16,7 @@
  *  9. getServiceSmartButtons – Stat block data for the Form View header
  */
 
-import { createClient, createAdminClient } from '@/lib/supabaseServer';
+import { createClient, createAdminClient, getUserSafe } from '@/lib/supabaseServer';
 import { revalidatePath } from 'next/cache';
 import {
   type ServiceState,
@@ -1111,9 +1111,7 @@ export async function searchCatalogItems(
 
 async function _getCallerRole(): Promise<string | null> {
   const supabase: AnyClient = await createClient();
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser();
+  const { user: authUser } = await getUserSafe(supabase);
 
   if (!authUser?.id) return null;
 

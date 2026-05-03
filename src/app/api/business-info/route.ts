@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient, createClient } from "@/lib/supabaseServer";
+import { createAdminClient, createClient, getUserSafe } from "@/lib/supabaseServer";
 
 const BUSINESS_SETTING_KEYS = [
   "business_name",
@@ -36,10 +36,7 @@ const DEFAULT_SETTINGS: BusinessSettingsPayload = {
 
 export async function GET(_request: NextRequest) {
   const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  const { user, error: authError } = await getUserSafe(supabase);
 
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

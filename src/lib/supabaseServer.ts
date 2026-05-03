@@ -31,6 +31,27 @@ export async function createClient() {
   )
 }
 
+const INVALID_REFRESH_CODES = new Set([
+  'refresh_token_not_found',
+  'refresh_token_already_used',
+  'invalid_refresh_token'
+]);
+
+export async function getUserSafe(supabase: { auth: { getUser: () => Promise<any>; signOut: (options?: { scope?: 'local' | 'global' }) => Promise<any> } }) {
+  const { data: { user }, error } = await supabase.auth.getUser();
+
+  if (error) {
+    const code = (error as { code?: string }).code;
+    if (code && INVALID_REFRESH_CODES.has(code)) {
+      await supabase.auth.signOut({ scope: 'local' });
+    }
+
+    return { user: null, error };
+  }
+
+  return { user, error: null };
+}
+
 // Admin client for server-side operations requiring service role
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 

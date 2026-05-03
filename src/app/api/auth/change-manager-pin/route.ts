@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient, createClient } from "@/lib/supabaseServer";
+import { createAdminClient, createClient, getUserSafe } from "@/lib/supabaseServer";
 
 const PIN_REGEX = /^\d{6}$/;
 
@@ -15,10 +15,7 @@ interface RequesterRecord {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const { user, error: authError } = await getUserSafe(supabase);
 
     if (authError || !user) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
