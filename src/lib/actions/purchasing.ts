@@ -14,7 +14,7 @@
  *  6. listPOs            — Paginated / filtered list for the List View
  */
 
-import { createClient } from '@/lib/supabaseServer';
+import { createClient, getUserSafe } from '@/lib/supabaseServer';
 import { revalidatePath } from 'next/cache';
 import {
   transitionPurchaseOrder,
@@ -77,7 +77,7 @@ export async function createRFQ(input: CreateRFQInput) {
   const supabase: any = await createClient();
 
   // ── Server-side role guard: only managers & super admin can create RFQs
-  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const { user: authUser } = await getUserSafe(supabase);
   if (authUser) {
     const { data: profile } = await supabase
       .from('user')

@@ -356,6 +356,7 @@ CREATE TABLE public.sale_item (
   price_at_sale numeric NOT NULL CHECK (price_at_sale >= 0::numeric),
   created_at timestamp with time zone DEFAULT now(),
   installation_fee numeric NOT NULL DEFAULT 0,
+  deleted_at timestamp with time zone,
   CONSTRAINT sale_item_pkey PRIMARY KEY (sale_item_id),
   CONSTRAINT sale_item_sale_id_fkey FOREIGN KEY (sale_id) REFERENCES public.sale(sale_id),
   CONSTRAINT sale_item_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.inventory_item(item_id)
@@ -398,6 +399,7 @@ CREATE TABLE public.service_job_item (
   quantity integer NOT NULL DEFAULT 1 CHECK (quantity > 0),
   price_at_service numeric NOT NULL DEFAULT 0,
   created_at timestamp with time zone DEFAULT now(),
+  deleted_at timestamp with time zone,
   CONSTRAINT service_job_item_pkey PRIMARY KEY (service_job_item_id),
   CONSTRAINT service_job_item_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.service_job(job_id),
   CONSTRAINT service_job_item_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.catalog_item(item_id)

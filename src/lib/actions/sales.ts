@@ -15,7 +15,7 @@
  *  7. voidSale           — Cancel/void a sale (super_admin / branch_manager)
  */
 
-import { createClient, createAdminClient } from '@/lib/supabaseServer';
+import { createClient, createAdminClient, getUserSafe } from '@/lib/supabaseServer';
 import { revalidatePath } from 'next/cache';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -585,10 +585,7 @@ export async function voidLatestPOSSaleForBranch(branchId: string, reason: strin
     return { success: false, error: 'Branch is required.' };
   }
 
-  const {
-    data: { user: authUser },
-    error: authError,
-  } = await supabase.auth.getUser();
+  const { user: authUser, error: authError } = await getUserSafe(supabase);
 
   if (authError || !authUser) {
     return { success: false, error: 'Unauthorized.' };

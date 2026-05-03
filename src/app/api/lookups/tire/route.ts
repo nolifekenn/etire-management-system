@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient, createClient } from '@/lib/supabaseServer';
+import { createAdminClient, createClient, getUserSafe } from '@/lib/supabaseServer';
 
 type LookupType = 'size' | 'brand';
 
 export async function GET() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getUserSafe(supabase);
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -29,7 +29,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user } = await getUserSafe(supabase);
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
